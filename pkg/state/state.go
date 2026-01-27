@@ -1,5 +1,5 @@
 // Package state provides types and functions for managing workflow state.
-// The state is persisted as JSON in .factorai/state.json within project directories.
+// The state is persisted as JSON in .sgai/state.json within project directories.
 package state
 
 import (
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// Workflow status constants define the possible states of a factorai workflow.
+// Workflow status constants define the possible states of a sgai workflow.
 const (
 	StatusWorking            = "working"
 	StatusAgentDone          = "agent-done"
@@ -105,7 +105,7 @@ type SessionCost struct {
 	ByAgent     []AgentCost `json:"byAgent"`
 }
 
-// Workflow represents the complete workflow state for a factorai session.
+// Workflow represents the complete workflow state for a sgai session.
 // It tracks progress, inter-agent messaging, and workflow status.
 type Workflow struct {
 	Status              string               `json:"status"`
