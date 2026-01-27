@@ -1,7 +1,7 @@
 build: lint
 	go build -o ./bin/sgai ./cmd/sgai
 
-test-go:
+test:
 	go test -v ./...
 	$(MAKE) lint
 

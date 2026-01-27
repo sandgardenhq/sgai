@@ -1,3 +1,6 @@
+// Package notify provides desktop notification support.
+// On macOS, notifications are displayed using osascript.
+// On other platforms, Send is a no-op.
 package notify
 
 import (

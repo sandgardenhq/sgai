@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseAgentSnippets(t *testing.T) {
-	dir := "../.."
+	dir := "skel"
 
 	tests := []struct {
 		name         string
