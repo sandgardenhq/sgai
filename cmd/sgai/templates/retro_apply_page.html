@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>Retrospective Apply - {{.SessionID}} - Sandgarden AI Software Factory</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+	<style>
+		.retro-apply-container {
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+		.retro-apply-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			flex-wrap: wrap;
+			gap: 1rem;
+		}
+		.retro-apply-header h2 {
+			margin: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			max-width: 70%;
+		}
+		.header-right {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+		}
+		.status-badge {
+			font-size: 0.75rem;
+			padding: 0.4rem 0.75rem;
+			border-radius: 4px;
+			font-weight: 500;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+		}
+		.status-badge.running {
+			background: color-mix(in srgb, var(--pico-primary) 20%, transparent);
+			color: var(--pico-primary);
+		}
+		.status-badge.complete {
+			background: color-mix(in srgb, #22c55e 20%, transparent);
+			color: #16a34a;
+		}
+		.status-spinner {
+			width: 12px;
+			height: 12px;
+			border: 2px solid currentColor;
+			border-top-color: transparent;
+			border-radius: 50%;
+			animation: spin 1s linear infinite;
+		}
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+		.apply-section {
+			min-height: 400px;
+			max-height: calc(100vh - 250px);
+			display: flex;
+			flex-direction: column;
+			padding: 0;
+		}
+		.apply-section header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 1rem 1rem 0.75rem 1rem;
+			background: var(--pico-card-background-color);
+			flex-shrink: 0;
+		}
+		.apply-section header h4 {
+			margin: 0;
+		}
+		.apply-section-content {
+			flex: 1;
+			overflow-y: auto;
+			padding: 0 1rem 1rem 1rem;
+		}
+		.log-container {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+		}
+		.log-lines {
+			font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+			font-size: 0.8rem;
+			line-height: 1.4;
+			white-space: pre-wrap;
+			word-break: break-all;
+			flex: 1;
+		}
+		.log-line {
+			padding: 0.15rem 0.25rem;
+			border-bottom: 1px solid color-mix(in srgb, var(--pico-muted-border-color) 30%, transparent);
+		}
+		.log-line:last-child {
+			border-bottom: none;
+		}
+		.log-line:nth-child(odd) {
+			background: color-mix(in srgb, var(--pico-muted-border-color) 10%, transparent);
+		}
+		.empty-state {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex: 1;
+			min-height: 150px;
+			color: var(--pico-muted-color);
+			font-style: italic;
+		}
+		.back-button-container {
+			margin-top: 1.5rem;
+			text-align: center;
+		}
+		.htmx-request .status-spinner {
+			display: inline-block;
+		}
+	</style>
+</head>
+<body hx-ext="morph">
+	<main class="container retro-apply-container">
+		<nav>
+			<ul>
+				<li><a href="/workspaces/{{.WorkspaceID}}/retro?session={{.SessionID}}">&larr; Back to Session</a></li>
+			</ul>
+			<ul>
+				<li><strong>Retrospective Apply</strong></li>
+			</ul>
+		</nav>
+
+		<div id="apply-content"
+			 hx-get="/workspaces/{{.WorkspaceID}}/retro/{{.SessionID}}/apply/status"
+			 hx-trigger="every 2s"
+			 hx-swap="morph:innerHTML">
+			{{template "retro_apply_status.html" .}}
+		</div>
+	</main>
+</body>
+</html>

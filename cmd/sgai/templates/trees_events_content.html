@@ -1,0 +1,171 @@
+{{if .GoalContent}}
+<details class="spec-foldable">
+	<summary>
+		<strong>GOAL.md</strong>
+		{{if .CodeAvailable}}
+		<form action="/workspaces/{{.DirName}}/open-vscode?file=GOAL.md" method="post" class="spec-vscode-form">
+			<button type="submit" class="vscode-file-btn" title="Open in VSCode">&#128221;</button>
+		</form>
+		{{else}}
+		<span class="vscode-file-btn disabled" title="VSCode CLI not available">&#128221;</span>
+		{{end}}
+	</summary>
+	<div class="spec-content">{{.GoalContent}}</div>
+</details>
+{{end}}
+
+<article id="workflow-container">
+	<header>Work Flow</header>
+	<div style="flex-direction: column;">
+		<div><img src="/workflow.svg?dir={{.Directory}}&h={{.SVGHash}}" alt="Workflow graph" style="max-width: 100%; height: auto;"></div>
+		{{if .CurrentModel}}
+		<p><strong>Current Model:</strong> <span data-tooltip="{{.CurrentModel}}">{{shortModelName .CurrentModel}}</span></p>
+		{{end}}
+		{{if .ModelStatuses}}
+		<div class="model-statuses">
+			<strong>Model Consensus:</strong>
+			<ul>
+			{{range $modelId, $status := .ModelStatuses}}
+				<li>
+					<span>{{if eq $status "model-working"}}◐{{else if eq $status "model-done"}}●{{else}}✕{{end}}</span>
+					<span data-tooltip="{{$modelId}}">{{shortModelName $modelId}}</span>
+					<small>({{$status}})</small>
+				</li>
+			{{end}}
+			</ul>
+		</div>
+		{{end}}
+		{{if .NeedsInput}}
+		<div style="margin-top: 1rem;">
+			<p><mark>Agent: {{.CurrentAgent}}</mark></p>
+			<blockquote class="human-message">{{.RenderedHumanMessage}}</blockquote>
+		</div>
+		{{end}}
+	</div>
+</article>
+
+<article class="events-container">
+
+	{{if .Progress}}
+	<div class="events-log">
+	{{range .Progress}}
+		{{if .ShowDateDivider}}
+		<div class="event-date-divider">
+			<span>{{.DateDivider}}</span>
+		</div>
+		{{end}}
+		<div class="event-entry">
+			<div class="event-timeline">
+				<span class="event-dot"></span>
+				<span class="event-line"></span>
+			</div>
+			<div class="event-content">
+				<div class="event-meta">
+					<time datetime="{{.Timestamp}}">{{.FormattedTime}}</time>
+					<mark>{{.Agent}}</mark>
+				</div>
+				<span class="event-description">{{.Description}}</span>
+			</div>
+		</div>
+	{{end}}
+	</div>
+	{{else}}
+	<p><em>No events recorded yet</em></p>
+	{{end}}
+</article>
+<style>
+	.events-container {
+		padding: 0.5rem 1rem;
+	}
+
+	.events-log {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+	.event-date-divider {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem 0 0.5rem 0;
+		margin-left: calc(0.75rem + 6px);
+	}
+	.event-date-divider span {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--pico-muted-color);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		background: var(--pico-background-color);
+		padding: 0.25rem 0.75rem;
+		border-radius: 12px;
+		border: 1px solid var(--pico-muted-border-color);
+	}
+	.event-entry {
+		display: flex;
+		gap: 0.75rem;
+		padding: 0.35rem 0;
+	}
+	.event-timeline {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 12px;
+		flex-shrink: 0;
+		padding-top: 0.35rem;
+	}
+	.event-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--pico-primary);
+		flex-shrink: 0;
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--pico-primary) 20%, transparent);
+	}
+	.event-line {
+		width: 2px;
+		flex: 1;
+		min-height: 20px;
+		background: #9ca3af;
+		margin-top: 4px;
+	}
+	@media (prefers-color-scheme: dark) {
+		.event-line {
+			background: #6b7280;
+		}
+	}
+	.event-entry:last-child .event-line {
+		display: none;
+	}
+	.event-content {
+		flex: 1;
+		min-width: 0;
+		padding-bottom: 0.5rem;
+	}
+	.event-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.25rem;
+		flex-wrap: wrap;
+	}
+	.event-meta time {
+		font-size: 0.75rem;
+		color: var(--pico-muted-color);
+		white-space: nowrap;
+	}
+	.event-meta mark {
+		font-size: 0.7rem;
+		padding: 0.15rem 0.4rem;
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--pico-primary) 15%, transparent);
+		color: var(--pico-primary);
+		font-weight: 500;
+	}
+	.event-description {
+		font-size: 0.875rem;
+		color: var(--pico-color);
+		line-height: 1.4;
+		word-break: break-word;
+	}
+</style>

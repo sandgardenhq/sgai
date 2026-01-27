@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>Agents - Sandgarden AI Software Factory</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+</head>
+<body>
+	<main class="container-fluid">
+		<nav>
+			<ul>
+				<li><a href="/workspaces/{{.DirName}}/progress">← Back</a></li>
+				<li><strong>Agents</strong></li>
+			</ul>
+			<ul>
+				<li><a href="/workspaces/{{.DirName}}/agents" role="button">Refresh</a></li>
+			</ul>
+		</nav>
+
+	{{if .Agents}}
+	<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+		{{range .Agents}}
+		<article>
+			<header><strong>{{.Name}}</strong></header>
+			<p>{{.Description}}</p>
+		</article>
+		{{end}}
+	</div>
+	{{else}}
+	<p><em>No agents found.</em></p>
+	{{end}}
+	</main>
+</body>
+</html>

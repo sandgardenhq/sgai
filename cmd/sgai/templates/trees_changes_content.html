@@ -1,0 +1,19 @@
+<article>
+	<header>Commit Description</header>
+	<form method="POST" action="/workspaces/{{.DirName}}/update-description">
+		<input type="hidden" name="directory" value="{{.Directory}}">
+		<fieldset role="group">
+			<input type="text" id="commit-description" name="description" value="{{.Description}}" placeholder="Enter commit message" hx-preserve="true">
+			<button type="submit">Update</button>
+		</fieldset>
+	</form>
+</article>
+
+<article class="diff-viewer">
+	<header>Diff</header>
+	{{if .DiffOutput}}
+	<div class="diff-content">{{.DiffOutput}}</div>
+	{{else}}
+	<p><em>No changes to display</em></p>
+	{{end}}
+</article>

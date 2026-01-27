@@ -1,0 +1,5 @@
+{{if .Logs}}
+<div class="log-lines" id="log-lines">{{range .Logs}}<div class="log-line">{{.Prefix}}{{.Text}}</div>{{end}}</div>
+{{else}}
+<p><em>No logs available</em></p>
+{{end}}

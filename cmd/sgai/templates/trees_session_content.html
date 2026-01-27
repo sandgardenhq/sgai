@@ -1,0 +1,114 @@
+{{if .NeedsInput}}
+<article class="human-message-container">
+	<header>Needs Input: {{.CurrentAgent}}</header>
+	<blockquote class="human-message">{{.RenderedHumanMessage}}</blockquote>
+</article>
+{{end}}
+
+<article id="todos-container">
+	<header>Tasks</header>
+	<div class="todos-grid">
+		<div class="todos-column project-todos">
+			<strong>Project TODO</strong>
+			{{if .ProjectTodos}}
+			<ul>
+			{{range .ProjectTodos}}
+				<li>
+					<span>{{if eq .Status "pending"}}○{{else if eq .Status "in_progress"}}◐{{else if eq .Status "completed"}}●{{else if eq .Status "cancelled"}}✕{{else}}○{{end}}</span>
+					<span>{{.Content}} ({{.Priority}})</span>
+				</li>
+			{{end}}
+			</ul>
+			{{else}}
+			<p><em>No project todos</em></p>
+			{{end}}
+		</div>
+		<div class="todos-column agent-todos">
+			<strong>Agent TODO</strong>
+			{{if and .Todos (ne .CurrentAgent "coordinator")}}
+			<ul>
+			{{range .Todos}}
+				<li>
+					<span>{{if eq .Status "pending"}}○{{else if eq .Status "in_progress"}}◐{{else if eq .Status "completed"}}●{{else if eq .Status "cancelled"}}✕{{else}}○{{end}}</span>
+					<span>{{.Content}} ({{.Priority}})</span>
+				</li>
+			{{end}}
+			</ul>
+			{{else}}
+			<p><em>No active agent todos</em></p>
+			{{end}}
+		</div>
+	</div>
+</article>
+
+{{if .HasProjectMgmt}}
+<details class="spec-foldable" open>
+	<summary>
+		<strong>PROJECT_MANAGEMENT.md</strong>
+		{{if .CodeAvailable}}
+		<form action="/workspaces/{{.DirName}}/open-vscode?file=PROJECT_MANAGEMENT.md" method="post" class="spec-vscode-form">
+			<button type="submit" class="vscode-file-btn" title="Open in VSCode">&#128221;</button>
+		</form>
+		{{else}}
+		<span class="vscode-file-btn disabled" title="VSCode CLI not available">&#128221;</span>
+		{{end}}
+	</summary>
+	<div class="spec-content">{{.ProjectMgmtContent}}</div>
+</details>
+{{end}}
+
+<article id="cost-container">
+	<header>Cost Tracking</header>
+	<div>
+		<div class="cost-summary-grid">
+			<div><small>Total Cost</small><br><strong>${{printf "%.4f" .Cost.TotalCost}}</strong></div>
+			<div data-tooltip="Total input = new tokens + cached tokens"><small>Total Input</small><br><strong>{{add .Cost.TotalTokens.Input .Cost.TotalTokens.CacheRead}}</strong></div>
+			<div data-tooltip="Newly processed tokens (not from cache)"><small>New Tokens</small><br><strong>{{.Cost.TotalTokens.Input}}</strong></div>
+			<div><small>Output Tokens</small><br><strong>{{.Cost.TotalTokens.Output}}</strong></div>
+			<div data-tooltip="Tokens served from prompt cache"><small>Cache Read</small><br><strong>{{.Cost.TotalTokens.CacheRead}}</strong></div>
+		</div>
+		{{if .Cost.ByAgent}}
+		<details data-preserve-open>
+			<summary>By Agent ({{len .Cost.ByAgent}} agents)</summary>
+			<div class="cost-agents">
+			{{range .Cost.ByAgent}}
+			<details data-preserve-open>
+				<summary class="cost-agent-summary">
+					<span class="cost-agent-name" data-tooltip="{{.Agent}}">{{.Agent}}</span>
+					<span class="cost-agent-value">${{printf "%.4f" .Cost}}</span>
+					<small>({{len .Steps}} steps)</small>
+				</summary>
+				<div class="cost-steps">
+				{{range .Steps}}
+					<div class="cost-step">
+						<small class="cost-step-id" data-tooltip="{{.StepID}}">{{.StepID}}</small>
+						<span class="cost-step-value">${{printf "%.6f" .Cost}}</span>
+						<small class="cost-step-tokens">({{.Tokens.Input}} in, {{.Tokens.Output}} out)</small>
+					</div>
+				{{end}}
+				</div>
+			</details>
+			{{end}}
+			</div>
+		</details>
+		{{end}}
+	</div>
+</article>
+
+<div id="sequence-container">
+	<article>
+		<header>Sequence</header>
+		{{if .AgentSequence}}
+		<ol>
+			{{range $index, $agent := .AgentSequence}}
+			<li data-tooltip="{{$agent.Agent}}">
+				<span class="agent-name">{{if $agent.IsCurrent}}<strong>{{$agent.Agent}}</strong>{{else}}{{$agent.Agent}}{{end}}</span>
+				<span class="agent-time" style="color: var(--pico-muted-color); font-size: 0.85em;">({{$agent.ElapsedTime}})</span>
+			</li>
+			{{end}}
+		</ol>
+		{{else}}
+		<p><em>No agent sequence yet</em></p>
+		{{end}}
+	</article>
+</div>

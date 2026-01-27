@@ -1,0 +1,9 @@
+*.log
+*.pid
+/.opencode
+/GOAL.md
+bin/
+sgai-bin
+sgai-test
+trees_dump.html
+verification/

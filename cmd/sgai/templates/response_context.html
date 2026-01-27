@@ -1,0 +1,74 @@
+{{if or .GoalContent .ProjectMgmtContent}}
+<style>
+	.response-context {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 0.75rem;
+	}
+
+	.response-context .spec-foldable {
+		margin: 0;
+		padding: 0;
+		border: 1px solid var(--pico-muted-border-color);
+		border-radius: 0.5rem;
+	}
+	.response-context .spec-foldable summary {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		cursor: pointer;
+		background-color: color-mix(in srgb, var(--pico-muted-border-color) 30%, transparent);
+		border-radius: 0.5rem;
+		list-style: none;
+	}
+	.response-context .spec-foldable summary::-webkit-details-marker,
+	.response-context .spec-foldable summary::marker {
+		display: none;
+		content: "";
+	}
+	.response-context .spec-foldable summary::after {
+		display: none;
+	}
+	.response-context .spec-foldable summary::before {
+		content: "▶";
+		font-size: 0.7rem;
+		transition: transform 0.2s ease;
+		flex-shrink: 0;
+	}
+	.response-context .spec-foldable[open] summary::before {
+		transform: rotate(90deg);
+	}
+	.response-context .spec-foldable[open] summary {
+		border-radius: 0.5rem 0.5rem 0 0;
+		border-bottom: 1px solid var(--pico-muted-border-color);
+	}
+	.response-context .spec-foldable summary strong {
+		flex-grow: 1;
+	}
+	.response-context .spec-content {
+		padding: 1rem 1.5rem;
+		font-size: 0.9rem;
+		line-height: 1.6;
+		max-height: 320px;
+		overflow-y: auto;
+	}
+</style>
+<hr>
+<section class="response-context">
+{{if .GoalContent}}
+<details class="spec-foldable">
+	<summary><strong>GOAL.md</strong></summary>
+	<div class="spec-content">{{.GoalContent}}</div>
+</details>
+{{end}}
+
+{{if .ProjectMgmtContent}}
+<details class="spec-foldable">
+	<summary><strong>PROJECT_MANAGEMENT.md</strong></summary>
+	<div class="spec-content">{{.ProjectMgmtContent}}</div>
+</details>
+{{end}}
+</section>
+{{end}}

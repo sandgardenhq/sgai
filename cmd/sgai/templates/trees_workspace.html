@@ -1,0 +1,26 @@
+<div class="sticky-header-container">
+	<header class="workspace-header-bar">
+		<h3 class="workspace-title" title="{{.Directory}}">{{.DirName}}</h3>
+		{{if .TotalExecutionTime}}<span class="execution-timer" data-tooltip="Total execution time">{{.TotalExecutionTime}}</span>{{end}}
+		<span class="status-badge{{if .Running}} running{{end}}">{{if .Running}}running{{else}}stopped{{end}}</span>
+		<nav id="header-actions">{{template "trees_actions.html" .}}</nav>
+	</header>
+	<div class="status-text-bar">
+		{{if .StatusText}}<div class="trees-status">{{if .CurrentAgent}}<span class="agent-pill">{{.CurrentAgent}} | {{.FormattedModel}}</span> {{end}}{{.StatusText}}</div>{{end}}
+		{{if .ModelStatuses}}<div class="model-consensus-bar">{{range $modelId, $status := .ModelStatuses}}<span class="model-status-pill" data-tooltip="{{$modelId}}: {{$status}}">{{if eq $status "model-working"}}◐{{else if eq $status "model-done"}}●{{else}}✕{{end}} {{shortModelName $modelId}}</span>{{end}}</div>{{end}}
+	</div>
+	<nav class="tab-nav">
+		<ul>
+		<li><a href="/workspaces/{{.DirName}}/progress"{{if eq .ActiveTab "progress"}} class="active"{{end}}>Progress</a></li>
+		<li><a href="/workspaces/{{.DirName}}/log"{{if eq .ActiveTab "log"}} class="active"{{end}}>Log</a></li>
+			<li><a href="/workspaces/{{.DirName}}/changes"{{if eq .ActiveTab "changes"}} class="active"{{end}}>Diffs</a></li>
+			<li><a href="/workspaces/{{.DirName}}/commits"{{if eq .ActiveTab "commits"}} class="active"{{end}}>Commits</a></li>
+			<li><a href="/workspaces/{{.DirName}}/messages"{{if eq .ActiveTab "messages"}} class="active"{{end}}>Messages</a></li>
+			<li><a href="/workspaces/{{.DirName}}/internals"{{if eq .ActiveTab "internals"}} class="active"{{end}}>Internals</a></li>
+			{{if not .DisableRetrospective}}<li><a href="/workspaces/{{.DirName}}/retro"{{if eq .ActiveTab "retrospectives"}} class="active"{{end}}>Retrospectives</a></li>{{end}}
+		</ul>
+	</nav>
+</div>
+<div id="tab-content" class="tab-content">
+	{{.TabContent}}
+</div>

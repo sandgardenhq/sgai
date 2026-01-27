@@ -1,0 +1,65 @@
+{
+  "status": "working",
+  "task": "Verify Go-TypeScript state.json contract",
+  "progress": [
+    {
+      "timestamp": "2025-01-01T00:00:00.000Z",
+      "agent": "coordinator",
+      "description": "Step 1 completed"
+    },
+    {
+      "timestamp": "2025-01-01T01:00:00.000Z",
+      "agent": "coordinator",
+      "description": "Step 2 completed"
+    }
+  ],
+  "humanMessage": "Golden file test message",
+  "messages": [
+    {
+      "id": 1,
+      "fromAgent": "coordinator",
+      "toAgent": "planner",
+      "body": "Golden message body",
+      "read": false
+    },
+    {
+      "id": 2,
+      "fromAgent": "planner",
+      "toAgent": "coder",
+      "body": "Historical golden message",
+      "read": true,
+      "readAt": "2025-01-01T12:00:00.000Z",
+      "readBy": "coder"
+    }
+  ],
+  "goalChecksum": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "visitCounts": {
+    "coder": 0,
+    "coordinator": 1,
+    "planner": 1
+  },
+  "currentAgent": "planner",
+  "agentSequence": [
+    {
+      "agent": "coordinator",
+      "startTime": "2025-12-21T10:00:00Z",
+      "isCurrent": false
+    },
+    {
+      "agent": "planner",
+      "startTime": "2025-12-21T10:01:00Z",
+      "isCurrent": true
+    }
+  ],
+  "cost": {
+    "totalCost": 0,
+    "totalTokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "byAgent": null
+  }
+}

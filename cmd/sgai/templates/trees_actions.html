@@ -1,0 +1,39 @@
+<div class="header-actions-container">
+	{{if not .Running}}
+	<form action="/workspaces/{{.DirName}}/start" method="post">
+		<input type="hidden" name="directory" value="{{.Directory}}">
+		<input type="hidden" name="auto" value="true">
+		<button type="submit" class="action-btn outline">Self-drive</button>
+	</form>
+	<form action="/workspaces/{{.DirName}}/start" method="post">
+		<input type="hidden" name="directory" value="{{.Directory}}">
+		<button type="submit" class="action-btn outline">Start</button>
+	</form>
+	{{if not .IsFork}}
+	<form action="/workspaces/{{.DirName}}/fork" method="post">
+		<input type="hidden" name="dir" value="{{.Directory}}">
+		<button type="submit" class="action-btn outline">Fork</button>
+	</form>
+	{{end}}
+	<a href="/workspaces/{{.DirName}}/goal" role="button" class="action-btn outline">Edit GOAL</a>
+	{{if .CodeAvailable}}
+	<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
+		<button type="submit" class="action-btn outline">Open in VSCode</button>
+	</form>
+	{{else}}
+	<button type="button" class="action-btn outline" disabled data-tooltip="VSCode CLI not available or remote connection">Open in VSCode</button>
+	{{end}}
+	{{end}}
+	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>
+	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>
+	<a href="/workspaces/{{.DirName}}/agents" role="button" class="action-btn outline">Agents</a>
+	{{if .Running}}
+	<form action="/workspaces/{{.DirName}}/stop" method="post">
+		<input type="hidden" name="directory" value="{{.Directory}}">
+		<button type="submit" class="action-btn outline">Stop</button>
+	</form>
+	{{end}}
+	{{if .NeedsInput}}
+	<a href="/respond?dir={{.Directory}}&returnTo={{.ReturnTo}}" role="button" class="action-btn attention">Respond to Agent</a>
+	{{end}}
+</div>

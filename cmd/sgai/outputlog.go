@@ -1,0 +1,190 @@
+package main
+
+import (
+	"bufio"
+	"container/ring"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"strings"
+	"sync"
+)
+
+const (
+	scannerBufSize    = 64 * 1024
+	scannerMaxBufSize = 1024 * 1024
+	outputBufferSize  = 30
+)
+
+type logLine struct {
+	prefix string
+	text   string
+}
+
+type circularLogBuffer struct {
+	mu   sync.RWMutex
+	ring *ring.Ring
+	size int
+}
+
+func newCircularLogBuffer() *circularLogBuffer {
+	return &circularLogBuffer{
+		ring: ring.New(outputBufferSize),
+	}
+}
+
+func (c *circularLogBuffer) add(line logLine) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.ring.Value = line
+	c.ring = c.ring.Next()
+	if c.size < outputBufferSize {
+		c.size++
+	}
+}
+
+func (c *circularLogBuffer) lines() []logLine {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.size == 0 {
+		return nil
+	}
+
+	result := make([]logLine, 0, c.size)
+	startRing := c.ring
+	if c.size < outputBufferSize {
+		startRing = c.ring.Move(-c.size)
+	}
+
+	startRing.Do(func(v any) {
+		if v != nil {
+			result = append(result, v.(logLine))
+		}
+	})
+
+	return result[:c.size]
+}
+
+type ringWriter struct {
+	mu      sync.Mutex
+	ring    *ring.Ring
+	size    int
+	partial []byte
+}
+
+func newRingWriter() *ringWriter {
+	return &ringWriter{
+		ring: ring.New(outputBufferSize),
+	}
+}
+
+func (r *ringWriter) Write(data []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	n := len(data)
+	combined := r.partial
+	combined = append(combined, data...)
+	lines := splitLines(combined)
+
+	for i := 0; i < len(lines)-1; i++ {
+		r.addLine(lines[i])
+	}
+
+	if len(combined) > 0 && combined[len(combined)-1] == '\n' {
+		r.addLine(lines[len(lines)-1])
+		r.partial = nil
+	} else {
+		r.partial = []byte(lines[len(lines)-1])
+	}
+
+	return n, nil
+}
+
+func (r *ringWriter) dump(w io.Writer) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.size == 0 && len(r.partial) == 0 {
+		return
+	}
+
+	startRing := r.ring
+	if r.size < outputBufferSize {
+		startRing = r.ring.Move(-r.size)
+	}
+
+	startRing.Do(func(v any) {
+		if v != nil {
+			if _, err := fmt.Fprintln(w, v.(string)); err != nil {
+				log.Println("write failed:", err)
+			}
+		}
+	})
+
+	if len(r.partial) > 0 {
+		if _, err := fmt.Fprintln(w, string(r.partial)); err != nil {
+			log.Println("write failed:", err)
+		}
+	}
+}
+
+func (r *ringWriter) addLine(line string) {
+	r.ring.Value = line
+	r.ring = r.ring.Next()
+	if r.size < outputBufferSize {
+		r.size++
+	}
+}
+
+func splitLines(data []byte) []string {
+	return strings.Split(string(data), "\n")
+}
+
+func prepareLogFile(logPath string) (*os.File, error) {
+	if err := rotateLogFile(logPath); err != nil {
+		return nil, err
+	}
+
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("opening log file: %w", err)
+	}
+
+	return f, nil
+}
+
+func rotateLogFile(logPath string) error {
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		return nil
+	}
+	return os.Rename(logPath, logPath+".old")
+}
+
+func (s *Server) captureOutput(stdout, stderr io.ReadCloser, sessionKey, prefix string) {
+	capturePipe := func(r io.ReadCloser) {
+		scanner := bufio.NewScanner(r)
+		scanner.Buffer(make([]byte, scannerBufSize), scannerMaxBufSize)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Println(prefix + line)
+
+			s.mu.Lock()
+			sess := s.sessions[sessionKey]
+			if sess != nil {
+				if sess.outputLog == nil {
+					sess.outputLog = newCircularLogBuffer()
+				}
+				sess.outputLog.add(logLine{prefix: prefix, text: line})
+			}
+			s.mu.Unlock()
+		}
+	}
+
+	go capturePipe(stdout)
+	go capturePipe(stderr)
+}

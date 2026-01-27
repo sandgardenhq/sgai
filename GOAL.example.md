@@ -1,0 +1,1 @@
+cmd/sgai/GOAL.example.md

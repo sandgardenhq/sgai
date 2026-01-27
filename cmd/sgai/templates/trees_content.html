@@ -1,0 +1,72 @@
+{{/* trees_content.html - Inner content for HTMX auto-refresh morphing */}}
+
+{{define "attention-indicator"}}{{if .NeedsInput}}<span class="workspace-attention" title="Needs input">●</span>{{end}}{{end}}
+
+{{define "workspace-indicators"}}{{if .Running}}<span class="workspace-spinner" title="Running">⟳</span>{{end}}{{template "attention-indicator" .}}{{end}}
+
+<div class="tree-panel" id="tree-panel-content">
+{{if .InProgressWorkspaces}}
+<div class="in-progress-section">
+	<div class="in-progress-header{{if not $.HasNeedsInputWorkspace}} no-attention{{end}}">{{if $.HasNeedsInputWorkspace}}<span class="workspace-attention" title="Needs input">●</span>{{end}} In Progress</div>
+	{{range .InProgressWorkspaces}}
+	<a class="in-progress-item{{if eq .Directory $.SelectedPath}} selected{{end}}"
+		href="/respond?dir={{.Directory}}"
+		title="{{.DirName}}">
+		<span class="workspace-name">{{.DirName}}</span>
+		{{template "workspace-indicators" .}}
+	</a>
+	{{end}}
+</div>
+{{end}}
+{{if .Groups}}
+{{range .Groups}}
+<div class="workspace-item">
+	{{if .Forks}}
+	{{$hasForkSelected := false}}
+	{{range .Forks}}{{if eq .Directory $.SelectedPath}}{{$hasForkSelected = true}}{{end}}{{end}}
+	<details class="workspace-expandable" data-preserve-open{{if or (eq .Root.Directory $.SelectedPath) $hasForkSelected}} open{{end}}>
+		<summary class="workspace-header">
+			<span class="tree-toggle" aria-label="Toggle forks"></span>
+		<a class="workspace-link{{if eq .Root.Directory $.SelectedPath}} selected{{end}}"
+			href="/workspaces/{{.Root.DirName}}/progress"
+			title="{{.Root.Directory}}">
+			<span class="workspace-name" title="{{.Root.DirName}}">{{.Root.DirName}}</span>
+			{{template "workspace-indicators" .Root}}
+		</a>
+		</summary>
+		<div class="workspace-children">
+			{{range .Forks}}
+		<a class="workspace-child{{if eq .Directory $.SelectedPath}} selected{{end}}"
+			href="/workspaces/{{.DirName}}/progress"
+			title="{{.Directory}}">
+			<span class="workspace-name" title="{{.DirName}}">{{.DirName}}</span>
+			{{template "workspace-indicators" .}}
+		</a>
+			{{end}}
+		</div>
+	</details>
+	{{else}}
+	<div class="workspace-header workspace-leaf">
+		<span class="tree-spacer"></span>
+		<a class="workspace-link{{if eq .Root.Directory $.SelectedPath}} selected{{end}}"
+			href="/workspaces/{{.Root.DirName}}/progress"
+			title="{{.Root.Directory}}">
+			<span class="workspace-name" title="{{.Root.DirName}}">{{.Root.DirName}}</span>
+			{{template "workspace-indicators" .Root}}
+		</a>
+	</div>
+	{{end}}
+</div>
+{{end}}
+{{else}}
+<p><em>No workspaces found.</em></p>
+{{end}}
+	<div class="tree-panel-footer-spacer" aria-hidden="true"></div>
+<div class="tree-panel-footer">
+	<a href="/workspaces/new" role="button" class="new-workspace-btn secondary outline">[ + ]</a>
+</div>
+</div>
+
+<div class="log-panel" id="workspace-view">
+	{{if .WorkspaceContent}}{{.WorkspaceContent}}{{else if not .SelectedPath}}<p><em>Select a workspace to view its details</em></p>{{end}}
+</div>

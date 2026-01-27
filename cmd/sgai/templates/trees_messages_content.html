@@ -1,0 +1,26 @@
+<article id="messages-content">
+	<header>Messages</header>
+	{{if .Messages}}
+	<div>
+		{{range $m := .Messages}}
+		<details id="msg-{{$m.ID}}" data-preserve-open>
+			<summary style="display: flex; align-items: baseline; gap: 0.5ch; flex-wrap: nowrap;">
+				{{if not $m.Read}}<strong style="display: contents;">{{end}}
+				<span style="white-space: nowrap;">{{$m.FromAgent}}</span>
+				<span style="white-space: nowrap;">→</span>
+				<span style="white-space: nowrap;">{{$m.ToAgent}}:</span>
+				{{if $m.Subject}}<span class="msg-subject" data-tooltip="{{$m.Subject}}">{{$m.Subject}}</span>{{end}}
+				{{if not $m.Read}}</strong>{{end}}
+			</summary>
+		{{if $m.Body}}<div>
+			<div class="msg-body-header"><strong>From:</strong> {{$m.FromAgent}}</div>
+			<div class="msg-body-header"><strong>To:</strong> {{$m.ToAgent}}</div>
+			<div class="msg-body-content">{{$m.RenderedBody}}</div>
+		</div>{{end}}
+		</details>
+		{{end}}
+	</div>
+	{{else}}
+	<p><em>No messages</em></p>
+	{{end}}
+</article>

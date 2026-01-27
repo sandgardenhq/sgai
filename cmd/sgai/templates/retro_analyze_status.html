@@ -1,0 +1,94 @@
+<div class="retro-analyze-header">
+	<h2>Analyzing: {{.SessionID}}</h2>
+	<div class="header-right">
+		{{if .Running}}
+		<span class="status-badge running">
+			<span class="status-spinner"></span>
+			Running
+		</span>
+		<form method="POST" action="/workspaces/{{.WorkspaceID}}/retro/{{.SessionID}}/analyze/stop">
+			<button type="submit" class="outline secondary action-btn">Stop Analysis</button>
+		</form>
+		{{else}}
+		<span class="status-badge complete">Complete</span>
+		{{end}}
+	</div>
+</div>
+
+<div class="analyze-grid">
+	<article class="analyze-section">
+		<header>
+			<h4>Progress Timeline</h4>
+			{{if .Progress}}
+			<small>{{len .Progress}} events</small>
+			{{end}}
+		</header>
+		<div class="analyze-section-content">
+			{{if .Progress}}
+			<div class="events-log">
+			{{range .Progress}}
+				{{if .ShowDateDivider}}
+				<div class="event-date-divider">
+					<span>{{.DateDivider}}</span>
+				</div>
+				{{end}}
+				<div class="event-entry">
+					<div class="event-timeline">
+						<span class="event-dot"></span>
+						<span class="event-line"></span>
+					</div>
+					<div class="event-content">
+						<div class="event-meta">
+							<time datetime="{{.Timestamp}}">{{.FormattedTime}}</time>
+							{{if .Agent}}<mark data-tooltip="{{.Agent}}">{{.Agent}}</mark>{{end}}
+						</div>
+						<span class="event-description">{{.Description}}</span>
+					</div>
+				</div>
+			{{end}}
+			</div>
+			{{else}}
+			<div class="empty-state">
+				<em>Waiting for progress events...</em>
+			</div>
+			{{end}}
+		</div>
+	</article>
+
+	<article class="analyze-section">
+		<header>
+			<h4>Logs</h4>
+			{{if .Logs}}
+			<small>{{len .Logs}} lines</small>
+			{{end}}
+		</header>
+		<div class="analyze-section-content">
+			{{if .Logs}}
+			<div class="log-container">
+				<div class="log-lines" id="log-lines">{{range .Logs}}<div class="log-line">{{.Prefix}}{{.Text}}</div>{{end}}</div>
+			</div>
+			{{else}}
+			<div class="empty-state">
+				<em>Waiting for logs...</em>
+			</div>
+			{{end}}
+		</div>
+	</article>
+</div>
+
+{{if .ImprovementsPreview}}
+<article class="analyze-section" style="margin-top: 1rem; max-height: 400px;">
+	<header>
+		<h4>IMPROVEMENTS.md Preview</h4>
+	</header>
+	<div class="analyze-section-content improvements-preview">
+		{{.ImprovementsPreview}}
+	</div>
+</article>
+{{end}}
+
+{{if not .Running}}
+<div class="back-button-container">
+	<a href="/workspaces/{{.WorkspaceID}}/retro?session={{.SessionID}}" role="button">View Results</a>
+</div>
+{{end}}

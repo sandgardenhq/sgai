@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>Snippets - Sandgarden AI Software Factory</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<style>
+		.snippet-card {
+			cursor: pointer;
+			text-decoration: none;
+			color: inherit;
+			display: block;
+		}
+		.snippet-card:hover {
+			background-color: var(--pico-primary-focus);
+		}
+		.snippet-name {
+			font-weight: 600;
+		}
+		.snippet-description {
+			font-size: 0.875rem;
+			color: var(--pico-muted-color);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			margin: 0;
+		}
+		.language-heading {
+			margin-top: 1.5rem;
+			margin-bottom: 0.75rem;
+			font-size: 1.1rem;
+			color: var(--pico-muted-color);
+			text-transform: lowercase;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+			padding-bottom: 0.5rem;
+		}
+		.language-heading:first-child {
+			margin-top: 0;
+		}
+	</style>
+</head>
+<body>
+	<main class="container-fluid">
+		<nav>
+			<ul>
+				<li><a href="/workspaces/{{.DirName}}/progress">← Back</a></li>
+				<li><strong>Snippets</strong></li>
+			</ul>
+			<ul>
+				<li><a href="/workspaces/{{.DirName}}/snippets" role="button">Refresh</a></li>
+			</ul>
+		</nav>
+
+	{{if .Languages}}
+		{{range .Languages}}
+		<h3 class="language-heading">{{.Name}}</h3>
+		<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+			{{range .Snippets}}
+			<a href="/workspaces/{{$.DirName}}/snippets/{{.FullPath}}" class="snippet-card">
+				<article>
+					<header><span class="snippet-name">{{.Name}}</span></header>
+					<p class="snippet-description" data-tooltip="{{.Description}}">{{.Description}}</p>
+				</article>
+			</a>
+			{{end}}
+		</div>
+		{{end}}
+	{{else}}
+	<p><em>No snippets found.</em></p>
+	{{end}}
+	</main>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>Select Improvements - sgai</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<style>
+		.section-group {
+			margin-bottom: 1.5rem;
+		}
+		.section-group-header {
+			font-weight: 600;
+			font-size: 1.1rem;
+			padding: 0.5rem 0;
+			border-bottom: 2px solid var(--pico-primary);
+			margin-bottom: 1rem;
+			color: var(--pico-primary);
+		}
+		.suggestion-item {
+			margin-bottom: 1rem;
+			padding: 1rem;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 8px;
+			background: color-mix(in srgb, var(--pico-muted-border-color) 15%, transparent);
+		}
+		.suggestion-header {
+			display: flex;
+			align-items: flex-start;
+			gap: 0.75rem;
+			margin-bottom: 0.5rem;
+		}
+		.suggestion-header input[type="checkbox"] {
+			margin-top: 0.25rem;
+			flex-shrink: 0;
+		}
+		.suggestion-header label {
+			margin: 0;
+			cursor: pointer;
+			font-weight: 600;
+			flex: 1;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.suggestion-header label[data-tooltip] {
+			cursor: help;
+		}
+		.suggestion-content {
+			margin-left: 2rem;
+			font-size: 0.9rem;
+			color: var(--pico-muted-color);
+			white-space: pre-wrap;
+			max-height: 150px;
+			overflow-y: auto;
+			padding: 0.5rem;
+			background: color-mix(in srgb, var(--pico-muted-border-color) 30%, transparent);
+			border-radius: 4px;
+		}
+		.form-actions {
+			display: flex;
+			gap: 0.75rem;
+			margin-top: 1.5rem;
+		}
+		.form-actions button[type="submit"] {
+			flex: 1;
+		}
+		.form-actions a {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.empty-state {
+			padding: 2rem;
+			text-align: center;
+			color: var(--pico-muted-color);
+			font-style: italic;
+		}
+		.suggestion-notes {
+			margin-left: 2rem;
+			margin-top: 0.75rem;
+		}
+		.suggestion-notes textarea {
+			font-size: 0.9rem;
+			resize: vertical;
+			min-height: 2.5rem;
+		}
+		.suggestion-notes small {
+			display: block;
+			margin-bottom: 0.25rem;
+			color: var(--pico-muted-color);
+		}
+	</style>
+</head>
+<body>
+	<main class="container">
+		<article>
+			<header>
+				<nav>
+					<ul><li><a href="/workspaces/{{.DirName}}/retro?session={{.SessionName}}">← Back</a></li></ul>
+					<ul><li><strong>Select Improvements to Apply</strong></li></ul>
+				</nav>
+			</header>
+			<p><mark>Session: {{.SessionName}}</mark></p>
+
+			{{if .Suggestions}}
+			<form method="POST" action="/workspaces/{{.DirName}}/retro/apply-select">
+				<input type="hidden" name="session" value="{{.SessionName}}">
+
+				<fieldset>
+					<legend>Select the improvements you want to apply:</legend>
+
+					{{$currentSection := ""}}
+					{{range .Suggestions}}
+					{{if ne .Section $currentSection}}
+					{{if ne $currentSection ""}}
+					</div>
+					{{end}}
+					<div class="section-group">
+						<div class="section-group-header">{{.Section}}</div>
+					{{$currentSection = .Section}}
+					{{end}}
+					<div class="suggestion-item">
+						<div class="suggestion-header">
+							<input type="checkbox" id="suggestion-{{.Index}}" name="suggestions" value="{{.Index}}" checked>
+							<label for="suggestion-{{.Index}}" data-tooltip="{{.Name}}">{{.Name}}</label>
+						</div>
+						{{if .Content}}
+						<div class="suggestion-content">{{.Content}}</div>
+						{{end}}
+						<div class="suggestion-notes">
+							<small>Notes (optional):</small>
+							<textarea name="notes-{{.Index}}" placeholder="Add notes for this suggestion..." rows="2"></textarea>
+						</div>
+					</div>
+					{{end}}
+					{{if ne $currentSection ""}}
+					</div>
+					{{end}}
+				</fieldset>
+
+				<div class="form-actions">
+					<a href="/workspaces/{{.DirName}}/retro?session={{.SessionName}}" role="button" class="secondary outline">Cancel</a>
+					<button type="submit">Apply Selected</button>
+				</div>
+			</form>
+			{{else}}
+			<p class="empty-state">No improvement suggestions found in IMPROVEMENTS.md</p>
+			<div class="form-actions">
+				<a href="/workspaces/{{.DirName}}/retro?session={{.SessionName}}" role="button" class="secondary">Back</a>
+			</div>
+			{{end}}
+		</article>
+	</main>
+</body>
+</html>
