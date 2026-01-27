@@ -8,7 +8,7 @@
 
 {
   "Additional Changes": [
-    "Updated workflow state comments and tests to use the new configuration directory name so references stayed consistent across the project. Specifically, references to `.factorai` were updated to `.sgai` in workflow state comment strings and the associated test expectations."
+    "Updated workflow state comments and tests to use `.sgai` (replacing `.factorai`) so configuration directory references stayed consistent across the project."
   ]
 }
 
