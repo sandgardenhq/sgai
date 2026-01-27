@@ -6,6 +6,9 @@
 - **Version**: 0.0.0+20260127
 - **Summary**: This release includes improved CI and cross-platform test reliability.
 
-### Bug Fixes
+{
+  "Additional Changes": [
+    "Updated workflow state comments and tests to use the new configuration directory name so references stayed consistent across the project. Specifically, references to `.factorai` were updated to `.sgai` in workflow state comment strings and the associated test expectations."
+  ]
+}
 
-- Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
