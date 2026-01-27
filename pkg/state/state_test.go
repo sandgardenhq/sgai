@@ -101,7 +101,7 @@ func TestWorkflow_RoundTrip(t *testing.T) {
 
 func TestSave_CreatesParentDirectories(t *testing.T) {
 	tmpDir := t.TempDir()
-	nestedPath := filepath.Join(tmpDir, ".factorai", "state.json")
+	nestedPath := filepath.Join(tmpDir, ".sgai", "state.json")
 
 	workflow := Workflow{
 		Status: "working",
@@ -128,11 +128,11 @@ func TestSave_CreatesParentDirectories(t *testing.T) {
 
 func TestSave_ExistingDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
-	factoraiDir := filepath.Join(tmpDir, ".factorai")
-	if err := os.MkdirAll(factoraiDir, 0755); err != nil {
+	sgaiDir := filepath.Join(tmpDir, ".sgai")
+	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
-	statePath := filepath.Join(factoraiDir, "state.json")
+	statePath := filepath.Join(sgaiDir, "state.json")
 
 	workflow := Workflow{Status: "complete"}
 
