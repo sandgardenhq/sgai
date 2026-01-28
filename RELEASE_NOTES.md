@@ -6,9 +6,7 @@
 - **Version**: 0.0.0+20260127
 - **Summary**: This release includes improved CI and cross-platform test reliability.
 
-{
-  "Additional Changes": [
-    "Updated workflow state comments and tests to use `.sgai` (replacing `.factorai`) so configuration directory references stayed consistent across the project."
-  ]
-}
+### Additional Changes
+
+- Updated workflow state comments and tests to use `.sgai` (replacing `.factorai`) so configuration directory references stayed consistent across the project.
 
