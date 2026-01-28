@@ -182,4 +182,4 @@ Move to Step 4 when:
 - [ ] UCAs prioritized by severity/likelihood
 - [ ] Human partner confirms analysis is complete
 
-Load: `sgai_find_skills({"name":"stpa/step4-loss-scenarios"})`
+Load: `skills({"name":"stpa/step4-loss-scenarios"})`

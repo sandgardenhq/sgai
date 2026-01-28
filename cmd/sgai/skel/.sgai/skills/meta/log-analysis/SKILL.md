@@ -1,7 +1,7 @@
 ---
 name: Log Analysis for Skill Extraction and How to Update .sgai/skills/REQUESTS.md correctly
 description: Analyze workbench logs to identify missing skills and using .sgai/skills/REQUESTS.current.md it will create .sgai/skills/REQUESTS.md
-when_to_use: When sgai_find_skills returns no results for a query, when workbench fails to progress due to missing techniques, when iterating the workbench to improve capabilities, when logs show repeated searches for same missing skills, when you want to harvest misses from .sgai/workbench.log, when you see 'no skills found' messages, when manual workarounds are logged for missing techniques, when sgai_find_skills returns empty results arrays
+when_to_use: When skills returns no results for a query, when workbench fails to progress due to missing techniques, when iterating the workbench to improve capabilities, when logs show repeated searches for same missing skills, when you want to harvest misses from .sgai/workbench.log, when you see 'no skills found' messages, when manual workarounds are logged for missing techniques, when skills returns empty results arrays
 
 version: 1.4.0
 
@@ -15,7 +15,7 @@ languages: all
 This skill automates the discovery of missing skills by analyzing workbench logs. It identifies gaps in the skill set where the workbench searched for help but found nothing, enabling systematic improvement of capabilities.
 
 ## When to Use
-- After sgai_find_skills returns empty results
+- After skills returns empty results
 - When workbench gets stuck on tasks that seem solvable
 - During iteration cycles to expand skill coverage
 - When logs show patterns of failed skill lookups
@@ -43,7 +43,7 @@ This skill automates the discovery of missing skills by analyzing workbench logs
 ### Step 1: Analyze Search Log
 - Read .sgai/workbench.log completely
 - Extract unique "query" values from JSON lines where "results" is empty array
-- For each query, check if `sgai_find_skills [query]` returns skills
+- For each query, check if `skills [query]` returns skills
 - Flag queries with zero matches as potential misses
 
 To extract misses, use Python script:
@@ -56,7 +56,7 @@ with open('.sgai/workbench.log', 'r') as f:
         if line:
             try:
                 entry = json.loads(line)
-                if entry.get('action') == 'sgai_find_skills' and not entry.get('results', []):
+                if entry.get('action') == 'skills' and not entry.get('results', []):
                     misses.append(entry['query'])
             except json.JSONDecodeError:
                 pass
@@ -150,7 +150,7 @@ Add entries following the format:
 ## Tools to Use
 - Read tool for complete log file access
 - Grep tool for pattern matching in logs
-- Bash for running sgai_find_skills checks
+- Bash for running skills checks
 - Edit tool for .sgai/skills/REQUESTS.md updates
 
 ## Real-World Impact

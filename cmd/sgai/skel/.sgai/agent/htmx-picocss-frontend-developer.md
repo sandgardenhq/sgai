@@ -8,10 +8,6 @@ permission:
   webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - htmx
-  - html
-  - css
 ---
 
 # HTMX + PicoCSS Frontend Developer

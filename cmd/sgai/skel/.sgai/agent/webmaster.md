@@ -2,16 +2,8 @@
 description: Website developer specializing in building marketing sites, landing pages, and institutional websites with Go backends, responsive CSS frameworks, and SEO best practices
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - html
-  - css
-  - go
 ---
 
 # Webmaster - Website Developer

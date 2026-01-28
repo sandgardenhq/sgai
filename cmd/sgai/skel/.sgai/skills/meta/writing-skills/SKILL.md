@@ -593,7 +593,7 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 How future instances find your skill:
 
 1. **Encounters problem** ("tests are flaky")
-2. **Searches skills** using `sgai_find_skills` tool (searches skills repository)
+2. **Searches skills** using `skills` tool (searches skills repository)
 3. **Finds SKILL.md** (rich when_to_use matches)
 4. **Scans overview** (is this relevant?)
 5. **Reads patterns** (quick reference table)

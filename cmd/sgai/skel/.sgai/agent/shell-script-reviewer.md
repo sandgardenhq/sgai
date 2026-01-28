@@ -8,8 +8,6 @@ permission:
   webfetch: deny
   doom_loop: deny
   external_directory: deny
-snippets:
-  - bash
 ---
 
 # Shell Script Reviewer

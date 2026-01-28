@@ -2,14 +2,8 @@
 description: Writes shell scripts based on requirements. Expert in POSIX-compliant scripting with proper argument handling.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - bash
 ---
 
 # Shell Script Coder

@@ -15,37 +15,37 @@ func TestParseAgentSnippets(t *testing.T) {
 		wantSnippets []string
 	}{
 		{
-			name:         "backend-go-developer has go snippets",
+			name:         "backendGoDeveloperNoSnippets",
 			agent:        "backend-go-developer",
-			wantSnippets: []string{"go"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "go-readability-reviewer has go snippets",
+			name:         "goReadabilityReviewerNoSnippets",
 			agent:        "go-readability-reviewer",
-			wantSnippets: []string{"go"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "htmx-picocss-frontend-developer has htmx html css snippets",
+			name:         "htmxPicocssFrontendDeveloperNoSnippets",
 			agent:        "htmx-picocss-frontend-developer",
-			wantSnippets: []string{"htmx", "html", "css"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "htmx-picocss-frontend-reviewer has htmx html css snippets",
+			name:         "htmxPicocssFrontendReviewerNoSnippets",
 			agent:        "htmx-picocss-frontend-reviewer",
-			wantSnippets: []string{"htmx", "html", "css"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "shell-script-coder has bash snippets",
+			name:         "shellScriptCoderNoSnippets",
 			agent:        "shell-script-coder",
-			wantSnippets: []string{"bash"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "shell-script-reviewer has bash snippets",
+			name:         "shellScriptReviewerNoSnippets",
 			agent:        "shell-script-reviewer",
-			wantSnippets: []string{"bash"},
+			wantSnippets: nil,
 		},
 		{
-			name:         "coordinator has no snippets",
+			name:         "coordinatorNoSnippets",
 			agent:        "coordinator",
 			wantSnippets: nil,
 		},

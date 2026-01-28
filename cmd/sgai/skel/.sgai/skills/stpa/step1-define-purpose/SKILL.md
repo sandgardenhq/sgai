@@ -158,4 +158,4 @@ Move to Step 2 when:
 - [ ] Each hazard has at least one constraint
 - [ ] Human partner confirms the analysis looks complete
 
-Load: `sgai_find_skills({"name":"stpa/step2-control-structure"})`
+Load: `skills({"name":"stpa/step2-control-structure"})`

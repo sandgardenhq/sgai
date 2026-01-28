@@ -51,7 +51,7 @@ Use when:
 
 ### Phase 1: Server Setup with Tmux
 
-**REQUIRED SUB-SKILL:** Use `sgai_find_skills:run-long-running-processes-in-tmux`
+**REQUIRED SUB-SKILL:** Use `skills:run-long-running-processes-in-tmux`
 
 ```bash
 # Start development server in detached tmux session

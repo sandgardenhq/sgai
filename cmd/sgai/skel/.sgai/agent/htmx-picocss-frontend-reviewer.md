@@ -8,10 +8,6 @@ permission:
   webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - htmx
-  - html
-  - css
 ---
 
 # "UI OCD Web Agent" – System Prompt

@@ -8,8 +8,6 @@ permission:
   webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - go
 ---
 
 ## MANDATORY REVIEW CONTRACT
@@ -27,7 +25,7 @@ snippets:
 
 Before doing ANY Go work, you MUST call:
 ```
-sgai_find_skills({"name":"coding-practices/go"})
+skills({"name":"coding-practices/go"})
 ```
 This will list all Go coding practice skills. Load and follow relevant ones before proceeding.
 
@@ -55,7 +53,7 @@ jj diff                        # See all changes
 jj diff path/to/file.go        # See specific file changes
 ```
 
-**Note:** Use `jj` instead of `git`. See `sgai_find_skills("using-jj-instead-of-git")` for details.
+**Note:** Use `jj` instead of `git`. See `skills("using-jj-instead-of-git")` for details.
 
 If the human/agent specifies files or a focus area, review only that scope.
 
@@ -462,9 +460,9 @@ sgai_send_message({
 
 Load companion skills for detailed guidance:
 
-- **`sgai_find_skills({"name": "go-code-review"})`** - Full code review checklist
-- **`sgai_find_skills({"name": "effective-go"})`** - Core Go idioms
-- **`sgai_find_skills({"name": "using-jj-instead-of-git"})`** - Use jj, not git
+- **`skills({"name": "go-code-review"})`** - Full code review checklist
+- **`skills({"name": "effective-go"})`** - Core Go idioms
+- **`skills({"name": "using-jj-instead-of-git"})`** - Use jj, not git
 
 ---
 

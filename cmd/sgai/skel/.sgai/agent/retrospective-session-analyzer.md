@@ -8,7 +8,6 @@ permission:
   webfetch: deny
   doom_loop: deny
   external_directory: deny
-log: false
 ---
 
 READ PROJECT_MANAGEMENT.md to find the Retrospective Session path (henceforth $retrospectivePath - for example .sgai/retrospectives/YYYY-MM-DD-HH-II.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9] )
@@ -105,7 +104,7 @@ Read the session JSON file provided. Pay attention to:
 Look for these indicators:
 
 **Missing Knowledge Signals (Skills/Snippets):**
-- Multiple `sgai_find_skills` calls with no results
+- Multiple `skills` calls with no results
 - Searching for similar terms repeatedly
 - Manual workarounds for common tasks
 - Explicit statements like "I wish there was..." or "I don't know how to..."
@@ -171,10 +170,10 @@ For each potential finding, you MUST:
    - Search by the primary concept (e.g., "debugging")
    - Search by related terms (e.g., "troubleshooting", "diagnosing")
    - Search by the problem domain (e.g., "async", "race conditions")
-   - Call `sgai_find_skills` with multiple queries to find related skills
+   - Call `skills` with multiple queries to find related skills
 
 2. **Read and understand top matches:**
-   - For the top 3 matching skills found, use the `sgai_find_skills({"name":"full exact name"})` tool to examine their full content
+   - For the top 3 matching skills found, use the `skills({"name":"full exact name"})` tool to examine their full content
    - Don't just match names - understand what the skill actually teaches
    - Ask: "Does this existing skill already solve the problem I'm addressing?"
    - Look for semantic overlap, not just keyword matches
@@ -189,7 +188,7 @@ For each potential finding, you MUST:
    You must be able to answer YES to all of these before including a suggestion:
    - [ ] **sgai RELEVANCE:** Would this help ANY project using sgai (not application-specific)?
    - [ ] Did I search existing skills using at least 3 different related terms?
-   - [ ] Did I READ (using the `sgai_find_skills({"name":"full exact name"})` tool) the full content of the top 3 matching skills?
+   - [ ] Did I READ (using the `skills({"name":"full exact name"})` tool) the full content of the top 3 matching skills?
    - [ ] For snippets: Did I grep the source code (`cmd/` and `pkg/`) for similar patterns?
    - [ ] For agent improvements: Did I READ the agent file to check if it's already covered?
    - [ ] Can I clearly articulate why this suggestion is genuinely NEW and not covered by existing assets?
@@ -256,7 +255,7 @@ Analyzed: [current date/time]
 
 **Session moment:**
 ```json
-{"type": "tool_use", "tool": "sgai_find_skills", "input": {"name": "debugging async"}}
+{"type": "tool_use", "tool": "skills", "input": {"name": "debugging async"}}
 {"type": "tool_result", "output": "No skills found"}
 {"type": "text", "content": "I'll try a manual approach to debugging this async issue..."}
 [followed by 15 minutes of trial-and-error debugging]

@@ -24,19 +24,19 @@ STPA (System Theoretic Process Analysis) is a hazard analysis method that:
 ## The 4 Steps
 
 ### Step 1: Define Purpose of Analysis
-Load: `sgai_find_skills({"name":"stpa/step1-define-purpose"})`
+Load: `skills({"name":"stpa/step1-define-purpose"})`
 - Identify **Losses** (unacceptable outcomes)
 - Define **System-Level Hazards** (states leading to losses)
 - Establish **System-Level Constraints** (behaviors to prevent hazards)
 
 ### Step 2: Model the Control Structure
-Load: `sgai_find_skills({"name":"stpa/step2-control-structure"})`
+Load: `skills({"name":"stpa/step2-control-structure"})`
 - Create hierarchical control-feedback diagrams
 - Identify controllers, control actions, and feedback paths
 - Use Graphviz/DOT format with `rankdir=TB` and `node [shape=box]`
 
 ### Step 3: Identify Unsafe Control Actions (UCAs)
-Load: `sgai_find_skills({"name":"stpa/step3-unsafe-control-actions"})`
+Load: `skills({"name":"stpa/step3-unsafe-control-actions"})`
 - Analyze each control action for 4 types of UCAs:
   1. Not provided when needed
   2. Provided when not needed
@@ -44,7 +44,7 @@ Load: `sgai_find_skills({"name":"stpa/step3-unsafe-control-actions"})`
   4. Wrong duration (stopped too soon/applied too long)
 
 ### Step 4: Identify Loss Scenarios
-Load: `sgai_find_skills({"name":"stpa/step4-loss-scenarios"})`
+Load: `skills({"name":"stpa/step4-loss-scenarios"})`
 - Trace causal pathways for each UCA
 - Identify why UCAs might occur
 - Develop recommendations and mitigations
