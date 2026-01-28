@@ -18,4 +18,4 @@
 
 ### Additional Changes
 
-- Added placeholder `GOALS/` directory so goals-related assets can be committed even before any files exist.
+- Added placeholder `GOALS/` directory to enable goals-related assets to be committed before any files exist.
