@@ -161,7 +161,7 @@ sgai uses configurable AI engines under the hood, but it's the opinionated exper
 
 **How to contribute:**
 
-1. Create a spec file in `GOALS/` following the naming convention:
+1. Create a spec file in `GOALS/` (the repository includes `GOALS/.gitkeep` so the directory is tracked even when empty) following the naming convention:
    `YYYY_MM_DD_summarized_name.md` (e.g., `2025_12_23_add_parallel_execution.md`)
 
 2. Submit a PR with your spec proposal
