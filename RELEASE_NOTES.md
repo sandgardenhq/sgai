@@ -9,3 +9,20 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260128 — Pending release notes
+
+- **Date**: 2026-01-28
+- **Version**: 0.0.0+20260128
+- **Summary**: This release includes the changes listed below.
+
+<!-- BEGIN NEW_RELEASE_NOTES_JSON -->
+```json
+{
+  "Additional Changes": [
+    "A placeholder GOALS directory was added so goals-related assets can be committed even before any files exist. The repository now includes a `GOALS/` folder tracked via `.gitkeep`, ensuring Git persists the empty directory across clones and checkouts."
+  ]
+}
+
+```
+<!-- END NEW_RELEASE_NOTES_JSON -->
