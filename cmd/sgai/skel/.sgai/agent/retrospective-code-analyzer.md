@@ -8,7 +8,6 @@ permission:
   webfetch: deny
   doom_loop: deny
   external_directory: deny
-log: false
 ---
 
 READ PROJECT_MANAGEMENT.md to find the Retrospective Session path (henceforth $retrospectivePath - for example .sgai/retrospectives/YYYY-MM-DD-HH-II.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9] )

@@ -78,7 +78,7 @@ Council members share state through TWO channels:
 Read GOAL.md to identify all checked items `[x]`:
 
 ```
-sgai_find_skills({"name":"project-completion-verification"})
+skills({"name":"project-completion-verification"})
 ```
 
 Then use the Read tool to examine GOAL.md.

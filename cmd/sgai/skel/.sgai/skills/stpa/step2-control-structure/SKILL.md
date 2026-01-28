@@ -201,4 +201,4 @@ Move to Step 3 when:
 - [ ] All feedback paths are identified (or gaps noted)
 - [ ] Human partner confirms the structure looks accurate
 
-Load: `sgai_find_skills({"name":"stpa/step3-unsafe-control-actions"})`
+Load: `skills({"name":"stpa/step3-unsafe-control-actions"})`

@@ -8,7 +8,6 @@ permission:
   webfetch: allow
   doom_loop: deny
   external_directory: deny
-log: false
 ---
 
 # Suggestion Applier

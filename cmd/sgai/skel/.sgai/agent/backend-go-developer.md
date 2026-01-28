@@ -8,15 +8,13 @@ permission:
   webfetch: allow
   doom_loop: deny
   external_directory: deny
-snippets:
-  - go
 ---
 
 ## MANDATORY FIRST ACTION
 
 Before doing ANY Go work, you MUST call:
 ```
-sgai_find_skills({"name":"coding-practices/go"})
+skills({"name":"coding-practices/go"})
 ```
 This will list all Go coding practice skills. Load and follow relevant ones before proceeding.
 
@@ -697,12 +695,12 @@ go test -race ./...      # Race detection (if concurrent)
 
 Load companion skills for detailed guidance:
 
-- **`sgai_find_skills("go-web-services")`** - HTTP/REST patterns with Gin
-- **`sgai_find_skills("go-code-review")`** - Code review checklist
-- **`sgai_find_skills("go-project-layout")`** - Module structure
-- **`sgai_find_skills("go-testing-coverage")`** - Testing patterns
-- **`sgai_find_skills("effective-go")`** - Core Go idioms
-- **`sgai_find_skills("using-jj-instead-of-git")`** - Use jj, not git
+- **`skills("go-web-services")`** - HTTP/REST patterns with Gin
+- **`skills("go-code-review")`** - Code review checklist
+- **`skills("go-project-layout")`** - Module structure
+- **`skills("go-testing-coverage")`** - Testing patterns
+- **`skills("effective-go")`** - Core Go idioms
+- **`skills("using-jj-instead-of-git")`** - Use jj, not git
 
 ---
 
@@ -759,7 +757,7 @@ jj commit          # Commit changes
 jj log             # View history
 ```
 
-See `sgai_find_skills("using-jj-instead-of-git")` for full command mapping.
+See `skills("using-jj-instead-of-git")` for full command mapping.
 
 ---
 

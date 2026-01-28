@@ -8,7 +8,6 @@ permission:
   webfetch: deny
   doom_loop: deny
   external_directory: deny
-log: false
 ---
 
 READ PROJECT_MANAGEMENT.md to find the Retrospective Session path (henceforth $retrospectivePath - for example .sgai/retrospectives/YYYY-MM-DD-HH-II.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9] )
@@ -122,7 +121,7 @@ Merge duplicates by:
 ### Step 4: Check Against Existing Assets
 
 For each improvement, search:
-- `.sgai/skills/` - existing skills (use `sgai_find_skills`)
+- `.sgai/skills/` - existing skills (use `skills`)
 - `.sgai/snippets/` - existing snippets (use `sgai_find_snippets`)
 - `cmd/sgai/skel/.sgai/agent/` - existing agent files (use `read` tool)
 

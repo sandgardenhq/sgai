@@ -1,11 +1,11 @@
 ---
 name: requesting-code-review
-description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements - dispatches sgai_find_skills:code-reviewer subagent to review implementation against plan or requirements before proceeding
+description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements - dispatches skills:code-reviewer subagent to review implementation against plan or requirements before proceeding
 ---
 
 # Requesting Code Review
 
-Dispatch sgai_find_skills:code-reviewer subagent to catch issues before they cascade.
+Dispatch skills:code-reviewer subagent to catch issues before they cascade.
 
 **Core principle:** Review early, review often.
 
@@ -30,7 +30,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code-reviewer subagent:**
 
-Use Task tool with sgai_find_skills:code-reviewer type, fill template at `code-reviewer.md`
+Use Task tool with skills:code-reviewer type, fill template at `code-reviewer.md`
 
 **Placeholders:**
 - `{WHAT_WAS_IMPLEMENTED}` - What you just built
@@ -55,7 +55,7 @@ You: Let me request code review before proceeding.
 BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
-[Dispatch sgai_find_skills:code-reviewer subagent]
+[Dispatch skills:code-reviewer subagent]
   WHAT_WAS_IMPLEMENTED: Verification and repair functions for conversation index
   BASE_SHA: a7981ec
   HEAD_SHA: 3df7661

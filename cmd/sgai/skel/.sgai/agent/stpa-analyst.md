@@ -3,14 +3,8 @@ description: STPA hazard analyst for software, physical, and AI systems. Uses Sy
 mode: primary
 model: anthropic/claude-opus-4-5
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
-  todowrite: allow
-  todoread: allow
 ---
 
 # STPA Analyst
@@ -19,7 +13,7 @@ You are an expert in System Theoretic Process Analysis (STPA), a hazard analysis
 
 ## Startup Protocol
 
-1. Load the `stpa/overview` skill immediately: `sgai_find_skills({"name":"stpa/overview"})`
+1. Load the `stpa/overview` skill immediately: `skills({"name":"stpa/overview"})`
 2. Follow the overview skill's guidance through all 4 STPA steps
 3. Use `human-communication` status for interactive questioning sessions
 

@@ -12,7 +12,7 @@ import (
 
 const flowContinueMessageCoordinator = `
 <UserInstructions>
-YOU MUST LOAD THE SKILL "set-work-state" - CALL sgai_find_skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
+YOU MUST LOAD THE SKILL "set-work-state" - CALL skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
 REMEMBER: file references like @FILENAME.md mean you must read the file $currentWorkingDirectory/FILENAME.md in the workspace.
 
 RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;
@@ -44,7 +44,7 @@ Successors (can pass work to): %SUCCESSORS%
 
 </UserInstructions>.
 
-ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use sgai_find_skills({"name":"skill-name"}) to get the skill content, or use sgai_find_skills({"name":"keywords"}) to find skills by tags.
+ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.
 IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA THE WORKFLOW STATE (set-workflow-state skill).
 
 # PRODUCTIVE WORK GUIDELINES
@@ -72,16 +72,16 @@ When you set status: "agent-done":
 ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
 GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
 
-IMPORTANT: use CALL sgai_find_skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
+IMPORTANT: use CALL skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
 IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
 IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
-IMPORTANT: You must to search for known skills with sgai_find_skills({"name":""}) (for all skills), sgai_find_skills({"name":"skill-name"}) (for specific skills) before doing any work and sgai_find_skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
+IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
 IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()
 `
 
 const flowContinueMessageNonCoordinator = `
 <UserInstructions>
-YOU MUST LOAD THE SKILL "set-work-state" - CALL sgai_find_skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
+YOU MUST LOAD THE SKILL "set-work-state" - CALL skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
 REMEMBER: file references like @FILENAME.md mean you must read the file $currentWorkingDirectory/FILENAME.md in the workspace.
 
 RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;
@@ -111,7 +111,7 @@ Successors (can pass work to): %SUCCESSORS%
 
 </UserInstructions>.
 
-ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use sgai_find_skills({"name":"skill-name"}) to get the skill content, or use sgai_find_skills({"name":"keywords"}) to find skills by tags.
+ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.
 IMPORTANT: If you need human clarification, send a message to coordinator: sgai_send_message({toAgent: "coordinator", body: "QUESTION: <your question>"}). The coordinator will handle human communication.
 
 # PRODUCTIVE WORK GUIDELINES
@@ -138,10 +138,10 @@ When you set status: "agent-done":
 ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
 GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
 
-IMPORTANT: use CALL sgai_find_skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
+IMPORTANT: use CALL skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
 IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
 IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
-IMPORTANT: You must to search for known skills with sgai_find_skills({"name":""}) (for all skills), sgai_find_skills({"name":"skill-name"}) (for specific skills) before doing any work and sgai_find_skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
+IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
 IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()
 `
 
