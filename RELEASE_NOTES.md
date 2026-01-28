@@ -20,7 +20,7 @@
 ```json
 {
   "Additional Changes": [
-    "A placeholder GOALS directory was added so goals-related assets can be committed even before any files exist. The repository now includes a `GOALS/` folder tracked via `.gitkeep`, ensuring Git persists the empty directory across clones and checkouts."
+    "A placeholder GOALS directory was added so goals-related assets can be committed even before any files exist."
   ]
 }
 
