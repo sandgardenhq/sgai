@@ -180,11 +180,12 @@ func (v *vscodeOpener) open(path string) error {
 
 // Server handles HTTP requests for the sgai serve command.
 type Server struct {
-	mu            sync.Mutex
-	sessions      map[string]*session
-	rootDir       string
-	codeAvailable bool
-	editor        editorOpener
+	mu              sync.Mutex
+	sessions        map[string]*session
+	everStartedDirs map[string]bool
+	rootDir         string
+	codeAvailable   bool
+	editor          editorOpener
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -198,10 +199,11 @@ func NewServer(rootDir string) *Server {
 	}
 	_, errCode := exec.LookPath("code")
 	return &Server{
-		sessions:      make(map[string]*session),
-		rootDir:       absRootDir,
-		codeAvailable: errCode == nil,
-		editor:        &vscodeOpener{},
+		sessions:        make(map[string]*session),
+		everStartedDirs: make(map[string]bool),
+		rootDir:         absRootDir,
+		codeAvailable:   errCode == nil,
+		editor:          &vscodeOpener{},
 	}
 }
 
@@ -320,6 +322,7 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 
 	sess = &session{running: true, interactiveAuto: autoMode}
 	s.sessions[workspacePath] = sess
+	s.everStartedDirs[workspacePath] = true
 	s.mu.Unlock()
 
 	resetHumanCommunication(workspacePath)
@@ -1861,7 +1864,7 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 
 func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace bool) workspaceInfo {
 	running, needsInput := s.getWorkspaceStatus(dir)
-	inProgress := running || needsInput
+	inProgress := running || needsInput || s.wasEverStarted(dir)
 
 	return workspaceInfo{
 		Directory:    dir,
@@ -1872,6 +1875,12 @@ func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace b
 		InProgress:   inProgress,
 		HasWorkspace: hasWorkspace,
 	}
+}
+
+func (s *Server) wasEverStarted(dir string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.everStartedDirs[dir]
 }
 
 func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
