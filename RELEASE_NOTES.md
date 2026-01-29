@@ -14,15 +14,8 @@
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
-- **Summary**: This release includes additional updates captured in the changelog below.
+- **Summary**: This release includes improved routing for in-progress workspace links.
 
-### Additional Changes
+### New Features
 
-```json
-{
-  "New Features": [
-    "In-progress workspace links now open the most relevant page for the current state of the workspace so users land where they can take the next action. The routing logic conditionally sends these links to either the Respond page (when the workspace needs input) or the Workspace Progress page (when no input is required)."
-  ]
-}
-
-```
+- Updated in-progress workspace links to open the most relevant page for the workspace state by routing to `Respond` when input is required and to `Workspace Progress` when no input is required.
