@@ -14,13 +14,8 @@
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
-- **Summary**: This release includes updates captured in the structured changelog payload below.
+- **Summary**: This release includes documentation refinements.
 
-```json
-{
-  "Additional Changes": [
-    "The project documentation was reorganized to make the intended workflow and setup steps clearer for day-to-day use. Specifically, README.md was rewritten to emphasize GOAL.md-driven workflows, highlight the web dashboard, and refresh configuration guidance to match the current setup."
-  ]
-}
+### Additional Changes
 
-```
+- Updated `README.md` to emphasize `GOAL.md`-driven workflows, highlight the web dashboard, and align configuration guidance with the current setup.
