@@ -18,4 +18,4 @@
 
 ### New Features
 
-- Updated in-progress workspace links to open the most relevant page for the workspace state by routing to `Respond` when input is required and to `Workspace Progress` when no input is required.
+- Updated in-progress workspace links to open the most relevant page for the workspace state by routing to the `Respond` page when input is required and to the `Workspace Progress` page when no input is required.
