@@ -120,23 +120,6 @@ sgai --interactive=no .   # Non-interactive (exit on human-communication)
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (open $EDITOR), `no` (exit), `auto` (self-driving) |
 
-### Web Dashboard
-
-sgai includes a web dashboard for monitoring and controlling workflow execution:
-
-```sh
-sgai serve                              # Start on localhost:8080
-sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
-```
-
-The dashboard provides:
-- Real-time workflow status visualization
-- Start/Stop controls for the engine
-- SVG visualization of the agent DAG
-- Session management and retrospective browsing
-- Goal editing and agent/skill/snippet listing
-- Human-communication response interface
-
 ### Skills (for agent authors)
 
 Agent specs can reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
