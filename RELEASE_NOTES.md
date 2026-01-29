@@ -10,7 +10,7 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260129 — Additional changes
+## 0.0.0+20260129 — Workspace lifecycle state tracking
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
