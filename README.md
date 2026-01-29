@@ -139,7 +139,7 @@ The dashboard provides:
 
 ### Skills (for agent authors)
 
-Agent specs in `cmd/sgai/skel/.sgai` reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
+Agent specs can reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
 
 Examples:
 
