@@ -18,7 +18,7 @@
 
 {
   "New Features": [
-    "Workspaces now track whether they have ever been started and expose that status so users can understand lifecycle progress at a glance. This adds a persisted “has ever started” workspace state that is surfaced to consumers and used to automatically mark the workspace as in-progress when applicable."
+    "Workspaces now track whether they have ever been started and expose that status so users can understand lifecycle progress at a glance."
   ]
 }
 
