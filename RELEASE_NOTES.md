@@ -16,9 +16,7 @@
 - **Version**: 0.0.0+20260129
 - **Summary**: This release includes additional improvements across the project.
 
-{
-  "New Features": [
-    "Workspaces now track whether they have ever been started and expose that status so users can understand lifecycle progress at a glance."
-  ]
-}
+### New Features
+
+- Added a persisted workspace state indicating whether a workspace has ever started, and exposed it to consumers.
 
