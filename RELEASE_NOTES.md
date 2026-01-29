@@ -16,13 +16,8 @@
 - **Version**: 0.0.0+20260129
 - **Summary**: This release includes the updates listed below.
 
-<!-- Generated release notes payload (to be formatted into sections and bullets in subsequent commits):
+### Breaking Changes
 
-{
-  "Breaking Changes": [
-    "Environment variable names for SGAI configuration were standardized so they are consistent across the command-line tooling, the MCP integration, and notification handling. Specifically, several sgai-related environment variables were renamed to uppercase to align with conventional ENV naming and to ensure the CLI, MCP, and notification code paths read the same keys."
-  ]
-}
+- Renamed SGAI environment variables to uppercase for consistent configuration across the CLI, MCP integration, and notifications, including `sgai_NTFY` → `SGAI_NTFY` and `sgai_MCP_WORKING_DIRECTORY` → `SGAI_MCP_WORKING_DIRECTORY`.
+- Updated migration steps: Replace `sgai_NTFY` with `SGAI_NTFY` and `sgai_MCP_WORKING_DIRECTORY` with `SGAI_MCP_WORKING_DIRECTORY` in your shell environment and CI configuration.
 
-
--->
