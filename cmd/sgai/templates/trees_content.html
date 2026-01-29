@@ -10,7 +10,7 @@
 	<div class="in-progress-header{{if not $.HasNeedsInputWorkspace}} no-attention{{end}}">{{if $.HasNeedsInputWorkspace}}<span class="workspace-attention" title="Needs input">●</span>{{end}} In Progress</div>
 	{{range .InProgressWorkspaces}}
 	<a class="in-progress-item{{if eq .Directory $.SelectedPath}} selected{{end}}"
-		href="/respond?dir={{.Directory}}"
+		href="{{if .NeedsInput}}/respond?dir={{.Directory}}{{else}}/workspaces/{{.DirName}}/progress{{end}}"
 		title="{{.DirName}}">
 		<span class="workspace-name">{{.DirName}}</span>
 		{{template "workspace-indicators" .}}
