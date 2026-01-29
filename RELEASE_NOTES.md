@@ -14,7 +14,7 @@
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
-- **Summary**: This release includes tighter authorization for workflow terminal status transitions.
+- **Summary**: This release includes refined authorization for workflow terminal status transitions.
 
 ### Additional Changes
 
