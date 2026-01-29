@@ -18,4 +18,4 @@
 
 ### Additional Changes
 
-- Updated workflow status transition authorization so only the coordinator role can set the `complete` and `human-communication` terminal states.
+- Updated workflow status transition authorization so only the coordinator role can set the `complete` and `human-communication` terminal states, preventing other roles from setting these terminal states.
