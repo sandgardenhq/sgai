@@ -19,7 +19,7 @@
 ```json
 {
   "Additional Changes": [
-    "Only coordinators can now mark a workflow as complete or as requiring human communication, preventing other roles from setting these terminal states. Technically, the workflow status transition rules were tightened so that only the coordinator role is authorized to set the status values `complete` and `human-communication`."
+    "Only coordinators can now mark a workflow as complete or as requiring human communication, preventing other roles from setting these terminal states."
   ]
 }
 
