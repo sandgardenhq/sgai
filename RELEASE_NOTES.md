@@ -10,7 +10,7 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260129 — Feature and maintenance updates
+## 0.0.0+20260129 — Improved in-progress workspace link routing
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
@@ -18,4 +18,4 @@
 
 ### New Features
 
-- Updated in-progress workspace links to open the most relevant page for the workspace state by routing to the `Respond` page when input is required and to the `Workspace Progress` page when no input is required (if needed).
+- Updated in-progress workspace links to open the most relevant page for the workspace state by routing to the `Respond` page when input is required and to the `Workspace Progress` page when no input is required.
