@@ -14,8 +14,8 @@
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
-- **Summary**: This release includes updates to agent templates and documentation to align new and existing agents with the current recommended tooling.
+- **Summary**: This release includes updates to agent templates and documentation to use the current skill discovery tooling and remove language snippet associations.
 
 ### Additional Changes
 
-- Updated agent templates and documentation to align new and existing agents with the current recommended tooling.
+- Updated agent templates, documentation, and tests to use the current skill discovery tooling and remove language snippet associations.
