@@ -9,3 +9,16 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260129 — Additional changes
+
+- **Date**: 2026-01-29
+- **Version**: 0.0.0+20260129
+- **Summary**: This release includes additional improvements across the project.
+
+{
+  "New Features": [
+    "Workspaces now track whether they have ever been started and expose that status so users can understand lifecycle progress at a glance. This adds a persisted “has ever started” workspace state that is surfaced to consumers and used to automatically mark the workspace as in-progress when applicable."
+  ]
+}
+
