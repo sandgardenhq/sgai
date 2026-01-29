@@ -18,5 +18,5 @@
 
 ### Breaking Changes
 
-- Updated SGAI configuration environment variables to uppercase for consistent behavior across the CLI, MCP integration, and notifications (migrate `sgai_NTFY` → `SGAI_NTFY` and `sgai_MCP_WORKING_DIRECTORY` → `SGAI_MCP_WORKING_DIRECTORY`).
+- Updated SGAI configuration environment variables to uppercase for consistent behavior across the CLI, MCP integration, and notifications (for example, rename `sgai_NTFY` to `SGAI_NTFY` and update any remaining lowercase `sgai_*` variables to `SGAI_*`, including `SGAI_MCP_WORKING_DIRECTORY`).
 
