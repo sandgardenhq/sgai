@@ -120,7 +120,7 @@ sgai --interactive=no .   # Non-interactive (exit on human-communication)
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (open $EDITOR), `no` (exit), `auto` (self-driving) |
 
-### Web Dashboard
+## Web Dashboard
 
 sgai includes a web dashboard for monitoring and controlling workflow execution:
 
@@ -136,6 +136,17 @@ The dashboard provides:
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
 - Human-communication response interface
+
+### In-progress status
+
+The dashboard can mark a workspace as **in progress**.
+
+A workspace is considered **in progress** when any of the following is true:
+
+- A session is currently running for that workspace
+- The session is waiting for human input
+- The workspace has been started before (even if the session is currently stopped)
+
 ### Skills (for agent authors)
 
 Agent specs can reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
