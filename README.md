@@ -136,7 +136,7 @@ The dashboard provides:
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
 - Human-communication response interface
-
+### Skills (for agent authors)
 
 Agent specs can reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
 
