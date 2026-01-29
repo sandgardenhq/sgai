@@ -18,5 +18,5 @@
 
 ### New Features
 
-- Added a persisted workspace state indicating whether a workspace has ever started, and exposed it to consumers.
+- Added a persisted workspace state indicating whether a workspace has ever started, and exposed that state to consumers.
 
