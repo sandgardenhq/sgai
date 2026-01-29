@@ -10,11 +10,11 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260129 — Updates
+## 0.0.0+20260129 — Improved documentation workflow guidance
 
 - **Date**: 2026-01-29
 - **Version**: 0.0.0+20260129
-- **Summary**: This release includes documentation refinements.
+- **Summary**: This release includes improved workflow and configuration guidance in `README.md`.
 
 ### Additional Changes
 
