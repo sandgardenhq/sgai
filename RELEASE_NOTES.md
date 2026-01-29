@@ -19,7 +19,7 @@
 ```json
 {
   "Additional Changes": [
-    "Updated the agent templates and documentation so new and existing agents follow the current recommended tooling. Specifically, agent skeletons and related docs now use the `skills` tool instead of `sgai_find_skills`, and language snippet associations were removed from several agents and their tests to align behavior and test coverage with the new approach."
+    "Updated the agent templates and documentation so new and existing agents follow the current recommended tooling."
   ]
 }
 
