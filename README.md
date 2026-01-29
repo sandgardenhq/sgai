@@ -137,6 +137,24 @@ The dashboard provides:
 - Goal editing and agent/skill/snippet listing
 - Human-communication response interface
 
+### Skills (for agent authors)
+
+Agent specs in `cmd/sgai/skel/.sgai` reference reusable workflows called “skills”. To browse or fetch skills, use the `skills` tool.
+
+Examples:
+
+```text
+skills({"name":""})
+```
+
+```text
+skills({"name":"project-completion-verification"})
+```
+
+```text
+skills({"name":"log analysis"})
+```
+
 ### Other Commands
 
 ```sh
