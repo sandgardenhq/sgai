@@ -22,9 +22,9 @@ export const Workbench: Plugin = async ({ directory }) => {
       }
       config.mcp.sgai = {
         type: "local",
-        command: [process.env.sgai_MCP_EXECUTABLE || "sgai", "mcp"],
+        command: [process.env.SGAI_MCP_EXECUTABLE || "sgai", "mcp"],
         environment: {
-          sgai_MCP_WORKING_DIRECTORY: directory
+          SGAI_MCP_WORKING_DIRECTORY: directory
         }
       };
     },

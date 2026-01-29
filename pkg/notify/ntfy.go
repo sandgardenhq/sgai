@@ -13,7 +13,7 @@ import (
 )
 
 func sendRemote(title, message string) error {
-	ntfyURL := os.Getenv("sgai_NTFY")
+	ntfyURL := os.Getenv("SGAI_NTFY")
 	if ntfyURL == "" {
 		return nil
 	}

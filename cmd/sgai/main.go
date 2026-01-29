@@ -748,7 +748,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		cmd := exec.CommandContext(ctx, "opencode", args...)
 		cmd.Env = append(os.Environ(),
 			"OPENCODE_CONFIG_DIR=.sgai",
-			"sgai_MCP_EXECUTABLE="+cfg.executablePath)
+			"SGAI_MCP_EXECUTABLE="+cfg.executablePath)
 		cmd.Stdin = strings.NewReader(msg)
 
 		stderrWriter := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
