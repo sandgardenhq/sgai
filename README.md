@@ -108,6 +108,10 @@ The web dashboard shows:
 - Goal editing and agent/skill/snippet listing
 - Human-communication response interface
 
+### Navigating in-progress work
+
+The dashboard routes in-progress workspaces differently depending on whether the run is waiting for human input. See [Web dashboard: opening an in-progress workspace](./guides/web-dashboard-in-progress-workspaces.md).
+
 ## GOAL.md Reference
 
 Create a `GOAL.md` file in your project directory to define your goals:
