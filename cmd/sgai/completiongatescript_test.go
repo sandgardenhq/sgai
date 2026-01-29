@@ -86,6 +86,73 @@ func TestFormatCompletionGateScriptFailureMessage(t *testing.T) {
 	}
 }
 
+func TestBuildUpdateWorkflowStateSchemaStatusEnum(t *testing.T) {
+	tests := []struct {
+		name            string
+		agent           string
+		expectComplete  bool
+		expectHumanComm bool
+		expectWorking   bool
+		expectAgentDone bool
+	}{
+		{
+			name:            "coordinatorHasCompleteAndHumanCommunication",
+			agent:           "coordinator",
+			expectComplete:  true,
+			expectHumanComm: true,
+			expectWorking:   true,
+			expectAgentDone: true,
+		},
+		{
+			name:            "nonCoordinatorLacksCompleteAndHumanCommunication",
+			agent:           "backend-go-developer",
+			expectComplete:  false,
+			expectHumanComm: false,
+			expectWorking:   true,
+			expectAgentDone: true,
+		},
+		{
+			name:            "anotherNonCoordinatorLacksPrivilegedStatuses",
+			agent:           "go-readability-reviewer",
+			expectComplete:  false,
+			expectHumanComm: false,
+			expectWorking:   true,
+			expectAgentDone: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schema, _ := buildUpdateWorkflowStateSchema(tt.agent)
+			statusProp := schema.Properties["status"]
+			if statusProp == nil {
+				t.Fatal("status property not found in schema")
+			}
+
+			enumSlice := statusProp.Enum
+			enumMap := make(map[string]bool)
+			for _, v := range enumSlice {
+				if s, ok := v.(string); ok {
+					enumMap[s] = true
+				}
+			}
+
+			if got := enumMap["complete"]; got != tt.expectComplete {
+				t.Errorf("enum contains 'complete' = %v, want %v", got, tt.expectComplete)
+			}
+			if got := enumMap["human-communication"]; got != tt.expectHumanComm {
+				t.Errorf("enum contains 'human-communication' = %v, want %v", got, tt.expectHumanComm)
+			}
+			if got := enumMap["working"]; got != tt.expectWorking {
+				t.Errorf("enum contains 'working' = %v, want %v", got, tt.expectWorking)
+			}
+			if got := enumMap["agent-done"]; got != tt.expectAgentDone {
+				t.Errorf("enum contains 'agent-done' = %v, want %v", got, tt.expectAgentDone)
+			}
+		})
+	}
+}
+
 func TestParseYAMLFrontmatterWithCompletionGateScript(t *testing.T) {
 	tests := []struct {
 		name           string
