@@ -236,9 +236,9 @@ type askUserQuestionArgs struct {
 }
 
 // cmdMCP starts an MCP server exposing sgai custom tools via stdio transport.
-// It reads sgai_MCP_WORKING_DIRECTORY.
+// It reads SGAI_MCP_WORKING_DIRECTORY.
 func cmdMCP(_ []string) {
-	workingDir := os.Getenv("sgai_MCP_WORKING_DIRECTORY")
+	workingDir := os.Getenv("SGAI_MCP_WORKING_DIRECTORY")
 	if workingDir == "" {
 		workingDir = "."
 	}
