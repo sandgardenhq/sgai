@@ -9,3 +9,18 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260129 — Additional updates
+
+- **Date**: 2026-01-29
+- **Version**: 0.0.0+20260129
+- **Summary**: This release covers the changes captured in the structured release note input below.
+
+```json
+{
+  "Additional Changes": [
+    "Only coordinators can now mark a workflow as complete or as requiring human communication, preventing other roles from setting these terminal states. Technically, the workflow status transition rules were tightened so that only the coordinator role is authorized to set the status values `complete` and `human-communication`."
+  ]
+}
+
+```
