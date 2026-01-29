@@ -1160,11 +1160,11 @@ func messageMatchesSender(msg state.Message, currentAgent, currentModel string) 
 }
 
 func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
-	statusEnum := []any{"working", "agent-done", "complete"}
+	statusEnum := []any{"working", "agent-done"}
 	description := "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done."
 
 	if currentAgent == "coordinator" {
-		statusEnum = append(statusEnum, "human-communication")
+		statusEnum = append(statusEnum, "complete", "human-communication")
 		description = "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done, or set human-communication if you need help or talk to the human partner."
 	}
 
