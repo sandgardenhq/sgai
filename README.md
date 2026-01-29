@@ -25,7 +25,7 @@
 | Variable        | Purpose                                                                         |
 |-----------------|---------------------------------------------------------------------------------|
 | `EDITOR`        | When set, defaults interactive mode to `yes` (opens editor for human responses) |
-| `sgai_NTFY` | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
+| `SGAI_NTFY` | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
 
 ## Installation
 
