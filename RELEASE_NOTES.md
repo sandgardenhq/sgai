@@ -18,4 +18,4 @@
 
 ### Additional Changes
 
-- Updated `README.md` to emphasize `GOAL.md`-driven workflows, highlight the web dashboard, and align configuration guidance with the current setup.
+- Updated `README.md` to improve guidance for `GOAL.md`-driven workflows, expand web dashboard documentation, and update configuration guidance to match the current setup.
