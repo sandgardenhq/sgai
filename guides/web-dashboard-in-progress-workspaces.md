@@ -1,6 +1,6 @@
 # Web dashboard: opening an in-progress workspace
 
-Hey there, fellow developer! 👋
+Hey there, fellow developer!
 
 When a workspace is already running, the web dashboard lets you jump back in quickly. This page explains where the dashboard takes you when you select an **in-progress** workspace.
 
