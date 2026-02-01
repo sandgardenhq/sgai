@@ -358,6 +358,16 @@ func cmdMCP(_ []string) {
 			Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
 			InputSchema: askUserQuestionSchema,
 		}, mcpCtx.askUserQuestionHandler)
+
+		askUserWorkGateSchema, err := jsonschema.For[struct{}](nil)
+		if err != nil {
+			log.Fatalln("failed to create ask_user_work_gate schema:", err)
+		}
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        "ask_user_work_gate",
+			Description: "Present the work gate approval question to the human partner. No arguments needed - the question and choices are hardcoded. When approved, the session switches to self-driving mode for the remainder of the session.",
+			InputSchema: askUserWorkGateSchema,
+		}, mcpCtx.askUserWorkGateHandler)
 	}
 
 	transport := &mcp.StdioTransport{}
@@ -472,6 +482,16 @@ func (c *mcpContext) askUserQuestionHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
+func (c *mcpContext) askUserWorkGateHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := askUserWorkGate(c.workingDir)
+	if err != nil {
+		return nil, emptyResult{}, err
+	}
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: result}},
+	}, emptyResult{}, nil
+}
+
 func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error) {
 	statePath := filepath.Join(workingDir, ".sgai", "state.json")
 
@@ -520,6 +540,37 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		result.WriteString(fmt.Sprintf("  MultiSelect: %v\n", q.MultiSelect))
 	}
 	return result.String(), nil
+}
+
+func askUserWorkGate(workingDir string) (string, error) {
+	statePath := filepath.Join(workingDir, ".sgai", "state.json")
+
+	currentState, err := state.Load(statePath)
+	if err != nil {
+		currentState = state.Workflow{
+			Status:   state.StatusWorking,
+			Progress: []state.ProgressEntry{},
+		}
+	}
+
+	currentState.MultiChoiceQuestion = &state.MultiChoiceQuestion{
+		Questions: []state.QuestionItem{
+			{
+				Question:    "Is the definition complete? May I begin implementation?",
+				Choices:     []string{workGateApprovalText, "Not ready yet, need more clarification"},
+				MultiSelect: false,
+			},
+		},
+		IsWorkGate: true,
+	}
+	currentState.HumanMessage = "Is the definition complete? May I begin implementation?"
+	currentState.Status = state.StatusHumanCommunication
+
+	if err := state.Save(statePath, currentState); err != nil {
+		return "", fmt.Errorf("failed to save state: %w", err)
+	}
+
+	return "Presented work gate question to user:\n\nQuestion: Is the definition complete? May I begin implementation?\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false", nil
 }
 
 func findSkills(workingDir, name string) (string, error) {
