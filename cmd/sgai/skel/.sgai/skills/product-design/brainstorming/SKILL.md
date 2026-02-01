@@ -39,13 +39,6 @@ IMPORTANT: Hand the control back to the human partner so they can feed you with 
 
 IMPORTANT: Hand the control back to the human partner so they can feed you with information.
 
-### Phase 5: Planning Handoff
-Ask: "Ready to create the implementation plan?"
-
-When your human partner confirms (any affirmative response):
-- Announce: "I'm using the Writing Plans skill to create the implementation plan."
-- Create detailed plan
-
 ## When to Revisit Earlier Phases
 
 **You can and should go backward when:**
