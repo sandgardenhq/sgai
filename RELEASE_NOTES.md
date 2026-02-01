@@ -16,12 +16,11 @@
 - **Version**: 0.0.0+20260201
 - **Summary**: This release includes product updates and fixes across core functionality.
 
-{
-  "Additional Changes": [
-    "Simplified the brainstorming skill guidance by removing the explicit planning handoff phase."
-  ],
-  "New Features": [
-    "Added an approval question that can automatically move a session into self-driving mode once a user approves it."
-  ]
-}
+### New Features
+
+- Added an approval question that, once approved, automatically transitions a session into `self-driving mode` and propagates the setting through workflow state and coordinator instructions.
+
+### Additional Changes
+
+- Updated the `brainstorming` skill guidance by removing the explicit planning handoff phase.
 
