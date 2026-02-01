@@ -45,6 +45,16 @@ Common fields include:
 - `modelStatuses` (object map of model ID to status string)
 - `currentModel` (string, format `agentName:modelSpec`)
 
+## Human communication: multiple-choice questions
+
+When a coordinator asks a multiple-choice question (via the MCP tool `ask_user_question`), it writes a `multiChoiceQuestion` object to state.
+
+Each question item includes:
+
+- `question` (string)
+- `choices` (string array)
+- `multiSelect` (boolean)
+
 ## Messages
 
 A message entry includes:
