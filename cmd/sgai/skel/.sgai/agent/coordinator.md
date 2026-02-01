@@ -239,20 +239,13 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
   1. Append all brainstorming decisions with timestamps to 'Agent Decisions Log' section in @.sgai/PROJECT_MANAGEMENT.md
 
   Check your context, @GOAL.md, and @.sgai/PROJECT_MANAGEMENT.md and verify if the human already cleared the WORK-GATE with "DEFINITION IS COMPLETE, BUILD MAY BEGIN" and act accordingly.
-  You MUST ask your human partner if you are allowed to start working. Use the `sgai_ask_user_question` tool with the following format:
+  You MUST ask your human partner if you are allowed to start working. Use the `sgai_ask_user_work_gate` tool:
 
   ```
-  sgai_ask_user_question({
-    questions: [{
-      question: "Is the definition complete? May I begin implementation?",
-      choices: [
-        "DEFINITION IS COMPLETE, BUILD MAY BEGIN",
-        "Not ready yet, need more clarification"
-      ],
-      multiSelect: false
-    }]
-  })
+  sgai_ask_user_work_gate()
   ```
+
+  No arguments are needed - the question and choices are hardcoded. When the human approves, the session automatically switches to self-driving mode.
 
   If the human partner selects "DEFINITION IS COMPLETE, BUILD MAY BEGIN", log this decision into @.sgai/PROJECT_MANAGEMENT, and hand-over control to specialized agents to execute the work.
   If the human partner selects "Not ready yet, need more clarification", return to the BRAINSTORMING step to gather more requirements.

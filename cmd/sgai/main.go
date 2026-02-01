@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const workGateApprovalText = "DEFINITION IS COMPLETE, BUILD MAY BEGIN"
+
 var modelVariantPattern = regexp.MustCompile(`^(.+?)\s*\(([^)]+)\)$`)
 
 func parseModelAndVariant(modelSpec string) (model, variant string) {
@@ -383,6 +385,9 @@ func runWorkflow(ctx context.Context, args []string) {
 
 		metadata = tryReloadGoalMetadata(goalPath, metadata)
 		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, interactive, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+		if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
+			return
+		}
 		if wfState.Status == state.StatusComplete {
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
@@ -425,6 +430,9 @@ func runWorkflow(ctx context.Context, args []string) {
 
 			metadata = tryReloadGoalMetadata(goalPath, metadata)
 			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, interactive, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+			if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
+				return
+			}
 
 			if wfState.Status == state.StatusComplete {
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
@@ -453,6 +461,20 @@ func runWorkflow(ctx context.Context, args []string) {
 			continue
 		}
 	}
+}
+
+func applyWorkGateApproval(wfState *state.Workflow, interactive *string, stateJSONPath, paddedsgai string) bool {
+	if !wfState.WorkGateApproved {
+		return false
+	}
+	*interactive = "auto-session"
+	wfState.WorkGateApproved = false
+	if err := state.Save(stateJSONPath, *wfState); err != nil {
+		log.Println("failed to save state:", err)
+		return true
+	}
+	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto-session mode")
+	return false
 }
 
 func selectModelForAgent(metadataModels map[string]any, agent string) string {
@@ -858,7 +880,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				case "yes":
 					fmt.Println("["+cfg.paddedsgai+"]", "multi-choice question requested...")
 					handleMultiChoiceQuestion(cfg.dir, cfg.statePath, newState.MultiChoiceQuestion)
-				case "auto":
+				case "auto", "auto-session":
 					fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: auto-selecting first option...")
 					autoResponse := formatMultiChoiceResponse([]string{newState.MultiChoiceQuestion.Questions[0].Choices[0]}, "")
 					writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponse)
@@ -881,7 +903,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 					} else {
 						fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
 					}
-				case "auto":
+				case "auto", "auto-session":
 					fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: sending decision principles...")
 					writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponseMessage)
 				case "no":
@@ -893,6 +915,17 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			}
 
 			humanResponse = waitForStateTransition(cfg.dir, cfg.statePath)
+			if newState.MultiChoiceQuestion != nil && newState.MultiChoiceQuestion.IsWorkGate && strings.Contains(humanResponse, workGateApprovalText) {
+				loadedState, errLoad := state.Load(cfg.statePath)
+				if errLoad != nil {
+					log.Println("failed to load state for work gate approval:", errLoad)
+				} else {
+					loadedState.WorkGateApproved = true
+					if errSave := state.Save(cfg.statePath, loadedState); errSave != nil {
+						log.Fatalln("failed to save work gate approval:", errSave)
+					}
+				}
+			}
 			wfState = newState
 			wfState.Status = state.StatusWorking
 			continue

@@ -60,7 +60,8 @@ type QuestionItem struct {
 // MultiChoiceQuestion stores an active batch of questions for human response.
 // Used by the AskUserQuestion tool to present choices to the human partner.
 type MultiChoiceQuestion struct {
-	Questions []QuestionItem `json:"questions"`
+	Questions  []QuestionItem `json:"questions"`
+	IsWorkGate bool           `json:"isWorkGate,omitempty"`
 }
 
 // TokenUsage tracks token counts from a step.
@@ -122,7 +123,9 @@ type Workflow struct {
 	AgentSequence       []AgentSequenceEntry `json:"agentSequence,omitempty"`
 	SessionID           string               `json:"sessionId,omitempty"`
 
-	Cost SessionCost `json:"cost,omitempty"`
+	Cost SessionCost `json:"cost"`
+
+	WorkGateApproved bool `json:"workGateApproved,omitempty"`
 
 	// ModelStatuses tracks per-model status in multi-model agents.
 	// Key is model ID (agent:modelSpec), value is "model-working", "model-done", or "model-error".
