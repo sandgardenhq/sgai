@@ -18,10 +18,10 @@
 
 {
   "Additional Changes": [
-    "Simplified the brainstorming skill guidance by removing the explicit planning handoff phase. The instructions no longer include a dedicated planning-to-execution transition step, reducing directive complexity in the brainstorming flow."
+    "Simplified the brainstorming skill guidance by removing the explicit planning handoff phase."
   ],
   "New Features": [
-    "Added an approval question that can automatically move a session into self-driving mode once a user approves it. The approval is propagated through workflow state and integrated with MCP tools and coordinator instructions so the mode switch is enforced end-to-end."
+    "Added an approval question that can automatically move a session into self-driving mode once a user approves it."
   ]
 }
 
