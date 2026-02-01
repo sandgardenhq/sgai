@@ -22,6 +22,11 @@ sgai [--interactive] [--fresh] <target_directory>
   - `no` (exit on human-communication)
   - `auto` (self-driving)
 
+  When `--interactive=auto`, `sgai` does not prompt for human input in the terminal:
+
+  - For multiple-choice questions (see `ask_user_question`), `sgai` automatically selects the first choice.
+  - For non-multiple-choice human communication, `sgai` writes a default response that ends with `DEFINITION IS COMPLETE, BUILD MAY BEGIN`.
+
 - `--fresh`
 
   Force a fresh start (do not resume existing workflow).

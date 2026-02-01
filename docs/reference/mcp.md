@@ -104,3 +104,8 @@ Input:
 
 - `questions`: array of `{ "question": string, "choices": string[], "multiSelect": boolean }`
 
+Behavior:
+
+- Writes the questions to `.sgai/state.json` as `multiChoiceQuestion`.
+- Sets `humanMessage` to the first question.
+- Sets `status` to `human-communication`.
