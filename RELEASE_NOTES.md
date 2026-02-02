@@ -16,9 +16,7 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes updates delivered on 2026-02-02.
 
-{
-  "Breaking Changes": [
-    "The interactive workflow now uses a structured multi-choice prompt instead of free-form messaging, making the interaction flow clearer and more consistent across tools."
-  ]
-}
+### Breaking Changes
+
+- Updated the interactive workflow to use a structured multi-choice prompt instead of free-form messaging, improving consistency across tools.
 
