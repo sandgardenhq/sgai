@@ -13,6 +13,16 @@ The `status` field in `.sgai/state.json` uses these values:
 - `working`
 - `agent-done`
 - `complete`
+- `waiting-for-human`
+
+### `waiting-for-human`
+
+`waiting-for-human` indicates the workflow is paused until a human responds.
+
+At this point, you typically see at least one of the following in state:
+
+- `multiChoiceQuestion` is present (structured questions)
+- `humanMessage` is non-empty (a free-form prompt for the human)
 
 ### Coordinator-only statuses in MCP
 
@@ -20,6 +30,8 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 
 - When the current agent is `coordinator`, the schema allows `complete`.
 - When the current agent is not `coordinator`, the schema only allows `working` and `agent-done`.
+
+`update_workflow_state` does not set `waiting-for-human`. The workflow enters `waiting-for-human` via the coordinator's human-interaction tools (for example, `ask_user_question`).
 
 ## Human interaction
 
@@ -38,6 +50,7 @@ Common fields include:
 - `task` (string)
 - `progress` (array of objects with `timestamp`, `agent`, `description`)
 - `multiChoiceQuestion` (object with `questions`, each with `question`, `choices`, `multiSelect`)
+- `humanMessage` (string)
 - `messages` (array of inter-agent messages)
 - `visitCounts` (object map of agent name to integer)
 - `currentAgent` (string)
