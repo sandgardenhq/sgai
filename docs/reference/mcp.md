@@ -14,6 +14,20 @@ sgai mcp
 
 If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`.
 
+## Interactive mode
+
+The MCP server reads `SGAI_MCP_INTERACTIVE` to decide whether to run in a self-driving mode.
+
+- Self-driving modes: `auto`, `auto-session`
+- Non-self-driving modes: `yes`, `no`, or an empty value
+
+When `SGAI_MCP_INTERACTIVE` is a self-driving mode:
+
+- The MCP server does **not** register the tools that prompt a human for input:
+  - `ask_user_question`
+  - `ask_user_work_gate`
+- `update_workflow_state.status` does not include the `human-communication` status value.
+
 ## Tools
 
 ### `find_skills`
