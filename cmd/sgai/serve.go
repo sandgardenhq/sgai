@@ -400,7 +400,7 @@ func (s *Server) stopSession(workspacePath string) {
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
-	if wfState.Status == "waiting-for-human" && wfState.HumanMessage != "" {
+	if wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "") {
 		return "badge-needs-input", "Needs Input"
 	}
 	if running || wfState.Status == state.StatusWorking || wfState.Status == state.StatusAgentDone {
@@ -685,7 +685,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 	}
 
 	badgeClass, badgeText := badgeStatus(wfState, running)
-	needsInput := wfState.Status == "waiting-for-human" && wfState.HumanMessage != ""
+	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
 
 	status := wfState.Status
 	if status == "" {
@@ -1309,56 +1309,32 @@ func (s *Server) pageRespond(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	isModal := r.URL.Query().Get("modal") == "true"
 
-	if wfState.MultiChoiceQuestion != nil && len(wfState.MultiChoiceQuestion.Questions) > 0 {
-		mcData := struct {
-			AgentName          string
-			Questions          []state.QuestionItem
-			Directory          string
-			DirName            string
-			ReturnTo           string
-			GoalContent        template.HTML
-			ProjectMgmtContent template.HTML
-		}{
-			AgentName:          agentName,
-			Questions:          wfState.MultiChoiceQuestion.Questions,
-			Directory:          dir,
-			DirName:            filepath.Base(dir),
-			ReturnTo:           returnTo,
-			GoalContent:        template.HTML(goalContent),
-			ProjectMgmtContent: template.HTML(projectMgmtContent),
-		}
-		if isModal {
-			executeTemplate(w, templates.Lookup("response_multichoice_modal.html"), mcData)
-		} else {
-			executeTemplate(w, templates.Lookup("response_multichoice.html"), mcData)
-		}
+	if wfState.MultiChoiceQuestion == nil || len(wfState.MultiChoiceQuestion.Questions) == 0 {
+		http.Redirect(w, r, returnTo, http.StatusSeeOther)
 		return
 	}
 
-	data := struct {
-		AgentName            string
-		HumanMessage         string
-		RenderedHumanMessage template.HTML
-		Directory            string
-		DirName              string
-		ReturnTo             string
-		GoalContent          template.HTML
-		ProjectMgmtContent   template.HTML
+	mcData := struct {
+		AgentName          string
+		Questions          []state.QuestionItem
+		Directory          string
+		DirName            string
+		ReturnTo           string
+		GoalContent        template.HTML
+		ProjectMgmtContent template.HTML
 	}{
-		AgentName:            agentName,
-		HumanMessage:         wfState.HumanMessage,
-		RenderedHumanMessage: renderHumanMessage(wfState.HumanMessage),
-		Directory:            dir,
-		DirName:              filepath.Base(dir),
-		ReturnTo:             returnTo,
-		GoalContent:          template.HTML(goalContent),
-		ProjectMgmtContent:   template.HTML(projectMgmtContent),
+		AgentName:          agentName,
+		Questions:          wfState.MultiChoiceQuestion.Questions,
+		Directory:          dir,
+		DirName:            filepath.Base(dir),
+		ReturnTo:           returnTo,
+		GoalContent:        template.HTML(goalContent),
+		ProjectMgmtContent: template.HTML(projectMgmtContent),
 	}
-
 	if isModal {
-		executeTemplate(w, templates.Lookup("response_modal.html"), data)
+		executeTemplate(w, templates.Lookup("response_multichoice_modal.html"), mcData)
 	} else {
-		executeTemplate(w, templates.Lookup("response_dialog.html"), data)
+		executeTemplate(w, templates.Lookup("response_multichoice.html"), mcData)
 	}
 }
 
@@ -1382,13 +1358,7 @@ func (s *Server) pageRespondPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var response string
-	isMultichoice := r.FormValue("multichoice") == "true"
-	if isMultichoice {
-		response = buildMultichoiceResponse(r)
-	} else {
-		response = r.FormValue("response")
-	}
+	response := buildMultichoiceResponse(r)
 
 	if response == "" {
 		http.Error(w, "Missing response", http.StatusBadRequest)
@@ -1858,7 +1828,7 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 	}
 
 	wfState, _ := state.Load(statePath(dir))
-	needsInput = wfState.Status == "waiting-for-human" && wfState.HumanMessage != ""
+	needsInput = wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
 	return running, needsInput
 }
 
@@ -2369,7 +2339,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		sess.mu.Unlock()
 	}
 
-	needsInput := wfState.Status == "waiting-for-human" && wfState.HumanMessage != ""
+	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
 	isFork := hasJJDirectory(dir) && !isRootWorkspace(dir)
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
@@ -2689,7 +2659,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		currentAgent = "Unknown"
 	}
 
-	needsInput := wfState.Status == "waiting-for-human" && wfState.HumanMessage != ""
+	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
 	renderedHumanMessage := renderHumanMessage(wfState.HumanMessage)
 
 	var goalContent template.HTML

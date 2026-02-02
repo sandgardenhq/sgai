@@ -888,10 +888,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				case "yes":
 					fmt.Println("["+cfg.paddedsgai+"]", "multi-choice question requested...")
 					handleMultiChoiceQuestion(cfg.dir, cfg.statePath, newState.MultiChoiceQuestion)
-				case "auto", "auto-session":
-					fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: auto-selecting first option...")
-					autoResponse := formatMultiChoiceResponse([]string{newState.MultiChoiceQuestion.Questions[0].Choices[0]}, "")
-					writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponse)
 				case "no":
 					for i, q := range newState.MultiChoiceQuestion.Questions {
 						fmt.Printf("["+cfg.paddedsgai+"] question %d:\n", i+1)
@@ -910,15 +906,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 						launchEditorForResponse(cfg.dir, newState.HumanMessage, cfg.statePath)
 					} else {
 						fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
-					}
-				case "auto", "auto-session":
-					if newState.MultiChoiceQuestion != nil && len(newState.MultiChoiceQuestion.Questions) > 0 {
-						fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: auto-selecting first option...")
-						autoResponse := formatMultiChoiceResponse([]string{newState.MultiChoiceQuestion.Questions[0].Choices[0]}, "")
-						writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponse)
-					} else {
-						fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: sending decision principles...")
-						writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponseMessage)
 					}
 				case "no":
 					fmt.Println("["+cfg.paddedsgai+"]", "message:")
@@ -1295,18 +1282,6 @@ func parseYAMLFrontmatter(content []byte) (GoalMetadata, error) {
 
 //go:embed skel/**
 var skelFS embed.FS
-
-const autoResponseMessage = `
-always respect the expertise of the agents in the flow, never execute work that isn't yours - coordinator explicitly delegates tasks to agents for a reason, coordinator MUST NEVER write source code directly
-always prefer solutions that minimize complexity
-always go with the solution with fewest moving parts
-always go with the solution with most synchronous implementation
-always go with the solution that involves the least number of architectural or structural changes
-always go with the solution that involves the zeroest number of additional state management
-always go with the solution that involves managing state locally, never globally
-always go with the solution that adheres to the original style, patterns, and conventions of the existing codebase
-DEFINITION IS COMPLETE, BUILD MAY BEGIN
-`
 
 func normalizeInteractive(value string) string {
 	switch strings.ToLower(value) {

@@ -166,7 +166,7 @@ sgai_check_outbox()  // Returns all messages sent by you, so that you can avoid 
 
 ## Human Communication and Answer Logging
 
-As the coordinator, you are the ONLY agent that can communicate with the human partner via `human-communication` status.
+As the coordinator, you are the ONLY agent that can communicate with the human partner via `ask_user_question`.
 
 ### Before Asking Human Questions
 ALWAYS check .sgai/PROJECT_MANAGEMENT.md first to see if the question was already answered in a previous session. Look for:

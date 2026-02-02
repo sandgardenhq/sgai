@@ -22,8 +22,6 @@ var ValidStatuses = []string{
 	StatusWorking,
 	StatusAgentDone,
 	StatusComplete,
-	StatusHumanCommunication,
-	StatusWaitingForHuman,
 }
 
 // TodoItem represents a single item in the agent's TODO list.

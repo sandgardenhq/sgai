@@ -17,7 +17,7 @@ REMEMBER: file references like @FILENAME.md mean you must read the file $current
 
 RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;
 
-if you want to tell me something, make sure you must call sgai_update_workflow_state (set blocked and a blocked message);
+if you want to tell me something, use ask_user_question to present structured questions;
 
 You can send messages to other agents using sgai_send_message() (make sure you call sgai_check_outbox() to see if you haven't sent the message you want to send, avoid duplicated messages) and read messages using sgai_check_inbox(). You can also read messages from other agents and send messages to other agents by writing them into @PROJECT_MANAGEMENT.md
 
@@ -45,7 +45,7 @@ Successors (can pass work to): %SUCCESSORS%
 </UserInstructions>.
 
 ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.
-IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA THE WORKFLOW STATE (set-workflow-state skill).
+IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).
 
 # PRODUCTIVE WORK GUIDELINES
 BEFORE calling sgai_update_workflow_state, ask yourself:
@@ -53,7 +53,6 @@ BEFORE calling sgai_update_workflow_state, ask yourself:
 2. If I only called sgai_update_workflow_state with status "working", I'm wasting a turn - DO SOMETHING PRODUCTIVE FIRST.
 3. Status "working" should be used ONLY after doing substantial work that needs continuation.
 4. If my work is complete, use status "agent-done" so the system can move forward.
-5. Only use status "human-communication" when I genuinely need human input.
 
 ANTI-PATTERN: Repeatedly calling sgai_update_workflow_state({status:"working"}) without doing real work creates infinite loops.
 GOOD PATTERN: Read files -> Write code -> Run tests -> THEN sgai_update_workflow_state with appropriate status.

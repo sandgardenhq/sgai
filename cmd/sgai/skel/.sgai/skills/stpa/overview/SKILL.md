@@ -62,7 +62,7 @@ Load: `skills({"name":"stpa/step4-loss-scenarios"})`
 At each step:
 1. Load the step-specific skill
 2. Ask ONE question at a time
-3. Use `human-communication` status to wait for responses
+3. Use `ask_user_question` to present questions and wait for responses
 4. Record answers in .sgai/PROJECT_MANAGEMENT.md under `## STPA Analysis`
 5. Continue to next question or step
 

@@ -13,11 +13,10 @@ description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU 
 
 ```json
 {
-  "status": "working" | "agent-done" | "complete" | "human-communication",
+  "status": "working" | "agent-done" | "complete",
   "message": "Status message describing current state",
   "task": "Current task description or null",
-  "progress": ["note1", "note2", "note3"],
-  "humanMessage": "A message for the human to see, must be set with status:human-communication"
+  "progress": ["note1", "note2", "note3"]
 }
 ```
 
@@ -27,7 +26,6 @@ description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU 
 - `"working"` - Actively working, may need another iteration
 - `"agent-done"` - Agent finished its work and the sgai should move to the next agent.
 - `"complete"` - Work is done successfully
-- `"human-communication"` - Return control to human partner to communicate
 
 **`message`** - Status message
 - Brief description of current state
@@ -46,15 +44,6 @@ description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU 
 - Track issues encountered and how you resolved them
 - This helps humans understand your thought process
 
-**`humanMessage`** - Message you want the human to see so it can communicate back to you
-- Set when you need human input
-- Leave as `null` during normal work
-- Examples:
-  - "Should I use PostgreSQL or MongoDB for this feature?"
-  - "The API credentials are missing. Where should I find them?"
-  - "Design choice: REST or GraphQL for this endpoint?"
-- After human responds, clear this field and continue working
-
 ### How to Update State File
 
 **IMPORTANT:** Use the `sgai_update_workflow_state` tool to update the state file. Do NOT use bash/jq commands directly.
@@ -62,10 +51,9 @@ description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU 
 **Tool: sgai_update_workflow_state**
 
 Available parameters:
-- `status` (required): "working" | "agent-done" | "complete" | "human-communication"
+- `status` (required): "working" | "agent-done" | "complete"
 - `task` (required): Current task being worked on. Use empty string to clear.
 - `addProgress` (required): Add a progress note (appended to progress array). Document your steps frequently.
-- `humanMessage` (optional): A message for the human to see, must be set with status:human-communication, or null
 
 **Examples:**
 
@@ -89,27 +77,6 @@ Parameters: {
 ```
 
 ```
-Request help (blocked):
-Tool: sgai_update_workflow_state
-Parameters: {
-  "status": "human-communication",
-  "humanMessage": "Should I use refresh tokens (complex, better UX) or simple JWT (simpler)?",
-  "addProgress": "Paused to ask about authentication strategy"
-}
-```
-
-```
-Continue working after help received:
-Tool: sgai_update_workflow_state
-Parameters: {
-  "status": "working",
-  "humanMessage": null,
-  "task": "Implementing refresh token logic",
-  "addProgress": "Human chose refresh tokens, proceeding with implementation"
-}
-```
-
-```
 Signal work is done for this agent:
 Tool: sgai_update_workflow_state
 Parameters: {
@@ -125,6 +92,10 @@ Parameters: {
 - Before requesting another iteration
 - Before marking complete
 - At least every few turns of work
+
+### Human Communication
+
+Use `ask_user_question` to present structured multi-choice questions to the human partner. This is the sole channel for human communication.
 
 ---
 

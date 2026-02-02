@@ -210,10 +210,9 @@ type findSnippetsArgs struct {
 type workflowStatus string
 
 type updateWorkflowStateArgs struct {
-	Status       workflowStatus `json:"status" jsonschema:"Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved) or 'human-communication' (cannot proceed - need human help). Valid values: working, agent-done, complete, human-communication"`
-	Task         string         `json:"task" jsonschema:"Current task being worked on (e.g. 'Writing tests for auth endpoints'). Use empty string to clear. Be specific about what you're doing."`
-	AddProgress  string         `json:"addProgress" jsonschema:"Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps."`
-	HumanMessage *string        `json:"humanMessage,omitempty" jsonschema:"Message you want the human partner to see. Set to empty to clear. Only set when status='human-communication'. Be clear about what you need help with."`
+	Status      workflowStatus `json:"status" jsonschema:"Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete"`
+	Task        string         `json:"task" jsonschema:"Current task being worked on (e.g. 'Writing tests for auth endpoints'). Use empty string to clear. Be specific about what you're doing."`
+	AddProgress string         `json:"addProgress" jsonschema:"Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps."`
 }
 
 type sendMessageArgs struct {
@@ -282,7 +281,7 @@ func cmdMCP(_ []string) {
 		InputSchema: findSnippetsSchema,
 	}, mcpCtx.findSnippetsHandler)
 
-	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(currentAgent, interactive)
+	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(currentAgent)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_workflow_state",
 		Description: updateWorkflowStateDescription,
@@ -885,19 +884,11 @@ func updateWorkflowState(workingDir string, args updateWorkflowStateArgs) (strin
 		currentState.Progress = append(currentState.Progress, entry)
 	}
 
-	if args.HumanMessage != nil {
-		currentState.HumanMessage = *args.HumanMessage
-	}
-
 	if currentState.Status == state.StatusAgentDone || currentState.Status == state.StatusComplete {
 		pendingCount := countPendingTodos(currentState, currentState.CurrentAgent)
 		if pendingCount > 0 {
 			return fmt.Sprintf("Error: Cannot transition to '%s' with %d pending TODO items. Please complete all TODO items first.", currentState.Status, pendingCount), nil
 		}
-	}
-
-	if currentState.Status == "human-communication" && currentState.HumanMessage == "" {
-		return "Warning: Status is 'human-communication' but no humanMessage provided. Please specify why you need human communication.", nil
 	}
 
 	if (currentState.Status == state.StatusComplete || currentState.Status == state.StatusAgentDone) && currentState.Task != "" {
@@ -915,9 +906,6 @@ func updateWorkflowState(workingDir string, args updateWorkflowStateArgs) (strin
 	}
 	if args.AddProgress != "" {
 		response += fmt.Sprintf("  Added progress note: %s\n", args.AddProgress)
-	}
-	if currentState.HumanMessage != "" {
-		response += fmt.Sprintf("  Human Message: %s\n", currentState.HumanMessage)
 	}
 	response += fmt.Sprintf("  Total progress notes: %d", len(currentState.Progress))
 
@@ -1217,16 +1205,12 @@ func isSelfDriveMode(interactive string) bool {
 	return interactive == "auto" || interactive == "auto-session"
 }
 
-func buildUpdateWorkflowStateSchema(currentAgent, interactive string) (*jsonschema.Schema, string) {
+func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
 	statusEnum := []any{"working", "agent-done"}
 	description := "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done."
 
 	if currentAgent == "coordinator" {
 		statusEnum = append(statusEnum, "complete")
-		if !isSelfDriveMode(interactive) {
-			statusEnum = append(statusEnum, "human-communication")
-			description = "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done, or set human-communication if you need help or talk to the human partner."
-		}
 	}
 
 	schema := &jsonschema.Schema{
@@ -1235,7 +1219,7 @@ func buildUpdateWorkflowStateSchema(currentAgent, interactive string) (*jsonsche
 			"status": {
 				Type:        "string",
 				Enum:        statusEnum,
-				Description: "Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved) or 'human-communication' (cannot proceed - need human help). Valid values: working, agent-done, complete, human-communication",
+				Description: "Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete",
 			},
 			"task": {
 				Type:        "string",
@@ -1244,10 +1228,6 @@ func buildUpdateWorkflowStateSchema(currentAgent, interactive string) (*jsonsche
 			"addProgress": {
 				Type:        "string",
 				Description: "Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps.",
-			},
-			"humanMessage": {
-				Type:        "string",
-				Description: "Message you want the human partner to see. Set to empty to clear. Only set when status='human-communication'. Be clear about what you need help with.",
 			},
 		},
 		Required: []string{"status", "task", "addProgress"},
