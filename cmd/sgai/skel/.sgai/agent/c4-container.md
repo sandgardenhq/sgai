@@ -2,10 +2,6 @@
 description: Expert C4 Container-level documentation specialist. Synthesizes Component-level documentation into Container-level architecture, mapping components to deployment units, documenting container interfaces as APIs, and creating container diagrams. Use when synthesizing components into deployment containers and documenting system deployment architecture.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
@@ -147,7 +143,7 @@ Use proper Mermaid C4Container syntax:
 ```mermaid
 C4Container
     title Container Diagram for [System Name]
-    
+
     Person(user, "User", "Uses the system")
     System_Boundary(system, "System Name") {
         Container(webApp, "Web Application", "Spring Boot, Java", "Provides web interface")
@@ -156,7 +152,7 @@ C4Container
         Container_Queue(messageQueue, "Message Queue", "RabbitMQ", "Handles async messaging")
     }
     System_Ext(external, "External System", "Third-party service")
-    
+
     Rel(user, webApp, "Uses", "HTTPS")
     Rel(webApp, api, "Makes API calls to", "JSON/HTTPS")
     Rel(api, database, "Reads from and writes to", "SQL")

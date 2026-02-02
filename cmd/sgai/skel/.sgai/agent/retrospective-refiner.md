@@ -2,9 +2,6 @@
 description: Deduplicates, polishes, and formats IMPROVEMENTS.draft.md into the final $retrospectivePath/IMPROVEMENTS.md with checkbox approval format
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
   webfetch: deny
   doom_loop: deny
   external_directory: deny

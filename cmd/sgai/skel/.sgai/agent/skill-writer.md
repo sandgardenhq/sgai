@@ -1,6 +1,6 @@
 ---
 description: Creates new skills from approved suggestions, MUST validate using testing-skills-with-subagents before completion
-mode: primary
+mode: all
 permission:
   doom_loop: deny
   external_directory: deny

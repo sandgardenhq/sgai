@@ -1,11 +1,7 @@
 ---
 description: Adjusts source code CLI output style for minimal, plain-text output
-mode: primary
+mode: all
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

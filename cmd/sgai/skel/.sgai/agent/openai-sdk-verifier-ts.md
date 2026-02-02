@@ -2,10 +2,6 @@
 description: Use this agent to verify that a TypeScript OpenAI Agents SDK application is properly configured, follows SDK best practices and documentation recommendations, and is ready for deployment or testing. This agent should be invoked after a TypeScript OpenAI SDK app has been created or modified.
 mode: all
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

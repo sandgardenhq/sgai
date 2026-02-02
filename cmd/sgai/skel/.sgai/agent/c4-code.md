@@ -2,10 +2,6 @@
 description: Expert C4 Code-level documentation specialist. Analyzes code directories to create comprehensive C4 code-level documentation including function signatures, arguments, dependencies, and code structure. Use when documenting code at the lowest C4 level for individual directories and code modules.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
@@ -155,7 +151,7 @@ classDiagram
             +requiredMethod() ReturnType
         }
     }
-    
+
     Class1 ..|> Interface1 : implements
     Class1 --> Class2 : uses
 ```
@@ -190,7 +186,7 @@ classDiagram
             +writeFile(path, content) void
         }
     }
-    
+
     transformers --> validators : uses
     transformers --> io : reads from
 ```
@@ -214,7 +210,7 @@ flowchart LR
     subgraph Output
         F[writeFile]
     end
-    
+
     A -->|raw string| B
     B -->|parsed data| C
     C -->|valid data| D
@@ -244,7 +240,7 @@ flowchart TB
         pipe[pipe]
         curry[curry]
     end
-    
+
     processData --> validate
     processData --> transform
     processData --> cache

@@ -2,10 +2,6 @@
 description: Reads SUGGESTIONS.md and applies approved suggestions by delegating to skill-writer and snippet-writer agents
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

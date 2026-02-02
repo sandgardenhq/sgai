@@ -2,10 +2,6 @@
 description: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks to which no other specialized agent would be able to do; be aware that maybe other agents are more adequate for language or domain specific work.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
