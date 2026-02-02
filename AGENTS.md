@@ -1,5 +1,9 @@
 Every time you are asked to make a modification to `/.sgai` you have to make the modification to `cmd/sgai/skel/.sgai` instead.
 
+For the list of agent roles available in SGAI, see:
+
+- [SGAI Agents Reference](./docs/AGENTS.md)
+
 In term of Go code style, I prefer total absence of inline comments; organize functions and if blocks in a way that they have intention revealing names, and use that instead.
 
 In term of Go code style, I prefer very private functions over public functions; private struct over public structs; local types and structs over global structs; public functions and structs must have godoc comments.
