@@ -106,7 +106,7 @@ The web dashboard shows:
 - Start/Stop controls for the engine
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
-- Human response interface for agent questions
+- Interface for answering agent questions (multiple-choice prompts)
 
 ## GOAL.md Reference
 
