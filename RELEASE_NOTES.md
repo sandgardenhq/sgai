@@ -18,11 +18,4 @@
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Documentation now consistently points readers to the correct project management file location so they can find the same guidance across agent and skill docs."
-  ]
-}
-
-```
+- Updated documentation references to consistently use `.sgai/PROJECT_MANAGEMENT.md` for project management guidance.
