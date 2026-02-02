@@ -328,9 +328,7 @@ func (s *Server) renderTreesRetrospectivesTabToBuffer(buf *bytes.Buffer, _ *http
 		Details:         detailsData,
 	}
 
-	if err := templates.Lookup("trees_retrospectives_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+	renderTabToBuffer(buf, "trees_retrospectives_content.html", data)
 }
 
 func (s *Server) runWorkspaceRetrospectiveCommand(w http.ResponseWriter, r *http.Request, workspacePath, keyPrefix, subcommand, startErrorMsg string) {

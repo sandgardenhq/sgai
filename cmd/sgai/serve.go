@@ -1207,6 +1207,12 @@ func (s *Server) renderNoWorkspacePlaceholder(dir string) workspaceContentResult
 	}
 }
 
+func renderTabToBuffer(buf *bytes.Buffer, templateName string, data any) {
+	if err := templates.Lookup(templateName).Execute(buf, data); err != nil {
+		log.Println("template execution failed:", err)
+	}
+}
+
 func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Request) tabContentResult {
 	var buf bytes.Buffer
 	var result tabContentResult
@@ -1220,17 +1226,17 @@ func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Req
 			return result
 		}
 	case "specification":
-		s.renderTreesSpecificationTabToBuffer(&buf, r, dir)
+		s.renderTreesSpecificationTab(&buf, r, dir)
 	case "log":
-		s.renderTreesLogTabToBuffer(&buf, dir)
+		s.renderTreesLogTab(&buf, dir)
 	case "progress":
-		s.renderTreesEventsTabToBuffer(&buf, r, dir)
+		s.renderTreesEventsTab(&buf, r, dir)
 	case "changes":
-		s.renderTreesChangesTabToBuffer(&buf, dir)
+		s.renderTreesChangesTab(&buf, dir)
 	case "commits":
-		s.renderTreesCommitsTabToBuffer(&buf, dir)
+		s.renderTreesCommitsTab(&buf, dir)
 	case "messages":
-		s.renderTreesMessagesTabToBuffer(&buf, dir)
+		s.renderTreesMessagesTab(&buf, dir)
 	case "retrospectives":
 		s.renderTreesRetrospectivesTabToBuffer(&buf, r, dir, sessionParam)
 	default:
@@ -1241,7 +1247,7 @@ func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Req
 	return result
 }
 
-func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.Request, dir string) {
+func (s *Server) renderTreesSpecificationTab(buf *bytes.Buffer, r *http.Request, dir string) {
 	var goalContent template.HTML
 	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
 		stripped := stripFrontmatter(string(data))
@@ -1260,9 +1266,7 @@ func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.
 		}
 	}
 
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
-
-	data := struct {
+	renderTabToBuffer(buf, "trees_specification_content.html", struct {
 		Directory          string
 		DirName            string
 		GoalContent        template.HTML
@@ -1275,15 +1279,11 @@ func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.
 		GoalContent:        goalContent,
 		ProjectMgmtContent: projectMgmtContent,
 		HasProjectMgmt:     projectMgmtExists,
-		CodeAvailable:      codeAvailable,
-	}
-
-	if err := templates.Lookup("trees_specification_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+		CodeAvailable:      s.codeAvailable && isLocalRequest(r),
+	})
 }
 
-func (s *Server) renderTreesLogTabToBuffer(buf *bytes.Buffer, dir string) {
+func (s *Server) renderTreesLogTab(buf *bytes.Buffer, dir string) {
 	type logEntry struct {
 		Prefix string
 		Text   string
@@ -1302,7 +1302,7 @@ func (s *Server) renderTreesLogTabToBuffer(buf *bytes.Buffer, dir string) {
 		}
 	}
 
-	data := struct {
+	renderTabToBuffer(buf, "trees_log_content.html", struct {
 		Directory string
 		DirName   string
 		Logs      []logEntry
@@ -1310,28 +1310,19 @@ func (s *Server) renderTreesLogTabToBuffer(buf *bytes.Buffer, dir string) {
 		Directory: dir,
 		DirName:   filepath.Base(dir),
 		Logs:      logs,
-	}
-
-	if err := templates.Lookup("trees_log_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+	})
 }
 
-func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request, dir string) {
+func (s *Server) renderTreesEventsTab(buf *bytes.Buffer, r *http.Request, dir string) {
 	wfState, _ := state.Load(statePath(dir))
 
 	reversedProgress := slices.Clone(wfState.Progress)
 	slices.Reverse(reversedProgress)
 
-	progressDisplay := formatProgressForDisplay(reversedProgress)
-
 	currentAgent := wfState.CurrentAgent
 	if currentAgent == "" {
 		currentAgent = "Unknown"
 	}
-
-	needsInput := wfState.NeedsHumanInput()
-	renderedHumanMessage := renderHumanMessage(wfState.HumanMessage)
 
 	var goalContent template.HTML
 	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
@@ -1341,9 +1332,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		}
 	}
 
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
-
-	data := struct {
+	renderTabToBuffer(buf, "trees_events_content.html", struct {
 		Directory            string
 		DirName              string
 		Progress             []eventsProgressDisplay
@@ -1358,23 +1347,19 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
-		Progress:             progressDisplay,
+		Progress:             formatProgressForDisplay(reversedProgress),
 		SVGHash:              getWorkflowSVGHash(dir, currentAgent),
 		CurrentAgent:         currentAgent,
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
-		NeedsInput:           needsInput,
-		RenderedHumanMessage: renderedHumanMessage,
+		NeedsInput:           wfState.NeedsHumanInput(),
+		RenderedHumanMessage: renderHumanMessage(wfState.HumanMessage),
 		GoalContent:          goalContent,
-		CodeAvailable:        codeAvailable,
-	}
-
-	if err := templates.Lookup("trees_events_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+		CodeAvailable:        s.codeAvailable && isLocalRequest(r),
+	})
 }
 
-func (s *Server) renderTreesChangesTabToBuffer(buf *bytes.Buffer, dir string) {
+func (s *Server) renderTreesChangesTab(buf *bytes.Buffer, dir string) {
 	diffCmd := exec.Command("jj", "diff", "--git")
 	diffCmd.Dir = dir
 	diffOutput, err := diffCmd.Output()
@@ -1390,7 +1375,7 @@ func (s *Server) renderTreesChangesTabToBuffer(buf *bytes.Buffer, dir string) {
 		descOutput = []byte("")
 	}
 
-	data := struct {
+	renderTabToBuffer(buf, "trees_changes_content.html", struct {
 		Directory   string
 		DirName     string
 		DiffOutput  template.HTML
@@ -1400,14 +1385,10 @@ func (s *Server) renderTreesChangesTabToBuffer(buf *bytes.Buffer, dir string) {
 		DirName:     filepath.Base(dir),
 		DiffOutput:  formatDiffHTML(diffOutput),
 		Description: strings.TrimSpace(string(descOutput)),
-	}
-
-	if err := templates.Lookup("trees_changes_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+	})
 }
 
-func (s *Server) renderTreesCommitsTabToBuffer(buf *bytes.Buffer, dir string) {
+func (s *Server) renderTreesCommitsTab(buf *bytes.Buffer, dir string) {
 	if !hasJJDirectory(dir) {
 		buf.WriteString("<p><em>Not a jj repository</em></p>")
 		return
@@ -1429,21 +1410,16 @@ func (s *Server) renderTreesCommitsTabToBuffer(buf *bytes.Buffer, dir string) {
 	buf.WriteString(renderJJLogHTML(commits, currentWorkspace))
 }
 
-func (s *Server) renderTreesMessagesTabToBuffer(buf *bytes.Buffer, dir string) {
+func (s *Server) renderTreesMessagesTab(buf *bytes.Buffer, dir string) {
 	wfState, _ := state.Load(statePath(dir))
-	reversedMessages := reverseMessages(wfState.Messages)
 
-	data := struct {
+	renderTabToBuffer(buf, "trees_messages_content.html", struct {
 		Directory string
 		DirName   string
 		Messages  []messageDisplay
 	}{
 		Directory: dir,
 		DirName:   filepath.Base(dir),
-		Messages:  reversedMessages,
-	}
-
-	if err := templates.Lookup("trees_messages_content.html").Execute(buf, data); err != nil {
-		log.Println("template execution failed:", err)
-	}
+		Messages:  reverseMessages(wfState.Messages),
+	})
 }
