@@ -15,6 +15,7 @@ const configFileName = "sgai.json"
 type projectConfig struct {
 	DefaultModel         string                     `json:"defaultModel,omitempty"`
 	DisableRetrospective bool                       `json:"disable_retrospective,omitempty"`
+	EnableAdhocPrompt    bool                       `json:"enable-adhoc-prompt,omitempty"`
 	MCP                  map[string]json.RawMessage `json:"mcp,omitempty"`
 }
 
