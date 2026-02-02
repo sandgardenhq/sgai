@@ -151,7 +151,7 @@ not implementation. Focus on outcomes.
 | `flow`        | DOT-format DAG defining agent execution order            |
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
-| `interactive` | `yes` (respond via web UI), `no` (exit on human-communication), `auto` (self-driving) |
+| `interactive` | `yes` (respond via web UI), `no` (exit on human-communication), `auto` (self-driving), `auto-session` (self-driving for the current session) |
 
 ## Usage
 
