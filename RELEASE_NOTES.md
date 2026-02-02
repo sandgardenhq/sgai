@@ -19,7 +19,7 @@
 ```json
 {
   "Additional Changes": [
-    "Improved the visibility of the flow by logging a message before the completion gate script runs in the sgai flow agent. Specifically, the sgai flow agent now emits a console log immediately prior to invoking the completion gate script to aid debugging and trace execution order."
+    "Improved the visibility of the flow by logging a message before the completion gate script runs in the sgai flow agent."
   ]
 }
 
