@@ -10,17 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Release updates
+## 0.0.0+20260202 — Standardized `waiting-for-human` workflow state
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes the following updates.
+- **Summary**: This release includes standardized workflow wait-state handling for `waiting-for-human`.
 
-```json
-{
-  "Additional Changes": [
-    "Unified the `waiting-for-human` workflow state via shared helpers, constrained Auto mode to `auto`, and preserved `waiting-for-human` status across workflow updates, with CLI/server/MCP logic and tests updated accordingly."
-  ]
-}
+### Additional Changes
 
-```
+- Updated workflow wait-state handling to use a single `waiting-for-human` state via shared helpers, constrained Auto mode to `auto`, and preserved `waiting-for-human` status across workflow updates, with CLI/server/MCP logic and tests updated accordingly.
