@@ -10,11 +10,11 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Release updates
+## 0.0.0+20260202 — Updated Go CI workflow triggers
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes new capabilities and maintenance updates.
+- **Summary**: This release includes updated Go GitHub Actions workflow triggers.
 
 ### Additional Changes
 
