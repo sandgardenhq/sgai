@@ -52,6 +52,8 @@ When the current agent is `coordinator`, it also allows:
 
 - `complete`
 
+`update_workflow_state` does not set `waiting-for-human`. Human-waiting is controlled by the coordinator's human-interaction tools (for example, `ask_user_question`).
+
 #### TODO guardrails
 
 Transitions to `agent-done` or `complete` fail if there are pending TODO items.
