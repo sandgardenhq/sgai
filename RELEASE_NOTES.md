@@ -16,13 +16,6 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes the changes listed below.
 
-### Additional Changes
+### New Features
 
-```json
-{
-  "New Features": [
-    "A new Markdown reference document was added to describe all SGAI agents and what each one does."
-  ]
-}
-
-```
+- Added a Markdown reference document that describes all `sgai` agents and the purpose of each.
