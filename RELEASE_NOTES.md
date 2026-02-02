@@ -10,18 +10,13 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Pending release notes details
+## 0.0.0+20260202 — Updated Go tooling dependencies
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes updated Go tooling dependencies.
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Updated Go tooling dependencies by bumping `golang.org/x/tools` to `v0.41.0` and refreshing `go.sum`."
-  ]
-}
-```
+- Updated Go tooling dependencies by bumping `golang.org/x/tools` to `v0.41.0` and refreshing `go.sum`.
+
