@@ -21,7 +21,7 @@
 ```json
 {
   "Additional Changes": [
-    "Agent permission and mode behavior was standardized in the SGAI skeleton to reduce configuration drift. This update normalizes the skeleton’s agent permissions/modes, removes an explicit model override, and includes minor whitespace/formatting cleanup."
+    "Agent permission and mode behavior was standardized in the SGAI skeleton to reduce configuration drift."
   ]
 }
 
