@@ -4,7 +4,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ## Features
 
-- **Web dashboard** — Monitor and control agent execution via HTMX + PicoCSS web UI with real-time status visualization, start/stop controls, and human-in-the-loop response interface
+- **Web dashboard** — Monitor and control agent execution via HTMX + PicoCSS web UI with real-time status visualization, start/stop controls, and an interactive interface for agent questions
 - **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
 - **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
 - **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
