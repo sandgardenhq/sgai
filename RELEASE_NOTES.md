@@ -18,7 +18,7 @@
 
 {
   "New Features": [
-    "Added an interactive mode that can be carried through sgai’s workflow and the MCP server to support fully automated operation. The system now defines self-drive behavior for `auto`/`auto-session`, disables human-question tools and `human-communication` status while self-driving, and automatically selects answers for multi-choice questions in self-drive mode."
+    "Added an interactive mode that can be carried through sgai’s workflow and the MCP server to support fully automated operation."
   ]
 }
 
