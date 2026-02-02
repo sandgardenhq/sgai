@@ -22,6 +22,12 @@ When `sgai` runs `opencode`, it sets `SGAI_MCP_EXECUTABLE` to the absolute path 
 
 This is used by the `sgai` MCP integration to locate the `sgai` binary.
 
+## `SGAI_MCP_INTERACTIVE`
+
+When `sgai` starts the MCP server, it sets `SGAI_MCP_INTERACTIVE` to the current interactive mode (for example, `yes`, `no`, `auto`, or `auto-session`).
+
+The MCP server uses this value to decide whether to run in a self-driving mode.
+
 ## `SGAI_NTFY`
 
 If `SGAI_NTFY` is set, `sgai` sends remote notifications by posting the message body to that URL.
