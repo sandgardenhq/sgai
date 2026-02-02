@@ -40,7 +40,7 @@ You are running as one of multiple models within this agent. Check the "Multi-Mo
 
 Council members share state through TWO channels:
 - **Messages** (`sgai_send_message` / `sgai_check_inbox`) for real-time debate
-- **PROJECT_MANAGEMENT.md** (`.sgai/PROJECT_MANAGEMENT.md`) as persistent shared state that all members can read
+- **.sgai/PROJECT_MANAGEMENT.md** (`.sgai/PROJECT_MANAGEMENT.md`) as persistent shared state that all members can read
 
 1. **Check messages and shared state first:**
    ```
@@ -49,7 +49,7 @@ Council members share state through TWO channels:
    Also read `.sgai/PROJECT_MANAGEMENT.md` to see any evaluations already written by siblings.
 
 2. **Share your evaluation with siblings (messages + shared file):**
-   - Write your evaluations to PROJECT_MANAGEMENT.md so all members can reference them
+   - Write your evaluations to .sgai/PROJECT_MANAGEMENT.md so all members can reference them
    - Send a message to each sibling:
    ```
    sgai_send_message({
@@ -96,7 +96,7 @@ For EACH checked item, answer:
 
 After completing your individual evaluation, share your findings with sibling models using BOTH channels:
 
-1. **Write your evaluations to PROJECT_MANAGEMENT.md** under a `## Council Evaluation (YYYY-MM-DD)` section. This serves as shared persistent state that all council members can read.
+1. **Write your evaluations to .sgai/PROJECT_MANAGEMENT.md** under a `## Council Evaluation (YYYY-MM-DD)` section. This serves as shared persistent state that all council members can read.
 2. **Send messages to each sibling** with your verdicts:
    ```
    sgai_send_message({
@@ -110,9 +110,9 @@ After completing your individual evaluation, share your findings with sibling mo
 ### Step 4: Debate and Reach Consensus
 
 1. Check your inbox for sibling evaluations
-2. Read PROJECT_MANAGEMENT.md to see siblings' written findings
+2. Read .sgai/PROJECT_MANAGEMENT.md to see siblings' written findings
 3. Respond to disagreements (max 2 rounds per item)
-4. Update your section in PROJECT_MANAGEMENT.md with any revised positions
+4. Update your section in .sgai/PROJECT_MANAGEMENT.md with any revised positions
 
 Consensus is reached when:
 - All siblings explicitly agree, OR
@@ -165,7 +165,7 @@ EVIDENCE: [specific evidence]
 COMMENT: <!-- COUNCIL OVERRIDE (YYYY-MM-DD): Reverted because [reason] -->
 ---
 
-PROPOSED PROJECT_MANAGEMENT.md ADDITIONS:
+PROPOSED .sgai/PROJECT_MANAGEMENT.md ADDITIONS:
 ## Council Evaluation (YYYY-MM-DD)
 ### Items Verified
 - [item]: [evidence]
@@ -175,7 +175,7 @@ PROPOSED PROJECT_MANAGEMENT.md ADDITIONS:
 ---
 END COUNCIL VERDICT
 
-Coordinator: Please apply the above changes to GOAL.md and PROJECT_MANAGEMENT.md.`
+Coordinator: Please apply the above changes to GOAL.md and .sgai/PROJECT_MANAGEMENT.md.`
 })
 ```
 
@@ -210,14 +210,14 @@ Be EXTREMELY STRICT. A checkbox means "this is done" - not "this is mostly done"
 ## Powers and Permissions
 
 You can:
-- **Request edits to GOAL.md and PROJECT_MANAGEMENT.md via coordinator** - Submit proposed changes in your verdict
+- **Request edits to GOAL.md and .sgai/PROJECT_MANAGEMENT.md via coordinator** - Submit proposed changes in your verdict
 - **Run commands** - Verify tests pass, check file existence
 - **Message coordinator** - Report findings, submit verdicts, escalate issues
 - **Message siblings** - Debate, reach consensus
 
 You cannot:
 - **Edit GOAL.md** - You must request changes through coordinator
-- **Edit PROJECT_MANAGEMENT.md** - You must request changes through coordinator
+- **Edit .sgai/PROJECT_MANAGEMENT.md** - You must request changes through coordinator
 - Check items that weren't already checked (not your role)
 - Doom loop (external_directory is denied)
 - Access files outside the project
@@ -268,7 +268,7 @@ REVISED: Accept partial completion. Will add comment noting error handling gap r
 
 1. This council is a **single-pass process**: Evaluate → Share with siblings → Debate → Take action → Report (designated reporter only) → Done.
 2. **Never message the coordinator before debating with siblings.** You must share findings, wait for sibling responses, and resolve disagreements first.
-3. Once you have shared your findings (via messages AND PROJECT_MANAGEMENT.md), wait for sibling responses **once**. Respond only to DISAGREE messages.
+3. Once you have shared your findings (via messages AND .sgai/PROJECT_MANAGEMENT.md), wait for sibling responses **once**. Respond only to DISAGREE messages.
 4. After at most 2 exchanges on any disagreement, the topic is closed. Accept the majority position.
 5. Only after consensus: prepare proposed changes. If you are the designated reporter (first in your sibling list), send the coordinator verdict with all proposed changes. Then **immediately mark agent-done**.
 6. **Do NOT:** check inbox after completing Step 6, reply to agreements, send "summary" or "confirmation" messages, or wait for others to finish.

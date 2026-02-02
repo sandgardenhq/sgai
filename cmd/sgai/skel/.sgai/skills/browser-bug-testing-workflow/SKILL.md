@@ -284,7 +284,7 @@ This skill leverages these Playwright functions:
 ```
 
 When taking screenshots:
-1. Get the current retrospective ID from `.sgai/state.json` (field: `retrospectiveSession` or from PROJECT_MANAGEMENT.md header)
+1. Get the current retrospective ID from `.sgai/state.json` (field: `retrospectiveSession` or from .sgai/PROJECT_MANAGEMENT.md header)
 2. Create the screenshots directory if it doesn't exist
 3. Store screenshots with descriptive names
 

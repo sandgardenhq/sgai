@@ -63,12 +63,12 @@ At each step:
 1. Load the step-specific skill
 2. Ask ONE question at a time
 3. Use `human-communication` status to wait for responses
-4. Record answers in PROJECT_MANAGEMENT.md under `## STPA Analysis`
+4. Record answers in .sgai/PROJECT_MANAGEMENT.md under `## STPA Analysis`
 5. Continue to next question or step
 
 ## Documentation Structure
 
-### In PROJECT_MANAGEMENT.md:
+### In .sgai/PROJECT_MANAGEMENT.md:
 ```markdown
 ## STPA Analysis
 

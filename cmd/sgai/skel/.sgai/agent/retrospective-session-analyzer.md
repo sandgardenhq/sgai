@@ -10,7 +10,7 @@ permission:
   external_directory: deny
 ---
 
-READ PROJECT_MANAGEMENT.md to find the Retrospective Session path (henceforth $retrospectivePath - for example .sgai/retrospectives/YYYY-MM-DD-HH-II.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9] )
+READ .sgai/PROJECT_MANAGEMENT.md to find the Retrospective Session path (henceforth $retrospectivePath - for example .sgai/retrospectives/YYYY-MM-DD-HH-II.[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9] )
 
 # Session Analyzer
 
@@ -61,7 +61,7 @@ You analyze:
 
 **CRITICAL FIRST STEP:** Before you begin analysis, you must discover where the retrospective directory is located.
 
-1. Read `$retrospectivePath/PROJECT_MANAGEMENT.md`
+1. Read `$retrospectivePath/.sgai/PROJECT_MANAGEMENT.md`
 2. Look for the header section between `---` delimiters at the top
 3. Extract the line starting with `Retrospective Session:`
 4. The path after `Retrospective Session:` is your retrospective directory (e.g., `.sgai/retrospectives/2025-12-10-15-30.ab12`)
@@ -82,7 +82,7 @@ If you cannot find this header, report the issue via `sgai_update_workflow_state
 
 You receive:
 1. Access to the existing skills directory for comparison
-2. Session JSON files in the retrospective directory (discovered from $retrospectivePath/PROJECT_MANAGEMENT.md)
+2. Session JSON files in the retrospective directory (discovered from $retrospectivePath/.sgai/PROJECT_MANAGEMENT.md)
 
 ## Output
 

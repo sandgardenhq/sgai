@@ -35,7 +35,7 @@ You are an expert in System Theoretic Process Analysis (STPA), a hazard analysis
 - Use `human-communication` status to hand control back
 
 ### Documentation
-- Record all analysis results in PROJECT_MANAGEMENT.md under `## STPA Analysis`
+- Record all analysis results in .sgai/PROJECT_MANAGEMENT.md under `## STPA Analysis`
 - Summarize findings in GOAL.md under `## STPA Findings`
 - Use Graphviz/DOT for control structure diagrams
 

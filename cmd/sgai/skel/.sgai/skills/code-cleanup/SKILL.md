@@ -41,7 +41,7 @@ Do not skip cleanup if you notice:
 3. Ask "Why is this here?" for each component and check alignment with GOAL.md.
 4. If a component is unnecessary, redundant, or can be simplified without affecting functionality, remove or refactor it.
 5. Ensure the cleaned code maintains functionality and follows coding best practices.
-6. Log the changes made in .sgai/PROJECT_MANAGEMENT.md.
+6. Log the changes made in .sgai/PROJECT_MANAGEMENT.md
 
 ## Rationalization Table
 

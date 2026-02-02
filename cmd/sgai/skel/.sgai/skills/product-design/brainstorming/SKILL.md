@@ -88,8 +88,8 @@ IMPORTANT: Hand the control back to the human partner so they can feed you with 
 
 When asking questions during brainstorming, you MUST follow this protocol to ensure the human partner sees the full context:
 
-1. **Log to PROJECT_MANAGEMENT.md FIRST:**
-   - Write the question WITH its context to PROJECT_MANAGEMENT.md
+1. **Log to .sgai/PROJECT_MANAGEMENT.md FIRST:**
+   - Write the question WITH its context to .sgai/PROJECT_MANAGEMENT.md
    - Include: Current phase, what you're trying to understand, the question itself
 
 2. **Embed context IN the question field:**

@@ -145,7 +145,7 @@ High priority = High severity + High likelihood + Low detectability
 
 ## Output Template
 
-Record in PROJECT_MANAGEMENT.md:
+Record in .sgai/PROJECT_MANAGEMENT.md:
 
 ```markdown
 ### Step 3: Unsafe Control Actions

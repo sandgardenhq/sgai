@@ -162,7 +162,7 @@ Before proceeding to Step 3:
 
 ## Output Template
 
-Record in PROJECT_MANAGEMENT.md:
+Record in .sgai/PROJECT_MANAGEMENT.md:
 
 ```markdown
 ### Step 2: Control Structure
