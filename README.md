@@ -155,10 +155,12 @@ not implementation. Focus on outcomes.
 
 #### completionGateScript output
 
-When `completionGateScript` is set, `sgai` prints a line before running the script. For example:
+When `completionGateScript` is set, `sgai` prints a line before running the script.
+
+The line includes a bracketed prefix and the configured script value, for example:
 
 ```text
-[sgai] running completionGateScript: make test
+[... ] running completionGateScript: make test
 ```
 
 Use this line as a quick sanity check that the expected script is about to run.
