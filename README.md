@@ -181,4 +181,14 @@ sgai uses configurable AI engines under the hood, but it's the opinionated exper
 
 3. Maintainers will discuss the proposal and, if accepted, run the specification against the current implementation to validate
 
+### Dependency updates (Dependabot)
+
+This repository uses GitHub Dependabot to keep Go module dependencies up to date.
+
+Dependabot is configured in [`.github/dependabot.yml`](./.github/dependabot.yml) to:
+
+- Use the `gomod` ecosystem
+- Check the repository root directory (`/`)
+- Run on a `weekly` schedule
+
 All are welcome. Questions? Open an issue.
