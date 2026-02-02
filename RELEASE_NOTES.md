@@ -18,5 +18,5 @@
 
 ### Additional Changes
 
-- Updated Go tooling dependencies by updating `golang.org/x/tools` to `v0.41.0` and refreshing `go.sum`.
+- Updated Go tooling dependencies to `golang.org/x/tools` `v0.41.0` and refreshed `go.sum`.
 
