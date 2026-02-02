@@ -18,5 +18,5 @@
 
 ### Additional Changes
 
-- Updated dependency management by adding automated update configuration for the Go ecosystem and updating existing dependencies to current releases.
+- Added Dependabot configuration for Go modules (`go.mod`/`go.sum`) and updated Go module dependencies.
 
