@@ -26,9 +26,9 @@ You receive:
 
 ## Output
 
-A new skill file at `cmd/sgai/skel/.sgai/skills/<skill-name>/SKILL.md` that has been tested and validated.
+A new skill file at `sgai/skills/<skill-name>/SKILL.md` that has been tested and validated.
 
-**IMPORTANT:** Skills must be created in `cmd/sgai/skel/.sgai/skills/` for distribution with the sgai CLI, NOT in the local `.sgai/skills/` directory.
+**IMPORTANT:** Skills must be created in `sgai/skills/` (the overlay directory), NOT in the local `.sgai/skills/` directory.
 
 ## CRITICAL: Testing Requirement
 
@@ -156,12 +156,12 @@ The skill is ready when:
 
 ## File Naming Conventions
 
-- Directory: `cmd/sgai/skel/.sgai/skills/[skill-name]/`
+- Directory: `sgai/skills/[skill-name]/`
 - File: `SKILL.md`
 - Name: lowercase, hyphenated (e.g., `async-debugging`)
 - Group related skills in subdirectories
 
-**IMPORTANT:** All skills must be written to `cmd/sgai/skel/.sgai/skills/` for distribution.
+**IMPORTANT:** All skills must be written to `sgai/skills/` (the overlay directory) for distribution.
 
 ## Quality Checklist
 

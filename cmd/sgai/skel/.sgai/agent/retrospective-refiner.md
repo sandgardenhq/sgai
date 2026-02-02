@@ -251,5 +251,7 @@ After producing $retrospectivePath/IMPROVEMENTS.md:
 2. **Copy $retrospectivePath/IMPROVEMENTS.md to the project root** (same directory as GOAL.md)
 3. Delete IMPROVEMENTS.draft.md (cleanup intermediate file)
 4. Verify $retrospectivePath/IMPROVEMENTS.md is well-formed in both locations
-5. Call `sgai_update_workflow_state` with status `agent-done`
-6. Include a summary: "Produced $retrospectivePath/IMPROVEMENTS.md with N skill improvements, M snippet improvements, and P agent improvements. Filtered out Q application-specific items. (Written to project root and retrospective directory)"
+5. Send a message to the coordinator reporting completion:
+   `sgai_send_message({toAgent: "coordinator", body: "RETROSPECTIVE COMPLETE - Final IMPROVEMENTS.md has been written to $retrospectivePath/IMPROVEMENTS.md and copied to the project root. All retrospective analysis agents have completed their work. The workflow goal is fulfilled - please mark the workflow as complete."})`
+6. Call `sgai_update_workflow_state` with status `agent-done`
+7. Include a summary: "Produced $retrospectivePath/IMPROVEMENTS.md with N skill improvements, M snippet improvements, and P agent improvements. Filtered out Q application-specific items. (Written to project root and retrospective directory)"

@@ -316,5 +316,7 @@ Analyzed: [current date/time]
 
 After analyzing the session:
 1. Verify findings are appended to $retrospectivePath/IMPROVEMENTS.draft.md
-2. Call `sgai_update_workflow_state` with status `agent-done`
-3. Include a summary message of what was found
+2. Send a message to the coordinator reporting your progress:
+   `sgai_send_message({toAgent: "coordinator", body: "Session analysis complete. Findings written to $retrospectivePath/IMPROVEMENTS.draft.md."})`
+3. Call `sgai_update_workflow_state` with status `agent-done`
+4. Include a summary message of what was found
