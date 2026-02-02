@@ -72,7 +72,7 @@ When you set status: "agent-done":
 ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
 GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
 
-IMPORTANT: use CALL skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
+IMPORTANT: You are the SOLE owner of GOAL.md checkboxes. When delegated work is confirmed complete, you MUST mark the corresponding checkbox by changing '- [ ]' to '- [x]'. Use skills({"name":"project-completion-verification"}) to check status and mark items. Look for 'GOAL COMPLETE:' messages from agents as triggers.
 IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
 IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
 IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
@@ -138,7 +138,7 @@ When you set status: "agent-done":
 ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
 GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
 
-IMPORTANT: use CALL skills({"name":"project-completion-verification"}) to manage the content of GOAL.md
+IMPORTANT: When you complete a task listed in GOAL.md, you MUST notify the coordinator: sgai_send_message({toAgent: "coordinator", body: "GOAL COMPLETE: [exact checkbox text from GOAL.md]"}). Do NOT attempt to edit GOAL.md yourself - only the coordinator can mark checkboxes.
 IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
 IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
 IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.

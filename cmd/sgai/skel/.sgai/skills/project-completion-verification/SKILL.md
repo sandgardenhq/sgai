@@ -1,7 +1,7 @@
 ---
 name: project-completion-verification
-description: Automatically scans GOAL.md for unchecked items and provides completion status summary with counts by category
-when_to_use: When coordinator needs to verify project completion status or before marking work as complete. Symptoms - manually going through GOAL.md line by line to check task completion, needing quick summary of pending vs completed tasks, verifying all requirements are met before finalizing work.
+description: Automatically scans GOAL.md for unchecked items, provides completion status summary, and enables coordinator to mark items as complete
+when_to_use: When coordinator needs to verify project completion status or before marking work as complete. When coordinator needs to mark completed items in GOAL.md. Symptoms - manually going through GOAL.md line by line to check task completion, needing quick summary of pending vs completed tasks, verifying all requirements are met before finalizing work.
 version: 1.0.0
 languages: all
 ---
@@ -56,12 +56,43 @@ The skill uses ripgrep (`rg`) and `awk` to:
 3. Provide completion percentages
 4. List specific pending items for action
 
+## Marking Items as Complete (Coordinator Only)
+
+**Note:** This capability is for the coordinator agent ONLY. Non-coordinator agents must NOT use this section. Instead, non-coordinator agents should send a message to the coordinator with "GOAL COMPLETE:" prefix when they finish a task.
+
+### Workflow
+
+1. **Run the status check commands above** to see current state of GOAL.md (pending vs completed counts, specific pending items)
+2. **For each item to mark**, use the Edit tool to change `- [ ]` to `- [x]` for the specific line in GOAL.md
+3. **Re-run status check** to verify the mark was applied correctly
+4. **Log the change** in .sgai/PROJECT_MANAGEMENT.md with timestamp
+
+### Example
+
+```
+# Step 1: Check current status
+rg "\[ \]" GOAL.md -c && rg "\[x\]" GOAL.md -c
+
+# Step 2: Mark specific item using Edit tool
+# oldString: "- [ ] Implement authentication endpoint"
+# newString: "- [x] Implement authentication endpoint"
+
+# Step 3: Re-run status check to verify
+rg "\[ \]" GOAL.md -c && rg "\[x\]" GOAL.md -c
+
+# Step 4: Log in PROJECT_MANAGEMENT.md
+# "2026-02-01: Marked 'Implement authentication endpoint' as complete after verifying tests pass"
+```
+
 ## Common Mistakes
 
 - Not checking both unchecked `[ ]` and checked `[x]` patterns
 - Missing section-level analysis for categorized reporting
 - Forgetting to handle edge cases (empty sections, mixed formatting)
 - Not providing actionable output (just counts without context)
+- Non-coordinator agents attempting to use the marking capability
+- Marking items without verifying the work is actually complete
+- Forgetting to log the marking in PROJECT_MANAGEMENT.md
 
 ## Expected Output Format
 
