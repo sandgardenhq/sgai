@@ -21,7 +21,7 @@
 ```json
 {
   "Additional Changes": [
-    "Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch. Specifically, the Go CI workflow’s `on:` configuration was updated to include `pull_request` and `merge_group` triggers instead of being limited to main-branch pushes/PRs."
+    "Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch."
   ]
 }
 
