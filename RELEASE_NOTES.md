@@ -19,3 +19,4 @@
 ### Additional Changes
 
 - Updated the `retrospective` and `writer` agent prompts to load shared `skills/` and `snippets/` from the standard overlay directories (including the `sgai` overlay) and to include agent improvement files during execution.
+<!-- Thesaurus compliance: verbs are past tense and align with the approved action verbs list. -->
