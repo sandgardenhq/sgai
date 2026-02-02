@@ -9,3 +9,16 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260202 — Additional changes
+
+- **Date**: 2026-02-02
+- **Version**: 0.0.0+20260202
+- **Summary**: This release includes the changes listed below.
+
+{
+  "New Features": [
+    "Added an interactive mode that can be carried through sgai’s workflow and the MCP server to support fully automated operation. The system now defines self-drive behavior for `auto`/`auto-session`, disables human-question tools and `human-communication` status while self-driving, and automatically selects answers for multi-choice questions in self-drive mode."
+  ]
+}
+
