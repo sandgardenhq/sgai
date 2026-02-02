@@ -10,12 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Added interactive mode
+## 0.0.0+20260202 — Added self-drive interactive mode
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes updates to `sgai` interactive operation.
+- **Summary**: This release includes improved `sgai` interactive behavior.
 
 ### New Features
 
-- Added an interactive mode that can be carried through `sgai`’s workflow and the MCP server to support fully automated operation.
+- Added an interactive mode that propagates through `sgai` workflows and the MCP server to support fully automated operation, including `auto`/`auto-session` self-drive behavior and automatic answer selection for multi-choice prompts.
