@@ -18,4 +18,4 @@
 
 ### Additional Changes
 
-- Updated workflow wait-state handling to use a single `waiting-for-human` state via shared helpers, constrained Auto mode to `auto`, and preserved `waiting-for-human` status across workflow updates, with CLI/server/MCP logic and tests updated accordingly.
+- Updated workflow wait-state handling to use a single `waiting-for-human` state via shared helpers, constrained Auto mode to `auto`, and preserved `waiting-for-human` status across workflow updates.
