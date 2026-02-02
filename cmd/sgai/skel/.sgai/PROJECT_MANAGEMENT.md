@@ -58,7 +58,7 @@ For each question, include:
    **Question:** 
    **Options:** 
 
-## Human partner clarifications
+## Human Partner Clarifications
 
 When the human partner answers a question, copy the Q/A here so it persists.
 
