@@ -21,7 +21,7 @@
 ```json
 {
   "New Features": [
-    "A new Markdown reference document was added to describe all SGAI agents and what each one does. The documentation enumerates each SGAI agent and its role/responsibilities in a single Markdown reference file intended for quick lookup and onboarding."
+    "A new Markdown reference document was added to describe all SGAI agents and what each one does."
   ]
 }
 
