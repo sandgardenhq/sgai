@@ -23,10 +23,10 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 
 ## Human interaction
 
-`sgai` uses structured multi-choice questions for human input.
+`sgai` uses structured, multi-choice questions for human input.
 
-- The skeleton coordinator instructions describe the coordinator as the only agent that can communicate with the human partner via `ask_user_question`.
-- The `set-workflow-state` skill documentation removes the `human-communication` status and removes the `humanMessage` field; it adds a section stating to use `ask_user_question` for human communication.
+- The coordinator communicates with the human partner through `ask_user_question`.
+- The workflow state file stores the active question in `multiChoiceQuestion`.
 
 ## Workflow object shape
 
