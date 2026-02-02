@@ -9,3 +9,20 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260202 — Release updates
+
+- **Date**: 2026-02-02
+- **Version**: 0.0.0+20260202
+- **Summary**: This release includes new capabilities and maintenance updates.
+
+### Changes (generated)
+
+```json
+{
+  "Additional Changes": [
+    "Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch. Specifically, the Go CI workflow’s `on:` configuration was updated to include `pull_request` and `merge_group` triggers instead of being limited to main-branch pushes/PRs."
+  ]
+}
+
+```
