@@ -14,7 +14,7 @@
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes a new agent reference document.
 
 ### New Features
 
