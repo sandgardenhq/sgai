@@ -73,7 +73,7 @@ Retrospective Session: .sgai/retrospectives/2025-12-10-15-30.ab12
 ---
 ```
 
-If you cannot find this header, report the issue via `sgai_update_workflow_state` with status `human-communication`.
+If you cannot find this header, report the issue via `ask_user_question` to the human partner.
 
 ## Input
 

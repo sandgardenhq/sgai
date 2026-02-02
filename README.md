@@ -106,7 +106,7 @@ The web dashboard shows:
 - Start/Stop controls for the engine
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
-- Human-communication response interface
+- Human response interface for agent questions
 
 ## GOAL.md Reference
 
@@ -151,7 +151,7 @@ not implementation. Focus on outcomes.
 | `flow`        | DOT-format DAG defining agent execution order            |
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
-| `interactive` | `yes` (respond via web UI), `no` (exit on human-communication), `auto` (self-driving) |
+| `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
 
 ## Usage
 

@@ -90,63 +90,21 @@ func TestBuildUpdateWorkflowStateSchemaStatusEnum(t *testing.T) {
 	tests := []struct {
 		name            string
 		agent           string
-		interactive     string
 		expectComplete  bool
-		expectHumanComm bool
 		expectWorking   bool
 		expectAgentDone bool
 	}{
 		{
-			name:            "coordinatorInteractiveYes",
+			name:            "coordinatorHasComplete",
 			agent:           "coordinator",
-			interactive:     "yes",
 			expectComplete:  true,
-			expectHumanComm: true,
 			expectWorking:   true,
 			expectAgentDone: true,
 		},
 		{
-			name:            "coordinatorInteractiveAuto",
-			agent:           "coordinator",
-			interactive:     "auto",
-			expectComplete:  true,
-			expectHumanComm: false,
-			expectWorking:   true,
-			expectAgentDone: true,
-		},
-		{
-			name:            "coordinatorInteractiveAutoSession",
-			agent:           "coordinator",
-			interactive:     "auto-session",
-			expectComplete:  true,
-			expectHumanComm: false,
-			expectWorking:   true,
-			expectAgentDone: true,
-		},
-		{
-			name:            "nonCoordinatorInteractiveYes",
+			name:            "nonCoordinatorLacksComplete",
 			agent:           "backend-go-developer",
-			interactive:     "yes",
 			expectComplete:  false,
-			expectHumanComm: false,
-			expectWorking:   true,
-			expectAgentDone: true,
-		},
-		{
-			name:            "nonCoordinatorInteractiveAuto",
-			agent:           "backend-go-developer",
-			interactive:     "auto",
-			expectComplete:  false,
-			expectHumanComm: false,
-			expectWorking:   true,
-			expectAgentDone: true,
-		},
-		{
-			name:            "anotherNonCoordinatorLacksPrivilegedStatuses",
-			agent:           "go-readability-reviewer",
-			interactive:     "yes",
-			expectComplete:  false,
-			expectHumanComm: false,
 			expectWorking:   true,
 			expectAgentDone: true,
 		},
@@ -154,7 +112,7 @@ func TestBuildUpdateWorkflowStateSchemaStatusEnum(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			schema, _ := buildUpdateWorkflowStateSchema(tt.agent, tt.interactive)
+			schema, _ := buildUpdateWorkflowStateSchema(tt.agent)
 			statusProp := schema.Properties["status"]
 			if statusProp == nil {
 				t.Fatal("status property not found in schema")
@@ -171,8 +129,8 @@ func TestBuildUpdateWorkflowStateSchemaStatusEnum(t *testing.T) {
 			if got := enumMap["complete"]; got != tt.expectComplete {
 				t.Errorf("enum contains 'complete' = %v, want %v", got, tt.expectComplete)
 			}
-			if got := enumMap["human-communication"]; got != tt.expectHumanComm {
-				t.Errorf("enum contains 'human-communication' = %v, want %v", got, tt.expectHumanComm)
+			if enumMap["human-communication"] {
+				t.Error("enum should not contain 'human-communication'")
 			}
 			if got := enumMap["working"]; got != tt.expectWorking {
 				t.Errorf("enum contains 'working' = %v, want %v", got, tt.expectWorking)
