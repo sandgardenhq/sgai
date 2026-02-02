@@ -18,7 +18,7 @@
 
 {
   "Additional Changes": [
-    "Dependency management was improved by adding automated update configuration for the Go ecosystem and updating existing dependencies to current releases. Specifically, a Dependabot configuration was introduced for Go modules (`go.mod`/`go.sum`), and multiple Go dependency versions were bumped to newer upstream versions."
+    "Dependency management was improved by adding automated update configuration for the Go ecosystem and updating existing dependencies to current releases."
   ]
 }
 
