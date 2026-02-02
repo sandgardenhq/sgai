@@ -16,11 +16,6 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes additional updates across the project.
 
-```json
-{
-  "Additional Changes": [
-    "Improved the visibility of the flow by logging a message before the completion gate script runs in the sgai flow agent."
-  ]
-}
+### Additional Changes
 
-```
+- Improved flow visibility by logging a message immediately before the completion gate script runs in the `sgai` flow agent.
