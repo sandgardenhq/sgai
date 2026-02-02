@@ -26,7 +26,7 @@ Scan source code files and apply style transformations to ensure CLI outputs are
 
 ## File Discovery Process
 
-1. **Read context**: Check GOAL.md and PROJECT_MANAGEMENT.md for what was recently worked on
+1. **Read context**: Check GOAL.md and .sgai/PROJECT_MANAGEMENT.md for what was recently worked on
 2. **Check jj diff**: Run `jj diff -r $COMMIT --stat` to find recently changed files
 3. **Scan relevant directories**: Use Glob to find source files in active areas
 4. **Apply style rules**: For each source file, check and fix style violations

@@ -185,7 +185,7 @@ For each UCA, work through:
 
 ## Output Template
 
-Record in PROJECT_MANAGEMENT.md:
+Record in .sgai/PROJECT_MANAGEMENT.md:
 
 ```markdown
 ### Step 4: Loss Scenarios
@@ -236,7 +236,7 @@ When all scenarios are documented:
   - R-2: [brief description]
 ```
 
-2. **Update PROJECT_MANAGEMENT.md** with complete analysis
+2. **Update .sgai/PROJECT_MANAGEMENT.md** with complete analysis
 
 3. **Set status: "agent-done"** to return control
 
@@ -244,7 +244,7 @@ When all scenarios are documented:
 
 STPA is iterative. If during Step 4 you discover:
 - New hazards → Return to Step 1
-- Missing control paths → Return to Step 2  
+- Missing control paths → Return to Step 2
 - New UCAs → Return to Step 3
 
 Document any iterations and the insights that triggered them.

@@ -130,7 +130,7 @@ Before proceeding to Step 2, verify:
 
 ## Output Template
 
-Record in PROJECT_MANAGEMENT.md:
+Record in .sgai/PROJECT_MANAGEMENT.md:
 
 ```markdown
 ## STPA Analysis
