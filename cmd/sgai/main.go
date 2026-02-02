@@ -474,13 +474,13 @@ func applyWorkGateApproval(wfState *state.Workflow, interactive *string, stateJS
 	if !wfState.WorkGateApproved {
 		return false
 	}
-	*interactive = "auto-session"
+	*interactive = "auto"
 	wfState.WorkGateApproved = false
 	if err := state.Save(stateJSONPath, *wfState); err != nil {
 		log.Println("failed to save state:", err)
 		return true
 	}
-	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto-session mode")
+	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto mode")
 	return false
 }
 
@@ -677,7 +677,7 @@ func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state
 				if err := state.Save(cfg.statePath, wfState); err != nil {
 					log.Fatalln("failed to save state after model done:", err)
 				}
-			case state.StatusComplete, state.StatusHumanCommunication:
+			case state.StatusComplete, state.StatusWaitingForHuman:
 				return newState
 			}
 		}
@@ -874,8 +874,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			}
 			return newState
 
-		case "human-communication":
-			newState.Status = "waiting-for-human"
+		case state.StatusWaitingForHuman:
 			if err := state.Save(cfg.statePath, newState); err != nil {
 				log.Fatalln("failed to save state:", err)
 			}
@@ -2198,8 +2197,7 @@ func canResumeWorkflow(wfState state.Workflow, freshFlag bool, currentGoalChecks
 	}
 	return wfState.Status == state.StatusWorking ||
 		wfState.Status == state.StatusAgentDone ||
-		wfState.Status == state.StatusWaitingForHuman ||
-		wfState.Status == state.StatusHumanCommunication
+		state.IsHumanPending(wfState.Status)
 }
 
 // extractRetrospectiveDirFromProjectManagement parses the PROJECT_MANAGEMENT.md

@@ -10,14 +10,27 @@ import (
 
 // Workflow status constants define the possible states of a sgai workflow.
 const (
-	StatusWorking            = "working"
-	StatusAgentDone          = "agent-done"
-	StatusComplete           = "complete"
-	StatusHumanCommunication = "human-communication"
-	StatusWaitingForHuman    = "waiting-for-human"
+	StatusWorking         = "working"
+	StatusAgentDone       = "agent-done"
+	StatusComplete        = "complete"
+	StatusWaitingForHuman = "waiting-for-human"
 )
 
-// ValidStatuses contains all valid workflow status values for validation.
+// IsHumanPending reports whether the given status indicates the workflow
+// is waiting for a human response.
+func IsHumanPending(status string) bool {
+	return status == StatusWaitingForHuman
+}
+
+// NeedsHumanInput reports whether this workflow is actively waiting for
+// human input, meaning it has a pending question or message for the human.
+func (w Workflow) NeedsHumanInput() bool {
+	return w.Status == StatusWaitingForHuman && (w.MultiChoiceQuestion != nil || w.HumanMessage != "")
+}
+
+// ValidStatuses contains the workflow status values that agents can set
+// via the update_workflow_state tool. StatusWaitingForHuman is excluded
+// because it is set only by askUserQuestion and askUserWorkGate tools.
 var ValidStatuses = []string{
 	StatusWorking,
 	StatusAgentDone,

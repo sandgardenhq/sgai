@@ -16,7 +16,7 @@ import (
 // The expected JSON structure is:
 //
 //	{
-//	  "status": string,           // "working", "agent-done", "complete", "human-communication", "waiting-for-human"
+//	  "status": string,           // "working", "agent-done", "complete", "waiting-for-human"
 //	  "task": string,             // Current task or empty string
 //	  "progress": [string],       // Array of progress notes
 //	  "humanMessage": string,     // Message to human or empty string

@@ -528,7 +528,7 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		Questions: questions,
 	}
 	currentState.HumanMessage = args.Questions[0].Question
-	currentState.Status = state.StatusHumanCommunication
+	currentState.Status = state.StatusWaitingForHuman
 
 	if err := state.Save(statePath, currentState); err != nil {
 		return "", fmt.Errorf("failed to save state: %w", err)
@@ -566,7 +566,7 @@ func askUserWorkGate(workingDir string) (string, error) {
 		IsWorkGate: true,
 	}
 	currentState.HumanMessage = "Is the definition complete? May I begin implementation?"
-	currentState.Status = state.StatusHumanCommunication
+	currentState.Status = state.StatusWaitingForHuman
 
 	if err := state.Save(statePath, currentState); err != nil {
 		return "", fmt.Errorf("failed to save state: %w", err)
@@ -861,7 +861,9 @@ func updateWorkflowState(workingDir string, args updateWorkflowStateArgs) (strin
 		currentState.Progress = []state.ProgressEntry{}
 	}
 
-	if args.Status != "" {
+	statusPreserved := state.IsHumanPending(currentState.Status)
+
+	if args.Status != "" && !statusPreserved {
 		status := strings.Trim(string(args.Status), "\"'")
 		if !slices.Contains(state.ValidStatuses, status) {
 			return fmt.Sprintf("Error: Invalid status '%s'. Must be one of: %s", status, strings.Join(state.ValidStatuses, ", ")), nil
@@ -900,6 +902,9 @@ func updateWorkflowState(workingDir string, args updateWorkflowStateArgs) (strin
 	}
 
 	response := "State updated successfully.\n"
+	if statusPreserved {
+		response = fmt.Sprintf("Status is currently '%s'. Waiting for human response. Your task and progress notes were updated but status was preserved.\n", currentState.Status)
+	}
 	response += fmt.Sprintf("  Status: %s\n", currentState.Status)
 	if currentState.Task != "" {
 		response += fmt.Sprintf("  Current task: %s\n", currentState.Task)
@@ -1202,7 +1207,7 @@ func messageMatchesSender(msg state.Message, currentAgent, currentModel string) 
 }
 
 func isSelfDriveMode(interactive string) bool {
-	return interactive == "auto" || interactive == "auto-session"
+	return interactive == "auto"
 }
 
 func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
