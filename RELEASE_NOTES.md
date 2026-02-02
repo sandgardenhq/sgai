@@ -16,11 +16,6 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes the changes listed below.
 
-```json
-{
-  "Additional Changes": [
-    "Updated the `retrospective` and `writer` agent prompts to load shared `skills/` and `snippets/` from the standard overlay directories (including the `sgai` overlay) and to include agent improvement files during execution."
-  ]
-}
+### Additional Changes
 
-```
+- Updated the `retrospective` and `writer` agent prompts to load shared `skills/` and `snippets/` from the standard overlay directories (including the `sgai` overlay) and to include agent improvement files during execution.
