@@ -19,7 +19,7 @@
 ```json
 {
   "Additional Changes": [
-    "The system now uses a single, consistent set of human-wait states so workflows behave the same way when waiting for a person. Specifically, the `waiting-for-human` state is unified via shared helpers, Auto mode is constrained to the `auto` value, and workflow update handling preserves `waiting-for-human` status across updates, with corresponding CLI/server/MCP logic and tests updated to match."
+    "Unified the `waiting-for-human` workflow state via shared helpers, constrained Auto mode to `auto`, and preserved `waiting-for-human` status across workflow updates, with CLI/server/MCP logic and tests updated accordingly."
   ]
 }
 
