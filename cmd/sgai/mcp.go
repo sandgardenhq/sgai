@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -671,14 +672,10 @@ func sendMessage(workingDir, toAgent, body string) (string, error) {
 		currentState.VisitCounts = make(map[string]int)
 	}
 
-	knownAgents := make([]string, 0, len(currentState.VisitCounts))
-	for agent := range currentState.VisitCounts {
-		knownAgents = append(knownAgents, agent)
-	}
-
 	targetAgentName := extractAgentNameFromTarget(toAgent)
-	if !slices.Contains(knownAgents, targetAgentName) {
-		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(knownAgents, ", ")), nil
+	if _, ok := currentState.VisitCounts[targetAgentName]; !ok {
+		validAgents := slices.Sorted(maps.Keys(currentState.VisitCounts))
+		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(validAgents, ", ")), nil
 	}
 
 	nextID := 1
