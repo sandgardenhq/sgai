@@ -21,6 +21,13 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 - When the current agent is `coordinator`, the schema allows `complete`.
 - When the current agent is not `coordinator`, the schema only allows `working` and `agent-done`.
 
+## Human interaction
+
+`sgai` uses structured multi-choice questions for human input.
+
+- The skeleton coordinator instructions describe the coordinator as the only agent that can communicate with the human partner via `ask_user_question`.
+- The `set-workflow-state` skill documentation removes the `human-communication` status and removes the `humanMessage` field; it adds a section stating to use `ask_user_question` for human communication.
+
 ## Workflow object shape
 
 `state.json` stores a JSON object with fields used by the CLI, web UI, and MCP tools.
