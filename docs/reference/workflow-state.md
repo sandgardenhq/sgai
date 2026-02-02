@@ -13,14 +13,12 @@ The `status` field in `.sgai/state.json` uses these values:
 - `working`
 - `agent-done`
 - `complete`
-- `human-communication`
-- `waiting-for-human`
 
 ### Coordinator-only statuses in MCP
 
 The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 
-- When the current agent is `coordinator`, the schema allows `complete` and `human-communication`.
+- When the current agent is `coordinator`, the schema allows `complete`.
 - When the current agent is not `coordinator`, the schema only allows `working` and `agent-done`.
 
 ## Workflow object shape
@@ -32,7 +30,6 @@ Common fields include:
 - `status` (string)
 - `task` (string)
 - `progress` (array of objects with `timestamp`, `agent`, `description`)
-- `humanMessage` (string)
 - `multiChoiceQuestion` (object with `questions`, each with `question`, `choices`, `multiSelect`)
 - `messages` (array of inter-agent messages)
 - `visitCounts` (object map of agent name to integer)
