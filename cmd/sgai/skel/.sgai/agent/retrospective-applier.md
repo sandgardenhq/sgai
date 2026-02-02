@@ -81,10 +81,12 @@ Produce a summary like:
 ```
 Applied Suggestions Summary:
 - Created 2 skills:
-  - skel/.sgai/skills/async-debugging/SKILL.md
-  - skel/.sgai/skills/error-handling/SKILL.md
+  - sgai/skills/async-debugging/SKILL.md
+  - sgai/skills/error-handling/SKILL.md
 - Created 1 snippet:
-  - skel/.sgai/snippets/go/retry-with-backoff.go
+  - sgai/snippets/go/retry-with-backoff.go
+- Updated 1 agent:
+  - sgai/agent/backend-go-developer.md
 - Skipped 3 suggestions (not approved)
 ```
 

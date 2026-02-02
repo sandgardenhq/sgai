@@ -317,8 +317,9 @@ IMPROVEMENTS.MD CONTENT:
 ---
 
 Read the markdown above and apply only the improvements that have been approved by the human reviewer.
-For approved skills, create them in skel/.sgai/skills/<name>/SKILL.md
-For approved snippets, create them in skel/.sgai/snippets/<language>/<name>
+For approved skills, create them in sgai/skills/<name>/SKILL.md
+For approved snippets, create them in sgai/snippets/<language>/<name>
+For approved agent improvements, create/modify them in sgai/agent/<name>.md
 Skip any improvements that were not approved or were vetoed.
 Report what was created.`, improvementsPath, sessionPath, string(content)))
 

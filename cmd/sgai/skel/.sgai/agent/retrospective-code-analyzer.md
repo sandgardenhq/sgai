@@ -263,5 +263,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 After analyzing the diff:
 1. Verify findings are appended to `$retrospectivePath/IMPROVEMENTS.draft.md`
-2. Call `sgai_update_workflow_state` with status `agent-done`
-3. Include a summary of snippets found that could benefit sgai
+2. Send a message to the coordinator reporting your progress:
+   `sgai_send_message({toAgent: "coordinator", body: "Code analysis complete. Findings appended to $retrospectivePath/IMPROVEMENTS.draft.md."})`
+3. Call `sgai_update_workflow_state` with status `agent-done`
+4. Include a summary of snippets found that could benefit sgai

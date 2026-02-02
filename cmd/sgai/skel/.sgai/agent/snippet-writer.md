@@ -26,9 +26,9 @@ You receive:
 
 ## Output
 
-A new snippet file at `cmd/sgai/skel/.sgai/snippets/<language>/<name>.<ext>` that is ready to use.
+A new snippet file at `sgai/snippets/<language>/<name>.<ext>` that is ready to use.
 
-**IMPORTANT:** Snippets must be created in `cmd/sgai/skel/.sgai/snippets/` for distribution with the sgai CLI, NOT in the local `.sgai/snippets/` directory.
+**IMPORTANT:** Snippets must be created in `sgai/snippets/` (the overlay directory), NOT in the local `.sgai/snippets/` directory.
 
 ## Snippet Creation Process
 
@@ -81,7 +81,7 @@ Ensure the snippet:
 
 ## File Naming Conventions
 
-- Directory: `cmd/sgai/skel/.sgai/snippets/<language>/`
+- Directory: `sgai/snippets/<language>/`
 - File: `<snippet-name>.<ext>`
 - Languages use their standard extensions:
   - Go: `.go`
@@ -91,7 +91,7 @@ Ensure the snippet:
   - Bash: `.sh`
   - etc.
 
-**IMPORTANT:** All snippets must be written to `cmd/sgai/skel/.sgai/snippets/` for distribution.
+**IMPORTANT:** All snippets must be written to `sgai/snippets/` (the overlay directory) for distribution.
 
 ## Header Comment Format by Language
 
@@ -166,7 +166,7 @@ Language: go
 Purpose: Standard HTTP health check endpoint returning JSON status
 ```
 
-**Output file:** `cmd/sgai/skel/.sgai/snippets/go/http-health-check.go`
+**Output file:** `sgai/snippets/go/http-health-check.go`
 
 ```go
 // Package server provides HTTP handler utilities.
