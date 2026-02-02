@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -12,21 +10,10 @@ import (
 
 func TestAskUserQuestion(t *testing.T) {
 	t.Run("singleQuestionSetsStateCorrectly", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		sgai := filepath.Join(tmpDir, ".sgai")
-		if err := os.MkdirAll(sgai, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		initialState := state.Workflow{
+		workDir := setupStateDir(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
-		}
-		statePath := filepath.Join(sgai, "state.json")
-		data, _ := json.Marshal(initialState)
-		if err := os.WriteFile(statePath, data, 0644); err != nil {
-			t.Fatal(err)
-		}
+		})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -38,7 +25,7 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, err := askUserQuestion(tmpDir, args)
+		result, err := askUserQuestion(workDir, args)
 		if err != nil {
 			t.Fatalf("askUserQuestion error: %v", err)
 		}
@@ -47,13 +34,10 @@ func TestAskUserQuestion(t *testing.T) {
 			t.Error("expected non-empty result")
 		}
 
-		loadedState, err := state.Load(statePath)
-		if err != nil {
-			t.Fatalf("failed to load state: %v", err)
-		}
+		loadedState := loadState(t, workDir)
 
-		if loadedState.Status != state.StatusHumanCommunication {
-			t.Errorf("expected status %q, got %q", state.StatusHumanCommunication, loadedState.Status)
+		if loadedState.Status != state.StatusWaitingForHuman {
+			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
 		}
 
 		if loadedState.MultiChoiceQuestion == nil {
@@ -83,18 +67,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("multipleQuestionsSetsStateCorrectly", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		sgai := filepath.Join(tmpDir, ".sgai")
-		if err := os.MkdirAll(sgai, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		statePath := filepath.Join(sgai, "state.json")
-		initialState := state.Workflow{Status: state.StatusWorking}
-		data, _ := json.Marshal(initialState)
-		if err := os.WriteFile(statePath, data, 0644); err != nil {
-			t.Fatal(err)
-		}
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -111,7 +84,7 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, err := askUserQuestion(tmpDir, args)
+		result, err := askUserQuestion(workDir, args)
 		if err != nil {
 			t.Fatalf("askUserQuestion error: %v", err)
 		}
@@ -120,10 +93,7 @@ func TestAskUserQuestion(t *testing.T) {
 			t.Errorf("expected result to mention 2 questions, got: %s", result)
 		}
 
-		loadedState, err := state.Load(statePath)
-		if err != nil {
-			t.Fatalf("failed to load state: %v", err)
-		}
+		loadedState := loadState(t, workDir)
 
 		if len(loadedState.MultiChoiceQuestion.Questions) != 2 {
 			t.Fatalf("expected 2 questions, got %d", len(loadedState.MultiChoiceQuestion.Questions))
@@ -139,24 +109,13 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("emptyQuestionsReturnsError", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		sgai := filepath.Join(tmpDir, ".sgai")
-		if err := os.MkdirAll(sgai, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		statePath := filepath.Join(sgai, "state.json")
-		initialState := state.Workflow{Status: state.StatusWorking}
-		data, _ := json.Marshal(initialState)
-		if err := os.WriteFile(statePath, data, 0644); err != nil {
-			t.Fatal(err)
-		}
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{},
 		}
 
-		result, _ := askUserQuestion(tmpDir, args)
+		result, _ := askUserQuestion(workDir, args)
 
 		if result != "Error: At least one question is required" {
 			t.Errorf("expected error message, got: %q", result)
@@ -164,18 +123,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("questionWithEmptyChoicesReturnsError", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		sgai := filepath.Join(tmpDir, ".sgai")
-		if err := os.MkdirAll(sgai, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		statePath := filepath.Join(sgai, "state.json")
-		initialState := state.Workflow{Status: state.StatusWorking}
-		data, _ := json.Marshal(initialState)
-		if err := os.WriteFile(statePath, data, 0644); err != nil {
-			t.Fatal(err)
-		}
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -187,10 +135,212 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, _ := askUserQuestion(tmpDir, args)
+		result, _ := askUserQuestion(workDir, args)
 
 		if result != "Error: Question 1 has no choices" {
 			t.Errorf("expected error message, got: %q", result)
+		}
+	})
+}
+
+func TestAskUserQuestionStress(t *testing.T) {
+	t.Run("batchOfTenQuestions", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		questions := make([]questionItem, 10)
+		for i := range questions {
+			questions[i] = questionItem{
+				Question:    fmt.Sprintf("Question %d?", i+1),
+				Choices:     []string{"yes", "no", "maybe"},
+				MultiSelect: i%2 == 0,
+			}
+		}
+
+		result, err := askUserQuestion(workDir, askUserQuestionArgs{Questions: questions})
+		if err != nil {
+			t.Fatalf("askUserQuestion error: %v", err)
+		}
+
+		if !strings.Contains(result, "10 question(s)") {
+			t.Errorf("expected result to mention 10 questions, got: %s", result)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if loadedState.Status != state.StatusWaitingForHuman {
+			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
+		}
+
+		if len(loadedState.MultiChoiceQuestion.Questions) != 10 {
+			t.Fatalf("expected 10 questions, got %d", len(loadedState.MultiChoiceQuestion.Questions))
+		}
+	})
+
+	t.Run("preservesExistingProgress", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "coordinator",
+			Progress: []state.ProgressEntry{
+				{Timestamp: "t1", Agent: "coordinator", Description: "previous work"},
+				{Timestamp: "t2", Agent: "coordinator", Description: "more work"},
+			},
+		})
+
+		args := askUserQuestionArgs{
+			Questions: []questionItem{
+				{Question: "Choose?", Choices: []string{"A", "B"}},
+			},
+		}
+
+		_, err := askUserQuestion(workDir, args)
+		if err != nil {
+			t.Fatalf("askUserQuestion error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if len(loadedState.Progress) != 2 {
+			t.Errorf("expected 2 progress entries preserved, got %d", len(loadedState.Progress))
+		}
+	})
+
+	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusAgentDone})
+
+		args := askUserQuestionArgs{
+			Questions: []questionItem{
+				{Question: "Pick?", Choices: []string{"X", "Y"}},
+			},
+		}
+
+		_, err := askUserQuestion(workDir, args)
+		if err != nil {
+			t.Fatalf("askUserQuestion error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if loadedState.Status != state.StatusWaitingForHuman {
+			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
+		}
+	})
+
+	t.Run("nilQuestionsReturnsError", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		args := askUserQuestionArgs{Questions: nil}
+
+		result, _ := askUserQuestion(workDir, args)
+
+		if result != "Error: At least one question is required" {
+			t.Errorf("expected error message, got: %q", result)
+		}
+	})
+
+	t.Run("questionWithNilChoicesReturnsError", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		args := askUserQuestionArgs{
+			Questions: []questionItem{
+				{Question: "No choices?", Choices: nil},
+			},
+		}
+
+		result, _ := askUserQuestion(workDir, args)
+
+		if result != "Error: Question 1 has no choices" {
+			t.Errorf("expected error message, got: %q", result)
+		}
+	})
+}
+
+func TestAskUserWorkGateStress(t *testing.T) {
+	t.Run("setsIsWorkGateTrue", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "coordinator",
+		})
+
+		_, err := askUserWorkGate(workDir)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if !loadedState.MultiChoiceQuestion.IsWorkGate {
+			t.Error("expected IsWorkGate to be true")
+		}
+	})
+
+	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		_, err := askUserWorkGate(workDir)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if loadedState.Status != state.StatusWaitingForHuman {
+			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
+		}
+	})
+
+	t.Run("preservesExistingMessages", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "coordinator",
+			Messages: []state.Message{
+				{ID: 1, FromAgent: "coordinator", ToAgent: "developer", Body: "do stuff"},
+				{ID: 2, FromAgent: "developer", ToAgent: "coordinator", Body: "done"},
+			},
+		})
+
+		_, err := askUserWorkGate(workDir)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if len(loadedState.Messages) != 2 {
+			t.Errorf("expected 2 messages preserved, got %d", len(loadedState.Messages))
+		}
+	})
+
+	t.Run("setsHumanMessage", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		_, err := askUserWorkGate(workDir)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if loadedState.HumanMessage == "" {
+			t.Error("expected HumanMessage to be set")
+		}
+	})
+
+	t.Run("hasTwoChoices", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		_, err := askUserWorkGate(workDir)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		if len(loadedState.MultiChoiceQuestion.Questions) != 1 {
+			t.Fatalf("expected 1 question, got %d", len(loadedState.MultiChoiceQuestion.Questions))
+		}
+
+		if len(loadedState.MultiChoiceQuestion.Questions[0].Choices) != 2 {
+			t.Errorf("expected 2 choices, got %d", len(loadedState.MultiChoiceQuestion.Questions[0].Choices))
 		}
 	})
 }
@@ -325,8 +475,8 @@ func TestFormatMultiChoiceResponse(t *testing.T) {
 }
 
 func TestMultiChoiceQuestionStateRoundTrip(t *testing.T) {
-	fullState := state.Workflow{
-		Status:       state.StatusHumanCommunication,
+	workDir := setupStateDir(t, state.Workflow{
+		Status:       state.StatusWaitingForHuman,
 		HumanMessage: "Choose your option",
 		MultiChoiceQuestion: &state.MultiChoiceQuestion{
 			Questions: []state.QuestionItem{
@@ -338,68 +488,43 @@ func TestMultiChoiceQuestionStateRoundTrip(t *testing.T) {
 			},
 		},
 		CurrentAgent: "coordinator",
-	}
+	})
 
-	tmpDir := t.TempDir()
-	stateFile := filepath.Join(tmpDir, "state.json")
-
-	data, err := json.MarshalIndent(fullState, "", "  ")
-	if err != nil {
-		t.Fatalf("failed to marshal state: %v", err)
-	}
-
-	if err := os.WriteFile(stateFile, data, 0644); err != nil {
-		t.Fatalf("failed to write state file: %v", err)
-	}
-
-	readData, err := os.ReadFile(stateFile)
-	if err != nil {
-		t.Fatalf("failed to read state file: %v", err)
-	}
-
-	var readState state.Workflow
-	if err := json.Unmarshal(readData, &readState); err != nil {
-		t.Fatalf("failed to unmarshal state: %v", err)
-	}
+	readState := loadState(t, workDir)
 
 	if readState.MultiChoiceQuestion == nil {
 		t.Fatal("expected MultiChoiceQuestion to be preserved")
 	}
 
-	if len(readState.MultiChoiceQuestion.Questions) != len(fullState.MultiChoiceQuestion.Questions) {
+	if len(readState.MultiChoiceQuestion.Questions) != 1 {
 		t.Errorf("questions length mismatch: got %d, want %d",
-			len(readState.MultiChoiceQuestion.Questions), len(fullState.MultiChoiceQuestion.Questions))
+			len(readState.MultiChoiceQuestion.Questions), 1)
 	}
 
 	readQ := readState.MultiChoiceQuestion.Questions[0]
-	wantQ := fullState.MultiChoiceQuestion.Questions[0]
 
-	if readQ.Question != wantQ.Question {
-		t.Errorf("question mismatch: got %q, want %q", readQ.Question, wantQ.Question)
+	if readQ.Question != "Which framework should we use?" {
+		t.Errorf("question mismatch: got %q, want %q", readQ.Question, "Which framework should we use?")
 	}
 
-	if len(readQ.Choices) != len(wantQ.Choices) {
-		t.Errorf("choices length mismatch: got %d, want %d", len(readQ.Choices), len(wantQ.Choices))
+	if len(readQ.Choices) != 4 {
+		t.Errorf("choices length mismatch: got %d, want %d", len(readQ.Choices), 4)
 	}
 
-	if readQ.MultiSelect != wantQ.MultiSelect {
-		t.Errorf("multiSelect mismatch: got %v, want %v", readQ.MultiSelect, wantQ.MultiSelect)
+	if readQ.MultiSelect != false {
+		t.Errorf("multiSelect mismatch: got %v, want %v", readQ.MultiSelect, false)
 	}
 }
 
 func TestMultiChoiceOmitsWhenNil(t *testing.T) {
-	stateWithoutMCQ := state.Workflow{
+	workDir := setupStateDir(t, state.Workflow{
 		Status:       state.StatusWorking,
 		CurrentAgent: "coordinator",
-	}
+	})
 
-	data, err := json.MarshalIndent(stateWithoutMCQ, "", "  ")
-	if err != nil {
-		t.Fatalf("failed to marshal state: %v", err)
-	}
+	loadedState := loadState(t, workDir)
 
-	jsonStr := string(data)
-	if strings.Contains(jsonStr, "multiChoiceQuestion") {
-		t.Errorf("multiChoiceQuestion should be omitted from JSON when nil:\n%s", jsonStr)
+	if loadedState.MultiChoiceQuestion != nil {
+		t.Error("multiChoiceQuestion should be nil when not set")
 	}
 }

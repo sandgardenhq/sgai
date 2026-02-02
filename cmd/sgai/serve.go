@@ -400,7 +400,7 @@ func (s *Server) stopSession(workspacePath string) {
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
-	if wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "") {
+	if wfState.NeedsHumanInput() {
 		return "badge-needs-input", "Needs Input"
 	}
 	if running || wfState.Status == state.StatusWorking || wfState.Status == state.StatusAgentDone {
@@ -685,7 +685,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 	}
 
 	badgeClass, badgeText := badgeStatus(wfState, running)
-	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
+	needsInput := wfState.NeedsHumanInput()
 
 	status := wfState.Status
 	if status == "" {
@@ -1289,7 +1289,7 @@ func (s *Server) pageRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if wfState.Status != "waiting-for-human" || wfState.HumanMessage == "" {
+	if wfState.Status != state.StatusWaitingForHuman || wfState.HumanMessage == "" {
 		http.Redirect(w, r, treesRedirectURL(dir), http.StatusSeeOther)
 		return
 	}
@@ -1422,7 +1422,7 @@ func resetHumanCommunication(dir string) {
 		return
 	}
 	wfState.HumanMessage = ""
-	if wfState.Status == state.StatusHumanCommunication || wfState.Status == state.StatusWaitingForHuman {
+	if state.IsHumanPending(wfState.Status) {
 		wfState.Status = state.StatusWorking
 	}
 	if err := state.Save(statePath(dir), wfState); err != nil {
@@ -1828,7 +1828,7 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 	}
 
 	wfState, _ := state.Load(statePath(dir))
-	needsInput = wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
+	needsInput = wfState.NeedsHumanInput()
 	return running, needsInput
 }
 
@@ -2339,7 +2339,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		sess.mu.Unlock()
 	}
 
-	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
+	needsInput := wfState.NeedsHumanInput()
 	isFork := hasJJDirectory(dir) && !isRootWorkspace(dir)
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
@@ -2659,7 +2659,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		currentAgent = "Unknown"
 	}
 
-	needsInput := wfState.Status == "waiting-for-human" && (wfState.MultiChoiceQuestion != nil || wfState.HumanMessage != "")
+	needsInput := wfState.NeedsHumanInput()
 	renderedHumanMessage := renderHumanMessage(wfState.HumanMessage)
 
 	var goalContent template.HTML

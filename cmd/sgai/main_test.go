@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 func TestParseModelAndVariant(t *testing.T) {
@@ -191,6 +193,80 @@ No frontmatter here.
 		}
 		if len(got.Models) != 0 {
 			t.Errorf("tryReloadGoalMetadata() Models should be empty, got %v", got.Models)
+		}
+	})
+}
+
+func TestCanResumeWorkflow(t *testing.T) {
+	checksum := "abc123"
+
+	t.Run("workingWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWorking, GoalChecksum: checksum}
+		if !canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = true for working status with matching checksum")
+		}
+	})
+
+	t.Run("agentDoneWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusAgentDone, GoalChecksum: checksum}
+		if !canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = true for agent-done status")
+		}
+	})
+
+	t.Run("waitingForHumanWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWaitingForHuman, GoalChecksum: checksum}
+		if !canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = true for waiting-for-human status")
+		}
+	})
+
+	t.Run("completeWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusComplete, GoalChecksum: checksum}
+		if canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = false for complete status")
+		}
+	})
+
+	t.Run("emptyStatusWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: "", GoalChecksum: checksum}
+		if canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = false for empty status")
+		}
+	})
+
+	t.Run("freshFlagAlwaysFalse", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWorking, GoalChecksum: checksum}
+		if canResumeWorkflow(wf, true, checksum) {
+			t.Error("expected canResumeWorkflow = false when fresh=true")
+		}
+	})
+
+	t.Run("mismatchedChecksumAlwaysFalse", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWorking, GoalChecksum: "different"}
+		if canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = false when checksums mismatch")
+		}
+	})
+
+	t.Run("freshFlagWithWaitingForHuman", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWaitingForHuman, GoalChecksum: checksum}
+		if canResumeWorkflow(wf, true, checksum) {
+			t.Error("expected canResumeWorkflow = false when fresh=true even for waiting-for-human")
+		}
+	})
+
+	t.Run("emptyChecksumMatchesEmpty", func(t *testing.T) {
+		wf := state.Workflow{Status: state.StatusWorking, GoalChecksum: ""}
+		if !canResumeWorkflow(wf, false, "") {
+			t.Error("expected canResumeWorkflow = true when both checksums are empty")
+		}
+	})
+
+	t.Run("arbitraryStatusWithMatchingChecksum", func(t *testing.T) {
+		wf := state.Workflow{Status: "some-unknown-status", GoalChecksum: checksum}
+		if canResumeWorkflow(wf, false, checksum) {
+			t.Error("expected canResumeWorkflow = false for unknown status")
 		}
 	})
 }

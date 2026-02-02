@@ -149,10 +149,16 @@ func TestIsSelfDriveMode(t *testing.T) {
 		want        bool
 	}{
 		{"auto", "auto", true},
-		{"autoSession", "auto-session", true},
 		{"yes", "yes", false},
 		{"no", "no", false},
 		{"empty", "", false},
+		{"uppercaseAuto", "Auto", false},
+		{"allUppercaseAuto", "AUTO", false},
+		{"leadingWhitespace", " auto", false},
+		{"trailingWhitespace", "auto ", false},
+		{"removedAutoSession", "auto-session", false},
+		{"arbitraryString", "self-drive", false},
+		{"graph", "graph", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -575,11 +575,11 @@ func TestIsStaleWorkingState(t *testing.T) {
 		{"runningWorking", true, state.StatusWorking, false},
 		{"runningAgentDone", true, state.StatusAgentDone, false},
 		{"runningComplete", true, state.StatusComplete, false},
-		{"runningHumanComm", true, state.StatusHumanCommunication, false},
+		{"runningWaitingForHuman", true, state.StatusWaitingForHuman, false},
 		{"stoppedWorking", false, state.StatusWorking, true},
 		{"stoppedAgentDone", false, state.StatusAgentDone, true},
 		{"stoppedComplete", false, state.StatusComplete, false},
-		{"stoppedHumanComm", false, state.StatusHumanCommunication, false},
+		{"stoppedWaitingForHuman", false, state.StatusWaitingForHuman, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
