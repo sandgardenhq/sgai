@@ -70,7 +70,7 @@ Use this format:
 - **Answer:** 
 - **Impact:** what changes in the plan, requirements, or acceptance criteria
 
-## Agent decisions log
+## Agent Decisions Log
 
 Append decisions with dates. Include alternatives considered when helpful.
 
