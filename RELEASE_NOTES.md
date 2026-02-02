@@ -18,11 +18,4 @@
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Agent permission and mode behavior was standardized in the SGAI skeleton to reduce configuration drift."
-  ]
-}
-
-```
+- Updated agent permission and execution mode defaults in the agent configuration template to reduce configuration drift.
