@@ -10,11 +10,11 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Additional updates
+## 0.0.0+20260202 — Updated interactive workflow prompts
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes interactive workflow prompt changes.
+- **Summary**: This release includes interactive workflow prompt updates.
 
 ### Breaking Changes
 
