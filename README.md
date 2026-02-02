@@ -15,17 +15,17 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ## Prerequisites
 
-| Dependency                                   | Purpose                                                                   |                           |
-|----------------------------------------------|---------------------------------------------------------------------------|---------------------------|
-| [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
-| [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
-| [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
+| Dependency                                   | Purpose                                                                     |                           |
+|----------------------------------------------|-----------------------------------------------------------------------------|---------------------------|
+| [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions   |                           |
+| [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                  |                           |
+| [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                          | Plain-text SVG fallback   |
 
 ### Environment Variables
 
-| Variable        | Purpose                                                                         |
-|-----------------|---------------------------------------------------------------------------------|
-| `SGAI_NTFY`     | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
+| Variable        | Purpose                                                                       |
+|-----------------|-------------------------------------------------------------------------------|
+| `SGAI_NTFY`     | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting) |
 
 ## Installation
 
@@ -80,6 +80,11 @@ make build
    - [ ] Add password hashing
    ```
 
+   Notes:
+
+   - Only the **coordinator** agent updates task checkboxes in `GOAL.md` (changes `- [ ]` → `- [x]`).
+   - When a non-coordinator agent finishes a task, it reports completion to the coordinator by sending a message that starts with `GOAL COMPLETE:` and includes the exact checkbox text from `GOAL.md`.
+
 4. **Launch the web dashboard:**
 
    ```sh
@@ -101,6 +106,7 @@ GOAL.md → sgai serve → Monitor in Browser → Iterate
 5. **Iterate** — Review results, update goals, and continue until satisfied
 
 The web dashboard shows:
+
 - Real-time workflow status and agent activity
 - SVG visualization of the agent DAG
 - Start/Stop controls for the engine
@@ -144,14 +150,23 @@ not implementation. Focus on outcomes.
 - [ ] Task 4
 ```
 
+Notes:
+
+- Only the **coordinator** agent marks `GOAL.md` checkboxes as complete.
+- To report a completed task, a non-coordinator agent sends a message to the coordinator in this format:
+
+  ```text
+  GOAL COMPLETE: Task 1
+  ```
+
 ### Frontmatter Options
 
-| Field         | Description                                              |
-|---------------|----------------------------------------------------------|
-| `flow`        | DOT-format DAG defining agent execution order            |
-| `models`      | Per-agent AI model assignments (supports variant syntax) |
-| `completionGateScript`   | Shell command that determines workflow completion        |
-| `interactive` | `yes` (respond via web UI), `no` (exit on human-communication), `auto` (self-driving) |
+| Field                   | Description                                                                           |
+|-------------------------|---------------------------------------------------------------------------------------|
+| `flow`                  | DOT-format DAG defining agent execution order                                         |
+| `models`                | Per-agent AI model assignments (supports variant syntax)                              |
+| `completionGateScript`  | Shell command that determines workflow completion                                     |
+| `interactive`           | `yes` (respond via web UI), `no` (exit on human-communication), `auto` (self-driving) |
 
 ## Usage
 
