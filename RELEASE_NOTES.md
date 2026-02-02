@@ -16,13 +16,6 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes new capabilities and maintenance updates.
 
-### Changes (generated)
+### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch."
-  ]
-}
-
-```
+- Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch.
