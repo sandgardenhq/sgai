@@ -28,38 +28,54 @@ func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
 	return "badge-stopped", "Stopped"
 }
 
-type sessionData struct {
-	Directory            string
-	DirName              string
-	BadgeClass           string
-	BadgeText            string
-	NeedsInput           bool
-	Running              bool
-	InteractiveAuto      bool
-	Status               string
-	StatusText           string
-	Message              string
-	Task                 string
+type sessionStateData struct {
+	BadgeClass      string
+	BadgeText       string
+	NeedsInput      bool
+	Running         bool
+	InteractiveAuto bool
+	Status          string
+	StatusText      string
+	Message         string
+	Task            string
+}
+
+type sessionAgentData struct {
 	CurrentAgent         string
 	CurrentModel         string
 	ModelStatuses        map[string]string
 	HumanMessage         string
 	RenderedHumanMessage template.HTML
-	Progress             []state.ProgressEntry
-	ProgressOpen         bool
-	LatestProgress       string
-	Messages             []messageDisplay
-	Todos                []state.TodoItem
-	ProjectTodos         []state.TodoItem
-	GoalContent          template.HTML
-	PMContent            template.HTML
-	ProjectMgmtContent   template.HTML
-	HasProjectMgmt       bool
-	CodeAvailable        bool
-	ActiveTab            string
-	SVGHash              string
 	AgentSequence        []agentSequenceDisplay
-	Cost                 state.SessionCost
+}
+
+type sessionProgressData struct {
+	Progress       []state.ProgressEntry
+	ProgressOpen   bool
+	LatestProgress string
+	Messages       []messageDisplay
+	Todos          []state.TodoItem
+	ProjectTodos   []state.TodoItem
+	Cost           state.SessionCost
+}
+
+type sessionContentData struct {
+	GoalContent        template.HTML
+	PMContent          template.HTML
+	ProjectMgmtContent template.HTML
+	HasProjectMgmt     bool
+	CodeAvailable      bool
+	SVGHash            string
+}
+
+type sessionData struct {
+	Directory string
+	DirName   string
+	ActiveTab string
+	sessionStateData
+	sessionAgentData
+	sessionProgressData
+	sessionContentData
 }
 
 func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.Request) sessionData {
@@ -134,36 +150,44 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 	codeAvailable := s.codeAvailable && isLocalRequest(r)
 
 	return sessionData{
-		Directory:            dir,
-		DirName:              filepath.Base(dir),
-		BadgeClass:           badgeClass,
-		BadgeText:            badgeText,
-		NeedsInput:           needsInput,
-		Running:              running,
-		InteractiveAuto:      interactiveAuto,
-		Status:               status,
-		Message:              message,
-		Task:                 task,
-		CurrentAgent:         currentAgent,
-		CurrentModel:         wfState.CurrentModel,
-		ModelStatuses:        wfState.ModelStatuses,
-		HumanMessage:         wfState.HumanMessage,
-		RenderedHumanMessage: renderedHumanMessage,
-		Progress:             reversedProgress,
-		ProgressOpen:         progressOpen,
-		LatestProgress:       getLatestProgress(wfState.Progress),
-		Messages:             reversedMessages,
-		Todos:                todos,
-		ProjectTodos:         wfState.ProjectTodos,
-		GoalContent:          template.HTML(goalContent),
-		PMContent:            template.HTML(pmContent),
-		ProjectMgmtContent:   template.HTML(pmContent),
-		HasProjectMgmt:       projectMgmtExists,
-		CodeAvailable:        codeAvailable,
-		ActiveTab:            "goal",
-		SVGHash:              getWorkflowSVGHash(dir, currentAgent),
-		AgentSequence:        prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
-		Cost:                 wfState.Cost,
+		Directory: dir,
+		DirName:   filepath.Base(dir),
+		ActiveTab: "goal",
+		sessionStateData: sessionStateData{
+			BadgeClass:      badgeClass,
+			BadgeText:       badgeText,
+			NeedsInput:      needsInput,
+			Running:         running,
+			InteractiveAuto: interactiveAuto,
+			Status:          status,
+			Message:         message,
+			Task:            task,
+		},
+		sessionAgentData: sessionAgentData{
+			CurrentAgent:         currentAgent,
+			CurrentModel:         wfState.CurrentModel,
+			ModelStatuses:        wfState.ModelStatuses,
+			HumanMessage:         wfState.HumanMessage,
+			RenderedHumanMessage: renderedHumanMessage,
+			AgentSequence:        prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
+		},
+		sessionProgressData: sessionProgressData{
+			Progress:       reversedProgress,
+			ProgressOpen:   progressOpen,
+			LatestProgress: getLatestProgress(wfState.Progress),
+			Messages:       reversedMessages,
+			Todos:          todos,
+			ProjectTodos:   wfState.ProjectTodos,
+			Cost:           wfState.Cost,
+		},
+		sessionContentData: sessionContentData{
+			GoalContent:        template.HTML(goalContent),
+			PMContent:          template.HTML(pmContent),
+			ProjectMgmtContent: template.HTML(pmContent),
+			HasProjectMgmt:     projectMgmtExists,
+			CodeAvailable:      codeAvailable,
+			SVGHash:            getWorkflowSVGHash(dir, currentAgent),
+		},
 	}
 }
 
