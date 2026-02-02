@@ -943,6 +943,88 @@ func buildBaseStatusText(wfState state.Workflow) string {
 	return ""
 }
 
+type workspaceHandler func(w http.ResponseWriter, r *http.Request, workspacePath string)
+
+type workspaceRoute struct {
+	action  string
+	handler workspaceHandler
+}
+
+type workspacePrefixRoute struct {
+	prefix  string
+	handler func(w http.ResponseWriter, r *http.Request, workspacePath, subpath string)
+}
+
+func (s *Server) workspaceRoutes() []workspaceRoute {
+	return []workspaceRoute{
+		{"progress", s.tabHandler("progress")},
+		{"spec", s.redirectHandler("progress")},
+		{"log", s.tabHandler("log")},
+		{"internals", s.tabHandler("internals")},
+		{"changes", s.tabHandler("changes")},
+		{"commits", s.tabHandler("commits")},
+		{"messages", s.tabHandler("messages")},
+		{"retro", s.retroGuard(s.tabHandler("retrospectives"))},
+		{"init", s.handleWorkspaceInit},
+		{"goal", s.handleWorkspaceGoal},
+		{"start", s.handleWorkspaceStart},
+		{"stop", s.handleWorkspaceStop},
+		{"reset-state", s.handleWorkspaceResetState},
+		{"fork", s.handleWorkspaceFork},
+		{"update-description", s.handleWorkspaceUpdateDescription},
+		{"retro/analyze", s.retroGuard(s.handleWorkspaceRetroAnalyze)},
+		{"retro/apply", s.retroGuard(s.handleWorkspaceRetroApply)},
+		{"retro/apply-select", s.retroGuard(s.handleWorkspaceRetroApplySelect)},
+		{"retro/delete", s.retroGuard(s.handleWorkspaceRetroDelete)},
+		{"open-vscode", s.handleWorkspaceOpenVSCode},
+		{"skills", s.handleWorkspaceSkills},
+		{"snippets", s.handleWorkspaceSnippets},
+		{"agents", s.handleWorkspaceAgents},
+	}
+}
+
+func (s *Server) workspacePrefixRoutes() []workspacePrefixRoute {
+	return []workspacePrefixRoute{
+		{"retro/", s.routeWorkspaceRetroPrefix},
+		{"skills/", s.routeWorkspaceSkillPrefix},
+		{"snippets/", s.routeWorkspaceSnippetPrefix},
+	}
+}
+
+func (s *Server) tabHandler(tabName string) workspaceHandler {
+	return func(w http.ResponseWriter, r *http.Request, workspacePath string) {
+		s.handleWorkspaceTab(w, r, workspacePath, tabName)
+	}
+}
+
+func (s *Server) redirectHandler(target string) workspaceHandler {
+	return func(w http.ResponseWriter, r *http.Request, workspacePath string) {
+		http.Redirect(w, r, workspaceURL(workspacePath, target), http.StatusSeeOther)
+	}
+}
+
+func (s *Server) retroGuard(handler workspaceHandler) workspaceHandler {
+	return func(w http.ResponseWriter, r *http.Request, workspacePath string) {
+		if isRetrospectiveDisabled(workspacePath) {
+			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+			return
+		}
+		handler(w, r, workspacePath)
+	}
+}
+
+func (s *Server) routeWorkspaceRetroPrefix(w http.ResponseWriter, r *http.Request, workspacePath, subpath string) {
+	s.routeWorkspaceRetro(w, r, workspacePath, subpath)
+}
+
+func (s *Server) routeWorkspaceSkillPrefix(w http.ResponseWriter, r *http.Request, workspacePath, subpath string) {
+	s.handleWorkspaceSkillDetail(w, r, workspacePath, subpath)
+}
+
+func (s *Server) routeWorkspaceSnippetPrefix(w http.ResponseWriter, r *http.Request, workspacePath, subpath string) {
+	s.handleWorkspaceSnippetDetail(w, r, workspacePath, subpath)
+}
+
 func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/workspaces/")
 	parts := strings.SplitN(path, "/", 2)
@@ -963,89 +1045,21 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch action {
-	case "progress":
-		s.handleWorkspaceTab(w, r, workspacePath, "progress")
-	case "spec":
-		http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
-		return
-	case "log":
-		s.handleWorkspaceTab(w, r, workspacePath, "log")
-	case "internals":
-		s.handleWorkspaceTab(w, r, workspacePath, "internals")
-	case "changes":
-		s.handleWorkspaceTab(w, r, workspacePath, "changes")
-	case "commits":
-		s.handleWorkspaceTab(w, r, workspacePath, "commits")
-	case "messages":
-		s.handleWorkspaceTab(w, r, workspacePath, "messages")
-	case "retro":
-		if isRetrospectiveDisabled(workspacePath) {
-			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+	for _, route := range s.workspaceRoutes() {
+		if action == route.action {
+			route.handler(w, r, workspacePath)
 			return
 		}
-		s.handleWorkspaceTab(w, r, workspacePath, "retrospectives")
-	case "init":
-		s.handleWorkspaceInit(w, r, workspacePath)
-	case "goal":
-		s.handleWorkspaceGoal(w, r, workspacePath)
-	case "start":
-		s.handleWorkspaceStart(w, r, workspacePath)
-	case "stop":
-		s.handleWorkspaceStop(w, r, workspacePath)
-	case "reset-state":
-		s.handleWorkspaceResetState(w, r, workspacePath)
-	case "fork":
-		s.handleWorkspaceFork(w, r, workspacePath)
-	case "update-description":
-		s.handleWorkspaceUpdateDescription(w, r, workspacePath)
-	case "retro/analyze":
-		if isRetrospectiveDisabled(workspacePath) {
-			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
-			return
-		}
-		s.handleWorkspaceRetroAnalyze(w, r, workspacePath)
-	case "retro/apply":
-		if isRetrospectiveDisabled(workspacePath) {
-			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
-			return
-		}
-		s.handleWorkspaceRetroApply(w, r, workspacePath)
-	case "retro/apply-select":
-		if isRetrospectiveDisabled(workspacePath) {
-			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
-			return
-		}
-		s.handleWorkspaceRetroApplySelect(w, r, workspacePath)
-	case "retro/delete":
-		if isRetrospectiveDisabled(workspacePath) {
-			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
-			return
-		}
-		s.handleWorkspaceRetroDelete(w, r, workspacePath)
-	case "open-vscode":
-		s.handleWorkspaceOpenVSCode(w, r, workspacePath)
-	case "skills":
-		s.handleWorkspaceSkills(w, r, workspacePath)
-	case "snippets":
-		s.handleWorkspaceSnippets(w, r, workspacePath)
-	case "agents":
-		s.handleWorkspaceAgents(w, r, workspacePath)
-	default:
-		if after, ok := strings.CutPrefix(action, "retro/"); ok {
-			s.routeWorkspaceRetro(w, r, workspacePath, after)
-			return
-		}
-		if after, ok := strings.CutPrefix(action, "skills/"); ok {
-			s.handleWorkspaceSkillDetail(w, r, workspacePath, after)
-			return
-		}
-		if after, ok := strings.CutPrefix(action, "snippets/"); ok {
-			s.handleWorkspaceSnippetDetail(w, r, workspacePath, after)
-			return
-		}
-		http.NotFound(w, r)
 	}
+
+	for _, prefix := range s.workspacePrefixRoutes() {
+		if after, ok := strings.CutPrefix(action, prefix.prefix); ok {
+			prefix.handler(w, r, workspacePath, after)
+			return
+		}
+	}
+
+	http.NotFound(w, r)
 }
 
 func workspaceURL(workspacePath, action string) string {
