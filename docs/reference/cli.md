@@ -21,6 +21,11 @@ sgai [--interactive] [--fresh] <target_directory>
   - `yes` (open `$EDITOR` for human responses)
   - `no` (exit on human-communication)
   - `auto` (self-driving)
+  - `auto-session` (self-driving for the current session)
+
+  Notes:
+
+  - Self-driving modes disable human-question tools in the MCP server (for example, the tools that prompt a human for answers).
 
 - `--fresh`
 
