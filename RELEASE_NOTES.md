@@ -9,3 +9,20 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260202 — Additional changes
+
+- **Date**: 2026-02-02
+- **Version**: 0.0.0+20260202
+- **Summary**: This release includes the changes listed below.
+
+### Additional Changes
+
+```json
+{
+  "Additional Changes": [
+    "Agent permission and mode behavior was standardized in the SGAI skeleton to reduce configuration drift. This update normalizes the skeleton’s agent permissions/modes, removes an explicit model override, and includes minor whitespace/formatting cleanup."
+  ]
+}
+
+```
