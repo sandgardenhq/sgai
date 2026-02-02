@@ -301,7 +301,7 @@ func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bo
 	for i, entry := range sequence {
 		startTime, err := time.Parse(time.RFC3339, entry.StartTime)
 		if err != nil {
-			log.Printf("prepareAgentSequenceDisplay: skipping entry with invalid timestamp %q: %v", entry.StartTime, err)
+			log.Println("prepareAgentSequenceDisplay: skipping entry with invalid timestamp:", entry.StartTime, err)
 			continue
 		}
 		var elapsed time.Duration

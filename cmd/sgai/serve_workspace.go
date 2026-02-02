@@ -176,12 +176,9 @@ func collectInProgressWorkspaces(groups []workspaceGroup) []workspaceInfo {
 }
 
 func hasAnyNeedsInput(workspaces []workspaceInfo) bool {
-	for _, w := range workspaces {
-		if w.NeedsInput {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(workspaces, func(w workspaceInfo) bool {
+		return w.NeedsInput
+	})
 }
 
 func (s *Server) resolveWorkspaceNameToPath(workspaceName string) string {

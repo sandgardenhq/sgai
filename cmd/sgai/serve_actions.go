@@ -290,7 +290,7 @@ func (s *Server) handleWorkspaceFork(w http.ResponseWriter, r *http.Request, wor
 
 	sgaiDir := filepath.Join(targetPath, ".sgai")
 	if errMkdir := os.MkdirAll(sgaiDir, 0755); errMkdir != nil {
-		log.Printf("Warning: failed to create .sgai directory: %v", errMkdir)
+		log.Println("warning: failed to create .sgai directory:", errMkdir)
 	}
 
 	goalPath := filepath.Join(targetPath, "GOAL.md")

@@ -387,7 +387,7 @@ func (s *Server) runWorkspaceRetrospectiveCommand(w http.ResponseWriter, r *http
 
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			log.Printf("retrospective %s exited with error: %v", subcommand, err)
+			log.Println("retrospective", subcommand, "exited with error:", err)
 		}
 		sess.mu.Lock()
 		sess.running = false
@@ -491,7 +491,7 @@ func (s *Server) handleWorkspaceRetroAnalyze(w http.ResponseWriter, r *http.Requ
 
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			log.Printf("retrospective analyze exited with error: %v", err)
+			log.Println("retrospective analyze exited with error:", err)
 		}
 		sess.mu.Lock()
 		sess.running = false
@@ -647,12 +647,12 @@ func (s *Server) handleWorkspaceRetroApplySelectPost(w http.ResponseWriter, r *h
 		sess.mu.Unlock()
 
 		if errApply != nil {
-			log.Printf("retrospective apply exited with error: %v", errApply)
+			log.Println("retrospective apply exited with error:", errApply)
 			return
 		}
 
 		if err := deleteRetrospectiveSession(workspacePath, sessionID); err != nil {
-			log.Printf("failed to auto-delete retrospective session %s: %v", sessionID, err)
+			log.Println("failed to auto-delete retrospective session:", sessionID, err)
 		}
 	}()
 
