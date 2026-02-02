@@ -18,4 +18,4 @@
 
 ### Additional Changes
 
-- Expanded when the Go GitHub Actions workflow runs so it triggers for all pull requests and merge groups rather than only events tied to the main branch.
+- Updated the Go GitHub Actions workflow `on:` configuration to trigger on `pull_request` and `merge_group` events rather than only main-branch events.
