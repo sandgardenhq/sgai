@@ -19,7 +19,7 @@
 ```json
 {
   "Additional Changes": [
-    "Updated the retrospective and writer agent prompts so they load shared skills and snippets from the standard overlay directories, and so they include agent improvement files during execution. Specifically, the prompts now read skills/snippets from the sgai overlay directory structure, incorporate the agent improvement artifacts, and send a coordinator notification via `sgai_send_message` before marking workflow steps as completed."
+    "Updated the `retrospective` and `writer` agent prompts to load shared `skills/` and `snippets/` from the standard overlay directories (including the `sgai` overlay) and to include agent improvement files during execution."
   ]
 }
 
