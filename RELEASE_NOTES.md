@@ -18,7 +18,7 @@
 
 {
   "Breaking Changes": [
-    "The interactive workflow now uses a structured multi-choice prompt instead of free-form messaging, making the interaction flow clearer and more consistent across tools. The previous `human-communication` status and free-form message handling have been replaced with an `ask_user_question` multi-choice interaction, including corresponding updates to the workflow state/schema, CLI behavior, server UI, and documentation."
+    "The interactive workflow now uses a structured multi-choice prompt instead of free-form messaging, making the interaction flow clearer and more consistent across tools."
   ]
 }
 
