@@ -21,7 +21,7 @@
 ```json
 {
   "Additional Changes": [
-    "The response context body area now shows all content without forcing vertical scrolling. Specifically, the UI no longer applies a `max-height` constraint or `overflow-y` scrolling to the response context body container."
+    "The response context body area now shows all content without forcing vertical scrolling."
   ]
 }
 
