@@ -16,7 +16,7 @@ If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`
 
 ## Tools
 
-### `find_skills`
+### `skills`
 
 - Input: `{ "name": "..." }` (optional)
 - Behavior:
