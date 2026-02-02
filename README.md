@@ -108,6 +108,12 @@ The web dashboard shows:
 - Goal editing and agent/skill/snippet listing
 - Interface for answering agent questions (multiple-choice prompts)
 
+### Agent questions (ask_user_question)
+
+When the system needs clarification, it asks a structured question (multiple-choice) instead of switching into a free-form “human communication” status.
+
+If custom agent prompts reference the old `human-communication` workflow status, replace that with `ask_user_question`.
+
 ## GOAL.md Reference
 
 Create a `GOAL.md` file in your project directory to define your goals:
