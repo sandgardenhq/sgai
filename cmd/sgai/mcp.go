@@ -236,12 +236,13 @@ type askUserQuestionArgs struct {
 }
 
 // cmdMCP starts an MCP server exposing sgai custom tools via stdio transport.
-// It reads SGAI_MCP_WORKING_DIRECTORY.
+// It reads SGAI_MCP_WORKING_DIRECTORY and SGAI_MCP_INTERACTIVE.
 func cmdMCP(_ []string) {
 	workingDir := os.Getenv("SGAI_MCP_WORKING_DIRECTORY")
 	if workingDir == "" {
 		workingDir = "."
 	}
+	interactive := os.Getenv("SGAI_MCP_INTERACTIVE")
 	absDir, err := filepath.Abs(workingDir)
 	if err != nil {
 		log.Fatalln("failed to resolve working directory:", err)
@@ -281,7 +282,7 @@ func cmdMCP(_ []string) {
 		InputSchema: findSnippetsSchema,
 	}, mcpCtx.findSnippetsHandler)
 
-	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(currentAgent)
+	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(currentAgent, interactive)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_workflow_state",
 		Description: updateWorkflowStateDescription,
@@ -349,25 +350,27 @@ func cmdMCP(_ []string) {
 			InputSchema: projectTodoReadSchema,
 		}, mcpCtx.projectTodoReadHandler)
 
-		askUserQuestionSchema, err := jsonschema.For[askUserQuestionArgs](nil)
-		if err != nil {
-			log.Fatalln("failed to create ask_user_question schema:", err)
-		}
-		mcp.AddTool(server, &mcp.Tool{
-			Name:        "ask_user_question",
-			Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
-			InputSchema: askUserQuestionSchema,
-		}, mcpCtx.askUserQuestionHandler)
+		if !isSelfDriveMode(interactive) {
+			askUserQuestionSchema, err := jsonschema.For[askUserQuestionArgs](nil)
+			if err != nil {
+				log.Fatalln("failed to create ask_user_question schema:", err)
+			}
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "ask_user_question",
+				Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
+				InputSchema: askUserQuestionSchema,
+			}, mcpCtx.askUserQuestionHandler)
 
-		askUserWorkGateSchema, err := jsonschema.For[struct{}](nil)
-		if err != nil {
-			log.Fatalln("failed to create ask_user_work_gate schema:", err)
+			askUserWorkGateSchema, err := jsonschema.For[struct{}](nil)
+			if err != nil {
+				log.Fatalln("failed to create ask_user_work_gate schema:", err)
+			}
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "ask_user_work_gate",
+				Description: "Present the work gate approval question to the human partner. No arguments needed - the question and choices are hardcoded. When approved, the session switches to self-driving mode for the remainder of the session.",
+				InputSchema: askUserWorkGateSchema,
+			}, mcpCtx.askUserWorkGateHandler)
 		}
-		mcp.AddTool(server, &mcp.Tool{
-			Name:        "ask_user_work_gate",
-			Description: "Present the work gate approval question to the human partner. No arguments needed - the question and choices are hardcoded. When approved, the session switches to self-driving mode for the remainder of the session.",
-			InputSchema: askUserWorkGateSchema,
-		}, mcpCtx.askUserWorkGateHandler)
 	}
 
 	transport := &mcp.StdioTransport{}
@@ -1210,13 +1213,20 @@ func messageMatchesSender(msg state.Message, currentAgent, currentModel string) 
 	return false
 }
 
-func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
+func isSelfDriveMode(interactive string) bool {
+	return interactive == "auto" || interactive == "auto-session"
+}
+
+func buildUpdateWorkflowStateSchema(currentAgent, interactive string) (*jsonschema.Schema, string) {
 	statusEnum := []any{"working", "agent-done"}
 	description := "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done."
 
 	if currentAgent == "coordinator" {
-		statusEnum = append(statusEnum, "complete", "human-communication")
-		description = "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done, or set human-communication if you need help or talk to the human partner."
+		statusEnum = append(statusEnum, "complete")
+		if !isSelfDriveMode(interactive) {
+			statusEnum = append(statusEnum, "human-communication")
+			description = "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done, or set human-communication if you need help or talk to the human partner."
+		}
 	}
 
 	schema := &jsonschema.Schema{
