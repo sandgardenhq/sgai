@@ -19,4 +19,3 @@
 ### Additional Changes
 
 - Updated documentation to clarify that only the coordinator updates `GOAL.md` checkboxes and that workers report completions using `GOAL COMPLETE:` messages.
-
