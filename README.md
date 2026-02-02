@@ -160,6 +160,16 @@ sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
+## Development workflow
+
+### Updating Go module dependencies
+
+When changing Go dependencies, ensure the module files stay consistent:
+
+1. Make the dependency change (for example by editing `go.mod`, or using `go get`).
+2. Run `go mod tidy`.
+3. Commit both `go.mod` and `go.sum`.
+
 ## Contributing
 
 Contributions happen through specifications, not code.
