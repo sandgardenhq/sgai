@@ -1314,9 +1314,23 @@ func (s *Server) pageRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type renderedQuestion struct {
+		Question    template.HTML
+		Choices     []string
+		MultiSelect bool
+	}
+	renderedQuestions := make([]renderedQuestion, len(wfState.MultiChoiceQuestion.Questions))
+	for i, q := range wfState.MultiChoiceQuestion.Questions {
+		renderedQuestions[i] = renderedQuestion{
+			Question:    renderHumanMessage(q.Question),
+			Choices:     q.Choices,
+			MultiSelect: q.MultiSelect,
+		}
+	}
+
 	mcData := struct {
 		AgentName          string
-		Questions          []state.QuestionItem
+		Questions          []renderedQuestion
 		Directory          string
 		DirName            string
 		ReturnTo           string
@@ -1324,7 +1338,7 @@ func (s *Server) pageRespond(w http.ResponseWriter, r *http.Request) {
 		ProjectMgmtContent template.HTML
 	}{
 		AgentName:          agentName,
-		Questions:          wfState.MultiChoiceQuestion.Questions,
+		Questions:          renderedQuestions,
 		Directory:          dir,
 		DirName:            filepath.Base(dir),
 		ReturnTo:           returnTo,
