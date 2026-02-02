@@ -6,9 +6,6 @@ permission:
     "*": deny
     "*/GOAL.md": allow
     "*/.sgai/PROJECT_MANAGEMENT.md": allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
   todowrite: deny

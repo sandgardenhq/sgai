@@ -1,11 +1,8 @@
 ---
 description: Reviews Go code for readability, idioms, and best practices. Read-only reviewer that sends fixes via inter-agent messaging.
-mode: primary
+mode: all
 permission:
   edit: deny
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

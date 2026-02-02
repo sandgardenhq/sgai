@@ -7,9 +7,6 @@ permission:
     "*/.sgai/state.json": deny
   edit:
     "*": deny
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

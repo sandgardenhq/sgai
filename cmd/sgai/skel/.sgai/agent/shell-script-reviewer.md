@@ -1,6 +1,6 @@
 ---
 description: Reviews shell script quality for correctness, portability, security, and best practices. Read-only reviewer.
-mode: primary
+mode: all
 permission:
   edit: deny
   bash: deny

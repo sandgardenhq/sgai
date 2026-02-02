@@ -2,10 +2,6 @@
 description: Expert C4 Component-level documentation specialist. Synthesizes C4 Code-level documentation into Component-level architecture, defining component boundaries, interfaces, and relationships. Creates component diagrams and documentation. Use when synthesizing code-level documentation into logical components.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
@@ -139,7 +135,7 @@ Use proper Mermaid C4Component syntax. Component diagrams show components **with
 ```mermaid
 C4Component
     title Component Diagram for [Container Name]
-    
+
     Container_Boundary(container, "Container Name") {
         Component(component1, "Component 1", "Type", "Description")
         Component(component2, "Component 2", "Type", "Description")
@@ -147,7 +143,7 @@ C4Component
     }
     Container_Ext(externalContainer, "External Container", "Description")
     System_Ext(externalSystem, "External System", "Description")
-    
+
     Rel(component1, component2, "Uses")
     Rel(component2, component3, "Reads from and writes to")
     Rel(component1, externalContainer, "Uses", "API")

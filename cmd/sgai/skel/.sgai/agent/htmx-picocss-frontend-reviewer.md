@@ -1,11 +1,7 @@
 ---
 description: UI OCD Web Agent - frontend interface reviewer for interfaces done using HTMX and PicoCSS
-mode: primary
+mode: all
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---

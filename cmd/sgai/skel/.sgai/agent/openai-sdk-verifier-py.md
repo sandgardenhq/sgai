@@ -2,10 +2,6 @@
 description: Use this agent to verify that a Python OpenAI Agents SDK application is properly configured, follows SDK best practices and documentation recommendations, and is ready for deployment or testing. This agent should be invoked after a Python OpenAI SDK app has been created or modified.
 mode: all
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
@@ -88,10 +84,10 @@ from agents import function_tool
 @function_tool
 def my_tool(param1: str) -> str:
     """Description of what the tool does.
-    
+
     Args:
         param1: Parameter description
-        
+
     Returns:
         Result description
     """

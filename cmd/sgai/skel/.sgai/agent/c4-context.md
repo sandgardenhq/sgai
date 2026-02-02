@@ -2,10 +2,6 @@
 description: Expert C4 Context-level documentation specialist. Creates high-level system context diagrams, documents personas, user journeys, system features, and external dependencies. Synthesizes container and component documentation with system documentation to create comprehensive context-level architecture. Use when creating the highest-level C4 system context documentation.
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
-  webfetch: allow
   doom_loop: deny
   external_directory: deny
 ---
@@ -169,13 +165,13 @@ Use proper Mermaid C4 syntax:
 ```mermaid
 C4Context
     title System Context Diagram
-    
+
     Person(user, "User", "Uses the system to accomplish their goals")
     System(system, "System Name", "Provides features X, Y, and Z")
     System_Ext(external1, "External System 1", "Provides service A")
     System_Ext(external2, "External System 2", "Provides service B")
     SystemDb(externalDb, "External Database", "Stores data")
-    
+
     Rel(user, system, "Uses")
     Rel(system, external1, "Uses", "API")
     Rel(system, external2, "Sends events to")

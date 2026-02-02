@@ -2,9 +2,6 @@
 description: Mines code from session diffs to identify snippets worth adding to sgai
 mode: primary
 permission:
-  edit: allow
-  bash: allow
-  skill: allow
   webfetch: deny
   doom_loop: deny
   external_directory: deny

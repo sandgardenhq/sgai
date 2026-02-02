@@ -1,6 +1,6 @@
 ---
 description: Creates new code snippets from approved suggestions
-mode: primary
+mode: all
 permission:
   webfetch: deny
   doom_loop: deny
