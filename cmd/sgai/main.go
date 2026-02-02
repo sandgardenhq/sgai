@@ -837,6 +837,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				}
 
 				if metadata.CompletionGateScript != "" {
+					fmt.Println("["+cfg.paddedsgai+"]", "running completionGateScript:", metadata.CompletionGateScript)
 					output, errScript := runCompletionGateScript(metadata.CompletionGateScript)
 					if errScript != nil {
 						fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
