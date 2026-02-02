@@ -13,7 +13,7 @@
 		{{if gt (len $.Questions) 1}}
 		<div style="font-size: 0.875rem; color: var(--pico-muted-color); margin-bottom: 0.5rem;">Question {{add $qIndex 1}} of {{len $.Questions}}</div>
 		{{end}}
-		<div style="white-space: pre-wrap; margin-bottom: 1rem;">{{$question.Question}}</div>
+		<div style="margin-bottom: 1rem;">{{$question.Question}}</div>
 		<input type="hidden" name="multiSelect_{{$qIndex}}" value="{{$question.MultiSelect}}">
 
 		<fieldset style="margin-bottom: 1rem;">
