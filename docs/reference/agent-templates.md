@@ -1,27 +1,49 @@
-# Agent template settings (mode and tool permissions)
+# Agent template settings (mode, tool permissions, and model)
 
 This page describes a few agent-template settings as they appear in the `sgai` skeleton under `cmd/sgai/skel/.sgai/agent/*.md`.
 
 ## Overview
 
-The skeleton includes multiple agent template files. Commit `f2ab442683ad28f673061c3459309240ea7ee2e5` normalizes how agent `mode` and tool permissions are expressed.
+The skeleton includes multiple agent template files. Some of these templates set a `mode` field, and some list tool permissions using per-tool `...: allow` entries.
 
 ## Mode
 
-At least one skeleton agent template uses a `mode` setting.
+Several skeleton agent templates set `mode: all`.
 
-- One template changes its `mode` value from `primary` to `all`.
+The following templates use `mode: all` in the current skeleton:
+
+- `go-readability-reviewer`
+- `htmx-picocss-frontend-reviewer`
+- `shell-script-reviewer`
+- `skill-writer`
+- `snippet-writer`
 
 ## Tool permissions
 
-Several skeleton agent templates listed individual tool permissions as separate entries (for example: `edit: allow`, `bash: allow`, `skill: allow`, `webfetch: allow`). In this commit, many templates remove these per-tool `allow` entries.
+Some skeleton agent templates include per-tool permission entries like:
 
-One skeleton template changes its tool-permission section to:
+- `edit: allow`
+- `bash: allow`
+- `skill: allow`
+- `webfetch: allow`
 
-- remove `edit: allow`, `bash: allow`, and `skill: allow`
-- add `tools: allow`
-- keep `webfetch: allow`
+In the current skeleton, some templates remove previously listed `...: allow` entries.
 
-## Notes
+Examples from the current skeleton:
 
-- Some templates still include individual tool permissions (for example, one template retains `edit`, `bash`, `skill`, and `webfetch` entries but removes trailing whitespace).
+- `go-readability-reviewer` no longer lists `bash: allow`, `skill: allow`, or `webfetch: allow`.
+- `htmx-picocss-frontend-developer` no longer lists `edit: allow`, `bash: allow`, `skill: allow`, or `webfetch: allow`.
+- `htmx-picocss-frontend-reviewer` no longer lists `edit: allow`, `bash: allow`, `skill: allow`, or `webfetch: allow`.
+- `retrospective-code-analyzer` no longer lists `edit: allow`, `bash: allow`, or `skill: allow`.
+- `retrospective-refiner` no longer lists `edit: allow`, `bash: allow`, or `skill: allow`.
+
+Some templates explicitly allow tools.
+
+Examples from the current skeleton:
+
+- `retrospective-applier` lists `edit: allow`, `bash: allow`, `skill: allow`, and `webfetch: allow`.
+- `retrospective-session-analyzer` lists `edit: allow`, `bash: allow`, and `skill: allow`.
+
+## Model
+
+The `stpa-analyst` template does not set an explicit model override line for `anthropic/claude-opus-4-5`.
