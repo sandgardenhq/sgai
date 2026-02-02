@@ -54,6 +54,12 @@ When the current agent is `coordinator`, it also allows:
 
 `update_workflow_state` does not set `waiting-for-human`. Human-waiting is controlled by the coordinator's human-interaction tools (for example, `ask_user_question`).
 
+#### Status preservation while waiting for a human
+
+When the current workflow `status` is `waiting-for-human`, updating `status` via `update_workflow_state` preserves the existing `waiting-for-human` value.
+
+In this state, `task` and `addProgress` still apply (so the workflow can keep recording work and notes while it waits for a response).
+
 #### TODO guardrails
 
 Transitions to `agent-done` or `complete` fail if there are pending TODO items.
