@@ -20,7 +20,8 @@ The `status` field in `.sgai/state.json` uses these values:
 
 The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 
-- When the current agent is `coordinator`, the schema allows `complete` and `human-communication`.
+- When the current agent is `coordinator` and `SGAI_MCP_INTERACTIVE` is not a self-driving mode, the schema allows `complete` and `human-communication`.
+- When the current agent is `coordinator` and `SGAI_MCP_INTERACTIVE` is a self-driving mode (`auto` or `auto-session`), the schema allows `complete` but does not allow `human-communication`.
 - When the current agent is not `coordinator`, the schema only allows `working` and `agent-done`.
 
 ## Workflow object shape
