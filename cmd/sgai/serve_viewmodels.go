@@ -35,7 +35,6 @@ type sessionStateData struct {
 	Running         bool
 	InteractiveAuto bool
 	Status          string
-	StatusText      string
 	Message         string
 	Task            string
 }

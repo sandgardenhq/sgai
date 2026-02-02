@@ -352,12 +352,11 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			log.Printf("sgai process exited with error: %v", err)
+			log.Println("sgai process exited with error:", err)
 		}
 		sess.mu.Lock()
 		sess.running = false
 		sess.mu.Unlock()
-
 	}()
 
 	return startSessionResult{sess: sess}
@@ -411,7 +410,7 @@ func cmdServe(args []string) {
 	mux.HandleFunc("POST /workspaces/new", srv.handleNewWorkspacePost)
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
 
-	log.Printf("sgai serve listening on http://%s", *listenAddr)
+	log.Println("sgai serve listening on http://" + *listenAddr)
 	if err := http.ListenAndServe(*listenAddr, mux); err != nil {
 		log.Fatalln("server error:", err)
 	}
@@ -653,7 +652,7 @@ func resetHumanCommunication(dir string) {
 func executeTemplate(w http.ResponseWriter, tmpl *template.Template, data any) {
 	w.Header().Set("Content-Type", "text/html")
 	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("template execution error: %v", err)
+		log.Println("template execution error:", err)
 	}
 }
 
@@ -775,10 +774,6 @@ func (s *Server) pageTreesRefresh(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	executeTemplate(w, templates.Lookup("trees_content.html"), data)
-}
-
-func buildTreesStatusText(wfState state.Workflow, _ string) string {
-	return buildBaseStatusText(wfState)
 }
 
 func buildBaseStatusText(wfState state.Workflow) string {
@@ -951,7 +946,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	}
 
 	wfState, _ := state.Load(statePath(dir))
-	statusText := buildTreesStatusText(wfState, dir)
+	statusText := buildBaseStatusText(wfState)
 
 	var running bool
 	s.mu.Lock()
@@ -1025,7 +1020,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 
 	var buf bytes.Buffer
 	if err := templates.Lookup("trees_workspace.html").Execute(&buf, workspaceData); err != nil {
-		log.Printf("Error rendering workspace template: %v", err)
+		log.Println("error rendering workspace template:", err)
 		return workspaceContentResult{
 			Content: template.HTML(fmt.Sprintf("<p>Error rendering workspace: %s</p>", err.Error())),
 		}
