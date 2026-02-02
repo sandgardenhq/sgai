@@ -24,6 +24,8 @@ At this point, you typically see at least one of the following in state:
 - `multiChoiceQuestion` is present (structured questions)
 - `humanMessage` is non-empty (a free-form prompt for the human)
 
+While the workflow is waiting for a response, other fields (like `task` and `progress`) can still update without changing `status`.
+
 ### Coordinator-only statuses in MCP
 
 The MCP tool `update_workflow_state` uses a per-agent JSON schema.
