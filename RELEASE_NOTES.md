@@ -18,9 +18,5 @@
 
 ### Additional Changes
 
-{
-  "Additional Changes": [
-    "The project documentation now makes it clear that only the coordinator is responsible for updating GOAL.md checkboxes, and workers must report completed goals in a consistent way. Specifically, workers must send completion reports using “GOAL COMPLETE:” messages, and the project-completion-verification skill documentation has been extended with coordinator-only instructions for marking and verifying completed items in GOAL.md."
-  ]
-}
+- Updated documentation to clarify that only the coordinator updates `GOAL.md` checkboxes and that workers report completions using `GOAL COMPLETE:` messages.
 
