@@ -153,6 +153,15 @@ not implementation. Focus on outcomes.
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
 
+### Human input prompts
+
+When the workflow needs a human response, the run enters a `waiting-for-human` state.
+
+The web UI prompts for input when either of these are present:
+
+- A free-form message to respond to
+- A multiple-choice question to answer
+
 ## Usage
 
 ```sh
