@@ -66,7 +66,7 @@ Input fields:
 When the current agent is `coordinator`, it also allows:
 
 - `complete`
-- `human-communication`
+- `human-communication` (only when `SGAI_MCP_INTERACTIVE` is not a self-driving mode)
 
 #### TODO guardrails
 
