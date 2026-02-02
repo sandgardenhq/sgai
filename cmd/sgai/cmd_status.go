@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -291,11 +292,7 @@ func cmdListAgents(args []string) {
 	}
 
 	fmt.Println("Skeleton agents:")
-	skelNames := make([]string, 0, len(skelAgents))
-	for name := range skelAgents {
-		skelNames = append(skelNames, name)
-	}
-	slices.Sort(skelNames)
+	skelNames := slices.Sorted(maps.Keys(skelAgents))
 	for _, name := range skelNames {
 		desc := skelAgents[name]
 		if desc != "" {
@@ -307,11 +304,7 @@ func cmdListAgents(args []string) {
 
 	if len(dirAgents) > 0 {
 		fmt.Println("\nDirectory agents (.sgai/agent/):")
-		dirNames := make([]string, 0, len(dirAgents))
-		for name := range dirAgents {
-			dirNames = append(dirNames, name)
-		}
-		slices.Sort(dirNames)
+		dirNames := slices.Sorted(maps.Keys(dirAgents))
 		for _, name := range dirNames {
 			desc := dirAgents[name]
 			if desc != "" {

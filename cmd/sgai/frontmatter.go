@@ -29,16 +29,16 @@ type agentMetadata struct {
 	Snippets []string `json:"snippets" yaml:"snippets"`
 }
 
-func shouldLogAgent(dir, agentName string) bool {
+func parseAgentMetadata(dir, agentName string) (agentMetadata, bool) {
 	agentPath := filepath.Join(dir, ".sgai", "agent", agentName+".md")
 	content, err := os.ReadFile(agentPath)
 	if err != nil {
-		return true
+		return agentMetadata{}, false
 	}
 
 	delimiter := []byte("---")
 	if !bytes.HasPrefix(content, delimiter) {
-		return true
+		return agentMetadata{}, false
 	}
 
 	rest := content[len(delimiter):]
@@ -48,47 +48,30 @@ func shouldLogAgent(dir, agentName string) bool {
 
 	before, _, ok := bytes.Cut(rest, delimiter)
 	if !ok {
-		return true
+		return agentMetadata{}, false
 	}
 
-	yamlContent := before
-	var metadata agentMetadata
-	metadata.Log = true
-	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
-		return true
+	metadata := agentMetadata{Log: true}
+	if err := yaml.Unmarshal(before, &metadata); err != nil {
+		return agentMetadata{}, false
 	}
 
+	return metadata, true
+}
+
+func shouldLogAgent(dir, agentName string) bool {
+	metadata, ok := parseAgentMetadata(dir, agentName)
+	if !ok {
+		return true
+	}
 	return metadata.Log
 }
 
 func parseAgentSnippets(dir, agentName string) []string {
-	agentPath := filepath.Join(dir, ".sgai", "agent", agentName+".md")
-	content, err := os.ReadFile(agentPath)
-	if err != nil {
-		return nil
-	}
-
-	delimiter := []byte("---")
-	if !bytes.HasPrefix(content, delimiter) {
-		return nil
-	}
-
-	rest := content[len(delimiter):]
-	if len(rest) > 0 && rest[0] == '\n' {
-		rest = rest[1:]
-	}
-
-	before, _, ok := bytes.Cut(rest, delimiter)
+	metadata, ok := parseAgentMetadata(dir, agentName)
 	if !ok {
 		return nil
 	}
-
-	yamlContent := before
-	var metadata agentMetadata
-	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
-		return nil
-	}
-
 	return metadata.Snippets
 }
 
