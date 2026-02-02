@@ -10,11 +10,11 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — General updates
+## 0.0.0+20260202 — Documentation updates
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes changes across multiple areas.
+- **Summary**: This release includes documentation updates for goal completion reporting and coordinator responsibilities.
 
 ### Additional Changes
 
