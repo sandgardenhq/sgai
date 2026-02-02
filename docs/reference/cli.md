@@ -19,7 +19,7 @@ sgai [--interactive] [--fresh] <target_directory>
   Accepted values:
 
   - `yes` (open `$EDITOR` for human responses)
-  - `no` (exit on human-communication)
+  - `no` (do not open `$EDITOR` for human responses)
   - `auto` (self-driving)
 
 - `--fresh`
