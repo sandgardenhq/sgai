@@ -16,9 +16,7 @@
 - **Version**: 0.0.0+20260202
 - **Summary**: This release includes updates and fixes across the project.
 
-{
-  "Additional Changes": [
-    "Dependency management was improved by adding automated update configuration for the Go ecosystem and updating existing dependencies to current releases."
-  ]
-}
+### Additional Changes
+
+- Updated dependency management by adding automated update configuration for the Go ecosystem and updating existing dependencies to current releases.
 
