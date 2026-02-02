@@ -178,8 +178,15 @@ func runWorkflow(ctx context.Context, args []string) {
 
 	applyConfigDefaults(projectConfig, &metadata)
 
+	flagInteractiveExplicit := false
+	flagSet.Visit(func(f *flag.Flag) {
+		if f.Name == "interactive" {
+			flagInteractiveExplicit = true
+		}
+	})
+
 	interactive := metadata.Interactive
-	if *interactiveFlag != defaultInteractive {
+	if flagInteractiveExplicit {
 		interactive = *interactiveFlag
 	} else if interactive == "" {
 		interactive = defaultInteractive
@@ -770,7 +777,8 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		cmd := exec.CommandContext(ctx, "opencode", args...)
 		cmd.Env = append(os.Environ(),
 			"OPENCODE_CONFIG_DIR=.sgai",
-			"SGAI_MCP_EXECUTABLE="+cfg.executablePath)
+			"SGAI_MCP_EXECUTABLE="+cfg.executablePath,
+			"SGAI_MCP_INTERACTIVE="+cfg.interactive)
 		cmd.Stdin = strings.NewReader(msg)
 
 		stderrWriter := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
@@ -904,8 +912,14 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 						fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
 					}
 				case "auto", "auto-session":
-					fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: sending decision principles...")
-					writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponseMessage)
+					if newState.MultiChoiceQuestion != nil && len(newState.MultiChoiceQuestion.Questions) > 0 {
+						fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: auto-selecting first option...")
+						autoResponse := formatMultiChoiceResponse([]string{newState.MultiChoiceQuestion.Questions[0].Choices[0]}, "")
+						writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponse)
+					} else {
+						fmt.Println("["+cfg.paddedsgai+"]", "self-driving mode: sending decision principles...")
+						writeResponseAndTransition(cfg.dir, cfg.statePath, autoResponseMessage)
+					}
 				case "no":
 					fmt.Println("["+cfg.paddedsgai+"]", "message:")
 					fmt.Println(newState.Task)

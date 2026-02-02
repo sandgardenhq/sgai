@@ -24,7 +24,8 @@ export const Workbench: Plugin = async ({ directory }) => {
         type: "local",
         command: [process.env.SGAI_MCP_EXECUTABLE || "sgai", "mcp"],
         environment: {
-          SGAI_MCP_WORKING_DIRECTORY: directory
+          SGAI_MCP_WORKING_DIRECTORY: directory,
+          SGAI_MCP_INTERACTIVE: process.env.SGAI_MCP_INTERACTIVE || "yes"
         }
       };
     },
