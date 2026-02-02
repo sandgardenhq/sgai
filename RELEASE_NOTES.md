@@ -10,13 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260202 — Release updates
+## 0.0.0+20260202 — Improved agent prompt overlay loading
 
 - **Date**: 2026-02-02
 - **Version**: 0.0.0+20260202
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes updates to agent prompt overlays and improvement artifact loading.
 
 ### Additional Changes
 
 - Updated the `retrospective` and `writer` agent prompts to load shared `skills/` and `snippets/` from the standard overlay directories (including the `sgai` overlay) and to include agent improvement files during execution.
-<!-- Thesaurus compliance: verbs are past tense and align with the approved action verbs list. -->
