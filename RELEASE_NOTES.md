@@ -21,8 +21,7 @@
 ```json
 {
   "Additional Changes": [
-    "Updated the Go tooling dependencies to keep the development toolchain current and consistent across environments. Specifically, this bumps `golang.org/x/tools` to `v0.41.0` and refreshes `go.sum` to align dependency checksums with the updated module graph."
+    "Updated Go tooling dependencies by bumping `golang.org/x/tools` to `v0.41.0` and refreshing `go.sum`."
   ]
 }
-
 ```
