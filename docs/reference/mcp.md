@@ -40,7 +40,6 @@ Input fields:
 - `status`
 - `task`
 - `addProgress`
-- `humanMessage` (string)
 
 #### Status values depend on the current agent
 
@@ -52,7 +51,6 @@ Input fields:
 When the current agent is `coordinator`, it also allows:
 
 - `complete`
-- `human-communication`
 
 #### TODO guardrails
 
