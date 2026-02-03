@@ -9,3 +9,18 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260203 — Additional changes
+
+- **Date**: 2026-02-03
+- **Version**: 0.0.0+20260203
+- **Summary**: This release includes the updates listed below.
+
+```json
+{
+  "New Features": [
+    "You can now author GOAL specifications using a dedicated GOAL.md Composer skill and a guided workflow. This adds a GOAL specification file plus reference documentation for the GOAL.md Composer, including agents/models definitions, a 7-phase interactive authoring wizard, and explicit acceptance criteria for SGAI GOAL.md files."
+  ]
+}
+
+```
