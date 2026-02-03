@@ -88,6 +88,14 @@ make build
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
 
+   If `GOAL.md` does not have any body content yet, the dashboard routes goal authoring through the GOAL composer.
+
+   The composer is available at:
+
+   - [http://localhost:8080/compose?workspace=<workspace>](http://localhost:8080/compose?workspace=%3Cworkspace%3E)
+
+   See [GOAL.md Composer (web UI)](./docs/reference/goal-composer.md).
+
 ## How It Works
 
 ```
