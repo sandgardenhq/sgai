@@ -88,6 +88,8 @@ make build
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
 
+   Want to run a quick one-shot prompt against an OpenCode model from the UI? Start the server with `sgai serve --enable-adhoc-prompt`, then open a workspace and use the **Run** box in the Internals view.
+
 ## How It Works
 
 ```
