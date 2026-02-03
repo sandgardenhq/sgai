@@ -10,22 +10,16 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260203 — Maintenance updates
+## 0.0.0+20260203 — Workspace one-shot prompts and auto-refresh preservation
 
 - **Date**: 2026-02-03
 - **Version**: 0.0.0+20260203
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes workspace one-shot prompting and improved `HTMX`/`Idiomorph` auto-refresh behavior.
 
-### Additional Changes
+### New Features
 
-```json
-{
-  "Bug Fixes": [
-    "Auto-refresh behavior in HTMX/Idiomorph views now preserves page state so dynamic updates do not clobber user context during refresh cycles."
-  ],
-  "New Features": [
-    "You can now run an ad-hoc, one-shot prompt directly from a workspace when the feature is enabled by a flag and configuration, with the server keeping the interaction state so updates render reliably."
-  ]
-}
+- Added an ad-hoc, one-shot prompt that can be run directly from a workspace when enabled via configuration and a feature flag, with the server preserving interaction state for reliable rendering.
 
-```
+### Bug Fixes
+
+- Fixed `HTMX`/`Idiomorph` auto-refresh to preserve page state during refresh cycles.
