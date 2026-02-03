@@ -19,7 +19,7 @@
 ```json
 {
   "New Features": [
-    "Updated the web UI so “Open in Editor” links can open projects in a configurable editor instead of always using a single hard-coded editor. The implementation added a documented `editor` project setting with preset values, environment-variable fallbacks, and special handling for terminal-based editors when generating the “Open in Editor” link target."
+    "Updated the web UI so \"Open in Editor\" links can open projects in a configurable editor instead of always using a single hard-coded editor."
   ]
 }
 
