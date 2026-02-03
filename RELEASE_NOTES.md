@@ -16,11 +16,6 @@
 - **Version**: 0.0.0+20260203
 - **Summary**: This release includes the updates listed below.
 
-```json
-{
-  "New Features": [
-    "Added a dedicated `GOAL.md` Composer skill and guided workflow for authoring GOAL specifications."
-  ]
-}
+### New Features
 
-```
+- Added a dedicated `GOAL.md` Composer skill and guided workflow for authoring GOAL specifications.
