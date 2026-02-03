@@ -20,11 +20,18 @@
 	<a href="/workspaces/{{.DirName}}/goal" role="button" class="action-btn outline">Edit GOAL</a>
 	{{end}}
 	{{if .CodeAvailable}}
-	<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
-		<button type="submit" class="action-btn outline">Open in VSCode</button>
-	</form>
+		{{if .IsTerminalEditor}}
+		<div class="terminal-editor-workspace-path">
+			<small>Workspace Path:</small>
+			<input type="text" readonly value="{{.Directory}}" class="path-input">
+		</div>
+		{{else}}
+		<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
+			<button type="submit" class="action-btn outline">Open in Editor</button>
+		</form>
+		{{end}}
 	{{else}}
-	<button type="button" class="action-btn outline" disabled data-tooltip="VSCode CLI not available or remote connection">Open in VSCode</button>
+	<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
 	{{end}}
 	{{end}}
 	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>

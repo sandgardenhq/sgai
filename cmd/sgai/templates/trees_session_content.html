@@ -46,11 +46,18 @@
 	<summary>
 		<strong>PROJECT_MANAGEMENT.md</strong>
 		{{if .CodeAvailable}}
-		<form action="/workspaces/{{.DirName}}/open-vscode?file=PROJECT_MANAGEMENT.md" method="post" class="spec-vscode-form">
-			<button type="submit" class="vscode-file-btn" title="Open in VSCode">&#128221;</button>
-		</form>
+			{{if .IsTerminalEditor}}
+			<div class="terminal-editor-path">
+				<small>Path (select to copy):</small>
+				<input type="text" readonly value="{{.Directory}}/.sgai/PROJECT_MANAGEMENT.md" class="path-input">
+			</div>
+			{{else}}
+			<form action="/workspaces/{{.DirName}}/open-vscode?file=PROJECT_MANAGEMENT.md" method="post" class="spec-vscode-form">
+				<button type="submit" class="vscode-file-btn" title="Open in Editor">&#128221;</button>
+			</form>
+			{{end}}
 		{{else}}
-		<span class="vscode-file-btn disabled" title="VSCode CLI not available">&#128221;</span>
+		<span class="vscode-file-btn disabled" title="Editor not available">&#128221;</span>
 		{{end}}
 	</summary>
 	<div class="spec-content">{{.ProjectMgmtContent}}</div>
