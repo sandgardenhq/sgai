@@ -9,3 +9,18 @@
 ### Bug Fixes
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+
+## 0.0.0+20260203 — Additional updates
+
+- **Date**: 2026-02-03
+- **Version**: 0.0.0+20260203
+- **Summary**: This release includes the latest changes recorded for 2026-02-03.
+
+```json
+{
+  "New Features": [
+    "Updated the web UI so “Open in Editor” links can open projects in a configurable editor instead of always using a single hard-coded editor. The implementation added a documented `editor` project setting with preset values, environment-variable fallbacks, and special handling for terminal-based editors when generating the “Open in Editor” link target."
+  ]
+}
+
+```
