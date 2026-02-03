@@ -110,6 +110,8 @@ The web dashboard shows:
 
 ## GOAL.md Reference
 
+For a full breakdown of supported fields and authoring rules, see [GOAL.md reference and authoring guide](./docs/reference/goal-md.md).
+
 Create a `GOAL.md` file in your project directory to define your goals:
 
 ```markdown
