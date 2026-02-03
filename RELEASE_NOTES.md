@@ -22,4 +22,4 @@
 
 ### Bug Fixes
 
-- Fixed `HTMX`/`Idiomorph` auto-refresh to preserve page state during refresh cycles and avoid clobbering user context.
+- Fixed auto-refresh behavior in `HTMX`/`Idiomorph` views to preserve page state during refresh cycles and avoid clobbering user context.
