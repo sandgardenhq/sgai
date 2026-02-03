@@ -10,12 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260203 — Release notes updates
+## 0.0.0+20260203 — Improved multiple-choice markdown rendering
 
 - **Date**: 2026-02-03
 - **Version**: 0.0.0+20260203
-- **Summary**: This release includes the updates captured in the generated release notes for 2026-02-03.
+- **Summary**: This release includes improved rendering for markdown-authored multiple-choice questions.
 
-### Additional Changes
+### Bug Fixes
 
-- Added correct rendering for markdown-authored multiple-choice questions by converting markdown to HTML and updating templates to output the generated HTML consistently.
+- Fixed rendering for markdown-authored multiple-choice questions by converting markdown to HTML and updating templates to output the generated HTML consistently.
