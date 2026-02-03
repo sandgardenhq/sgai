@@ -18,4 +18,4 @@
 
 ### New Features
 
-- Updated the web UI so `Open in Editor` links use a configurable editor via the `editor` project setting (with environment variable fallbacks) instead of a single hard-coded editor.
+- Updated the web UI to use a configurable editor for `Open in Editor` links via the `editor` project setting (with environment variable fallbacks) instead of a single hard-coded editor.
