@@ -172,20 +172,98 @@ type editorOpener interface {
 	open(path string) error
 }
 
-type vscodeOpener struct{}
+const defaultEditorPreset = "code"
 
-func (v *vscodeOpener) open(path string) error {
-	return exec.Command("code", path).Run()
+// editorPreset defines a preset editor configuration with its command template
+// and whether it runs in a terminal.
+type editorPreset struct {
+	command    string
+	isTerminal bool
+}
+
+var editorPresets = map[string]editorPreset{
+	"code":   {command: "code {path}", isTerminal: false},
+	"cursor": {command: "cursor {path}", isTerminal: false},
+	"zed":    {command: "zed {path}", isTerminal: false},
+	"subl":   {command: "subl {path}", isTerminal: false},
+	"idea":   {command: "idea {path}", isTerminal: false},
+	"emacs":  {command: "emacsclient -n {path}", isTerminal: false},
+	"nvim":   {command: "nvim {path}", isTerminal: true},
+	"vim":    {command: "vim {path}", isTerminal: true},
+	"atom":   {command: "atom {path}", isTerminal: false},
+}
+
+// configurableEditor implements editorOpener with configurable editor support.
+// It supports preset editors and custom commands with {path} placeholders.
+type configurableEditor struct {
+	name       string
+	command    string
+	isTerminal bool
+}
+
+func (e *configurableEditor) open(path string) error {
+	cmdLine := e.command
+	if strings.Contains(cmdLine, "{path}") {
+		cmdLine = strings.ReplaceAll(cmdLine, "{path}", path)
+	} else {
+		cmdLine = cmdLine + " " + path
+	}
+
+	parts := strings.Fields(cmdLine)
+	if len(parts) == 0 {
+		return fmt.Errorf("empty editor command")
+	}
+
+	return exec.Command(parts[0], parts[1:]...).Run()
+}
+
+func resolveEditor(configEditor string) (name, command string, isTerminal bool) {
+	editorSpec := configEditor
+	if editorSpec == "" {
+		editorSpec = os.Getenv("VISUAL")
+	}
+	if editorSpec == "" {
+		editorSpec = os.Getenv("EDITOR")
+	}
+	if editorSpec == "" {
+		editorSpec = defaultEditorPreset
+	}
+
+	if preset, ok := editorPresets[editorSpec]; ok {
+		return editorSpec, preset.command, preset.isTerminal
+	}
+
+	return editorSpec, editorSpec, false
+}
+
+func newConfigurableEditor(configEditor string) *configurableEditor {
+	name, command, isTerminal := resolveEditor(configEditor)
+	return &configurableEditor{
+		name:       name,
+		command:    command,
+		isTerminal: isTerminal,
+	}
+}
+
+func isEditorAvailable(command string) bool {
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return false
+	}
+	_, err := exec.LookPath(parts[0])
+	return err == nil
 }
 
 // Server handles HTTP requests for the sgai serve command.
 type Server struct {
-	mu              sync.Mutex
-	sessions        map[string]*session
-	everStartedDirs map[string]bool
-	rootDir         string
-	codeAvailable   bool
-	editor          editorOpener
+	mu               sync.Mutex
+	sessions         map[string]*session
+	everStartedDirs  map[string]bool
+	rootDir          string
+	editorAvailable  bool
+	isTerminalEditor bool
+	editorName       string
+	editor           editorOpener
 
 	enableAdhocPrompt bool
 	adhocModelsMu     sync.Mutex
@@ -198,18 +276,25 @@ type Server struct {
 // between cookie values (set via validateDirectory) and template values
 // (set via scanForProjects).
 func NewServer(rootDir string) *Server {
+	return NewServerWithConfig(rootDir, "")
+}
+
+// NewServerWithConfig creates a new Server with a specific editor configuration.
+func NewServerWithConfig(rootDir, editorConfig string) *Server {
 	absRootDir, err := filepath.Abs(rootDir)
 	if err != nil {
 		absRootDir = rootDir
 	}
-	_, errCode := exec.LookPath("code")
+	editor := newConfigurableEditor(editorConfig)
 	return &Server{
-		sessions:        make(map[string]*session),
-		everStartedDirs: make(map[string]bool),
-		adhocStates:     make(map[string]*adhocPromptState),
-		rootDir:         absRootDir,
-		codeAvailable:   errCode == nil,
-		editor:          &vscodeOpener{},
+		sessions:         make(map[string]*session),
+		everStartedDirs:  make(map[string]bool),
+		adhocStates:      make(map[string]*adhocPromptState),
+		rootDir:          absRootDir,
+		editorAvailable:  isEditorAvailable(editor.command),
+		isTerminalEditor: editor.isTerminal,
+		editorName:       editor.name,
+		editor:           editor,
 	}
 }
 
@@ -658,6 +743,9 @@ type sessionData struct {
 	HasProjectMgmt       bool
 	HasEditedGoal        bool
 	CodeAvailable        bool
+	EditorAvailable      bool
+	IsTerminalEditor     bool
+	EditorName           string
 	ActiveTab            string
 	SVGHash              string
 	AgentSequence        []agentSequenceDisplay
@@ -742,7 +830,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 
 	renderedHumanMessage := renderHumanMessage(wfState.HumanMessage)
 
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
+	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
 
 	adhocEnabled := s.isAdhocPromptEnabled(dir)
 	var adhocModels []string
@@ -788,7 +876,10 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 		ProjectMgmtContent:   template.HTML(pmContent),
 		HasProjectMgmt:       projectMgmtExists,
 		HasEditedGoal:        hasEditedGoal,
-		CodeAvailable:        codeAvailable,
+		CodeAvailable:        editorAvailable,
+		EditorAvailable:      editorAvailable,
+		IsTerminalEditor:     s.isTerminalEditor,
+		EditorName:           s.editorName,
 		ActiveTab:            "goal",
 		SVGHash:              getWorkflowSVGHash(dir, currentAgent),
 		AgentSequence:        prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
@@ -2412,7 +2503,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress))
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
+	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
 	disableRetrospective := isRetrospectiveDisabled(dir)
 
 	agentInfo := resolveAgentModelInfo(wfState, dir)
@@ -2446,6 +2537,9 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		ReturnTo             string
 		TotalExecutionTime   string
 		CodeAvailable        bool
+		EditorAvailable      bool
+		IsTerminalEditor     bool
+		EditorName           string
 		DisableRetrospective bool
 		CurrentAgent         string
 		Model                string
@@ -2465,7 +2559,10 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		IsFork:               isFork,
 		ReturnTo:             returnToURL,
 		TotalExecutionTime:   totalExecTime,
-		CodeAvailable:        codeAvailable,
+		CodeAvailable:        editorAvailable,
+		EditorAvailable:      editorAvailable,
+		IsTerminalEditor:     s.isTerminalEditor,
+		EditorName:           s.editorName,
 		DisableRetrospective: disableRetrospective,
 		CurrentAgent:         agentInfo.agent,
 		Model:                agentInfo.model,
@@ -2665,7 +2762,7 @@ func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.
 		}
 	}
 
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
+	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
 
 	data := struct {
 		Directory          string
@@ -2674,13 +2771,19 @@ func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.
 		ProjectMgmtContent template.HTML
 		HasProjectMgmt     bool
 		CodeAvailable      bool
+		EditorAvailable    bool
+		IsTerminalEditor   bool
+		EditorName         string
 	}{
 		Directory:          dir,
 		DirName:            filepath.Base(dir),
 		GoalContent:        goalContent,
 		ProjectMgmtContent: projectMgmtContent,
 		HasProjectMgmt:     projectMgmtExists,
-		CodeAvailable:      codeAvailable,
+		CodeAvailable:      editorAvailable,
+		EditorAvailable:    editorAvailable,
+		IsTerminalEditor:   s.isTerminalEditor,
+		EditorName:         s.editorName,
 	}
 
 	if err := templates.Lookup("trees_specification_content.html").Execute(buf, data); err != nil {
@@ -2746,7 +2849,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		}
 	}
 
-	codeAvailable := s.codeAvailable && isLocalRequest(r)
+	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
 
 	data := struct {
 		Directory            string
@@ -2760,6 +2863,9 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		RenderedHumanMessage template.HTML
 		GoalContent          template.HTML
 		CodeAvailable        bool
+		EditorAvailable      bool
+		IsTerminalEditor     bool
+		EditorName           string
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -2771,7 +2877,10 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		NeedsInput:           needsInput,
 		RenderedHumanMessage: renderedHumanMessage,
 		GoalContent:          goalContent,
-		CodeAvailable:        codeAvailable,
+		CodeAvailable:        editorAvailable,
+		EditorAvailable:      editorAvailable,
+		IsTerminalEditor:     s.isTerminalEditor,
+		EditorName:           s.editorName,
 	}
 
 	if err := templates.Lookup("trees_events_content.html").Execute(buf, data); err != nil {
@@ -2993,7 +3102,7 @@ func (s *Server) handleWorkspaceResetState(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
 }
 
-// handleWorkspaceOpenVSCode opens VSCode for a workspace or specific file.
+// handleWorkspaceOpenVSCode opens the configured editor for a workspace or specific file.
 // Security: Only allows localhost requests and a whitelist of specific files.
 func (s *Server) handleWorkspaceOpenVSCode(w http.ResponseWriter, r *http.Request, workspacePath string) {
 	if r.Method != http.MethodPost {
@@ -3001,13 +3110,18 @@ func (s *Server) handleWorkspaceOpenVSCode(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if !s.codeAvailable {
-		http.Error(w, "VSCode CLI not available", http.StatusServiceUnavailable)
+	if !s.editorAvailable {
+		http.Error(w, "editor not available", http.StatusServiceUnavailable)
 		return
 	}
 
 	if !isLocalRequest(r) {
-		http.Error(w, "VSCode can only be opened from localhost", http.StatusForbidden)
+		http.Error(w, "editor can only be opened from localhost", http.StatusForbidden)
+		return
+	}
+
+	if s.isTerminalEditor {
+		http.Error(w, "terminal editors cannot be opened from the web interface", http.StatusBadRequest)
 		return
 	}
 
@@ -3028,7 +3142,7 @@ func (s *Server) handleWorkspaceOpenVSCode(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := s.editor.open(targetPath); err != nil {
-		http.Error(w, "Failed to open VSCode", http.StatusInternalServerError)
+		http.Error(w, "failed to open editor", http.StatusInternalServerError)
 		return
 	}
 

@@ -344,7 +344,7 @@ func TestHandleWorkspaceOpenVSCodeForbiddenForRemote(t *testing.T) {
 	createsgaiDir(t, validProject)
 
 	srv := NewServer(rootDir)
-	srv.codeAvailable = true
+	srv.editorAvailable = true
 
 	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-vscode", nil)
 	req.RemoteAddr = "192.168.1.100:54321"
@@ -366,7 +366,7 @@ func TestHandleWorkspaceOpenVSCodeUnavailable(t *testing.T) {
 	createsgaiDir(t, validProject)
 
 	srv := NewServer(rootDir)
-	srv.codeAvailable = false
+	srv.editorAvailable = false
 
 	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-vscode", nil)
 	req.RemoteAddr = "127.0.0.1:54321"
@@ -388,7 +388,7 @@ func TestHandleWorkspaceOpenVSCodeInvalidFile(t *testing.T) {
 	createsgaiDir(t, validProject)
 
 	srv := NewServer(rootDir)
-	srv.codeAvailable = true
+	srv.editorAvailable = true
 
 	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-vscode?file=../../../etc/passwd", nil)
 	req.RemoteAddr = "127.0.0.1:54321"
@@ -411,7 +411,7 @@ func TestHandleWorkspaceOpenVSCodeAllowedFiles(t *testing.T) {
 
 	mock := &mockEditorOpener{}
 	srv := NewServer(rootDir)
-	srv.codeAvailable = true
+	srv.editorAvailable = true
 	srv.editor = mock
 
 	allowedFiles := []string{"GOAL.md", "PROJECT_MANAGEMENT.md"}
@@ -464,7 +464,7 @@ func TestHandleWorkspaceOpenVSCodeEditorError(t *testing.T) {
 
 	mock := &mockEditorOpener{err: os.ErrPermission}
 	srv := NewServer(rootDir)
-	srv.codeAvailable = true
+	srv.editorAvailable = true
 	srv.editor = mock
 
 	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-vscode", nil)

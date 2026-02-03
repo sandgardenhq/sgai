@@ -970,6 +970,67 @@
 			z-index: 1000;
 		}
 
+		/* Terminal editor path display */
+		.terminal-editor-path {
+			display: inline-flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			margin: 0;
+			padding: 0.25rem 0.5rem;
+			flex-shrink: 0;
+		}
+		.terminal-editor-path small {
+			font-size: 0.65rem;
+			color: var(--pico-muted-color);
+			margin: 0;
+		}
+		.terminal-editor-path .path-input {
+			cursor: text;
+			user-select: all;
+			font-family: monospace;
+			font-size: 0.75rem;
+			padding: 0.25rem 0.5rem;
+			margin: 0;
+			width: 100%;
+			min-width: 300px;
+			background: var(--pico-form-element-background-color);
+			border: 1px solid var(--pico-form-element-border-color);
+			border-radius: 0.25rem;
+		}
+		.terminal-editor-path .path-input:focus {
+			outline: 2px solid var(--pico-primary);
+			outline-offset: 0;
+		}
+
+		/* Terminal editor workspace path in header actions */
+		.terminal-editor-workspace-path {
+			display: inline-flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			padding: 0.25rem 0.5rem;
+		}
+		.terminal-editor-workspace-path small {
+			font-size: 0.65rem;
+			color: var(--pico-muted-color);
+			margin: 0;
+		}
+		.terminal-editor-workspace-path .path-input {
+			cursor: text;
+			user-select: all;
+			font-family: monospace;
+			font-size: 0.75rem;
+			padding: 0.25rem 0.5rem;
+			margin: 0;
+			min-width: 300px;
+			background: var(--pico-form-element-background-color);
+			border: 1px solid var(--pico-form-element-border-color);
+			border-radius: 0.25rem;
+		}
+		.terminal-editor-workspace-path .path-input:focus {
+			outline: 2px solid var(--pico-primary);
+			outline-offset: 0;
+		}
+
 		/* Workflow container styles - mirrors session.html */
 		.tab-content #workflow-container ul {
 			list-style: none !important;
