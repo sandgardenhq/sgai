@@ -53,6 +53,12 @@ Options:
   - Project-level configuration can enable this per workspace via `sgai.json` using `"enable-adhoc-prompt": true`.
   - The Run box uses `opencode models` to populate the model list and runs prompts using `opencode run -m <model> <prompt>`.
 
+  What happens when the prompt runs:
+
+  - The prompt runs in the workspace directory.
+  - Output is collected from both stdout and stderr and shown in the Run box output area.
+  - While the prompt is running, the output area auto-refreshes and the Submit button is disabled.
+
 ### `sgai sessions`
 
 List all sessions in `.sgai/retrospectives`.
