@@ -28,6 +28,12 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 - The coordinator communicates with the human partner through `ask_user_question`.
 - The workflow state file stores the active question in `multiChoiceQuestion`.
 
+### Question text formatting (web UI)
+
+The web UI treats each questions `question` text as Markdown and renders it as HTML when displaying a multi-choice prompt.
+
+If the question needs line breaks or emphasis, prefer Markdown formatting (for example, separate paragraphs with a blank line).
+
 ## Workflow object shape
 
 `state.json` stores a JSON object with fields used by the CLI, web UI, and MCP tools.
