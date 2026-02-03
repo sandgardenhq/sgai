@@ -16,11 +16,6 @@
 - **Version**: 0.0.0+20260203
 - **Summary**: This release includes the latest changes recorded for 2026-02-03.
 
-```json
-{
-  "New Features": [
-    "Updated the web UI so \"Open in Editor\" links can open projects in a configurable editor instead of always using a single hard-coded editor."
-  ]
-}
+### New Features
 
-```
+- Updated the web UI so "Open in Editor" links can open projects in a configurable editor instead of always using a single hard-coded editor.
