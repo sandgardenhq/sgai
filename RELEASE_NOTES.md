@@ -18,4 +18,4 @@
 
 ### Bug Fixes
 
-- Fixed rendering for markdown-authored multiple-choice questions by converting markdown to HTML and updating templates to output the generated HTML consistently.
+- Fixed rendering for markdown-authored multiple-choice questions by converting markdown to HTML for multichoice question bodies and updating templates to output the generated HTML consistently.
