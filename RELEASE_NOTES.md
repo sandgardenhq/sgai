@@ -14,7 +14,7 @@
 
 - **Date**: 2026-02-03
 - **Version**: 0.0.0+20260203
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release covers the changes listed below.
 
 ### New Features
 
