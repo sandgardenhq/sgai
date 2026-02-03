@@ -16,7 +16,7 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir, "sgai")
+		ensureGitExclude(dir)
 
 		excludePath := filepath.Join(gitInfoDir, "exclude")
 		content, err := os.ReadFile(excludePath)
@@ -41,7 +41,7 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir, "sgai")
+		ensureGitExclude(dir)
 
 		content, err := os.ReadFile(excludePath)
 		if err != nil {
@@ -68,7 +68,7 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir, "sgai")
+		ensureGitExclude(dir)
 
 		content, err := os.ReadFile(excludePath)
 		if err != nil {
@@ -82,7 +82,7 @@ func TestEnsureGitExclude(t *testing.T) {
 	t.Run("skipsNonGitRepository", func(t *testing.T) {
 		dir := t.TempDir()
 
-		ensureGitExclude(dir, "sgai")
+		ensureGitExclude(dir)
 
 		excludePath := filepath.Join(dir, ".git", "info", "exclude")
 		if _, err := os.Stat(excludePath); !os.IsNotExist(err) {
@@ -97,7 +97,7 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir, "sgai")
+		ensureGitExclude(dir)
 
 		excludePath := filepath.Join(gitDir, "info", "exclude")
 		content, err := os.ReadFile(excludePath)

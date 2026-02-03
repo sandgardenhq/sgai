@@ -38,6 +38,14 @@
 	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>
 	<a href="/workspaces/{{.DirName}}/agents" role="button" class="action-btn outline">Agents</a>
 	{{if .Running}}
+	<form action="/workspaces/{{.DirName}}/toggle-mode" method="post">
+		<input type="hidden" name="mode" value="auto">
+		<button type="submit" class="action-btn{{if not .InteractiveAuto}} outline{{end}}">Auto</button>
+	</form>
+	<form action="/workspaces/{{.DirName}}/toggle-mode" method="post">
+		<input type="hidden" name="mode" value="yes">
+		<button type="submit" class="action-btn{{if .InteractiveAuto}} outline{{end}}">Interactive</button>
+	</form>
 	<form action="/workspaces/{{.DirName}}/stop" method="post">
 		<input type="hidden" name="directory" value="{{.Directory}}">
 		<button type="submit" class="action-btn outline">Stop</button>

@@ -2335,6 +2335,8 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceGoal(w, r, workspacePath)
 	case "start":
 		s.handleWorkspaceStart(w, r, workspacePath)
+	case "toggle-mode":
+		s.handleToggleMode(w, r, workspacePath)
 	case "stop":
 		s.handleWorkspaceStop(w, r, workspacePath)
 	case "reset-state":
@@ -2463,12 +2465,14 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	statusText := buildTreesStatusText(wfState, dir)
 
 	var running bool
+	var interactiveAuto bool
 	s.mu.Lock()
 	sess := s.sessions[dir]
 	s.mu.Unlock()
 	if sess != nil {
 		sess.mu.Lock()
 		running = sess.running
+		interactiveAuto = sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -2504,6 +2508,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		StatusText           string
 		ActiveTab            string
 		Running              bool
+		InteractiveAuto      bool
 		Session              string
 		TabContent           template.HTML
 		NeedsInput           bool
@@ -2527,6 +2532,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		StatusText:           statusText,
 		ActiveTab:            tabName,
 		Running:              running,
+		InteractiveAuto:      interactiveAuto,
 		Session:              sessionParam,
 		TabContent:           tabResult.Content,
 		NeedsInput:           needsInput,
@@ -2645,7 +2651,7 @@ func addGitExclude(dir string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("reading .git/info/exclude: %w", err)
 	}
-	if factoraLinePresent(existingContent) {
+	if dotSGAILinePresent(existingContent) {
 		return nil
 	}
 	existingContent = append(existingContent, []byte("/.sgai\n")...)
@@ -3126,6 +3132,48 @@ func (s *Server) handleWorkspaceStop(w http.ResponseWriter, r *http.Request, wor
 	s.stopSession(workspacePath)
 
 	http.Redirect(w, r, workspaceURL(workspacePath, "internals"), http.StatusSeeOther)
+}
+
+func (s *Server) handleToggleMode(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	mode := r.FormValue("mode")
+	if mode != "auto" && mode != "yes" {
+		http.Error(w, "Invalid mode", http.StatusBadRequest)
+		return
+	}
+
+	stPath := statePath(workspacePath)
+	wfState, err := state.Load(stPath)
+	if err != nil {
+		http.Error(w, "Failed to load state", http.StatusInternalServerError)
+		return
+	}
+
+	wfState.InteractiveOverride = mode
+	if err := state.Save(stPath, wfState); err != nil {
+		http.Error(w, "Failed to save state", http.StatusInternalServerError)
+		return
+	}
+
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	s.mu.Unlock()
+	if sess != nil {
+		sess.mu.Lock()
+		sess.interactiveAuto = mode == "auto"
+		sess.mu.Unlock()
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
 }
 
 func isStaleWorkingState(running bool, wfState state.Workflow) bool {
