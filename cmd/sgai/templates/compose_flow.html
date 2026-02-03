@@ -1,0 +1,39 @@
+{{/* compose_flow.html - Workflow DAG panel */}}
+<details class="compose-panel" data-preserve-open>
+	<summary>
+		<span>Workflow DAG (DOT Format)</span>
+	</summary>
+	<div class="compose-panel-content">
+		<form hx-post="/compose/update/flow?workspace={{.DirName}}" 
+			hx-trigger="change delay:500ms" 
+			hx-target="#compose-preview"
+			hx-swap="innerHTML"
+			hx-indicator="#flow-indicator">
+			<label for="flow">
+				Define workflow connections
+				<span id="flow-indicator" class="htmx-indicator" aria-busy="true" style="display:none; font-size:0.8rem; color:var(--pico-muted-color)"> Validating...</span>
+			</label>
+			<textarea name="flow" 
+				id="flow" 
+				placeholder='"agent1" -> "agent2"&#10;"agent2" -> "agent3"'
+				style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; min-height: 120px;">{{.State.Flow}}</textarea>
+			<small>Example: "backend-go-developer" -&gt; "go-readability-reviewer"</small>
+			{{if .FlowError}}
+			<div class="flow-error">
+				⚠️ {{.FlowError}}
+			</div>
+			{{end}}
+			<div class="compose-panel-actions">
+				<button type="button" 
+					hx-post="/compose/assist/flow?workspace={{.DirName}}"
+					hx-target="#compose-preview"
+					hx-swap="innerHTML"
+					hx-indicator="#assist-flow-indicator"
+					class="secondary outline">
+					<span id="assist-flow-indicator" class="htmx-indicator" aria-busy="true" style="display:none">⟳</span>
+					AI Generate DAG
+				</button>
+			</div>
+		</form>
+	</div>
+</details>

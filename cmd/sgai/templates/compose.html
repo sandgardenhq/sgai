@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>GOAL.md Composer - {{.DirName}}</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+		}
+		main.container-fluid {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			padding: 1rem;
+			overflow: hidden;
+		}
+
+		.compose-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+			flex-wrap: wrap;
+		}
+		.compose-header nav {
+			flex: 1;
+			min-width: 0;
+		}
+		.compose-header nav ul {
+			margin: 0;
+		}
+		.compose-actions {
+			display: flex;
+			gap: 0.5rem;
+			flex-shrink: 0;
+		}
+		.compose-actions button {
+			margin: 0;
+			padding: 0.5rem 1rem;
+			font-size: 0.875rem;
+		}
+
+		.compose-command-bar {
+			margin-bottom: 1rem;
+		}
+		.compose-command-bar form {
+			display: flex;
+			gap: 0.5rem;
+			margin: 0;
+		}
+		.compose-command-bar input[type="text"] {
+			flex: 1;
+			margin: 0;
+		}
+		.compose-command-bar button {
+			margin: 0;
+			padding: 0.5rem 1rem;
+			flex-shrink: 0;
+		}
+
+		.compose-layout {
+			display: grid;
+			grid-template-columns: 60% 40%;
+			gap: 1.5rem;
+			flex: 1;
+			overflow: hidden;
+		}
+
+		.compose-editor {
+			display: flex;
+			flex-direction: column;
+			overflow-y: auto;
+			gap: 0.75rem;
+			padding-right: 0.5rem;
+		}
+
+		.compose-preview-container {
+			position: sticky;
+			top: 0;
+			align-self: start;
+			max-height: calc(100vh - 200px);
+			overflow-y: auto;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			background: var(--pico-card-background-color);
+		}
+		.compose-preview-header {
+			position: sticky;
+			top: 0;
+			background: var(--pico-card-background-color);
+			padding: 1rem;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+			z-index: 10;
+		}
+		.compose-preview-header h3 {
+			margin: 0;
+			font-size: 1rem;
+		}
+		.compose-preview-content {
+			padding: 1rem;
+			font-size: 0.9rem;
+			line-height: 1.6;
+		}
+		.compose-preview-content h1 { font-size: 1.3rem; }
+		.compose-preview-content h2 { font-size: 1.15rem; }
+		.compose-preview-content h3 { font-size: 1rem; }
+
+		.compose-panel {
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			overflow: visible;
+		}
+		.compose-panel summary {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			padding: 0.75rem 1rem;
+			cursor: pointer;
+			background-color: color-mix(in srgb, var(--pico-muted-border-color) 30%, transparent);
+			border-radius: 0.5rem;
+			list-style: none;
+			font-weight: 600;
+		}
+		.compose-panel summary::-webkit-details-marker,
+		.compose-panel summary::marker {
+			display: none;
+			content: "";
+		}
+		.compose-panel summary::after {
+			display: none;
+		}
+		.compose-panel summary::before {
+			content: "▶";
+			font-size: 0.7rem;
+			transition: transform 0.2s ease;
+			flex-shrink: 0;
+		}
+		.compose-panel[open] summary::before {
+			transform: rotate(90deg);
+		}
+		.compose-panel[open] summary {
+			border-radius: 0.5rem 0.5rem 0 0;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+		}
+		.compose-panel-content {
+			padding: 1rem;
+		}
+		.compose-panel-content label {
+			font-size: 0.875rem;
+			font-weight: 600;
+			margin-bottom: 0.5rem;
+		}
+		.compose-panel-content textarea {
+			min-height: 120px;
+			font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+			font-size: 0.875rem;
+			resize: vertical;
+		}
+		.compose-panel-actions {
+			display: flex;
+			justify-content: flex-end;
+			gap: 0.5rem;
+			margin-top: 0.75rem;
+		}
+		.compose-panel-actions button {
+			margin: 0;
+			padding: 0.35rem 0.75rem;
+			font-size: 0.8rem;
+		}
+
+		.agent-list {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+		.agent-item {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			padding: 0.5rem;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.25rem;
+			background: color-mix(in srgb, var(--pico-muted-border-color) 15%, transparent);
+		}
+		.agent-checkbox {
+			flex-shrink: 0;
+			margin: 0;
+		}
+		.agent-info {
+			flex: 1;
+			min-width: 0;
+		}
+		.agent-name {
+			font-weight: 600;
+			font-size: 0.875rem;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.agent-description {
+			font-size: 0.75rem;
+			color: var(--pico-muted-color);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.agent-model-select {
+			flex-shrink: 0;
+			min-width: 200px;
+			margin: 0;
+		}
+
+		.flow-error {
+			margin-top: 0.5rem;
+			padding: 0.5rem;
+			background: color-mix(in srgb, #ef4444 15%, transparent);
+			color: #991b1b;
+			border-left: 3px solid #ef4444;
+			border-radius: 0.25rem;
+			font-size: 0.85rem;
+		}
+
+		.save-notification {
+			position: fixed;
+			top: 1rem;
+			right: 1rem;
+			padding: 0.75rem 1rem;
+			border-radius: 0.5rem;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+			z-index: 1000;
+			font-size: 0.875rem;
+			animation: slideIn 0.3s ease;
+		}
+		.save-success {
+			background: color-mix(in srgb, #22c55e 90%, white);
+			color: #166534;
+			border: 1px solid #22c55e;
+		}
+		.save-error {
+			background: color-mix(in srgb, #ef4444 90%, white);
+			color: #991b1b;
+			border: 1px solid #ef4444;
+		}
+		@keyframes slideIn {
+			from { transform: translateX(100%); opacity: 0; }
+			to { transform: translateX(0); opacity: 1; }
+		}
+
+		#command-modal {
+			width: min(90vw, 800px);
+			max-height: 90vh;
+			padding: 0;
+			border: none;
+			border-radius: 8px;
+			box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+		}
+		#command-modal::backdrop {
+			background: rgba(0, 0, 0, 0.5);
+		}
+		#command-modal article {
+			margin: 0;
+			padding: 1.5rem;
+			max-height: 90vh;
+			overflow-y: auto;
+		}
+		.modal-close {
+			background: none;
+			border: none;
+			padding: 0.25rem 0.5rem;
+			cursor: pointer;
+			font-size: 1.5rem;
+			color: var(--pico-muted-color);
+			line-height: 1;
+			float: right;
+		}
+		.modal-close:hover {
+			color: var(--pico-color);
+		}
+
+		@media (max-width: 768px) {
+			.compose-layout {
+				grid-template-columns: 1fr;
+			}
+			.compose-preview-container {
+				max-height: none;
+			}
+			.agent-item {
+				flex-direction: column;
+				align-items: flex-start;
+			}
+			.agent-model-select {
+				width: 100%;
+			}
+		}
+	</style>
+</head>
+<body hx-ext="morph">
+	<main class="container-fluid">
+		<div class="compose-header">
+			<nav>
+				<ul>
+					<li><a href="/trees?workspace={{.DirName}}">← Back to {{.DirName}}</a></li>
+				</ul>
+				<ul>
+					<li><strong>GOAL.md Composer</strong></li>
+				</ul>
+			</nav>
+			<div class="compose-actions">
+				<button type="button" 
+					hx-post="/compose/reset?workspace={{.DirName}}" 
+					hx-confirm="Reset all changes and reload from disk?"
+					class="secondary outline">
+					Reset
+				</button>
+				<button type="button" 
+					hx-post="/compose/save?workspace={{.DirName}}" 
+					hx-target="#save-notification"
+					hx-swap="innerHTML">
+					Save
+				</button>
+			</div>
+		</div>
+
+		<div id="save-notification"></div>
+
+		<div class="compose-command-bar">
+			<form hx-post="/compose/command?workspace={{.DirName}}" 
+				hx-target="#command-modal-content"
+				hx-swap="innerHTML">
+				<input type="text" 
+					name="command" 
+					placeholder="Natural language command (e.g., 'Add stpa-analyst after backend-go-developer')" 
+					aria-label="Natural language command">
+				<button type="submit">Execute</button>
+			</form>
+		</div>
+
+		<div class="compose-layout">
+			<div class="compose-editor">
+				{{template "compose_description.html" .}}
+				{{template "compose_frontmatter.html" .}}
+				{{template "compose_agents.html" .}}
+				{{template "compose_flow.html" .}}
+				{{template "compose_tasks.html" .}}
+			</div>
+
+			<div class="compose-preview-container" id="compose-preview">
+				{{template "compose_preview.html" .}}
+			</div>
+		</div>
+	</main>
+
+	<dialog id="command-modal">
+		<article>
+			<button class="modal-close" onclick="document.getElementById('command-modal').close()">×</button>
+			<div id="command-modal-content"></div>
+		</article>
+	</dialog>
+
+	<script>
+		Idiomorph.defaults.ignoreActive = true;
+		Idiomorph.defaults.ignoreActiveValue = true;
+		Idiomorph.defaults.callbacks.beforeAttributeUpdated = function(attr, node) {
+			if (attr === 'open' && node.tagName === 'DETAILS') return false;
+		};
+
+		document.body.addEventListener('htmx:afterSwap', function(evt) {
+			if (evt.detail.target.id === 'command-modal-content' && evt.detail.xhr.status === 200) {
+				document.getElementById('command-modal').showModal();
+			}
+		});
+
+		document.body.addEventListener('htmx:beforeSwap', function(evt) {
+			if (evt.detail.target.id === 'save-notification') {
+				setTimeout(function() {
+					evt.detail.target.innerHTML = '';
+				}, 3000);
+			}
+		});
+	</script>
+</body>
+</html>

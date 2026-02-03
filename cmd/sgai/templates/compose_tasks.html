@@ -1,0 +1,34 @@
+{{/* compose_tasks.html - Task list panel */}}
+<details class="compose-panel" data-preserve-open>
+	<summary>
+		<span>Task List</span>
+	</summary>
+	<div class="compose-panel-content">
+		<form hx-post="/compose/update/tasks?workspace={{.DirName}}" 
+			hx-trigger="change delay:500ms" 
+			hx-target="#compose-preview"
+			hx-swap="innerHTML"
+			hx-indicator="#tasks-indicator">
+			<label for="tasks">
+				Define tasks (markdown checkbox format)
+				<span id="tasks-indicator" class="htmx-indicator" aria-busy="true" style="display:none; font-size:0.8rem; color:var(--pico-muted-color)"> Updating...</span>
+			</label>
+			<textarea name="tasks" 
+				id="tasks" 
+				placeholder="- [ ] Task 1&#10;- [ ] Task 2&#10;- [ ] Task 3"
+				style="font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; min-height: 150px;">{{.State.Tasks}}</textarea>
+			<small>Use markdown checkbox syntax: - [ ] Task description</small>
+			<div class="compose-panel-actions">
+				<button type="button" 
+					hx-post="/compose/assist/tasks?workspace={{.DirName}}"
+					hx-target="#compose-preview"
+					hx-swap="innerHTML"
+					hx-indicator="#assist-tasks-indicator"
+					class="secondary outline">
+					<span id="assist-tasks-indicator" class="htmx-indicator" aria-busy="true" style="display:none">⟳</span>
+					AI Generate Tasks
+				</button>
+			</div>
+		</form>
+	</div>
+</details>

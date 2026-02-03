@@ -1,0 +1,33 @@
+{{/* compose_description.html - Project description panel */}}
+<details class="compose-panel" open data-preserve-open>
+	<summary>
+		<span>Project Description</span>
+	</summary>
+	<div class="compose-panel-content">
+		<form hx-post="/compose/update/description?workspace={{.DirName}}" 
+			hx-trigger="change delay:500ms" 
+			hx-target="#compose-preview"
+			hx-swap="innerHTML"
+			hx-indicator="#description-indicator">
+			<label for="description">
+				Describe your project goal
+				<span id="description-indicator" class="htmx-indicator" aria-busy="true" style="display:none; font-size:0.8rem; color:var(--pico-muted-color)"> Updating...</span>
+			</label>
+			<textarea name="description" 
+				id="description" 
+				placeholder="Describe what you want to build..."
+				style="font-family: inherit; min-height: 150px;">{{.State.Description}}</textarea>
+			<div class="compose-panel-actions">
+				<button type="button" 
+					hx-post="/compose/assist/description?workspace={{.DirName}}"
+					hx-target="#compose-preview"
+					hx-swap="innerHTML"
+					hx-indicator="#assist-description-indicator"
+					class="secondary outline">
+					<span id="assist-description-indicator" class="htmx-indicator" aria-busy="true" style="display:none">⟳</span>
+					AI Assist
+				</button>
+			</div>
+		</form>
+	</div>
+</details>
