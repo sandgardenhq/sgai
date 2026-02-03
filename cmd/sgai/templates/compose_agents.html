@@ -1,0 +1,49 @@
+{{/* compose_agents.html - Agent selection panel */}}
+<details class="compose-panel" data-preserve-open>
+	<summary>
+		<span>Agent Selection &amp; Models</span>
+	</summary>
+	<div class="compose-panel-content">
+		<form hx-post="/compose/update/agents?workspace={{.DirName}}" 
+			hx-trigger="change delay:500ms" 
+			hx-target="#compose-preview"
+			hx-swap="innerHTML">
+			<div class="agent-list">
+				{{range .Agents}}
+				<div class="agent-item">
+					<label class="agent-checkbox">
+						<input type="checkbox" 
+							name="agents" 
+							value="{{.Name}}" 
+							{{if .Selected}}checked{{end}}>
+					</label>
+					<div class="agent-info">
+						<div class="agent-name" title="{{.Name}}" data-tooltip="{{.Name}}">{{.Name}}</div>
+						{{if .Description}}
+						<div class="agent-description" title="{{.Description}}" data-tooltip="{{.Description}}">{{.Description}}</div>
+						{{end}}
+					</div>
+				{{$agentModel := .Model}}
+				<select name="model_{{.Name}}" class="agent-model-select">
+					<option value="">Default model</option>
+					{{range $.Models}}
+					<option value="{{.}}" {{if eq . $agentModel}}selected{{end}}>{{.}}</option>
+					{{end}}
+				</select>
+			</div>
+			{{end}}
+		</div>
+		<div class="compose-panel-actions">
+			<button type="button" 
+				hx-post="/compose/assist/agents?workspace={{.DirName}}"
+				hx-target="#compose-preview"
+				hx-swap="innerHTML"
+				hx-indicator="#assist-agents-indicator"
+				class="secondary outline">
+				<span id="assist-agents-indicator" class="htmx-indicator" aria-busy="true" style="display:none">⟳</span>
+				AI Suggest Agents
+			</button>
+		</div>
+	</form>
+	</div>
+</details>

@@ -448,6 +448,8 @@ func cmdServe(args []string) {
 	mux.HandleFunc("GET /workspaces/new", srv.handleNewWorkspaceGet)
 	mux.HandleFunc("POST /workspaces/new", srv.handleNewWorkspacePost)
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
+	mux.HandleFunc("/compose", srv.routeCompose)
+	mux.HandleFunc("/compose/", srv.routeCompose)
 
 	if srv.enableAdhocPrompt {
 		log.Println("ad-hoc prompt interface enabled")
@@ -654,6 +656,7 @@ type sessionData struct {
 	PMContent            template.HTML
 	ProjectMgmtContent   template.HTML
 	HasProjectMgmt       bool
+	HasEditedGoal        bool
 	CodeAvailable        bool
 	ActiveTab            string
 	SVGHash              string
@@ -669,13 +672,16 @@ type sessionData struct {
 
 func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.Request) sessionData {
 	goalContent := ""
+	hasEditedGoal := false
 	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
 		stripped := stripFrontmatter(string(data))
-		if rendered, err := renderMarkdown([]byte(stripped)); err == nil {
+		if rendered, errRender := renderMarkdown([]byte(stripped)); errRender == nil {
 			goalContent = rendered
 		} else {
 			goalContent = stripped
 		}
+		body := extractBody(data)
+		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
 	}
 
 	pmContent := ""
@@ -781,6 +787,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 		PMContent:            template.HTML(pmContent),
 		ProjectMgmtContent:   template.HTML(pmContent),
 		HasProjectMgmt:       projectMgmtExists,
+		HasEditedGoal:        hasEditedGoal,
 		CodeAvailable:        codeAvailable,
 		ActiveTab:            "goal",
 		SVGHash:              getWorkflowSVGHash(dir, currentAgent),
@@ -2420,6 +2427,12 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		}
 	}
 
+	hasEditedGoal := false
+	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
+		body := extractBody(data)
+		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
+	}
+
 	workspaceData := struct {
 		Directory            string
 		DirName              string
@@ -2439,6 +2452,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		FormattedModel       string
 		CurrentModel         string
 		ModelStatuses        map[string]string
+		HasEditedGoal        bool
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -2458,6 +2472,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		FormattedModel:       agentInfo.formattedModel,
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
+		HasEditedGoal:        hasEditedGoal,
 	}
 
 	var buf bytes.Buffer
