@@ -19,11 +19,11 @@
 <!--
 {
   "Additional Changes": [
-    "JavaScript usage rules have been slightly relaxed to reduce unnecessary friction during development. In addition, Idiomorph script usage has been simplified to rely on idiomorph-ext only, removing other script variants from the supported path."
+    "JavaScript usage rules have been slightly relaxed to reduce unnecessary friction during development."
   ],
   "New Features": [
-    "Users can now create and update a workspace GOAL from a guided, web-based composer when no goal content exists yet. The new GOAL.md composer flow supports LLM-assisted editing, includes reference documentation, and becomes the default entry point when the workspace goal body is empty (falling back to direct editing only when GOAL.md already has content).",
-    "Operators can now run an optional one-shot, web-based prompt from the Internals tab for ad-hoc interactions without leaving the UI. This adds an HTMX-driven interface plus an auto-refresh preservation mechanism (with corresponding agent guidance) and introduces centralized ANSI-stripping for command output rendering."
+    "Users can now create and update a workspace GOAL from a guided, web-based composer when no goal content exists yet.",
+    "Operators can now run an optional one-shot, web-based prompt from the Internals tab for ad-hoc interactions without leaving the UI."
   ]
 }
 
