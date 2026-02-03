@@ -69,18 +69,20 @@ When not set, `sgai` uses the following fallback chain:
 
 1. `$VISUAL` environment variable
 2. `$EDITOR` environment variable
-3. `code` (VS Code)
+3. `code`
 
 **Custom commands:**
 
-- If your custom command contains `{path}`, it will be replaced with the file path.
+- If your custom command contains `{path}`, it is replaced with the file path.
 - If your custom command does not contain `{path}`, the path is appended to the end.
 - Environment variable values are treated as custom commands.
 - Custom commands are assumed to be GUI editors (not terminal editors).
 
 **Terminal editors:**
 
-Terminal-based editors (`vim`, `nvim`) cannot be opened from the web interface. When a terminal editor is configured, the "Open in Editor" button is hidden.
+Terminal-based editors (`vim`, `nvim`) cannot be opened from the web interface.
+
+When a terminal editor is configured, the web interface shows the workspace path or file path in a read-only text field so it can be selected and copied, instead of showing an "Open in Editor" button.
 
 ### `mcp`
 
