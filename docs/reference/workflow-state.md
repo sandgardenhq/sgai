@@ -30,7 +30,7 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 
 ### Question text formatting (web UI)
 
-The web UI treats each questions `question` text as Markdown and renders it as HTML when displaying a multi-choice prompt.
+The web UI treats each question’s `question` text as Markdown and renders it as HTML when displaying a multi-choice prompt.
 
 If the question needs line breaks or emphasis, prefer Markdown formatting (for example, separate paragraphs with a blank line).
 
