@@ -1340,6 +1340,33 @@
 			flex-shrink: 0;
 		}
 
+		/* Ad-hoc prompt styles */
+		#adhoc-prompt-container {
+			margin-top: 1rem;
+		}
+		#adhoc-prompt-container .grid {
+			margin-bottom: 0.5rem;
+		}
+		#adhoc-prompt-container button[type="submit"] {
+			width: 100%;
+		}
+		.adhoc-output {
+			font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+			white-space: pre-wrap;
+			word-wrap: break-word;
+			max-height: 400px;
+			overflow-y: auto;
+			background: var(--pico-code-background-color);
+			padding: 1rem;
+			border-radius: var(--pico-border-radius);
+			font-size: 0.85em;
+			margin: 0 0 0.5rem 0;
+			min-height: 2rem;
+		}
+		.adhoc-output:empty {
+			display: none;
+		}
+
 		/* Sequence container */
 		#sequence-container article {
 			padding: 0.5rem;
@@ -1616,7 +1643,7 @@
 </head>
 <body hx-ext="morph">
 	<main class="container-fluid">
-		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s [document.activeElement.id!='commit-description']" hx-swap="morph:innerHTML">
+		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s [document.activeElement.id!='commit-description' && document.activeElement.id!='adhoc-prompt']" hx-swap="morph:innerHTML">
 {{ template "trees_content.html" . }}
 		</div>
 	</main>
@@ -1626,6 +1653,10 @@
 	Idiomorph.defaults.ignoreActiveValue = true;
 	Idiomorph.defaults.callbacks.beforeAttributeUpdated = function(attr, node) {
 		if (attr === 'open' && node.tagName === 'DETAILS') return false;
+	};
+	Idiomorph.defaults.callbacks.beforeNodeMorphed = function(oldNode, newNode) {
+		if (oldNode.id === 'adhoc-prompt-container') return false;
+		return true;
 	};
 	/* Idiomorph integration: preserve scroll positions during morph swaps */
 	(function() {

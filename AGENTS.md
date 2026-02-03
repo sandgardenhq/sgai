@@ -17,7 +17,7 @@ use directory ./verification
 In terms of layout, UI, style, when something doesn't fit a container, use ellipsis with tooltip - refer to https://picocss.com/docs/tooltip
 
 
-CRITICAL: it must be a pure HTMX and PicoCSS implementation, some light touch CSS to make looks be good is OK; NEVER USE CUSTOM JAVASCRIPT.
+CRITICAL: it must be a pure HTMX and PicoCSS implementation, some light touch CSS to make looks be good is OK; some Javascript to hook up Idiomorph HTMX extension, may be acceptable upon human partner approval; otherwise, NEVER USE CUSTOM JAVASCRIPT.
 CRITICAL: use playwright screenshots (and the skill to operate playwright) to verify the application is working correctly.
 
 CRITICAL(code quality): ensure good Go code quality by calling `make lint`
