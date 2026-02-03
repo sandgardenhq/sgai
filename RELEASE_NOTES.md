@@ -18,11 +18,4 @@
 
 ### Additional Changes
 
-```json
-{
-  "New Features": [
-    "Multiple-choice questions now render correctly when authored in markdown, so the content displays as intended in the UI. The renderer now converts markdown to HTML for multichoice question bodies and updates the relevant templates to output the generated HTML safely and consistently."
-  ]
-}
-
-```
+- Added correct rendering for markdown-authored multiple-choice questions by converting markdown to HTML and updating templates to output the generated HTML consistently.
