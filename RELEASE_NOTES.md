@@ -21,10 +21,10 @@
 ```json
 {
   "Bug Fixes": [
-    "Auto-refresh behavior in HTMX/Idiomorph views now preserves page state so dynamic updates do not clobber user context during refresh cycles. A dedicated auto-refresh preservation skill was added and adopted by HTMX PicoCSS agents to remove redundant inline scripting and centralize refresh guidance."
+    "Auto-refresh behavior in HTMX/Idiomorph views now preserves page state so dynamic updates do not clobber user context during refresh cycles."
   ],
   "New Features": [
-    "You can now run an ad-hoc, one-shot prompt directly from a workspace when the feature is enabled by a flag and configuration, with the server keeping the interaction state so updates render reliably. The workspace UI uses HTMX incremental updates with improved Idiomorph handling, strips ANSI escape sequences from output, supports model selection loaded from `opencode models`, and includes an auto-refresh behavior that preserves page state."
+    "You can now run an ad-hoc, one-shot prompt directly from a workspace when the feature is enabled by a flag and configuration, with the server keeping the interaction state so updates render reliably."
   ]
 }
 
