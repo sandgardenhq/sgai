@@ -360,7 +360,6 @@ You receive goals in natural language and implement them using HTMX and PicoCSS.
 The **ONLY** exception is the minimal JavaScript required to set up the idiomorph extension for HTMX:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
 ```
 
@@ -382,70 +381,18 @@ If you find yourself needing JavaScript, you are likely solving the problem inco
 
 ## Idiomorph: State Preservation on Auto-Refresh
 
-When building interfaces that auto-refresh (polling, SSE, etc.), you MUST use idiomorph to preserve UI state.
+Idiomorph is used for preserving UI state (form inputs, scroll position, accordion state, etc.) during auto-refresh operations like polling and SSE.
 
 **Reference:** https://htmx.org/extensions/idiomorph/
 
-### Fold/Unfold Preservation
-
-When using `<details>` elements with auto-refresh, the open/closed state MUST be preserved:
-
-```html
-<div hx-get="/content"
-     hx-trigger="every 5s"
-     hx-swap="morph:innerHTML"
-     hx-ext="morph">
-  <details data-preserve-open>
-    <summary>Click to expand</summary>
-    <p>Content that stays visible after refresh</p>
-  </details>
-</div>
-```
-
-**Requirements:**
-1. Use `hx-ext="morph"` on the container or body
-2. Use `hx-swap="morph:innerHTML"` or `hx-swap="morph:outerHTML"` for morphing swaps
-3. Add `data-preserve-open` attribute to `<details>` elements that need state preservation
-4. The idiomorph extension automatically preserves `open` attribute on elements with `data-preserve-open`
-
-**Configuration (add to document head or body):**
-```html
-<script>
-  document.body.addEventListener('htmx:beforeMorph', function(evt) {
-    evt.detail.config.callbacks.beforeAttributeUpdated = function(attr, to, updateType) {
-      if (attr === 'open' && to.hasAttribute('data-preserve-open')) {
-        return false; // Don't update the 'open' attribute
-      }
-      return true;
-    };
-  });
-</script>
-```
-
-### Scroll Position Preservation
-
-When using scrollable areas with auto-refresh, scroll position MUST be preserved:
-
-**Requirements:**
-1. Idiomorph automatically preserves scroll position during morph operations
-2. Use `hx-swap="morph:innerHTML"` instead of `innerHTML` swap
-3. For complex scenarios, ensure the scrollable container element itself is not replaced
-
-```html
-<div id="scrollable-messages"
-     style="overflow-y: auto; max-height: 400px;"
-     hx-get="/messages"
-     hx-trigger="every 3s"
-     hx-swap="morph:innerHTML"
-     hx-ext="morph">
-  <!-- Messages will refresh without losing scroll position -->
-</div>
-```
-
-**If scroll is still being lost:**
-1. Ensure the scrollable container has a stable ID
-2. Ensure only the CONTENTS are being replaced, not the container itself
-3. Use `morph:innerHTML` to replace children without touching the parent
+**MUST:** You MUST use the `htmx-auto-refresh-preservation` skill when building any interface with polling, SSE, or auto-refresh. The skill contains the authoritative patterns for:
+- CDN setup (only `idiomorph-ext.min.js` is needed)
+- Morph swap strategies (`morph:innerHTML` vs `morph:outerHTML`)
+- Form and input state preservation (`ignoreActive`, `ignoreActiveValue`)
+- `<details>` accordion state preservation (`beforeAttributeUpdated`)
+- Scroll position preservation
+- Selective morph exclusion (`beforeNodeMorphed`)
+- Conditional polling to pause during user interaction
 
 ---
 
