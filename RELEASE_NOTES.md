@@ -19,7 +19,7 @@
 ```json
 {
   "New Features": [
-    "You can now author GOAL specifications using a dedicated GOAL.md Composer skill and a guided workflow. This adds a GOAL specification file plus reference documentation for the GOAL.md Composer, including agents/models definitions, a 7-phase interactive authoring wizard, and explicit acceptance criteria for SGAI GOAL.md files."
+    "Added a dedicated `GOAL.md` Composer skill and guided workflow for authoring GOAL specifications."
   ]
 }
 
