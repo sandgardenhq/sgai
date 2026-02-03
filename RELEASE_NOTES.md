@@ -16,15 +16,12 @@
 - **Version**: 0.0.0+20260203
 - **Summary**: This release includes the changes listed below.
 
-<!--
-{
-  "Additional Changes": [
-    "JavaScript usage rules have been slightly relaxed to reduce unnecessary friction during development."
-  ],
-  "New Features": [
-    "Users can now create and update a workspace GOAL from a guided, web-based composer when no goal content exists yet.",
-    "Operators can now run an optional one-shot, web-based prompt from the Internals tab for ad-hoc interactions without leaving the UI."
-  ]
-}
+### New Features
 
--->
+- Added a guided, web-based `GOAL.md` composer for creating and updating a workspace goal when no goal content exists yet.
+- Added an optional one-shot, web-based prompt in the Internals tab for ad-hoc interactions without leaving the UI.
+
+### Additional Changes
+
+- Updated JavaScript usage rules to reduce unnecessary friction during development.
+
