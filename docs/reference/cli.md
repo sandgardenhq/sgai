@@ -33,7 +33,7 @@ sgai [--interactive] [--fresh] <target_directory>
 Start the web server for session management.
 
 ```sh
-sgai serve [--listen-addr addr]
+sgai serve [--listen-addr addr] [--enable-adhoc-prompt]
 ```
 
 Options:
@@ -43,6 +43,15 @@ Options:
   HTTP server listen address.
 
   Default: `127.0.0.1:8080`
+
+- `--enable-adhoc-prompt`
+
+  Enable the ad-hoc prompt box in the web UI (the **Run** box in the workspace Internals view).
+
+  Notes:
+
+  - Project-level configuration can enable this per workspace via `sgai.json` using `"enable-adhoc-prompt": true`.
+  - The Run box uses `opencode models` to populate the model list and runs prompts using `opencode run -m <model> <prompt>`.
 
 ### `sgai sessions`
 
