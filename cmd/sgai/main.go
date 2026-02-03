@@ -193,35 +193,12 @@ func runWorkflow(ctx context.Context, args []string) {
 	}
 	interactive = normalizeInteractive(interactive)
 
-	skelFS, err := fs.Sub(skelFS, "skel")
-	if err != nil {
-		log.Fatalln("failed to access skelFS subdirectory:", err)
-	}
-
-	err = fs.WalkDir(skelFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		outPath := filepath.Join(dir, path)
-		if d.IsDir() {
-			return os.MkdirAll(outPath, 0755)
-		}
-		data, err := fs.ReadFile(skelFS, path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(outPath, data, 0644)
-	})
-	if err != nil {
-		log.Fatalln("failed to unpack skelFS:", err)
+	if err := initializeWorkspaceDir(dir); err != nil {
+		log.Fatalln("failed to initialize workspace directory:", err)
 	}
 
 	if err := applyCustomMCPs(dir, projectConfig); err != nil {
 		log.Fatalln("failed to apply custom MCPs:", err)
-	}
-
-	if err := applyLayerFolderOverlay(dir); err != nil {
-		log.Fatalln("failed to apply sgai layer overlay:", err)
 	}
 
 	if err := os.Chdir(dir); err != nil {
@@ -265,9 +242,6 @@ func runWorkflow(ctx context.Context, args []string) {
 		longestNameLen = max(longestNameLen, len(agent))
 	}
 	paddedsgai := "sgai" + strings.Repeat(" ", longestNameLen-len("sgai"))
-
-	ensureGitExclude(dir, paddedsgai)
-	ensureJJ(dir)
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
@@ -395,6 +369,7 @@ func runWorkflow(ctx context.Context, args []string) {
 		if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
 			return
 		}
+		applyInteractiveOverride(&wfState, &interactive, stateJSONPath, paddedsgai)
 		if wfState.Status == state.StatusComplete {
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
@@ -440,6 +415,7 @@ func runWorkflow(ctx context.Context, args []string) {
 			if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
 				return
 			}
+			applyInteractiveOverride(&wfState, &interactive, stateJSONPath, paddedsgai)
 
 			if wfState.Status == state.StatusComplete {
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
@@ -482,6 +458,23 @@ func applyWorkGateApproval(wfState *state.Workflow, interactive *string, stateJS
 	}
 	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto mode")
 	return false
+}
+
+func applyInteractiveOverride(wfState *state.Workflow, interactive *string, stateJSONPath, paddedsgai string) {
+	override := wfState.InteractiveOverride
+	if override == "" {
+		return
+	}
+	if override != "auto" && override != "yes" {
+		return
+	}
+	*interactive = override
+	wfState.InteractiveOverride = ""
+	if err := state.Save(stateJSONPath, *wfState); err != nil {
+		log.Println("failed to save state:", err)
+		return
+	}
+	fmt.Println("["+paddedsgai+"]", "interactive mode switched to", override)
 }
 
 func selectModelForAgent(metadataModels map[string]any, agent string) string {
@@ -1373,38 +1366,38 @@ func initVisitCounts(agents []string) map[string]int {
 	return counts
 }
 
-func ensureGitExclude(dir, paddedsgai string) {
+func ensureGitExclude(dir string) {
 	gitDir := filepath.Join(dir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		fmt.Println("["+paddedsgai+"]", "not a git repository, skipping .git/info/exclude")
+		fmt.Println("[sgai]", "not a git repository, skipping .git/info/exclude")
 		return
 	}
 
 	gitInfoDir := filepath.Join(gitDir, "info")
 	if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
-		log.Println("["+paddedsgai+"]", "failed to create .git/info directory:", err)
+		log.Println("[sgai]", "failed to create .git/info directory:", err)
 		return
 	}
 
 	excludePath := filepath.Join(gitInfoDir, "exclude")
 	existingContent, err := os.ReadFile(excludePath)
 	if err != nil && !os.IsNotExist(err) {
-		log.Println("["+paddedsgai+"]", "failed to read .git/info/exclude:", err)
+		log.Println("[sgai]", "failed to read .git/info/exclude:", err)
 		return
 	}
 
-	if factoraLinePresent(existingContent) {
+	if dotSGAILinePresent(existingContent) {
 		return
 	}
 
 	existingContent = append(existingContent, []byte("/.sgai\n")...)
 	if err := os.WriteFile(excludePath, existingContent, 0644); err != nil {
-		log.Println("["+paddedsgai+"]", "failed to write .git/info/exclude:", err)
+		log.Println("[sgai]", "failed to write .git/info/exclude:", err)
 		return
 	}
 }
 
-func factoraLinePresent(content []byte) bool {
+func dotSGAILinePresent(content []byte) bool {
 	for line := range bytes.SplitSeq(content, []byte("\n")) {
 		if bytes.Equal(bytes.TrimSpace(line), []byte("/.sgai")) {
 			return true
@@ -1437,6 +1430,61 @@ func isExecNotFound(err error) bool {
 		return errors.Is(errExec.Err, exec.ErrNotFound)
 	}
 	return false
+}
+
+func initializeWorkspaceDir(dir string) error {
+	subFS, err := fs.Sub(skelFS, "skel")
+	if err != nil {
+		return fmt.Errorf("failed to access skeleton filesystem: %w", err)
+	}
+
+	if err := fs.WalkDir(subFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		outPath := filepath.Join(dir, path)
+		if d.IsDir() {
+			return os.MkdirAll(outPath, 0755)
+		}
+		data, err := fs.ReadFile(subFS, path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(outPath, data, 0644)
+	}); err != nil {
+		return fmt.Errorf("failed to unpack skeleton: %w", err)
+	}
+
+	if err := applyLayerFolderOverlay(dir); err != nil {
+		return fmt.Errorf("failed to apply layer overlay: %w", err)
+	}
+
+	if err := initializeJJ(dir); err != nil {
+		return fmt.Errorf("failed to initialize jj: %w", err)
+	}
+
+	ensureGitExclude(dir)
+
+	return nil
+}
+
+func initializeJJ(dir string) error {
+	if isForkWorkspace(dir) {
+		return nil
+	}
+	cmd := exec.Command("jj", "status")
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		if isExecNotFound(err) {
+			return fmt.Errorf("jj is required but not found in PATH")
+		}
+		initCmd := exec.Command("jj", "git", "init", "--colocate")
+		initCmd.Dir = dir
+		if errInit := initCmd.Run(); errInit != nil {
+			return fmt.Errorf("failed to run jj git init: %w", errInit)
+		}
+	}
+	return nil
 }
 
 func computeGoalChecksum(goalPath string) (string, error) {

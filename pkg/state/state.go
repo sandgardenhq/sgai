@@ -136,7 +136,8 @@ type Workflow struct {
 
 	Cost SessionCost `json:"cost"`
 
-	WorkGateApproved bool `json:"workGateApproved,omitempty"`
+	WorkGateApproved    bool   `json:"workGateApproved,omitempty"`
+	InteractiveOverride string `json:"interactiveOverride,omitempty"`
 
 	// ModelStatuses tracks per-model status in multi-model agents.
 	// Key is model ID (agent:modelSpec), value is "model-working", "model-done", or "model-error".
