@@ -24,4 +24,3 @@
 ### Additional Changes
 
 - Updated JavaScript usage rules to reduce unnecessary friction during development.
-
