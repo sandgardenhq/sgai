@@ -72,7 +72,11 @@ Reviews Go code for readability, idioms, and best practices following Go Code Re
 
 ## htmx-picocss-frontend-developer
 
-Frontend developer specializing in building modern, lightweight web interfaces using HTMX and PicoCSS without heavy JavaScript frameworks. This agent creates fast, accessible, and maintainable web applications with semantic HTML, partial page updates via HTMX attributes, and PicoCSS's classless styling approach. It enforces a strict no-custom-JavaScript policy (except for idiomorph extension setup), uses Playwright for visual verification, and ensures accessibility with proper contrast ratios. Use this agent for building interactive web UIs that need HTMX's AJAX capabilities.
+Frontend developer specializing in building modern, lightweight web interfaces using HTMX and PicoCSS without heavy JavaScript frameworks. This agent creates fast, accessible, and maintainable web applications with semantic HTML, partial page updates via HTMX attributes, and PicoCSS's classless styling approach.
+
+It enforces a strict no-custom-JavaScript policy (except for idiomorph extension setup) and expects idiomorph-based swaps for auto-refresh flows so UI state is preserved (for example, open/closed `<details>` sections and scroll position). It uses Playwright for visual verification, and ensures accessibility with proper contrast ratios.
+
+Use this agent for building interactive web UIs that need HTMX's AJAX capabilities.
 
 ---
 
