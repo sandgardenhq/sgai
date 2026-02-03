@@ -7,6 +7,7 @@ flow: |
   "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
   "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
   "project-critic-council"
+  "skill-writer"
 models:
   "coordinator": "anthropic/claude-opus-4-5 (max)"
   "backend-go-developer": "anthropic/claude-opus-4-5"
@@ -16,9 +17,23 @@ models:
   "htmx-picocss-frontend-reviewer": "anthropic/claude-opus-4-5"
   "stpa-analyst": "anthropic/claude-opus-4-5"
   "project-critic-council": ["opencode/kimi-k2.5-free", "opencode/minimax-m2.1-free", "opencode/glm-4.7-free"]
+  "skill-writer": "anthropic/claude-opus-4-5 (max)"
 interactive: yes
 completionGateScript: make test
 mode: graph
+---
+
+You will see below that I had to spent a lot of effort to deal with HTMX preservations and idiomorph, including remove unnecessary imports.
+
+I think we need to add a skill to address this shortcoming.
+
+Observing what you already see in the templates in this repository, and what you can learn from https://htmx.org/extensions/idiomorph/
+
+
+- [x] Add a HTMX Pico Skill using "skill-writer" and the skill "writing-skills"
+- [x] Update "htmx-picocss-frontend-developer" to add instructions on guiding how to use these skills
+- [x] Update "htmx-picocss-frontend-reviewer" to add instructions on guiding how to use these skills
+
 ---
 
 - [x] without using external dependencies, strip all ANSI codes that make this look wrong:

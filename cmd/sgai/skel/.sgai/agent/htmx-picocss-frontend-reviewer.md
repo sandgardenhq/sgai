@@ -242,3 +242,42 @@ https://htmx.org/examples/ - examples of successful HTMX patterns
 https://picocss.com/examples - examples of successful PicoCSS patterns
 https://picocss.com/docs/grid - how to use grid correctly
 https://picocss.com/docs/container - how to choose the correct container
+
+---
+
+## 11. Auto-Refresh State Preservation Review
+
+When reviewing interfaces that use polling, SSE, or any auto-refresh mechanism, you MUST verify idiomorph is correctly configured to preserve UI state.
+
+**Authoritative source:** Use the `htmx-auto-refresh-preservation` skill for detailed patterns and anti-patterns.
+
+### Review Checklist
+
+1. **CDN Setup**
+   - [ ] Is `idiomorph-ext.min.js` included (NOT `idiomorph.min.js`)?
+   - [ ] The ext file is the only one needed — including both is a bug.
+
+2. **Extension Activation**
+   - [ ] Is `hx-ext="morph"` set on `<body>` or the appropriate container element?
+
+3. **Swap Strategies**
+   - [ ] Are morph swap strategies used (`morph:innerHTML` or `morph:outerHTML`) instead of plain `innerHTML`?
+
+4. **Form and Input Preservation**
+   - [ ] Are `Idiomorph.defaults.ignoreActive` and `Idiomorph.defaults.ignoreActiveValue` set to `true`?
+   - [ ] Can users interact with form inputs without auto-refresh resetting their values?
+
+5. **Scroll Position**
+   - [ ] Is scroll position preserved for scrollable containers during auto-refresh?
+   - [ ] Are scrollable containers using stable IDs?
+
+6. **Accordion/Details State**
+   - [ ] Are `<details>` elements using a `beforeAttributeUpdated` callback to preserve the `open` attribute?
+
+7. **Selective Morph Exclusion**
+   - [ ] Are elements that should not be morphed (e.g., active prompt containers) excluded via `beforeNodeMorphed` returning `false`?
+
+8. **Conditional Polling**
+   - [ ] Is conditional polling used to pause auto-refresh during user interaction (e.g., `hx-trigger="every 2s [document.activeElement.id!='input-id']"`)?
+
+For detailed patterns and anti-patterns, reference the `htmx-auto-refresh-preservation` skill.
