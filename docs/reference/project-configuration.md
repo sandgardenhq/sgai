@@ -12,7 +12,7 @@
 The repository includes example configuration files you can use as starting points:
 
 - [`GOAL.example.md`](../../GOAL.example.md): Example `GOAL.md` frontmatter with a workflow graph and per-agent model selection.
-- [`sgai.example.json`](../../sgai.example.json): Example MCP configuration snippet for a project-level `sgai.json`.
+- [`sgai.example.json`](../../sgai.example.json): Example `sgai.json` snippet.
 - [`opencode.json`](../../opencode.json): Example OpenCode configuration with a local MCP entry.
 
 ## Schema
@@ -39,7 +39,15 @@ Type: string
 
 Configures the editor used for the "Open in Editor" button in the web interface.
 
-**Preset names:**
+If `editor` is not set, the app uses this fallback chain:
+
+1. `$VISUAL` environment variable
+2. `$EDITOR` environment variable
+3. `code`
+
+#### Presets
+
+Use one of these preset values to select a common editor command:
 
 | Preset | Command | Terminal? |
 |--------|---------|-----------|
@@ -53,7 +61,7 @@ Configures the editor used for the "Open in Editor" button in the web interface.
 | `vim` | `vim {path}` | Yes |
 | `atom` | `atom {path}` | No |
 
-**Examples:**
+#### Examples
 
 ```json
 {"editor": "cursor"}
@@ -63,24 +71,20 @@ Configures the editor used for the "Open in Editor" button in the web interface.
 {"editor": "myeditor --open {path}"}
 ```
 
-**Fallback chain:**
+#### Custom commands
 
-When not set, `sgai` uses the following fallback chain:
+Custom editor commands support a `{path}` placeholder.
 
-1. `$VISUAL` environment variable
-2. `$EDITOR` environment variable
-3. `code`
+- If the command contains `{path}`, the placeholder is replaced with the file path.
+- If the command does not contain `{path}`, the file path is appended to the end.
 
-**Custom commands:**
+Environment variable values from `$VISUAL` and `$EDITOR` are treated as custom commands.
 
-- If your custom command contains `{path}`, it is replaced with the file path.
-- If your custom command does not contain `{path}`, the path is appended to the end.
-- Environment variable values are treated as custom commands.
-- Custom commands are assumed to be GUI editors (not terminal editors).
+Custom commands are assumed to be GUI editors (not terminal editors).
 
-**Terminal editors:**
+#### Terminal editors
 
-Terminal-based editors (`vim`, `nvim`) cannot be opened from the web interface.
+Terminal-based editors (for example, `vim` and `nvim`) cannot be opened from the web interface.
 
 When a terminal editor is configured, the web interface shows the workspace path or file path in a read-only text field so it can be selected and copied, instead of showing an "Open in Editor" button.
 
