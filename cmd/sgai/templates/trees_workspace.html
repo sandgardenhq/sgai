@@ -18,6 +18,7 @@
 			<li><a href="/workspaces/{{.DirName}}/messages"{{if eq .ActiveTab "messages"}} class="active"{{end}}>Messages</a></li>
 			<li><a href="/workspaces/{{.DirName}}/internals"{{if eq .ActiveTab "internals"}} class="active"{{end}}>Internals</a></li>
 			{{if not .DisableRetrospective}}<li><a href="/workspaces/{{.DirName}}/retro"{{if eq .ActiveTab "retrospectives"}} class="active"{{end}}>Retrospectives</a></li>{{end}}
+			<li><a href="/workspaces/{{.DirName}}/run"{{if eq .ActiveTab "run"}} class="active"{{end}}>Run</a></li>
 		</ul>
 	</nav>
 </div>

@@ -120,26 +120,4 @@
 	</article>
 </div>
 
-{{if .AdhocPromptEnabled}}
-<article id="adhoc-prompt-container">
-	<header>Run</header>
-	<form hx-post="/workspaces/{{.DirName}}/adhoc/submit" hx-target="#adhoc-output" hx-swap="outerHTML">
-		<div class="grid">
-			<select name="model" id="adhoc-model" aria-label="Model" required{{if .AdhocRunning}} disabled{{end}} hx-post="/workspaces/{{.DirName}}/adhoc/save-state" hx-trigger="change" hx-swap="none" hx-include="[name='prompt']">
-				{{range .AdhocModels}}
-				<option value="{{.}}"{{if eq . $.AdhocSelectedModel}} selected{{end}}>{{.}}</option>
-				{{end}}
-			</select>
-			<input type="text" name="prompt" id="adhoc-prompt" aria-label="Prompt" placeholder="Enter prompt..." required{{if .AdhocRunning}} disabled{{end}} value="{{.AdhocPromptText}}" hx-post="/workspaces/{{.DirName}}/adhoc/save-state" hx-trigger="input changed delay:500ms, focusout changed" hx-swap="none" hx-include="[name='model']">
-		</div>
-		<div id="adhoc-output"{{if .AdhocRunning}} hx-get="/workspaces/{{.DirName}}/adhoc/output" hx-trigger="every 1s" hx-swap="outerHTML"{{end}}>
-			<pre class="adhoc-output">{{.AdhocOutput}}</pre>
-			{{if .AdhocRunning}}
-			<button type="submit" disabled aria-busy="true">Running...</button>
-			{{else}}
-			<button type="submit">Submit</button>
-			{{end}}
-		</div>
-	</form>
-</article>
-{{end}}
+
