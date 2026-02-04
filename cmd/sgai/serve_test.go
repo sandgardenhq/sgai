@@ -478,6 +478,60 @@ func TestHandleWorkspaceOpenVSCodeEditorError(t *testing.T) {
 	}
 }
 
+func TestNewServerWithConfigEditorFallback(t *testing.T) {
+	t.Run("fallbackToDefaultWhenEnvEditorUnavailable", func(t *testing.T) {
+		rootDir := t.TempDir()
+		fakeBinDir := t.TempDir()
+		fakeCode := filepath.Join(fakeBinDir, "code")
+		if err := os.WriteFile(fakeCode, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create fake code binary: %v", err)
+		}
+		t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		t.Setenv("EDITOR", "/nonexistent/editor/binary")
+		t.Setenv("VISUAL", "")
+		srv := NewServerWithConfig(rootDir, "")
+		if srv.editorName != defaultEditorPreset {
+			t.Errorf("editorName = %q; want %q (default preset fallback)", srv.editorName, defaultEditorPreset)
+		}
+	})
+
+	t.Run("usesEnvEditorWhenAvailable", func(t *testing.T) {
+		rootDir := t.TempDir()
+		fakeEditor := filepath.Join(t.TempDir(), "fakeeditor")
+		if err := os.WriteFile(fakeEditor, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create fake editor: %v", err)
+		}
+		t.Setenv("EDITOR", fakeEditor)
+		t.Setenv("VISUAL", "")
+		srv := NewServerWithConfig(rootDir, "")
+		if srv.editorName == defaultEditorPreset {
+			t.Errorf("editorName = %q; should use env EDITOR, not default preset", srv.editorName)
+		}
+		if !srv.editorAvailable {
+			t.Error("editorAvailable = false; want true for available env editor")
+		}
+	})
+
+	t.Run("usesConfigEditorOverEnv", func(t *testing.T) {
+		rootDir := t.TempDir()
+		fakeBinDir := t.TempDir()
+		fakeCode := filepath.Join(fakeBinDir, "code")
+		if err := os.WriteFile(fakeCode, []byte("#!/bin/sh\n"), 0755); err != nil {
+			t.Fatalf("failed to create fake code binary: %v", err)
+		}
+		t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		t.Setenv("EDITOR", "/nonexistent/editor/binary")
+		t.Setenv("VISUAL", "")
+		srv := NewServerWithConfig(rootDir, "code")
+		if srv.editorName != "code" {
+			t.Errorf("editorName = %q; want %q", srv.editorName, "code")
+		}
+		if !srv.editorAvailable {
+			t.Error("editorAvailable = false; want true for explicitly configured editor")
+		}
+	})
+}
+
 func TestHandleWorkspaceInit(t *testing.T) {
 	t.Run("postCreatesWorkspace", func(t *testing.T) {
 		rootDir := t.TempDir()
