@@ -18,13 +18,13 @@
 
 ### New Features
 
-- Added a reusable workspace initialization flow that unpacks the `.sgai` skeleton, initializes `jj`/Git repositories, configures `git` excludes, and writes `GOAL.md`.
-- Added a GOALS specification that defines expected behavior and edge cases for workspace pre-population and initialization.
+- Added a standardized workspace initialization flow that unpacks the `.sgai` skeleton, initializes `jj`/Git repositories, configures `git` excludes, and writes `GOAL.md`.
+- Added a GOALS specification that defines required behavior and edge cases for workspace pre-population and initialization.
 
 ### Bug Fixes
 
-- Fixed `initJJ` to treat a missing `jj` executable as non-fatal and continue workspace setup.
+- Fixed `initJJ` to continue workspace setup when the `jj` executable is missing.
 
 ### Additional Changes
 
-- Updated workspace documentation to reflect the new initialization workflow and replace the workspace `GOALS` document with a multi-agent workflow configuration script.
+- Updated workspace documentation to align with the standardized initialization workflow by replacing the workspace `GOALS` document with a multi-agent workflow configuration script.
