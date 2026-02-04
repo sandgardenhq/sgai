@@ -265,10 +265,9 @@ type Server struct {
 	editorName       string
 	editor           editorOpener
 
-	enableAdhocPrompt bool
-	adhocModelsMu     sync.Mutex
-	cachedModels      []string
-	adhocStates       map[string]*adhocPromptState
+	adhocModelsMu sync.Mutex
+	cachedModels  []string
+	adhocStates   map[string]*adhocPromptState
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -506,7 +505,6 @@ func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
 func cmdServe(args []string) {
 	serveFlags := flag.NewFlagSet("serve", flag.ExitOnError)
 	listenAddr := serveFlags.String("listen-addr", "127.0.0.1:8080", "HTTP server listen address")
-	enableAdhocPrompt := serveFlags.Bool("enable-adhoc-prompt", false, "Enable ad-hoc prompt interface")
 	serveFlags.Parse(args) //nolint:errcheck // ExitOnError FlagSet exits on error, never returns non-nil
 
 	var rootDir string
@@ -522,7 +520,6 @@ func cmdServe(args []string) {
 	}
 
 	srv := NewServer(rootDir)
-	srv.enableAdhocPrompt = *enableAdhocPrompt
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", srv.redirectToTrees)
@@ -535,10 +532,6 @@ func cmdServe(args []string) {
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
 	mux.HandleFunc("/compose", srv.routeCompose)
 	mux.HandleFunc("/compose/", srv.routeCompose)
-
-	if srv.enableAdhocPrompt {
-		log.Println("ad-hoc prompt interface enabled")
-	}
 
 	log.Printf("sgai serve listening on http://%s", *listenAddr)
 	if err := http.ListenAndServe(*listenAddr, mux); err != nil {
@@ -750,12 +743,6 @@ type sessionData struct {
 	SVGHash              string
 	AgentSequence        []agentSequenceDisplay
 	Cost                 state.SessionCost
-	AdhocPromptEnabled   bool
-	AdhocModels          []string
-	AdhocRunning         bool
-	AdhocSelectedModel   string
-	AdhocPromptText      string
-	AdhocOutput          string
 }
 
 func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.Request) sessionData {
@@ -832,23 +819,6 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 
 	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
 
-	adhocEnabled := s.isAdhocPromptEnabled(dir)
-	var adhocModels []string
-	var adhocRunning bool
-	var adhocSelectedModel string
-	var adhocPromptText string
-	var adhocOutput string
-	if adhocEnabled {
-		adhocModels = s.loadAdhocModels()
-		st := s.getAdhocState(dir)
-		st.mu.Lock()
-		adhocRunning = st.running
-		adhocSelectedModel = st.selectedModel
-		adhocPromptText = st.promptText
-		adhocOutput = st.output.String()
-		st.mu.Unlock()
-	}
-
 	return sessionData{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -884,12 +854,6 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 		SVGHash:              getWorkflowSVGHash(dir, currentAgent),
 		AgentSequence:        prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
 		Cost:                 wfState.Cost,
-		AdhocPromptEnabled:   adhocEnabled,
-		AdhocModels:          adhocModels,
-		AdhocRunning:         adhocRunning,
-		AdhocSelectedModel:   adhocSelectedModel,
-		AdhocPromptText:      adhocPromptText,
-		AdhocOutput:          adhocOutput,
 	}
 }
 
@@ -2349,6 +2313,8 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceTab(w, r, workspacePath, "commits")
 	case "messages":
 		s.handleWorkspaceTab(w, r, workspacePath, "messages")
+	case "run":
+		s.handleWorkspaceTab(w, r, workspacePath, "run")
 	case "retro":
 		if isRetrospectiveDisabled(workspacePath) {
 			http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
@@ -2733,6 +2699,8 @@ func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Req
 		s.renderTreesCommitsTabToBuffer(&buf, dir)
 	case "messages":
 		s.renderTreesMessagesTabToBuffer(&buf, dir)
+	case "run":
+		s.renderTreesRunTabToBuffer(&buf, dir)
 	case "retrospectives":
 		s.renderTreesRetrospectivesTabToBuffer(&buf, r, dir, sessionParam)
 	default:

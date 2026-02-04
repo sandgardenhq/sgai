@@ -1722,14 +1722,28 @@
 	/* Idiomorph integration: preserve scroll positions during morph swaps */
 	(function() {
 		var scrollState = {}, selectors = '.tree-panel, .log-panel, .retro-panel-embedded';
+		var adhocScrollState = {};
 		document.body.addEventListener('htmx:beforeSwap', function() {
 			scrollState = {};
 			document.querySelectorAll(selectors).forEach(function(el, i) { scrollState[i] = el.scrollTop; });
+			var adhocOutput = document.querySelector('.adhoc-output');
+			if (adhocOutput) {
+				var wasAtBottom = adhocOutput.scrollTop + adhocOutput.clientHeight >= adhocOutput.scrollHeight - 30;
+				adhocScrollState = { scrollTop: adhocOutput.scrollTop, wasAtBottom: wasAtBottom };
+			}
 		});
 		document.body.addEventListener('htmx:afterSwap', function() {
 			document.querySelectorAll(selectors).forEach(function(el, i) {
 				if (scrollState[i] !== undefined) el.scrollTop = scrollState[i];
 			});
+			var adhocOutput = document.querySelector('.adhoc-output');
+			if (adhocOutput && adhocScrollState.wasAtBottom !== undefined) {
+				if (adhocScrollState.wasAtBottom) {
+					adhocOutput.scrollTop = adhocOutput.scrollHeight;
+				} else {
+					adhocOutput.scrollTop = adhocScrollState.scrollTop;
+				}
+			}
 		});
 	})();
 	</script>

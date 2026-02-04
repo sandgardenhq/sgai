@@ -24,21 +24,6 @@ type adhocPromptState struct {
 	promptText    string
 }
 
-func (s *Server) isAdhocPromptEnabled(dir string) bool {
-	if s.enableAdhocPrompt {
-		return true
-	}
-	config, err := loadProjectConfig(dir)
-	if err != nil {
-		log.Printf("loading project config for ad-hoc prompt check: %v", err)
-		return false
-	}
-	if config == nil {
-		return false
-	}
-	return config.EnableAdhocPrompt
-}
-
 func (s *Server) loadAdhocModels() []string {
 	s.adhocModelsMu.Lock()
 	defer s.adhocModelsMu.Unlock()
@@ -47,7 +32,7 @@ func (s *Server) loadAdhocModels() []string {
 	}
 	validModels, err := fetchValidModels()
 	if err != nil {
-		log.Printf("fetching models for ad-hoc prompt: %v", err)
+		log.Println("fetching models for ad-hoc prompt:", err)
 		return nil
 	}
 	s.cachedModels = slices.Sorted(maps.Keys(validModels))
@@ -68,11 +53,6 @@ func (s *Server) getAdhocState(workspacePath string) *adhocPromptState {
 func (s *Server) handleAdhocSaveState(w http.ResponseWriter, r *http.Request, workspacePath string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if !s.isAdhocPromptEnabled(workspacePath) {
-		http.Error(w, "ad-hoc prompt not enabled", http.StatusForbidden)
 		return
 	}
 
@@ -97,11 +77,6 @@ func (s *Server) handleAdhocSaveState(w http.ResponseWriter, r *http.Request, wo
 func (s *Server) handleAdhocSubmit(w http.ResponseWriter, r *http.Request, workspacePath string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if !s.isAdhocPromptEnabled(workspacePath) {
-		http.Error(w, "ad-hoc prompt not enabled", http.StatusForbidden)
 		return
 	}
 
@@ -130,8 +105,9 @@ func (s *Server) handleAdhocSubmit(w http.ResponseWriter, r *http.Request, works
 	st.selectedModel = model
 	st.promptText = prompt
 
-	cmd := exec.Command("opencode", "run", "-m", model, prompt)
+	cmd := exec.Command("opencode", "run", "-m", model)
 	cmd.Dir = workspacePath
+	cmd.Stdin = strings.NewReader(prompt)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
 	cmd.Stdout = writer
 	cmd.Stderr = writer
@@ -174,10 +150,6 @@ func (w *lockedWriter) Write(p []byte) (int, error) {
 }
 
 func (s *Server) handleAdhocOutput(w http.ResponseWriter, _ *http.Request, workspacePath string) {
-	if !s.isAdhocPromptEnabled(workspacePath) {
-		http.Error(w, "ad-hoc prompt not enabled", http.StatusForbidden)
-		return
-	}
 	s.renderAdhocOutput(w, workspacePath)
 }
 
@@ -196,4 +168,50 @@ func (s *Server) renderAdhocOutput(w http.ResponseWriter, workspacePath string) 
 		Running bool
 		Output  string
 	}{dirName, running, outputText})
+}
+
+func resolveCoordinatorDefaultModel(dir string) string {
+	modelSpec := lookupModelForAgent(dir, "coordinator")
+	if modelSpec == "" {
+		return ""
+	}
+	model, _ := parseModelAndVariant(modelSpec)
+	return model
+}
+
+func (s *Server) renderTreesRunTabToBuffer(buf *bytes.Buffer, dir string) {
+	adhocModels := s.loadAdhocModels()
+	st := s.getAdhocState(dir)
+	st.mu.Lock()
+	adhocRunning := st.running
+	adhocSelectedModel := st.selectedModel
+	adhocPromptText := st.promptText
+	adhocOutput := st.output.String()
+	st.mu.Unlock()
+
+	if adhocSelectedModel == "" {
+		adhocSelectedModel = resolveCoordinatorDefaultModel(dir)
+	}
+
+	data := struct {
+		Directory          string
+		DirName            string
+		AdhocModels        []string
+		AdhocRunning       bool
+		AdhocSelectedModel string
+		AdhocPromptText    string
+		AdhocOutput        string
+	}{
+		Directory:          dir,
+		DirName:            filepath.Base(dir),
+		AdhocModels:        adhocModels,
+		AdhocRunning:       adhocRunning,
+		AdhocSelectedModel: adhocSelectedModel,
+		AdhocPromptText:    adhocPromptText,
+		AdhocOutput:        adhocOutput,
+	}
+
+	if err := templates.Lookup("trees_run_content.html").Execute(buf, data); err != nil {
+		log.Println("template execution failed:", err)
+	}
 }
