@@ -28,3 +28,4 @@
 ### Additional Changes
 
 - Updated workspace documentation to align with the standardized initialization workflow by replacing the workspace `GOALS` document with a multi-agent workflow configuration script.
+
