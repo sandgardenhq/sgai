@@ -10,19 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260204 — Additional changes
+## 0.0.0+20260204 — Dedicated Run tab
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release includes additional updates.
+- **Summary**: This release introduces a dedicated `Run` tab for ad-hoc execution.
 
-### Additional Changes
+### New Features
 
-```json
-{
-  "New Features": [
-    "The ad-hoc Run interface has been moved out of the session internals area into a dedicated Run tab that is always available. The new Run tab defaults to the coordinator’s model and includes updated execution handling, scrolling behavior, and permissions checks."
-  ]
-}
-
-```
+- Moved the ad-hoc `Run` interface from session internals to a dedicated `Run` tab that is always available.
