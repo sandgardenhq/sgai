@@ -63,38 +63,33 @@ Configures the editor used for the "Open in Editor" button in the web interface.
 {"editor": "myeditor --open {path}"}
 ```
 
-**Fallback chain:**
+## How `sgai` picks an editor
 
-When not set, `sgai` uses the following fallback chain:
+`sgai` selects an editor in the following order:
 
-1. `$VISUAL` environment variable
-2. `$EDITOR` environment variable
-3. `code` (VS Code)
+1. The `editor` field in `sgai.json` (when set)
+2. The `$VISUAL` environment variable
+3. The `$EDITOR` environment variable
+4. The `code` preset
 
-**Custom commands:**
+### Availability checks and fallback
+
+`sgai` only enables "Open in Editor" when the selected editor command is available.
+
+If `$VISUAL` / `$EDITOR` points at a command that is not available, `sgai` falls back to the default preset (`code`) when that preset is available.
+
+## Custom commands
 
 - If your custom command contains `{path}`, it will be replaced with the file path.
 - If your custom command does not contain `{path}`, the path is appended to the end.
 - Environment variable values are treated as custom commands.
 - Custom commands are assumed to be GUI editors (not terminal editors).
 
-**Terminal editors:**
+## Terminal editors
 
-Terminal-based editors (`vim`, `nvim`) cannot be opened from the web interface. When a terminal editor is configured, the "Open in Editor" button is hidden.
+Some presets (for example, `vim` and `nvim`) run in a terminal.
 
-### `mcp`
+The web interface still treats the editor as available based on whether the configured command exists on the machine.
 
-Type: object (`map[string]json.RawMessage`)
+If "Open in Editor" does not behave as expected with a terminal-based editor, pick a GUI editor preset (for example, `code` or `cursor`) or configure a GUI command explicitly.
 
-`mcp` allows defining additional MCP entries that are merged into `.sgai/opencode.jsonc`.
-
-Merge rules:
-
-- `sgai` only adds an MCP entry when the entry name does not already exist in `.sgai/opencode.jsonc`.
-- If `sgai.json` contains MCP entries but all of them already exist in `.sgai/opencode.jsonc`, `sgai` does not rewrite `.sgai/opencode.jsonc`.
-
-## Notes
-
-- If `sgai.json` does not exist, `sgai` proceeds without configuration.
-- If `sgai.json` exists but cannot be read due to permissions, `sgai` reports a "permission denied reading config file" error.
-- If `sgai.json` contains invalid JSON syntax or type mismatches, `sgai` reports an error that includes the file path and the failing offset or field.
