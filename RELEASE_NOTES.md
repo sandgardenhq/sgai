@@ -21,10 +21,10 @@
 ```json
 {
   "Additional Changes": [
-    "Developer workflows and automation are now more consistent across local and CI environments. This refines `.gitignore` handling and updates CI configuration to set up JJ more reliably."
+    "Updated `.gitignore` handling and CI configuration to set up `jj` more reliably across local and CI environments."
   ],
   "New Features": [
-    "Users can now switch between an automatic mode and an interactive mode in the product interface, with corresponding behavior supported end-to-end. This adds UI controls and backend handling for an auto/interactive mode toggle and centralizes workspace/JJ initialization so the selected mode is applied consistently."
+    "Added an `auto`/`interactive` mode toggle with end-to-end UI and backend support."
   ]
 }
 
