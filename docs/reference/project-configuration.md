@@ -98,3 +98,5 @@ Merge rules:
 - If `sgai.json` does not exist, `sgai` proceeds without configuration.
 - If `sgai.json` exists but cannot be read due to permissions, `sgai` reports a "permission denied reading config file" error.
 - If `sgai.json` contains invalid JSON syntax or type mismatches, `sgai` reports an error that includes the file path and the failing offset or field.
+- Some workflows (for example, creating a workspace in the web UI) populate `.sgai/` from an embedded skeleton, including `.sgai/opencode.jsonc`.
+- If a `.git/` directory exists, `sgai` may add `/.sgai` to `.git/info/exclude` so `.sgai/` is not tracked by default.
