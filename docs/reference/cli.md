@@ -44,6 +44,10 @@ Options:
 
   Default: `127.0.0.1:8080`
 
+#### Switching modes in the web dashboard
+
+When a session is running, each workspace page includes **Auto** and **Interactive** buttons in the workspace action bar. Use them to switch the current session between `auto` and `yes` without restarting.
+
 ### `sgai sessions`
 
 List all sessions in `.sgai/retrospectives`.
