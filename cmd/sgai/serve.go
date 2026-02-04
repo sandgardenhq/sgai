@@ -2578,21 +2578,94 @@ func (s *Server) renderNoWorkspacePlaceholder(dir string) workspaceContentResult
 	}
 }
 
+func initializeWorkspace(workspacePath string) error {
+	if err := unpackSkeleton(workspacePath); err != nil {
+		return fmt.Errorf("unpacking skeleton: %w", err)
+	}
+	if err := initJJ(workspacePath); err != nil {
+		return fmt.Errorf("initializing jj: %w", err)
+	}
+	if err := addGitExclude(workspacePath); err != nil {
+		return fmt.Errorf("adding git exclude: %w", err)
+	}
+	if err := writeGoalExample(workspacePath); err != nil {
+		return fmt.Errorf("writing GOAL.md: %w", err)
+	}
+	return nil
+}
+
+func unpackSkeleton(workspacePath string) error {
+	subFS, err := fs.Sub(skelFS, "skel")
+	if err != nil {
+		return fmt.Errorf("accessing skeleton subdirectory: %w", err)
+	}
+	return fs.WalkDir(subFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		outPath := filepath.Join(workspacePath, path)
+		if d.IsDir() {
+			return os.MkdirAll(outPath, 0755)
+		}
+		data, errRead := fs.ReadFile(subFS, path)
+		if errRead != nil {
+			return errRead
+		}
+		return os.WriteFile(outPath, data, 0644)
+	})
+}
+
+func initJJ(dir string) error {
+	cmd := exec.Command("jj", "status")
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+	initCmd := exec.Command("jj", "git", "init", "--colocate")
+	initCmd.Dir = dir
+	if errInit := initCmd.Run(); errInit != nil {
+		return fmt.Errorf("running jj git init: %w", errInit)
+	}
+	return nil
+}
+
+func addGitExclude(dir string) error {
+	gitDir := filepath.Join(dir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return nil
+	}
+	gitInfoDir := filepath.Join(gitDir, "info")
+	if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
+		return fmt.Errorf("creating .git/info directory: %w", err)
+	}
+	excludePath := filepath.Join(gitInfoDir, "exclude")
+	existingContent, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("reading .git/info/exclude: %w", err)
+	}
+	if factoraLinePresent(existingContent) {
+		return nil
+	}
+	existingContent = append(existingContent, []byte("/.sgai\n")...)
+	if err := os.WriteFile(excludePath, existingContent, 0644); err != nil {
+		return fmt.Errorf("writing .git/info/exclude: %w", err)
+	}
+	return nil
+}
+
+func writeGoalExample(dir string) error {
+	goalPath := filepath.Join(dir, "GOAL.md")
+	return os.WriteFile(goalPath, []byte(goalExampleContent), 0644)
+}
+
 func (s *Server) handleWorkspaceInit(w http.ResponseWriter, r *http.Request, workspacePath string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
 
-	sgaiDir := filepath.Join(workspacePath, ".sgai")
-	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
-		http.Error(w, "failed to create workspace directory", http.StatusInternalServerError)
-		return
-	}
-
-	goalPath := filepath.Join(workspacePath, "GOAL.md")
-	if err := os.WriteFile(goalPath, []byte(goalExampleContent), 0644); err != nil {
-		http.Error(w, "failed to create GOAL.md", http.StatusInternalServerError)
+	if err := initializeWorkspace(workspacePath); err != nil {
+		http.Error(w, "failed to initialize workspace", http.StatusInternalServerError)
 		return
 	}
 
@@ -2637,15 +2710,8 @@ func (s *Server) handleNewWorkspacePost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	sgaiDir := filepath.Join(workspacePath, ".sgai")
-	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
-		s.renderNewWorkspaceWithError(w, "failed to create .sgai directory")
-		return
-	}
-
-	goalPath := filepath.Join(workspacePath, "GOAL.md")
-	if err := os.WriteFile(goalPath, []byte(goalExampleContent), 0644); err != nil {
-		s.renderNewWorkspaceWithError(w, "failed to create GOAL.md")
+	if err := initializeWorkspace(workspacePath); err != nil {
+		s.renderNewWorkspaceWithError(w, "failed to initialize workspace")
 		return
 	}
 
@@ -3144,14 +3210,14 @@ func (s *Server) handleWorkspaceFork(w http.ResponseWriter, r *http.Request, wor
 		return
 	}
 
-	sgaiDir := filepath.Join(targetPath, ".sgai")
-	if errMkdir := os.MkdirAll(sgaiDir, 0755); errMkdir != nil {
-		log.Printf("Warning: failed to create .sgai directory: %v", errMkdir)
+	if err := unpackSkeleton(targetPath); err != nil {
+		log.Printf("failed to unpack skeleton for fork: %v", err)
 	}
-
-	goalPath := filepath.Join(targetPath, "GOAL.md")
-	if errWrite := os.WriteFile(goalPath, []byte(goalExampleContent), 0644); errWrite != nil {
-		log.Println("warning: failed to create GOAL.md:", errWrite)
+	if err := addGitExclude(targetPath); err != nil {
+		log.Printf("failed to add git exclude for fork: %v", err)
+	}
+	if err := writeGoalExample(targetPath); err != nil {
+		log.Printf("failed to create GOAL.md for fork: %v", err)
 	}
 
 	http.Redirect(w, r, workspaceURL(targetPath, "spec"), http.StatusSeeOther)
