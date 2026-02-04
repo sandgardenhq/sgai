@@ -165,6 +165,7 @@ not implementation. Focus on outcomes.
 | `backend-go-developer` | Expert Go backend developer for APIs, CLI tools, and services with idiomatic Go patterns. Works with go-readability-reviewer for code quality. | `go-readability-reviewer` |
 | `htmx-picocss-frontend-developer` | Frontend developer using HTMX and PicoCSS for lightweight web interfaces. No custom JavaScript. | `htmx-picocss-frontend-reviewer` |
 | `shell-script-coder` | Production-quality POSIX/bash shell scripts with proper error handling. | `shell-script-reviewer` |
+| `react-developer` | Frontend developer specializing in React for building modern, component-based web applications. TypeScript, hooks, modern patterns. | `react-reviewer` |
 | `general-purpose` | Cross-domain tasks, research, multi-step operations. No dedicated reviewer. | None |
 | `webmaster` | Marketing sites, landing pages with Bootstrap/Tailwind/PicoCSS. SEO and accessibility focus. | None |
 
@@ -174,6 +175,7 @@ not implementation. Focus on outcomes.
 |-------|-------------|
 | `go-readability-reviewer` | Reviews Go code for readability, idioms, and best practices. Read-only - sends fixes via messaging. |
 | `htmx-picocss-frontend-reviewer` | UI polish, accessibility, visual consistency for HTMX/PicoCSS interfaces. Read-only. |
+| `react-reviewer` | React code review for best practices, performance, accessibility, hooks usage, and anti-patterns. Read-only. |
 | `shell-script-reviewer` | Shell script correctness, portability, security review. Read-only. |
 | `project-critic-council` | Multi-model council that validates completion claims with strict standards. |
 
@@ -229,6 +231,7 @@ not implementation. Focus on outcomes.
 |-------------------|-------------------|
 | `backend-go-developer` | `go-readability-reviewer` |
 | `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
+| `react-developer` | `react-reviewer` |
 | `shell-script-coder` | `shell-script-reviewer` |
 
 ### Enforcement Rules
@@ -496,6 +499,21 @@ flow: |
   "go-readability-reviewer" -> "stpa-analyst"
   "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
   "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+```
+
+### React Frontend Only
+```yaml
+flow: |
+  "react-developer" -> "react-reviewer"
+```
+
+### Full-Stack Go + React
+```yaml
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "go-readability-reviewer" -> "stpa-analyst"
+  "react-developer" -> "react-reviewer"
+  "react-reviewer" -> "stpa-analyst"
 ```
 
 ### Research/Exploration
