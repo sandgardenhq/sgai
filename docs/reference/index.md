@@ -8,7 +8,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 - [Environment variables](./environment-variables.md)
 - [Project configuration (`sgai.json`)](./project-configuration.md)
 - [Workflow state (`.sgai/state.json`)](./workflow-state.md)
-- [MCP server](./mcp.md)
+- [Web dashboard: workspace tabs](./web-dashboard-workspaces.md)
 
 ## Examples
 
