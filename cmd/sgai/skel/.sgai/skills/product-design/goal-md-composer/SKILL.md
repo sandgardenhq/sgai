@@ -55,6 +55,7 @@ When selecting a development agent, you MUST automatically include its paired re
 |-------------------|-------------------|
 | `backend-go-developer` | `go-readability-reviewer` |
 | `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
+| `react-developer` | `react-reviewer` |
 | `shell-script-coder` | `shell-script-reviewer` |
 
 **Process:**
