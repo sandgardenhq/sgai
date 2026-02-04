@@ -18,4 +18,4 @@
 
 ### New Features
 
-- Moved the ad-hoc `Run` interface from session internals to a dedicated `Run` tab that is always available.
+- Added a dedicated `Run` tab for ad-hoc execution.
