@@ -18,4 +18,4 @@
 
 ### Bug Fixes
 
-- Fixed editor selection to fall back to a working default when the preferred editor was unavailable.
+- Fixed editor selection to fall back to a working default selection when the preferred editor was unavailable.
