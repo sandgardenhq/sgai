@@ -4,7 +4,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ## Features
 
-- **Web dashboard** — Monitor and control agent execution via HTMX + PicoCSS web UI with real-time status visualization, start/stop controls, and human-in-the-loop response interface
+- **Web dashboard** — Monitor and control agent execution via HTMX + PicoCSS web UI with real-time status visualization, start/stop controls, workspace mode switching (Auto/Interactive), and human-in-the-loop response interface
 - **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
 - **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
 - **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
@@ -107,6 +107,7 @@ The web dashboard shows:
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
 - Human response interface for agent questions
+- Workspace mode controls (Auto/Interactive) in the workspace action bar
 
 ## GOAL.md Reference
 
@@ -152,6 +153,15 @@ not implementation. Focus on outcomes.
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+
+### Switching modes while a session runs
+
+The web dashboard includes **Auto** and **Interactive** buttons in each workspace action bar. Use them to switch the current session between:
+
+- `auto` (self-driving)
+- `yes` (interactive)
+
+The button styling reflects the currently active mode.
 
 ## Usage
 
