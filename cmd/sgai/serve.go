@@ -285,12 +285,20 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		absRootDir = rootDir
 	}
 	editor := newConfigurableEditor(editorConfig)
+	editorAvail := isEditorAvailable(editor.command)
+	if !editorAvail {
+		fallback := newConfigurableEditor(defaultEditorPreset)
+		if isEditorAvailable(fallback.command) {
+			editor = fallback
+			editorAvail = true
+		}
+	}
 	return &Server{
 		sessions:         make(map[string]*session),
 		everStartedDirs:  make(map[string]bool),
 		adhocStates:      make(map[string]*adhocPromptState),
 		rootDir:          absRootDir,
-		editorAvailable:  isEditorAvailable(editor.command),
+		editorAvailable:  editorAvail,
 		isTerminalEditor: editor.isTerminal,
 		editorName:       editor.name,
 		editor:           editor,
@@ -817,7 +825,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 
 	renderedHumanMessage := renderHumanMessage(wfState.HumanMessage)
 
-	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
+	editorAvailable := s.editorAvailable && isLocalRequest(r)
 
 	return sessionData{
 		Directory:            dir,
@@ -2469,7 +2477,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress))
-	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
+	editorAvailable := s.editorAvailable && isLocalRequest(r)
 	disableRetrospective := isRetrospectiveDisabled(dir)
 
 	agentInfo := resolveAgentModelInfo(wfState, dir)
@@ -2730,7 +2738,7 @@ func (s *Server) renderTreesSpecificationTabToBuffer(buf *bytes.Buffer, r *http.
 		}
 	}
 
-	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
+	editorAvailable := s.editorAvailable && isLocalRequest(r)
 
 	data := struct {
 		Directory          string
@@ -2817,7 +2825,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		}
 	}
 
-	editorAvailable := s.editorAvailable && isLocalRequest(r) && !s.isTerminalEditor
+	editorAvailable := s.editorAvailable && isLocalRequest(r)
 
 	data := struct {
 		Directory            string
