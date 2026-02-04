@@ -14,7 +14,7 @@
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release includes a fix for editor selection fallback behavior.
+- **Summary**: This release includes improved editor selection fallback behavior.
 
 ### Bug Fixes
 
