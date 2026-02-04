@@ -14,6 +14,8 @@ Open a workspace, then use the navigation at the top:
 - **Session**: View session content.
 - **Run**: Submit an ad-hoc prompt and watch its output update while the prompt is running.
 
+The **Run** tab lives alongside **Session** in the workspace navigation (it is not embedded inside the session content view).
+
 ## Use the Run tab
 
 1. Open the workspace.
