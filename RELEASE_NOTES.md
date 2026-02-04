@@ -14,18 +14,12 @@
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release includes the changes captured below.
+- **Summary**: This release includes improved interactive workflows and CI consistency.
+
+### New Features
+
+- Added an `auto`/`interactive` mode toggle with end-to-end UI and backend support.
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Updated `.gitignore` handling and CI configuration to set up `jj` more reliably across local and CI environments."
-  ],
-  "New Features": [
-    "Added an `auto`/`interactive` mode toggle with end-to-end UI and backend support."
-  ]
-}
-
-```
+- Updated `.gitignore` handling and CI configuration to set up `jj` more reliably across local and CI environments.
