@@ -568,6 +568,8 @@ func TestHandleWorkspaceInit(t *testing.T) {
 		if len(content) == 0 {
 			t.Fatal("GOAL.md is empty")
 		}
+
+		assertSkeletonUnpacked(t, projectDir)
 	})
 
 	t.Run("nonPostMethodNotAllowed", func(t *testing.T) {
@@ -876,4 +878,88 @@ func TestBuildWorkspacePageData(t *testing.T) {
 			t.Error("HasNeedsInputWorkspace = false; want true (workspace needs input)")
 		}
 	})
+}
+
+func assertSkeletonUnpacked(t *testing.T, projectDir string) {
+	t.Helper()
+	skeletonFiles := []string{
+		filepath.Join(projectDir, ".sgai", "agent", "coordinator.md"),
+		filepath.Join(projectDir, ".sgai", "opencode.jsonc"),
+	}
+	for _, path := range skeletonFiles {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("skeleton file not found after init: %s", path)
+		}
+	}
+}
+
+func TestUnpackSkeleton(t *testing.T) {
+	dir := t.TempDir()
+	if err := unpackSkeleton(dir); err != nil {
+		t.Fatalf("unpackSkeleton failed: %v", err)
+	}
+	assertSkeletonUnpacked(t, dir)
+}
+
+func TestAddGitExclude(t *testing.T) {
+	t.Run("addsExcludeEntry", func(t *testing.T) {
+		dir := t.TempDir()
+		gitInfoDir := filepath.Join(dir, ".git", "info")
+		if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
+			t.Fatalf("failed to create .git/info: %v", err)
+		}
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
+		content, err := os.ReadFile(filepath.Join(gitInfoDir, "exclude"))
+		if err != nil {
+			t.Fatalf("failed to read exclude file: %v", err)
+		}
+		if !strings.Contains(string(content), "/.sgai") {
+			t.Error("exclude file does not contain /.sgai")
+		}
+	})
+
+	t.Run("skipsWhenAlreadyPresent", func(t *testing.T) {
+		dir := t.TempDir()
+		gitInfoDir := filepath.Join(dir, ".git", "info")
+		if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
+			t.Fatalf("failed to create .git/info: %v", err)
+		}
+		excludePath := filepath.Join(gitInfoDir, "exclude")
+		if err := os.WriteFile(excludePath, []byte("/.sgai\n"), 0644); err != nil {
+			t.Fatalf("failed to write exclude: %v", err)
+		}
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
+		content, err := os.ReadFile(excludePath)
+		if err != nil {
+			t.Fatalf("failed to read exclude file: %v", err)
+		}
+		if strings.Count(string(content), "/.sgai") != 1 {
+			t.Error("/.sgai should appear exactly once when already present")
+		}
+	})
+
+	t.Run("noGitDirectory", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude should not fail without .git: %v", err)
+		}
+	})
+}
+
+func TestWriteGoalExample(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeGoalExample(dir); err != nil {
+		t.Fatalf("writeGoalExample failed: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "GOAL.md"))
+	if err != nil {
+		t.Fatalf("GOAL.md was not created: %v", err)
+	}
+	if len(content) == 0 {
+		t.Fatal("GOAL.md is empty")
+	}
 }
