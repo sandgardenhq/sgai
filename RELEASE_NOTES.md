@@ -14,7 +14,7 @@
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release introduces a dedicated `Run` tab for ad-hoc execution.
+- **Summary**: This release includes a dedicated `Run` tab for ad-hoc execution.
 
 ### New Features
 
