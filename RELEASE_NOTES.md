@@ -10,19 +10,12 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260204 — Release notes update
+## 0.0.0+20260204 — Improved editor selection reliability
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release includes additional changes across the project.
+- **Summary**: This release includes a fix for editor selection fallback behavior.
 
-### Additional Changes
+### Bug Fixes
 
-```json
-{
-  "Bug Fixes": [
-    "The editor is now more reliably available by falling back to a working default selection when the preferred editor cannot be used."
-  ]
-}
-
-```
+- Fixed editor selection to fall back to a working default when the preferred editor was unavailable.
