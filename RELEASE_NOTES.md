@@ -8,7 +8,7 @@
 
 ### Bug Fixes
 
-- Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
+- Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point.
 
 ## 0.0.0+20260204 — Improved interactive workflows and CI consistency
 
