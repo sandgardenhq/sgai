@@ -93,8 +93,6 @@ Merge rules:
 - `sgai` only adds an MCP entry when the entry name does not already exist in `.sgai/opencode.jsonc`.
 - If `sgai.json` contains MCP entries but all of them already exist in `.sgai/opencode.jsonc`, `sgai` does not rewrite `.sgai/opencode.jsonc`.
 
-## Notes
+## Web dashboard notes
 
-- If `sgai.json` does not exist, `sgai` proceeds without configuration.
-- If `sgai.json` exists but cannot be read due to permissions, `sgai` reports a "permission denied reading config file" error.
-- If `sgai.json` contains invalid JSON syntax or type mismatches, `sgai` reports an error that includes the file path and the failing offset or field.
+- The **Run** tab is always available in the web dashboard. No CLI flag or `sgai.json` setting is required to enable it.
