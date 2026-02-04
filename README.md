@@ -152,16 +152,17 @@ not implementation. Focus on outcomes.
 | `flow`        | DOT-format DAG defining agent execution order            |
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
-| `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+| `interactive` | `yes` (interactive), `no` (exit when agent asks a question), `auto` (self-driving) |
 
 ### Switching modes while a session runs
 
-The web dashboard includes **Auto** and **Interactive** buttons in each workspace action bar. Use them to switch the current session between:
+The web dashboard includes **Auto** and **Interactive** buttons in each workspace action bar.
+Use them to change how the current session runs:
 
-- `auto` (self-driving)
-- `yes` (interactive)
+- **Auto** (`interactive: auto`) — runs self-driving
+- **Interactive** (`interactive: yes`) — pauses for human input when needed
 
-The button styling reflects the currently active mode.
+The selected button styling reflects the active mode.
 
 ## Usage
 
