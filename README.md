@@ -160,6 +160,19 @@ sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
+## Workspaces (web UI)
+
+When a workspace is created from the web dashboard (the `[+]` button), `sgai` initializes the workspace directory so it is immediately usable in the UI.
+
+Initialization includes:
+
+- Unpacking the embedded `.sgai` skeleton into the workspace directory (for example, `.sgai/agent/coordinator.md` and `.sgai/opencode.jsonc`).
+- Writing a `GOAL.md` example file.
+- Attempting to initialize version control:
+  - Runs `jj status` and, if needed, `jj git init --colocate`.
+  - If `jj` is not installed, initialization is skipped.
+- If a `.git/` directory exists, adding `/.sgai` to `.git/info/exclude`.
+
 ## Contributing
 
 Contributions happen through specifications, not code.
