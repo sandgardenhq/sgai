@@ -10,11 +10,11 @@
 
 - Fixed CI tests to run reliably on Ubuntu and macOS by consolidating execution into a single shared test entry point, correcting directory-dependent assumptions to be path-independent, and removing unused parameters from the notification integration.
 
-## 0.0.0+20260204 — Additional updates
+## 0.0.0+20260204 — Standardized workspace initialization
 
 - **Date**: 2026-02-04
 - **Version**: 0.0.0+20260204
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes standardized workspace initialization and related documentation updates.
 
 ### New Features
 
@@ -27,5 +27,4 @@
 
 ### Additional Changes
 
-- Updated workspace documentation to reflect the new initialization workflow and replace the workspace `GOALS` document with a multi-agent configuration script.
-
+- Updated workspace documentation to reflect the new initialization workflow and replace the workspace `GOALS` document with a multi-agent workflow configuration script.
