@@ -4,10 +4,23 @@ This page lists environment variables that `sgai` reads.
 
 ## `EDITOR`
 
+`sgai` reads `EDITOR` in two places:
+
+- Interactive mode defaults (see below)
+- Picking the editor behind the "Open in Editor" button in the web interface
+
+### Interactive mode default
+
 If `EDITOR` is set, `sgai` uses it to choose the default for `--interactive`.
 
 - When `EDITOR` is set, the default interactive mode is `yes`.
 - When `EDITOR` is not set, the default interactive mode is `auto`.
+
+### Web UI "Open in Editor"
+
+When the `editor` field is not set in `sgai.json`, `sgai` uses `$VISUAL` and `$EDITOR` as part of the editor selection chain.
+
+For details (including what happens when an environment variable points at a command that is not available), see [`Project configuration`](./project-configuration.md).
 
 ## `SGAI_MCP_EXECUTABLE`
 
@@ -42,4 +55,3 @@ environment: {
 ## `SGAI_NTFY`
 
 If `SGAI_NTFY` is set, `sgai` sends remote notifications by posting the message body to that URL.
-
