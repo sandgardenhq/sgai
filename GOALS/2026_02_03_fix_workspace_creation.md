@@ -1,21 +1,41 @@
-# Fix Workspace Creation Pre-population
+---
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "backend-go-developer" -> "stpa-analyst"
+  "go-readability-reviewer" -> "stpa-analyst"
+  "general-purpose" -> "stpa-analyst"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
+  "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+  "project-critic-council"
+  "skill-writer"
+models:
+  "coordinator": "anthropic/claude-opus-4-5 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-5"
+  "go-readability-reviewer": "anthropic/claude-opus-4-5"
+  "general-purpose": "anthropic/claude-opus-4-5"
+  "htmx-picocss-frontend-developer": "anthropic/claude-opus-4-5"
+  "htmx-picocss-frontend-reviewer": "anthropic/claude-opus-4-5"
+  "stpa-analyst": "anthropic/claude-opus-4-5"
+  "project-critic-council": ["opencode/kimi-k2.5-free", "opencode/minimax-m2.1-free", "opencode/glm-4.7-free"]
+  "skill-writer": "anthropic/claude-opus-4-5 (max)"
+interactive: yes
+completionGateScript: make test
+mode: graph
+---
 
-When creating a new workspace via the web UI `[+]` button, the workspace should be immediately usable without requiring a manual engine run first.
+Using gh, check these CI/CD errors https://github.com/sandgardenhq/sgai/pull/106/checks
 
-## Problem
+- [x] fix ubuntu
+- [x] fix macos
 
-The web UI `handleNewWorkspacePost` creates only the directory and a `GOAL.md`, but does not:
-1. Unpack the `.sgai` skeleton (agents, skills, snippets, plugin, opencode.jsonc)
-2. Initialize git/jj version control
-3. Add `/.sgai` to `.git/info/exclude`
+---
 
-This means the workspace appears broken until the first engine run: agents/skills/snippets tabs are empty, the fork button fails, and `.sgai` files are tracked by git.
+- [x] When I create a new workspace (`[ + ]`) few problems exist:
+  - [x] Agents, Skills, Snippets are empty -- that means that when you create a workspace, you must immediately pre-populate .sgai for me
+  - [x] when I create a new workspace, it seems that `.sgai` is not being correctly inserted into `.git/info/exclude`
+  - [x] when I create a new workspace, fork button fails -- which indicates that .git and .jj weren't initialized yet
+  - [x] create a branch
+  - [x] copy GOAL.md to GOALS/ following the instructions from README.md
 
-## Requirements
 
-- [ ] When a new workspace is created, immediately pre-populate `.sgai` from the embedded skeleton
-- [ ] Initialize `jj` (with `jj git init --colocate`) in the new workspace
-- [ ] Add `/.sgai` to `.git/info/exclude` so it is not tracked
-- [ ] The fork button should work immediately after workspace creation
-- [ ] Existing workspace initialization (engine startup) should continue to work
-- [ ] The same initialization logic should apply to `handleWorkspaceInit` and `handleWorkspaceFork`
+use GH to create a PR in sandgardenhq/sgai
