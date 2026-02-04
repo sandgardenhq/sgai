@@ -2620,6 +2620,8 @@ func initJJ(dir string) error {
 	cmd.Dir = dir
 	if err := cmd.Run(); err == nil {
 		return nil
+	} else if isExecNotFound(err) {
+		return nil
 	}
 	initCmd := exec.Command("jj", "git", "init", "--colocate")
 	initCmd.Dir = dir
