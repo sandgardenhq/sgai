@@ -21,7 +21,7 @@
 ```json
 {
   "Bug Fixes": [
-    "The editor is now more reliably available by falling back to a working default selection when the preferred editor cannot be used. This updates the editor selection logic to use a safe fallback and stops disabling the editor launch button for terminal-based editors, with tests added to cover the selection behavior."
+    "The editor is now more reliably available by falling back to a working default selection when the preferred editor cannot be used."
   ]
 }
 
