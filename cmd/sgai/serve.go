@@ -182,7 +182,7 @@ type editorPreset struct {
 }
 
 var editorPresets = map[string]editorPreset{
-	"code":   {command: "code {path}", isTerminal: false},
+	"code":   {command: "code -n {path}", isTerminal: false},
 	"cursor": {command: "cursor {path}", isTerminal: false},
 	"zed":    {command: "zed {path}", isTerminal: false},
 	"subl":   {command: "subl {path}", isTerminal: false},
