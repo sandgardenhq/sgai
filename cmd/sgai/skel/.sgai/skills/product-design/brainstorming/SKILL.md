@@ -37,6 +37,37 @@ IMPORTANT: Hand the control back to the human partner so they can feed you with 
 
 IMPORTANT: Hand the control back to the human partner so they can feed you with information.
 
+### Phase 4: Validation Criteria
+
+After design is agreed upon, gather validation criteria for project-critic-council.
+
+Ask these questions (each with escape hatch option):
+1. **Acceptance Criteria:** "How will you know this feature is done?"
+2. **Test Requirements:** "What tests should pass before completion?"
+3. **Evidence Requirements:** "What proof do you need to see?"
+4. **Edge Cases:** "What scenarios must work?"
+
+Example:
+```
+sgai_ask_user_question({
+  questions: [{
+    question: "**Phase 4: Validation Criteria**\n\nHow will you know this feature is complete? What's the acceptance criteria?",
+    choices: [
+      "Tests pass and feature works as described",
+      "I'll define specific criteria (describe in Other)",
+      "Skip detailed validation - proceed with current understanding"
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+**IMPORTANT:** Always include "Skip detailed validation" option to let users shorten the interview.
+
+Log all validation criteria in `@.sgai/PROJECT_MANAGEMENT.md` under a `## Validation Criteria` section.
+
+IMPORTANT: Hand the control back to the human partner so they can feed you with information.
+
 ## When to Revisit Earlier Phases
 
 **You can and should go backward when:**
