@@ -1704,7 +1704,7 @@
 </head>
 <body hx-ext="morph">
 	<main class="container-fluid">
-		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s [document.activeElement.id!='commit-description' && document.activeElement.id!='adhoc-prompt']" hx-swap="morph:innerHTML">
+		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s [document.activeElement.id!='commit-description' && document.activeElement.id!='adhoc-prompt' && document.activeElement.id!='steer-input']" hx-swap="morph:innerHTML">
 {{ template "trees_content.html" . }}
 		</div>
 	</main>
@@ -1717,6 +1717,7 @@
 	};
 	Idiomorph.defaults.callbacks.beforeNodeMorphed = function(oldNode, newNode) {
 		if (oldNode.id === 'adhoc-prompt-container') return false;
+		if (oldNode.id === 'steer-container') return false;
 		return true;
 	};
 	/* Idiomorph integration: preserve scroll positions during morph swaps */

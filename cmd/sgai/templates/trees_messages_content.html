@@ -16,6 +16,9 @@
 			<div class="msg-body-header"><strong>From:</strong> {{$m.FromAgent}}</div>
 			<div class="msg-body-header"><strong>To:</strong> {{$m.ToAgent}}</div>
 			<div class="msg-body-content">{{$m.RenderedBody}}</div>
+			<form hx-delete="/workspaces/{{$.DirName}}/messages/{{$m.ID}}" hx-confirm="Delete this message?" hx-swap="none" style="margin-top: 0.5rem;">
+				<button type="submit" class="secondary outline" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: fit-content;">Delete</button>
+			</form>
 		</div>{{end}}
 		</details>
 		{{end}}

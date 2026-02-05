@@ -1,3 +1,13 @@
+<article id="steer-container">
+	<header>Steer Next Turn</header>
+	<form hx-post="/workspaces/{{.DirName}}/steer" hx-swap="none" hx-on::after-request="this.reset()">
+		<div role="group">
+			<input type="text" name="message" id="steer-input" placeholder="Enter re-steering instruction..." required>
+			<button type="submit">Submit</button>
+		</div>
+	</form>
+</article>
+
 {{if .NeedsInput}}
 <article class="human-message-container">
 	<header>Needs Input: {{.CurrentAgent}}</header>

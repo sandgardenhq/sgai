@@ -732,6 +732,471 @@ func TestHandleWorkspaceResetState(t *testing.T) {
 	})
 }
 
+func TestHandleWorkspaceSteer(t *testing.T) {
+	t.Run("postInsertsMessageBeforeOldestUnread", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status: state.StatusWorking,
+			Messages: []state.Message{
+				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: true},
+				{ID: 2, FromAgent: "agent2", ToAgent: "agent3", Body: "msg2", Read: false},
+				{ID: 3, FromAgent: "agent3", ToAgent: "agent1", Body: "msg3", Read: false},
+			},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		form := strings.NewReader("message=test%20steering")
+		req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/steer", form)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceSteer(rec, req, projectDir)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("POST steer expected 303 redirect, got %d", rec.Code)
+		}
+
+		wfState, err := state.Load(statePath(projectDir))
+		if err != nil {
+			t.Fatalf("failed to load state: %v", err)
+		}
+
+		if len(wfState.Messages) != 4 {
+			t.Fatalf("expected 4 messages, got %d", len(wfState.Messages))
+		}
+
+		newMsg := wfState.Messages[1]
+		if newMsg.FromAgent != "Human Partner" {
+			t.Errorf("expected FromAgent 'Human Partner', got %q", newMsg.FromAgent)
+		}
+		if newMsg.ToAgent != "coordinator" {
+			t.Errorf("expected ToAgent 'coordinator', got %q", newMsg.ToAgent)
+		}
+		if !strings.Contains(newMsg.Body, "Re-steering instruction:") {
+			t.Errorf("expected body to contain 'Re-steering instruction:', got %q", newMsg.Body)
+		}
+		if !strings.Contains(newMsg.Body, "test steering") {
+			t.Errorf("expected body to contain 'test steering', got %q", newMsg.Body)
+		}
+	})
+
+	t.Run("emptyMessageRedirectsWithoutChange", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status:   state.StatusWorking,
+			Messages: []state.Message{{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: false}},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		form := strings.NewReader("message=")
+		req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/steer", form)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceSteer(rec, req, projectDir)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("expected 303 redirect, got %d", rec.Code)
+		}
+
+		wfState, err := state.Load(statePath(projectDir))
+		if err != nil {
+			t.Fatalf("failed to load state: %v", err)
+		}
+
+		if len(wfState.Messages) != 1 {
+			t.Errorf("expected messages unchanged (1), got %d", len(wfState.Messages))
+		}
+	})
+
+	t.Run("nonPostMethodNotAllowed", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		srv := NewServer(rootDir)
+		methods := []string{http.MethodGet, http.MethodPut, http.MethodDelete}
+		for _, method := range methods {
+			req := httptest.NewRequest(method, "/workspaces/test-project/steer", nil)
+			rec := httptest.NewRecorder()
+
+			srv.handleWorkspaceSteer(rec, req, projectDir)
+
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Errorf("%s request expected 405, got %d", method, rec.Code)
+			}
+		}
+	})
+
+	t.Run("insertsAtTopWhenAllMessagesRead", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status: state.StatusWorking,
+			Messages: []state.Message{
+				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: true},
+				{ID: 2, FromAgent: "agent2", ToAgent: "agent3", Body: "msg2", Read: true},
+			},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		form := strings.NewReader("message=new%20steering")
+		req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/steer", form)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceSteer(rec, req, projectDir)
+
+		wfState, err := state.Load(statePath(projectDir))
+		if err != nil {
+			t.Fatalf("failed to load state: %v", err)
+		}
+
+		if len(wfState.Messages) != 3 {
+			t.Fatalf("expected 3 messages, got %d", len(wfState.Messages))
+		}
+
+		firstMsg := wfState.Messages[0]
+		if firstMsg.FromAgent != "Human Partner" {
+			t.Errorf("expected new message at top, got from %q", firstMsg.FromAgent)
+		}
+	})
+}
+
+func TestHandleWorkspaceMessageAction(t *testing.T) {
+	t.Run("deleteRemovesMessage", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status: state.StatusWorking,
+			Messages: []state.Message{
+				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: false},
+				{ID: 2, FromAgent: "agent2", ToAgent: "agent3", Body: "msg2", Read: false},
+				{ID: 3, FromAgent: "agent3", ToAgent: "agent1", Body: "msg3", Read: false},
+			},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		req := httptest.NewRequest(http.MethodDelete, "/workspaces/test-project/messages/2", nil)
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceMessageAction(rec, req, projectDir, "2")
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("DELETE message expected 303 redirect, got %d", rec.Code)
+		}
+
+		wfState, err := state.Load(statePath(projectDir))
+		if err != nil {
+			t.Fatalf("failed to load state: %v", err)
+		}
+
+		if len(wfState.Messages) != 2 {
+			t.Fatalf("expected 2 messages after delete, got %d", len(wfState.Messages))
+		}
+
+		for _, msg := range wfState.Messages {
+			if msg.ID == 2 {
+				t.Error("message ID 2 should have been deleted")
+			}
+		}
+	})
+
+	t.Run("deleteNonexistentMessageSucceeds", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status:   state.StatusWorking,
+			Messages: []state.Message{{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: false}},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		req := httptest.NewRequest(http.MethodDelete, "/workspaces/test-project/messages/999", nil)
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceMessageAction(rec, req, projectDir, "999")
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("DELETE nonexistent message expected 303 redirect, got %d", rec.Code)
+		}
+
+		wfState, err := state.Load(statePath(projectDir))
+		if err != nil {
+			t.Fatalf("failed to load state: %v", err)
+		}
+
+		if len(wfState.Messages) != 1 {
+			t.Errorf("expected messages unchanged (1), got %d", len(wfState.Messages))
+		}
+	})
+
+	t.Run("invalidMessageIDReturnsBadRequest", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		srv := NewServer(rootDir)
+		req := httptest.NewRequest(http.MethodDelete, "/workspaces/test-project/messages/notanumber", nil)
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceMessageAction(rec, req, projectDir, "notanumber")
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("invalid message ID expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("nonDeleteMethodNotAllowed", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		srv := NewServer(rootDir)
+		methods := []string{http.MethodGet, http.MethodPost, http.MethodPut}
+		for _, method := range methods {
+			req := httptest.NewRequest(method, "/workspaces/test-project/messages/1", nil)
+			rec := httptest.NewRecorder()
+
+			srv.handleWorkspaceMessageAction(rec, req, projectDir, "1")
+
+			if rec.Code != http.StatusMethodNotAllowed {
+				t.Errorf("%s request expected 405, got %d", method, rec.Code)
+			}
+		}
+	})
+
+	t.Run("redirectsToMessagesTab", func(t *testing.T) {
+		rootDir := t.TempDir()
+		projectDir := filepath.Join(rootDir, "test-project")
+		createsgaiDir(t, projectDir)
+
+		initialState := state.Workflow{
+			Status:   state.StatusWorking,
+			Messages: []state.Message{{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg1", Read: false}},
+		}
+		if err := state.Save(statePath(projectDir), initialState); err != nil {
+			t.Fatalf("failed to create state file: %v", err)
+		}
+
+		srv := NewServer(rootDir)
+		req := httptest.NewRequest(http.MethodDelete, "/workspaces/test-project/messages/1", nil)
+		rec := httptest.NewRecorder()
+
+		srv.handleWorkspaceMessageAction(rec, req, projectDir, "1")
+
+		loc := rec.Header().Get("Location")
+		if !strings.HasSuffix(loc, "/messages") {
+			t.Errorf("expected redirect location ending with /messages, got %q", loc)
+		}
+	})
+}
+
+func TestHelperFunctions(t *testing.T) {
+	t.Run("findOldestUnreadMessageIndex", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			messages []state.Message
+			want     int
+		}{
+			{
+				name:     "emptyMessages",
+				messages: []state.Message{},
+				want:     0,
+			},
+			{
+				name: "allRead",
+				messages: []state.Message{
+					{ID: 1, Read: true},
+					{ID: 2, Read: true},
+				},
+				want: 0,
+			},
+			{
+				name: "firstUnread",
+				messages: []state.Message{
+					{ID: 1, Read: false},
+					{ID: 2, Read: true},
+				},
+				want: 0,
+			},
+			{
+				name: "middleUnread",
+				messages: []state.Message{
+					{ID: 1, Read: true},
+					{ID: 2, Read: false},
+					{ID: 3, Read: false},
+				},
+				want: 1,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := findOldestUnreadMessageIndex(tt.messages)
+				if got != tt.want {
+					t.Errorf("findOldestUnreadMessageIndex() = %d; want %d", got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("generateNewMessageID", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			messages []state.Message
+			want     int
+		}{
+			{
+				name:     "emptyMessages",
+				messages: []state.Message{},
+				want:     1,
+			},
+			{
+				name: "singleMessage",
+				messages: []state.Message{
+					{ID: 5},
+				},
+				want: 6,
+			},
+			{
+				name: "multipleMessages",
+				messages: []state.Message{
+					{ID: 1},
+					{ID: 10},
+					{ID: 5},
+				},
+				want: 11,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := generateNewMessageID(tt.messages)
+				if got != tt.want {
+					t.Errorf("generateNewMessageID() = %d; want %d", got, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("insertMessageAt", func(t *testing.T) {
+		newMsg := state.Message{ID: 99, Body: "new"}
+		tests := []struct {
+			name     string
+			messages []state.Message
+			index    int
+			wantLen  int
+			wantPos  int
+		}{
+			{
+				name:     "emptySlice",
+				messages: []state.Message{},
+				index:    0,
+				wantLen:  1,
+				wantPos:  0,
+			},
+			{
+				name:     "insertAtBeginning",
+				messages: []state.Message{{ID: 1}, {ID: 2}},
+				index:    0,
+				wantLen:  3,
+				wantPos:  0,
+			},
+			{
+				name:     "insertInMiddle",
+				messages: []state.Message{{ID: 1}, {ID: 2}, {ID: 3}},
+				index:    1,
+				wantLen:  4,
+				wantPos:  1,
+			},
+			{
+				name:     "insertAtEnd",
+				messages: []state.Message{{ID: 1}, {ID: 2}},
+				index:    5,
+				wantLen:  3,
+				wantPos:  2,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := insertMessageAt(tt.messages, tt.index, newMsg)
+				if len(got) != tt.wantLen {
+					t.Errorf("insertMessageAt() len = %d; want %d", len(got), tt.wantLen)
+				}
+				if got[tt.wantPos].ID != 99 {
+					t.Errorf("new message not at expected position %d", tt.wantPos)
+				}
+			})
+		}
+	})
+
+	t.Run("removeMessageByID", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			messages []state.Message
+			id       int
+			wantLen  int
+		}{
+			{
+				name:     "emptySlice",
+				messages: []state.Message{},
+				id:       1,
+				wantLen:  0,
+			},
+			{
+				name:     "removeExisting",
+				messages: []state.Message{{ID: 1}, {ID: 2}, {ID: 3}},
+				id:       2,
+				wantLen:  2,
+			},
+			{
+				name:     "removeNonexistent",
+				messages: []state.Message{{ID: 1}, {ID: 2}},
+				id:       99,
+				wantLen:  2,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got := removeMessageByID(tt.messages, tt.id)
+				if len(got) != tt.wantLen {
+					t.Errorf("removeMessageByID() len = %d; want %d", len(got), tt.wantLen)
+				}
+				for _, msg := range got {
+					if msg.ID == tt.id && tt.name == "removeExisting" {
+						t.Errorf("message ID %d should have been removed", tt.id)
+					}
+				}
+			})
+		}
+	})
+}
+
 func TestHasAnyNeedsInput(t *testing.T) {
 	t.Run("emptySlice", func(t *testing.T) {
 		got := hasAnyNeedsInput([]workspaceInfo{})
