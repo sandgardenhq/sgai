@@ -1,8 +1,6 @@
 ---
-name: Simplification Cascades
-description: Find one insight that eliminates multiple components - "if this is true, we don't need X, Y, or Z"
-when_to_use: Code has many similar-looking implementations. Growing list of special cases. Same concept handled 5 different ways. Excessive configuration. Many if/else branches doing similar things. Complexity spiraling.
-version: 1.0.0
+name: simplification-cascades
+description: Find one insight that eliminates multiple components - "if this is true, we don't need X, Y, or Z". Code has many similar-looking implementations. Growing list of special cases. Same concept handled 5 different ways. Excessive configuration. Many if/else branches doing similar things. Complexity spiraling.
 ---
 
 # Simplification Cascades

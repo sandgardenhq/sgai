@@ -1,7 +1,6 @@
 ---
 name: Error Boundary
-description: Error boundary class component with typed props and state
-when_to_use: When wrapping components that may throw errors during rendering to provide graceful fallback UI
+description: Error boundary class component with typed props and state; When wrapping components that may throw errors during rendering to provide graceful fallback UI
 ---
 
 /* An error boundary component for catching and displaying React rendering errors */

@@ -1,8 +1,6 @@
 ---
-name: Meta-Pattern Recognition
-description: Spot patterns appearing in 3+ domains to find universal principles
-when_to_use: Same issue in different parts of codebase. Pattern feels familiar across projects. "Haven't I solved this before?" Different teams solving similar problems. Recurring solution shapes.
-version: 1.0.0
+name: meta-pattern-recognition
+description: Spot patterns appearing in 3+ domains to find universal principles. Same issue in different parts of codebase. Pattern feels familiar across projects. "Haven't I solved this before?" Different teams solving similar problems. Recurring solution shapes.
 ---
 
 # Meta-Pattern Recognition

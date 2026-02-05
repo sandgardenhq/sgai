@@ -1,8 +1,6 @@
 ---
 name: goal-md-composer
-description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases.
-when_to_use: When your human partner wants to create a new GOAL.md file, start a new SGAI project, configure agents for a software factory, or asks "help me set up GOAL.md", "I want to configure agents", "let's start a new project with SGAI".
-version: 1.0.0
+description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. When your human partner wants to create a new GOAL.md file, start a new SGAI project, configure agents for a software factory, or asks "help me set up GOAL.md", "I want to configure agents", "let's start a new project with SGAI".
 ---
 
 # GOAL.md Composer

@@ -1,12 +1,6 @@
 ---
-name: Log Analysis for Skill Extraction and How to Update .sgai/skills/REQUESTS.md correctly
-description: Analyze workbench logs to identify missing skills and using .sgai/skills/REQUESTS.current.md it will create .sgai/skills/REQUESTS.md
-when_to_use: When skills returns no results for a query, when workbench fails to progress due to missing techniques, when iterating the workbench to improve capabilities, when logs show repeated searches for same missing skills, when you want to harvest misses from .sgai/workbench.log, when you see 'no skills found' messages, when manual workarounds are logged for missing techniques, when skills returns empty results arrays
-
-version: 1.4.0
-
-languages: all
-
+name: log-analysis
+description: Analyze workbench logs to identify missing skills and using .sgai/skills/REQUESTS.current.md it will create .sgai/skills/REQUESTS.md. When skills returns no results for a query, when workbench fails to progress due to missing techniques, when iterating the workbench to improve capabilities, when logs show repeated searches for same missing skills, when you want to harvest misses from .sgai/workbench.log, when you see 'no skills found' messages, when manual workarounds are logged for missing techniques, when skills returns empty results arrays
 ---
 
 # Log Analysis for Skill Extraction and How to Update .sgai/skills/REQUESTS.md correctly

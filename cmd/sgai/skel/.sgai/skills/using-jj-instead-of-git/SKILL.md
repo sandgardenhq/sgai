@@ -1,10 +1,9 @@
 ---
 name: using-jj-instead-of-git
-description: Use jj instead of git for version control operations
-when_to_use: When you need to perform version control tasks like committing, branching, merging, etc. Traps git use cases to steer to jj.
-version: 2.0.0
-languages: all
+description: YOU MUST USE THIS SKILL WHENEVER YOU NEED TO USE git OR jj. Use jj instead of git for version control operations. When you need to perform version control tasks like committing, branching, merging, etc. Traps git use cases to steer to jj.
 ---
+
+**CRITICAL** YOU MUST USE `jj` INSTEAD OF `git` FOR ALL VERSION CONTROL OPERATIONS. Jujutsu (jj) provides a more intuitive and powerful interface while maintaining compatibility with Git repositories. Whenever you need to perform version control tasks, refer to the jj equivalents of git commands. This skill ensures you leverage jj's capabilities for better workflow and efficiency.
 
 # Using jj instead of Git
 

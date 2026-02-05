@@ -1,9 +1,6 @@
 ---
 name: create-opencode-agents
-description: Guide for creating custom opencode agents with proper configuration, tools, permissions, and reasoning for specific tasks
-when_to_use: When creating new opencode agents for security auditing, code review, planning, documentation, or specialized workflows; when built-in agents don't suffice; when configuring agents with restricted tools or custom prompts
-version: 1.0.0
-languages: all
+description: Guide for creating custom opencode agents with proper configuration, tools, permissions, and reasoning for specific tasks. When creating new opencode agents for security auditing, code review, planning, documentation, or specialized workflows; when built-in agents don't suffice; when configuring agents with restricted tools or custom prompts
 ---
 
 # Create OpenCode Agents

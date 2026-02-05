@@ -1,7 +1,6 @@
 ---
 name: Go Generics Patterns
-description: Common generic patterns for type-safe reusable code (Go 1.18+)
-when_to_use: When writing reusable functions or data structures that work with multiple types
+description: Common generic patterns for type-safe reusable code (Go 1.18+); When writing reusable functions or data structures that work with multiple types
 ---
 
 /* Demonstrates common Go generics patterns.

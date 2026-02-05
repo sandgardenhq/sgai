@@ -1,9 +1,8 @@
 ---
-name: stpa/overview
-description: Entry point for STPA (System Theoretic Process Analysis) hazard analysis. Guides through all 4 steps sequentially.
-when_to_use: When starting a new STPA analysis session. When the human partner mentions safety analysis, hazard analysis, or risk assessment. When analyzing control systems for potential failures.
-version: 1.0.0
-tags: stpa, safety, hazard-analysis, control-theory
+name: stpa-overview
+description: Entry point for STPA (System Theoretic Process Analysis) hazard analysis. Guides through all 4 steps sequentially. When starting a new STPA analysis session. When the human partner mentions safety analysis, hazard analysis, or risk assessment. When analyzing control systems for potential failures.
+metadata:
+  tags: "stpa, safety, hazard-analysis, control-theory"
 ---
 
 # STPA Overview

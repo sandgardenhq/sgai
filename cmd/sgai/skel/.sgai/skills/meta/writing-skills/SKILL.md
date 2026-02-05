@@ -1,9 +1,6 @@
 ---
-name: Writing Skills
-description: TDD for process documentation - test with subagents before writing, iterate until bulletproof
-when_to_use: When you discover a technique, pattern, or tool worth documenting for reuse. When editing existing skills. When asked to modify skill documentation. When you've written a skill and need to verify it works before deploying. When skills fail to help agents, when documentation is unclear, when new patterns emerge that need standardization.
-version: 5.0.0
-languages: all
+name: writing-skills
+description: TDD for process documentation - test with subagents before writing, iterate until bulletproof. When you discover a technique, pattern, or tool worth documenting for reuse. When editing existing skills. When asked to modify skill documentation. When you've written a skill and need to verify it works before deploying. When skills fail to help agents, when documentation is unclear, when new patterns emerge that need standardization.
 ---
 
 # Writing Skills
@@ -95,12 +92,11 @@ API docs, syntax guides, tool documentation (office docs)
 
 ```markdown
 ---
-name: Human-Readable Name
-description: One-line summary of what this does
-when_to_use: Symptoms and situations when you need this (CSO-critical)
-version: 1.0.0
-languages: all | [typescript, python] | etc
-dependencies: (optional) Required tools/libraries
+name: kebab-style-human-readable-name
+description: One-line summary of what this does. Symptoms and situations when you need this (CSO-critical)
+metadata:
+  languages: all | [typescript, python] | etc
+  dependencies: (optional) Required tools/libraries
 ---
 
 # Skill Name
@@ -135,16 +131,16 @@ Concrete results
 
 **Critical for discovery:** Future instances need to FIND your skill
 
-### 1. Rich when_to_use
+### 1. Rich descriptions with Symptoms
 
 Include SYMPTOMS not just abstract use cases:
 
 ```yaml
 # ❌ BAD: Too abstract
-when_to_use: For async testing
+description: For async testing
 
 # ✅ GOOD: Symptoms and context
-when_to_use: When tests use setTimeout/sleep and are flaky, timing-dependent,
+description: When tests use setTimeout/sleep and are flaky, timing-dependent,
   pass locally but fail in CI, or timeout when run in parallel
 ```
 
@@ -231,13 +227,10 @@ wc -w .sgai/skills/path/SKILL.md
 
 Mention key concepts multiple times:
 - In description
-- In when_to_use
 - In overview
-- In section headers
+- In-section-headers
 
 Grep hits from multiple places = easier discovery
-
-### 5. Cross-Referencing Other Skills
 
 **When writing documentation that references other skills:**
 
@@ -295,8 +288,6 @@ Choose most relevant language:
 - Ready to adapt (not generic template)
 
 **Don't:**
-- Implement in 5+ languages
-- Create fill-in-the-blank templates
 - Write contrived examples
 
 You're good at porting - one great example is enough.
@@ -481,11 +472,10 @@ Make it easy for agents to self-check when rationalizing:
 
 ### Update CSO for Violation Symptoms
 
-Add to when_to_use: symptoms of when you're ABOUT to violate the rule:
+Add to description: symptoms of when you're ABOUT to violate the rule:
 
 ```yaml
-when_to_use: Every feature and bugfix. When you wrote code before tests.
-  When you're tempted to test after. When manually testing seems faster.
+description: Every feature and bugfix. When you wrote code before tests. When you're tempted to test after. When manually testing seems faster.
 ```
 
 ## RED-GREEN-REFACTOR for Skills
@@ -562,7 +552,7 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 
 **GREEN Phase - Write Minimal Skill:**
 - [ ] Name describes what you DO or core insight
-- [ ] YAML frontmatter with rich when_to_use (include symptoms!)
+- [ ] YAML frontmatter with rich descriptions (include symptoms!)
 - [ ] Keywords throughout for search (errors, symptoms, tools)
 - [ ] Clear overview with core principle
 - [ ] Address specific baseline failures identified in RED
@@ -592,12 +582,10 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 
 How future instances find your skill:
 
-1. **Encounters problem** ("tests are flaky")
+1. encounters-problem-tests-are-flaky
 2. **Searches skills** using `skills` tool (searches skills repository)
-3. **Finds SKILL.md** (rich when_to_use matches)
+3. **Finds SKILL.md** (rich descriptions match)
 4. **Scans overview** (is this relevant?)
-5. **Reads patterns** (quick reference table)
-6. **Loads example** (only when implementing)
 
 **Optimize for this flow** - put searchable terms early and often.
 

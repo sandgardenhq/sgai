@@ -1,9 +1,8 @@
 ---
 name: go-project-layout
-description: Go module structure and project organization patterns
-when_to_use: When setting up a new Go project or organizing existing Go code
-version: 1.0.0
-languages: go
+description: Go module structure and project organization patterns. When setting up a new Go project or organizing existing Go code
+metadata:
+    languages: go
 ---
 
 # Go Project Layout

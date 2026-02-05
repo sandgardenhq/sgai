@@ -1,7 +1,6 @@
 ---
 name: VCS Diff Retriever
-description: Retrieves version control diffs, trying jj first then falling back to git
-when_to_use: When you need to get diff output from a version control system with jj/git fallback
+description: Retrieves version control diffs, trying jj first then falling back to git; When you need to get diff output from a version control system with jj/git fallback
 ---
 
 // Package main provides a utility to retrieve version control diffs with jj and git fallback.

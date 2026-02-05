@@ -1,7 +1,6 @@
 ---
 name: Maps Package Usage
-description: Modern Go maps package operations (Go 1.21+)
-when_to_use: When cloning, comparing, or iterating over maps - prefer over manual loops
+description: Modern Go maps package operations (Go 1.21+); When cloning, comparing, or iterating over maps - prefer over manual loops
 ---
 
 /* Demonstrates the maps package for common map operations.

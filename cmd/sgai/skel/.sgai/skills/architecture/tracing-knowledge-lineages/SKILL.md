@@ -1,8 +1,6 @@
 ---
-name: Tracing Knowledge Lineages
-description: Understand how ideas evolved over time to find old solutions for new problems and avoid repeating past failures
-when_to_use: When problem feels familiar but can't remember details. When asked "why do we use X?". Before abandoning an approach, understand why it exists. When evaluating "new" ideas that might be revivals. When past attempts failed and need to understand why. When tracing decision genealogy.
-version: 1.0.0
+name: tracing-knowledge-lineages
+description: Understand how ideas evolved over time to find old solutions for new problems and avoid repeating past failures. When problem feels familiar but can't remember details. When asked "why do we use X?". Before abandoning an approach, understand why it exists. When evaluating "new" ideas that might be revivals. When past attempts failed and need to understand why. When tracing decision genealogy.
 ---
 
 # Tracing Knowledge Lineages

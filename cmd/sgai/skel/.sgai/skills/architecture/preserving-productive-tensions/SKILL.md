@@ -1,8 +1,6 @@
 ---
-name: Preserving Productive Tensions
-description: Recognize when disagreements reveal valuable context, preserve multiple valid approaches instead of forcing premature resolution
-when_to_use: When multiple approaches have legitimate trade-offs. When stakeholders have conflicting valid priorities. When context determines which approach is better. During design when you're tempted to ask "which is best?" but both are good. When tensions reveal flexibility needs.
-version: 1.0.0
+name: preserving-productive-tensions
+description: Recognize when disagreements reveal valuable context, preserve multiple valid approaches instead of forcing premature resolution. When multiple approaches have legitimate trade-offs. When stakeholders have conflicting valid priorities. When context determines which approach is better. During design when you're tempted to ask "which is best?" but both are good. When tensions reveal flexibility needs.
 ---
 
 # Preserving Productive Tensions

@@ -1,9 +1,6 @@
 ---
-name: Run Long Running Processes in Tmux
-description: Guide for using tmux to manage detached sessions for long-running processes, including lifecycle management, cleanup, startup, verification, and output capture
-when_to_use: When you need to run servers or long-running commands in the background, send commands to them, capture output, handle TTY requirements, or manage session lifecycle with error handling
-version: 2.0.0
-languages: bash
+name: run-long-running-processes-in-tmux
+description: Guide for using tmux to manage detached sessions for long-running processes, including lifecycle management, cleanup, startup, verification, and output capture; When you need to run servers or long-running commands in the background, send commands to them, capture output, handle TTY requirements, or manage session lifecycle with error handling
 ---
 
 # Run Long Running Processes in Tmux

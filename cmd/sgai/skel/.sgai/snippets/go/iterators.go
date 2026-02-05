@@ -1,7 +1,6 @@
 ---
 name: Go Iterators
-description: Range-over-function iterators (Go 1.23+)
-when_to_use: When creating custom iteration patterns using iter.Seq and iter.Seq2
+description: Range-over-function iterators (Go 1.23+); When creating custom iteration patterns using iter.Seq and iter.Seq2
 ---
 
 /* Demonstrates Go 1.23+ range-over-function iterators.

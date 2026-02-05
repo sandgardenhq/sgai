@@ -1,7 +1,6 @@
 ---
 name: Lazy Component
-description: React.lazy + Suspense code splitting pattern
-when_to_use: When loading heavy components on demand to reduce initial bundle size
+description: React.lazy + Suspense code splitting pattern; When loading heavy components on demand to reduce initial bundle size
 ---
 
 /* Code splitting with React.lazy and Suspense for on-demand component loading */

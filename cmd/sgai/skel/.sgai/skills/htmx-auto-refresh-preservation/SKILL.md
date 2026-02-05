@@ -1,10 +1,9 @@
 ---
 name: htmx-auto-refresh-preservation
-description: Use when building any HTMX interface with polling, SSE, or auto-refresh - prevents state loss (form inputs, scroll positions, details/accordion state) during automatic DOM updates by enforcing Idiomorph morph swaps with correct configuration
-when_to_use: When building HTMX pages that auto-refresh via polling (hx-trigger="every Ns") or SSE. When select boxes close on refresh. When form inputs lose focus or reset. When details/accordion elements collapse. When scroll positions jump to top. When you see innerHTML swap on auto-refreshing content.
-version: 1.0.0
-languages: [html, javascript]
-dependencies: [htmx, idiomorph]
+description: Use when building any HTMX interface with polling, SSE, or auto-refresh - prevents state loss (form inputs, scroll positions, details/accordion state) during automatic DOM updates by enforcing Idiomorph morph swaps with correct configuration. When building HTMX pages that auto-refresh via polling (hx-trigger="every Ns") or SSE. When select boxes close on refresh. When form inputs lose focus or reset. When details/accordion elements collapse. When scroll positions jump to top. When you see innerHTML swap on auto-refreshing content.
+metadata:
+  languages: [html, javascript]
+  dependencies: [htmx, idiomorph]
 ---
 
 # HTMX Auto-Refresh State Preservation

@@ -1,9 +1,8 @@
 ---
-name: stpa/step2-control-structure
-description: STPA Step 2 - Model the control structure using hierarchical control-feedback diagrams in Graphviz/DOT format.
-when_to_use: After completing STPA Step 1. When you need to understand how control flows through a system. When identifying controllers, control actions, and feedback paths.
-version: 1.0.0
-tags: stpa, safety, control-structure, graphviz, diagrams
+name: stpa-step2-control-structure
+description: STPA Step 2 - Model the control structure using hierarchical control-feedback diagrams in Graphviz/DOT format; After completing STPA Step 1. When you need to understand how control flows through a system. When identifying controllers, control actions, and feedback paths.
+metadata:
+    tags: stpa, safety, control-structure, graphviz, diagrams
 ---
 
 # STPA Step 2: Model the Control Structure

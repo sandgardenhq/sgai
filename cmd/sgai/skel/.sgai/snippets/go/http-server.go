@@ -1,7 +1,6 @@
 ---
 name: HTTP Server
-description: Simple HTTP server that responds with Hello World
-when_to_use: When creating a basic web server in Go
+description: Simple HTTP server that responds with Hello World; When creating a basic web server in Go
 ---
 
 /* A simple HTTP server in Go */

@@ -1,7 +1,6 @@
 ---
 name: Context Provider
-description: Context + Provider + useContext hook pattern with type safety
-when_to_use: When creating shared state accessible to a component subtree without prop drilling
+description: Context + Provider + useContext hook pattern with type safety; When creating shared state accessible to a component subtree without prop drilling
 ---
 
 /* A typed Context + Provider pattern with a safe useContext hook */

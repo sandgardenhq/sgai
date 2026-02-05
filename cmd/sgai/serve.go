@@ -4293,7 +4293,6 @@ func (s *Server) handleWorkspaceSnippetDetail(w http.ResponseWriter, r *http.Req
 		name = filename
 	}
 	description := fm["description"]
-	whenToUse := fm["when_to_use"]
 	codeContent := stripFrontmatter(string(content))
 
 	dirName := filepath.Base(workspacePath)
@@ -4311,7 +4310,6 @@ func (s *Server) handleWorkspaceSnippetDetail(w http.ResponseWriter, r *http.Req
 		FileName:    filename,
 		Language:    language,
 		Description: description,
-		WhenToUse:   whenToUse,
 		Content:     codeContent,
 		Extension:   strings.TrimPrefix(foundExt, "."),
 		DirName:     dirName,

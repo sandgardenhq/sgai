@@ -162,8 +162,7 @@ Append findings to `$retrospectivePath/IMPROVEMENTS.draft.md` in the retrospecti
 ```[language]
 ---
 name: [Human-readable name]
-description: [One-line description]
-when_to_use: [When agents should reach for this snippet]
+description: [One-line description]; [When agents should reach for this snippet]
 ---
 
 [The code, cleaned up and ready to use]
@@ -182,8 +181,7 @@ Snippets in `.sgai/snippets/` use this format:
 ```
 ---
 name: [Name]
-description: [Description]
-when_to_use: [Trigger conditions]
+description: [Description]; [Trigger conditions]
 ---
 
 [Code with optional inline comments]
@@ -232,8 +230,7 @@ The frontmatter is YAML. The code follows after the closing `---`.
 ```go
 ---
 name: Graceful Shutdown
-description: Graceful server shutdown with resource cleanup
-when_to_use: When building servers that need ordered shutdown of HTTP server, database, etc.
+description: Graceful server shutdown with resource cleanup; When building servers that need ordered shutdown of HTTP server, database, etc.
 ---
 
 // Shutdown gracefully stops the server and releases resources.

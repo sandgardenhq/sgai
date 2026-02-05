@@ -1,9 +1,8 @@
 ---
-name: stpa/step1-define-purpose
-description: STPA Step 1 - Define the purpose of analysis by identifying losses, hazards, and system-level constraints.
-when_to_use: When beginning STPA analysis. After loading stpa/overview. When you need to establish what could go wrong and what must be prevented.
-version: 1.0.0
-tags: stpa, safety, losses, hazards, constraints
+name: stpa-step1-define-purpose
+description: STPA Step 1 - Define the purpose of analysis by identifying losses, hazards, and system-level constraints. When beginning STPA analysis. After loading stpa/overview. When you need to establish what could go wrong and what must be prevented.
+metadata:
+  tags: "stpa, safety, losses, hazards, constraints"
 ---
 
 # STPA Step 1: Define Purpose of Analysis
