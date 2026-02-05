@@ -225,6 +225,7 @@ func parseFlow(flowSpec string, dir string) (*dag, error) {
 	}
 
 	d.injectCoordinatorEdges()
+	d.injectProjectCriticCouncilEdge()
 
 	if err := d.detectCycles(); err != nil {
 		return nil, err
@@ -257,6 +258,19 @@ func (d *dag) injectCoordinatorEdges() {
 	slices.Sort(coordNode.Successors)
 
 	d.EntryNodes = []string{"coordinator"}
+}
+
+func (d *dag) injectProjectCriticCouncilEdge() {
+	coordNode := d.ensureNode("coordinator")
+	pccNode := d.ensureNode("project-critic-council")
+
+	if !slices.Contains(coordNode.Successors, "project-critic-council") {
+		coordNode.Successors = append(coordNode.Successors, "project-critic-council")
+	}
+	if !slices.Contains(pccNode.Predecessors, "coordinator") {
+		pccNode.Predecessors = append(pccNode.Predecessors, "coordinator")
+	}
+	slices.Sort(coordNode.Successors)
 }
 
 func (d *dag) detectCycles() error {

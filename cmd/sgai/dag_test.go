@@ -23,8 +23,8 @@ func TestParseFlowInline(t *testing.T) {
 		t.Errorf("expected entry node 'coordinator', got %v", dag.EntryNodes)
 	}
 
-	if len(dag.Nodes) != 6 {
-		t.Errorf("expected 6 nodes (5 original + coordinator), got %d", len(dag.Nodes))
+	if len(dag.Nodes) != 7 {
+		t.Errorf("expected 7 nodes (5 original + coordinator + project-critic-council), got %d", len(dag.Nodes))
 	}
 
 	coordSuccessors := dag.getSuccessors("coordinator")
@@ -249,8 +249,8 @@ func TestDefaultFlowWhenNoFrontmatter(t *testing.T) {
 		t.Fatalf("parseFlow with empty spec failed: %v", err)
 	}
 
-	if len(dag.Nodes) != 2 {
-		t.Errorf("expected 2 nodes (coordinator, general-purpose), got %d", len(dag.Nodes))
+	if len(dag.Nodes) != 3 {
+		t.Errorf("expected 3 nodes (coordinator, general-purpose, project-critic-council), got %d", len(dag.Nodes))
 	}
 
 	if len(dag.EntryNodes) != 1 || dag.EntryNodes[0] != "coordinator" {
@@ -361,5 +361,106 @@ Different task description`
 	body3 := extractBody([]byte(content3))
 	if string(body1) == string(body3) {
 		t.Error("extractBody() should produce different bodies when content differs")
+	}
+}
+
+func TestInjectProjectCriticCouncilEdgeCreatesNodeAndEdge(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> planner
+		planner -> coder
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	pccNode, exists := dag.Nodes["project-critic-council"]
+	if !exists {
+		t.Fatal("expected project-critic-council node to exist")
+	}
+
+	coordNode := dag.Nodes["coordinator"]
+	if !slices.Contains(coordNode.Successors, "project-critic-council") {
+		t.Errorf("coordinator should have project-critic-council as successor, got: %v", coordNode.Successors)
+	}
+
+	if !slices.Contains(pccNode.Predecessors, "coordinator") {
+		t.Errorf("project-critic-council should have coordinator as predecessor, got: %v", pccNode.Predecessors)
+	}
+}
+
+func TestInjectProjectCriticCouncilEdgeExistingNodeNoEdge(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> planner
+		"project-critic-council"
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	pccNode := dag.Nodes["project-critic-council"]
+	coordNode := dag.Nodes["coordinator"]
+
+	if !slices.Contains(coordNode.Successors, "project-critic-council") {
+		t.Errorf("coordinator should have project-critic-council as successor, got: %v", coordNode.Successors)
+	}
+
+	if !slices.Contains(pccNode.Predecessors, "coordinator") {
+		t.Errorf("project-critic-council should have coordinator as predecessor, got: %v", pccNode.Predecessors)
+	}
+}
+
+func TestInjectProjectCriticCouncilEdgeIdempotent(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> "project-critic-council"
+		coordinator -> planner
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	coordNode := dag.Nodes["coordinator"]
+	pccNode := dag.Nodes["project-critic-council"]
+
+	pccCount := 0
+	for _, s := range coordNode.Successors {
+		if s == "project-critic-council" {
+			pccCount++
+		}
+	}
+	if pccCount != 1 {
+		t.Errorf("expected exactly 1 project-critic-council in coordinator.Successors, got %d", pccCount)
+	}
+
+	coordCount := 0
+	for _, p := range pccNode.Predecessors {
+		if p == "coordinator" {
+			coordCount++
+		}
+	}
+	if coordCount != 1 {
+		t.Errorf("expected exactly 1 coordinator in project-critic-council.Predecessors, got %d", coordCount)
+	}
+}
+
+func TestInjectProjectCriticCouncilEdgeSuccessorsSorted(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> zebra
+		coordinator -> alpha
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	coordNode := dag.Nodes["coordinator"]
+	if !slices.IsSorted(coordNode.Successors) {
+		t.Errorf("coordinator.Successors should be sorted, got: %v", coordNode.Successors)
 	}
 }

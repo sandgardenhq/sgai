@@ -1,4 +1,5 @@
 ---
+model: "anthropic/claude-opus-4-5 (max)"
 description: Coordinates the work flow.
 mode: primary
 permission:
@@ -272,6 +273,19 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
 
 - Step Name: CODE-CLEANUP
   A step that looks at the generated code and cleans it up by asking why certain things are there, cross-referencing with GOAL.md, and cleaning up based on good taste. Create the corresponding SKILL.md.
+
+- Step Name: ASK-PROJECT-CRITIC-COUNCIL
+  BEFORE you can mark the workflow as complete, you SHOULD send a message to project-critic-council asking them to verify all GOAL.md checkboxes are genuinely complete. This is VERY STRONGLY ENCOURAGED.
+  
+  ```
+  sgai_send_message({
+    toAgent: "project-critic-council",
+    body: "Please verify all checked items in GOAL.md are genuinely complete before I mark the workflow as finished."
+  })
+  ```
+  
+  Then set status to "agent-done" to let project-critic-council evaluate.
+  When project-critic-council responds, review their verdict before proceeding to MARK-COMPLETE.
 
 - Step Name: MARK-COMPLETE
   After the CODE-CLEANUP mark the entire workflow as complete:
