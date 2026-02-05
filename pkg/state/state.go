@@ -171,6 +171,12 @@ func Load(path string) (Workflow, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return Workflow{}, err
 	}
+	if state.VisitCounts == nil {
+		state.VisitCounts = make(map[string]int)
+	}
+	if state.ModelStatuses == nil {
+		state.ModelStatuses = make(map[string]string)
+	}
 	return state, nil
 }
 

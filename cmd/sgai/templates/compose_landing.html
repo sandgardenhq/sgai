@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>GOAL.md Composer - {{.DirName}}</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+		}
+		main.container {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			padding: 2rem;
+		}
+
+		.landing-header {
+			text-align: center;
+			margin-bottom: 2rem;
+		}
+		.landing-header h1 {
+			margin-bottom: 0.5rem;
+		}
+		.landing-header p {
+			color: var(--pico-muted-color);
+		}
+
+		.template-gallery {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+			gap: 1rem;
+			margin-bottom: 2rem;
+		}
+		.template-card {
+			padding: 1.5rem;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			text-align: center;
+			cursor: pointer;
+			transition: all 0.2s ease;
+			text-decoration: none;
+			color: inherit;
+		}
+		.template-card:hover {
+			border-color: var(--pico-primary);
+			background-color: color-mix(in srgb, var(--pico-primary) 5%, transparent);
+		}
+		.template-icon {
+			font-size: 2rem;
+			margin-bottom: 0.5rem;
+		}
+		.template-name {
+			font-weight: 600;
+			margin-bottom: 0.25rem;
+		}
+		.template-description {
+			font-size: 0.85rem;
+			color: var(--pico-muted-color);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+		}
+
+		.divider {
+			display: flex;
+			align-items: center;
+			text-align: center;
+			margin: 2rem 0;
+			color: var(--pico-muted-color);
+		}
+		.divider::before,
+		.divider::after {
+			content: '';
+			flex: 1;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+		}
+		.divider::before {
+			margin-right: 1rem;
+		}
+		.divider::after {
+			margin-left: 1rem;
+		}
+
+		.wizard-entry {
+			text-align: center;
+			padding: 2rem;
+			border: 1px dashed var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			background-color: color-mix(in srgb, var(--pico-muted-border-color) 10%, transparent);
+		}
+		.wizard-entry h3 {
+			margin-bottom: 0.5rem;
+		}
+		.wizard-entry p {
+			color: var(--pico-muted-color);
+			margin-bottom: 1rem;
+		}
+
+		nav ul {
+			margin: 0;
+		}
+	</style>
+</head>
+<body hx-ext="morph">
+	<main class="container">
+		<nav>
+			<ul>
+				<li><a href="/trees?workspace={{.DirName}}">← Back to {{.DirName}}</a></li>
+			</ul>
+		</nav>
+
+		<div class="landing-header">
+			<h1>📝 Create New GOAL.md</h1>
+			<p>Choose a template to get started quickly, or use the guided wizard for a customized setup</p>
+		</div>
+
+		<h2>🚀 Quick Start — Pick a Template</h2>
+		<div class="template-gallery">
+			{{range .Templates}}
+			<a href="/compose/template/{{.ID}}?workspace={{$.DirName}}" class="template-card">
+				<div class="template-icon">{{.Icon}}</div>
+				<div class="template-name">{{.Name}}</div>
+				<div class="template-description" title="{{.Description}}">{{.Description}}</div>
+			</a>
+			{{end}}
+		</div>
+
+		<div class="divider">OR</div>
+
+	<div class="wizard-entry">
+		<h3>🧙 Guided Wizard</h3>
+		<p>Answer a few questions and we'll build the perfect agent team for your project</p>
+		<a href="/compose/wizard/step/1?workspace={{.DirName}}" role="button">Start Guided Wizard →</a>
+	</div>
+
+	<div class="divider">OR</div>
+
+	<div class="wizard-entry">
+		<h3>✏️ Edit GOAL.md Directly</h3>
+		<p>For advanced users who want full control over their GOAL.md configuration</p>
+		<a href="/workspaces/{{.DirName}}/goal" role="button" class="secondary">Edit GOAL.md →</a>
+	</div>
+	</main>
+
+	<script>
+		Idiomorph.defaults.ignoreActive = true;
+		Idiomorph.defaults.ignoreActiveValue = true;
+	</script>
+</body>
+</html>

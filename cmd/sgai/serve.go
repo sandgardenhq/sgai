@@ -46,6 +46,13 @@ func init() {
 	funcs := template.FuncMap{
 		"add":            func(a, b int) int { return a + b },
 		"shortModelName": extractModelShortName,
+		"seq": func(start, end int) []int {
+			var result []int
+			for i := start; i <= end; i++ {
+				result = append(result, i)
+			}
+			return result
+		},
 	}
 	var err error
 	templates, err = template.New("").Funcs(funcs).ParseFS(templatesFS, "templates/*.html")
@@ -2866,7 +2873,8 @@ func (s *Server) handleNewWorkspacePost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.Redirect(w, r, workspaceURL(workspacePath, "goal"), http.StatusSeeOther)
+	redirectURL := "/compose?workspace=" + url.QueryEscape(filepath.Base(workspacePath))
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (s *Server) renderNewWorkspaceWithError(w http.ResponseWriter, errMsg string) {
@@ -2908,6 +2916,16 @@ func normalizeForkName(name string) string {
 	parts := strings.Fields(normalized)
 	joined := strings.Join(parts, "-")
 	return strings.ToLower(joined)
+}
+
+func invokeLLMForAssist(prompt string) (string, error) {
+	cmd := exec.Command("opencode", "run", "--thinking")
+	cmd.Stdin = strings.NewReader(prompt)
+	output, errRun := cmd.Output()
+	if errRun != nil {
+		return "", fmt.Errorf("opencode failed: %w", errRun)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 func (s *Server) handleNewForkGet(w http.ResponseWriter, r *http.Request) {
