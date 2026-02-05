@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>GOAL.md Composer - Review & Save - {{.DirName}}</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+		}
+		main.container-fluid {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			padding: 1rem;
+			overflow: hidden;
+		}
+
+		.finish-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 1rem;
+			padding-bottom: 0.75rem;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+		}
+		.finish-header nav ul {
+			margin: 0;
+		}
+
+		.progress-indicator {
+			display: flex;
+			gap: 0.5rem;
+			align-items: center;
+		}
+		.progress-dot {
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			background-color: var(--pico-primary);
+			opacity: 0.6;
+		}
+
+		.finish-layout {
+			display: grid;
+			grid-template-columns: 50% 50%;
+			gap: 1.5rem;
+			flex: 1;
+			overflow: hidden;
+		}
+
+		.summary-panel {
+			overflow-y: auto;
+			padding-right: 0.5rem;
+		}
+		.summary-panel h2 {
+			margin-bottom: 1rem;
+		}
+
+		.summary-item {
+			display: flex;
+			align-items: flex-start;
+			gap: 0.75rem;
+			padding: 0.75rem;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			margin-bottom: 0.5rem;
+		}
+		.summary-icon {
+			font-size: 1.25rem;
+		}
+		.summary-content {
+			flex: 1;
+			min-width: 0;
+		}
+		.summary-label {
+			font-size: 0.8rem;
+			color: var(--pico-muted-color);
+			margin-bottom: 0.25rem;
+		}
+		.summary-value {
+			font-weight: 600;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.agent-tags {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem;
+		}
+		.agent-tag {
+			font-size: 0.75rem;
+			padding: 0.15rem 0.5rem;
+			background: color-mix(in srgb, var(--pico-primary) 15%, transparent);
+			border-radius: 0.25rem;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-width: 200px;
+		}
+
+		.preview-container {
+			position: sticky;
+			top: 0;
+			align-self: start;
+			max-height: calc(100vh - 200px);
+			overflow-y: auto;
+			border: 1px solid var(--pico-muted-border-color);
+			border-radius: 0.5rem;
+			background: var(--pico-card-background-color);
+		}
+		.preview-header {
+			position: sticky;
+			top: 0;
+			background: var(--pico-card-background-color);
+			padding: 1rem;
+			border-bottom: 1px solid var(--pico-muted-border-color);
+			z-index: 10;
+		}
+		.preview-header h3 {
+			margin: 0;
+			font-size: 1rem;
+		}
+		.preview-body { padding: 1rem; }
+		.preview-content {
+			font-size: 0.9rem;
+			line-height: 1.6;
+			overflow-wrap: break-word;
+			word-break: break-word;
+		}
+		.flow-error { margin-top: 1rem; padding: 0.5rem; background: color-mix(in srgb, #ef4444 15%, transparent); color: #991b1b; border-left: 3px solid #ef4444; border-radius: 0.25rem; font-size: 0.85rem; }
+
+		.finish-actions {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			padding-top: 1rem;
+			border-top: 1px solid var(--pico-muted-border-color);
+			margin-top: 1rem;
+		}
+		.finish-actions button,
+		.finish-actions a {
+			margin: 0;
+		}
+
+
+		.save-notification {
+			position: fixed;
+			top: 1rem;
+			right: 1rem;
+			padding: 0.75rem 1rem;
+			border-radius: 0.5rem;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+			z-index: 1000;
+			font-size: 0.875rem;
+			animation: slideIn 0.3s ease;
+		}
+		.save-success {
+			background: color-mix(in srgb, #22c55e 90%, white);
+			color: #166534;
+			border: 1px solid #22c55e;
+		}
+		.save-error {
+			background: color-mix(in srgb, #ef4444 90%, white);
+			color: #991b1b;
+			border: 1px solid #ef4444;
+		}
+		@keyframes slideIn {
+			from { transform: translateX(100%); opacity: 0; }
+			to { transform: translateX(0); opacity: 1; }
+		}
+
+		@media (max-width: 768px) {
+			.finish-layout {
+				grid-template-columns: 1fr;
+			}
+			.preview-container {
+				max-height: none;
+			}
+		}
+	</style>
+</head>
+<body hx-ext="morph">
+	<main class="container-fluid">
+		<div class="finish-header">
+			<nav>
+				<ul>
+					<li><a href="/compose/wizard/step/4?workspace={{.DirName}}">← Back to Settings</a></li>
+				</ul>
+			</nav>
+			<div class="progress-indicator">
+				{{range seq 1 4}}
+				<div class="progress-dot"></div>
+				{{end}}
+			</div>
+		</div>
+
+		<div id="save-notification"></div>
+
+		<div class="finish-layout">
+			<div class="summary-panel">
+				<h2>✓ Review & Save</h2>
+
+				<div class="summary-item">
+					<div class="summary-icon">📝</div>
+					<div class="summary-content">
+						<div class="summary-label">Project Description</div>
+				{{if .State.Description}}
+				<div class="summary-value" title="{{.State.Description}}">{{.State.Description}}</div>
+				{{else}}
+				<div class="summary-value"><em>Not set</em></div>
+				{{end}}
+					</div>
+				</div>
+
+				<div class="summary-item">
+					<div class="summary-icon">👥</div>
+					<div class="summary-content">
+						<div class="summary-label">Selected Agents</div>
+						<div class="agent-tags">
+						{{range .Agents}}
+						{{if .Selected}}
+						<span class="agent-tag" title="{{.Name}}">{{.Name}}</span>
+						{{end}}
+						{{end}}
+						</div>
+					</div>
+				</div>
+
+				<div class="summary-item">
+					<div class="summary-icon">⚙️</div>
+					<div class="summary-content">
+						<div class="summary-label">Interactive Mode</div>
+					<div class="summary-value" title="{{.State.Interactive}}">{{.State.Interactive}}</div>
+					</div>
+				</div>
+
+				{{if .State.CompletionGate}}
+				<div class="summary-item">
+					<div class="summary-icon">🚦</div>
+					<div class="summary-content">
+						<div class="summary-label">Completion Gate</div>
+					<div class="summary-value" title="{{.State.CompletionGate}}"><code>{{.State.CompletionGate}}</code></div>
+					</div>
+				</div>
+				{{end}}
+
+				<div class="finish-actions">
+					<a href="/compose/wizard/step/1?workspace={{.DirName}}" role="button" class="secondary outline">← Edit Wizard</a>
+					<button type="button" 
+						hx-post="/compose/save?workspace={{.DirName}}" 
+						hx-target="#save-notification"
+						hx-swap="innerHTML">
+						💾 Save GOAL.md
+					</button>
+				</div>
+
+			</div>
+
+			<div class="preview-container" id="compose-preview">
+				<div class="preview-header">
+					<h3>📄 Final GOAL.md Preview</h3>
+				</div>
+				<div class="preview-body">
+					<div class="preview-content">
+						{{.Preview}}
+					</div>
+					{{if .FlowError}}
+					<div class="flow-error">
+						⚠️ {{.FlowError}}
+					</div>
+					{{end}}
+				</div>
+			</div>
+		</div>
+	</main>
+
+</body>
+</html>

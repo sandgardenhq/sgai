@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -31,8 +30,9 @@ type composerAgentConf struct {
 }
 
 type composerSession struct {
-	mu    sync.Mutex
-	state composerState
+	mu     sync.Mutex
+	state  composerState
+	wizard wizardState
 }
 
 type composerAgentInfo struct {
@@ -40,25 +40,6 @@ type composerAgentInfo struct {
 	Description string
 	Selected    bool
 	Model       string
-}
-
-type composerPageData struct {
-	Directory   string
-	DirName     string
-	State       composerState
-	Agents      []composerAgentInfo
-	Models      []string
-	Preview     template.HTML
-	FlowError   string
-	SaveSuccess bool
-	SaveError   string
-}
-
-type composerDiffData struct {
-	HasChanges bool
-	OldPreview string
-	NewPreview string
-	Changes    []string
 }
 
 var (
@@ -76,6 +57,7 @@ func getComposerSession(workspacePath string) *composerSession {
 
 	cs := &composerSession{}
 	cs.state = loadComposerStateFromDisk(workspacePath)
+	cs.wizard = defaultWizardState()
 	composerSessions[workspacePath] = cs
 	return cs
 }
@@ -125,7 +107,7 @@ func defaultComposerState() composerState {
 	return composerState{
 		Interactive: "yes",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: ""},
+			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 		},
 	}
 }
@@ -190,93 +172,6 @@ func extractTasksFromBody(body string) string {
 	return strings.TrimSpace(strings.Join(taskLines, "\n"))
 }
 
-func (s *Server) handleCompose(w http.ResponseWriter, _ *http.Request, workspacePath string) {
-	cs := getComposerSession(workspacePath)
-	cs.mu.Lock()
-	currentState := cs.state
-	cs.mu.Unlock()
-
-	agents := loadAvailableAgents(workspacePath)
-	models := loadAvailableModels()
-
-	agentInfos := buildAgentInfoList(agents, currentState.Agents)
-
-	preview := generateGOALPreview(currentState)
-
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
-	data := composerPageData{
-		Directory: workspacePath,
-		DirName:   filepath.Base(workspacePath),
-		State:     currentState,
-		Agents:    agentInfos,
-		Models:    models,
-		Preview:   template.HTML(preview),
-		FlowError: flowErr,
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	executeTemplate(w, templates.Lookup("compose.html"), data)
-}
-
-func (s *Server) handleComposeUpdatePanel(w http.ResponseWriter, r *http.Request, workspacePath, panel string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "failed to parse form", http.StatusBadRequest)
-		return
-	}
-
-	cs := getComposerSession(workspacePath)
-	cs.mu.Lock()
-
-	switch panel {
-	case "description":
-		cs.state.Description = r.FormValue("description")
-	case "frontmatter":
-		cs.state.Interactive = r.FormValue("interactive")
-		cs.state.CompletionGate = r.FormValue("completionGate")
-	case "agents":
-		cs.state.Agents = parseAgentFormValues(r, cs.state.Agents, loadAvailableAgents(workspacePath))
-	case "flow":
-		cs.state.Flow = r.FormValue("flow")
-	case "tasks":
-		cs.state.Tasks = r.FormValue("tasks")
-	}
-
-	currentState := cs.state
-	cs.mu.Unlock()
-
-	preview := generateGOALPreview(currentState)
-
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("Hx-Trigger", "previewUpdated")
-
-	data := struct {
-		Preview   template.HTML
-		FlowError string
-	}{
-		Preview:   template.HTML(preview),
-		FlowError: flowErr,
-	}
-	executeTemplate(w, templates.Lookup("compose_preview_partial.html"), data)
-}
-
 func (s *Server) handleComposePreview(w http.ResponseWriter, _ *http.Request, workspacePath string) {
 	cs := getComposerSession(workspacePath)
 	cs.mu.Lock()
@@ -324,9 +219,7 @@ func (s *Server) handleComposeSave(w http.ResponseWriter, r *http.Request, works
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("Hx-Trigger", "saveSuccess")
-	_, _ = w.Write([]byte(`<div class="save-success">GOAL.md saved successfully!</div>`))
+	w.Header().Set("Hx-Redirect", "/workspaces/"+filepath.Base(workspacePath)+"/progress")
 }
 
 func (s *Server) handleComposeReset(w http.ResponseWriter, r *http.Request, workspacePath string) {
@@ -343,128 +236,6 @@ func (s *Server) handleComposeReset(w http.ResponseWriter, r *http.Request, work
 	cs.mu.Unlock()
 
 	http.Redirect(w, r, "/compose?workspace="+filepath.Base(workspacePath), http.StatusSeeOther)
-}
-
-func (s *Server) handleComposeAssist(w http.ResponseWriter, r *http.Request, workspacePath, panel string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	cs := getComposerSession(workspacePath)
-	cs.mu.Lock()
-	currentState := cs.state
-	cs.mu.Unlock()
-
-	prompt := buildAssistPrompt(panel, currentState, workspacePath)
-
-	result, err := invokeLLMForAssist(prompt)
-	if err != nil {
-		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("Hx-Trigger", "assistError")
-		_, _ = fmt.Fprintf(w, `<div class="assist-error">AI assist failed: %s</div>`, template.HTMLEscapeString(err.Error()))
-		return
-	}
-
-	cs.mu.Lock()
-	applyAssistResult(panel, result, &cs.state)
-	newState := cs.state
-	cs.mu.Unlock()
-
-	s.renderPanelAndPreview(w, workspacePath, panel, newState)
-}
-
-func (s *Server) handleComposeCommand(w http.ResponseWriter, r *http.Request, workspacePath string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "failed to parse form", http.StatusBadRequest)
-		return
-	}
-
-	command := r.FormValue("command")
-	if command == "" {
-		http.Error(w, "command required", http.StatusBadRequest)
-		return
-	}
-
-	cs := getComposerSession(workspacePath)
-	cs.mu.Lock()
-	currentState := cs.state
-	cs.mu.Unlock()
-
-	prompt := buildCommandPrompt(command, currentState, workspacePath)
-
-	result, err := invokeLLMForCommand(prompt)
-	if err != nil {
-		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("Hx-Trigger", "commandError")
-		_, _ = fmt.Fprintf(w, `<div class="command-error">Command failed: %s</div>`, template.HTMLEscapeString(err.Error()))
-		return
-	}
-
-	diff := computeStateDiff(currentState, result)
-
-	w.Header().Set("Content-Type", "text/html")
-	data := struct {
-		Command    string
-		Diff       composerDiffData
-		NewState   composerState
-		HasChanges bool
-	}{
-		Command:    command,
-		Diff:       diff,
-		NewState:   result,
-		HasChanges: diff.HasChanges,
-	}
-	executeTemplate(w, templates.Lookup("compose_command_preview.html"), data)
-}
-
-func (s *Server) handleComposeApply(w http.ResponseWriter, r *http.Request, workspacePath string) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST required", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "failed to parse form", http.StatusBadRequest)
-		return
-	}
-
-	var newState composerState
-	stateJSON := r.FormValue("newState")
-	if err := json.Unmarshal([]byte(stateJSON), &newState); err != nil {
-		http.Error(w, "invalid state", http.StatusBadRequest)
-		return
-	}
-
-	cs := getComposerSession(workspacePath)
-	cs.mu.Lock()
-	cs.state = newState
-	cs.mu.Unlock()
-
-	http.Redirect(w, r, "/compose?workspace="+filepath.Base(workspacePath), http.StatusSeeOther)
-}
-
-func (s *Server) handleComposeAgents(w http.ResponseWriter, _ *http.Request, workspacePath string) {
-	agents := loadAvailableAgents(workspacePath)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(agents); err != nil {
-		http.Error(w, "encoding failed", http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleComposeModels(w http.ResponseWriter, _ *http.Request, _ string) {
-	models := loadAvailableModels()
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(models); err != nil {
-		http.Error(w, "encoding failed", http.StatusInternalServerError)
-	}
 }
 
 func loadAvailableAgents(workspacePath string) []composerAgentInfo {
@@ -540,32 +311,46 @@ func buildAgentInfoList(available []composerAgentInfo, selected []composerAgentC
 	return result
 }
 
-func parseAgentFormValues(r *http.Request, _ []composerAgentConf, available []composerAgentInfo) []composerAgentConf {
-	selectedAgents := r.Form["agents"]
-	selectedSet := make(map[string]bool)
-	for _, a := range selectedAgents {
-		selectedSet[a] = true
-	}
-
-	var result []composerAgentConf
-	for _, a := range available {
-		conf := composerAgentConf{
-			Name:     a.Name,
-			Selected: selectedSet[a.Name],
-			Model:    r.FormValue("model_" + a.Name),
-		}
-		result = append(result, conf)
-	}
-	return result
-}
-
 func generateGOALPreview(state composerState) string {
 	content := buildGOALContent(state)
-	rendered, err := renderMarkdown([]byte(content))
-	if err != nil {
-		return template.HTMLEscapeString(content)
+	frontmatter, body := splitFrontmatterAndBody(content)
+
+	var result bytes.Buffer
+	if frontmatter != "" {
+		result.WriteString(`<pre class="yaml-frontmatter"><code>`)
+		result.WriteString(template.HTMLEscapeString(frontmatter))
+		result.WriteString(`</code></pre>`)
 	}
-	return rendered
+
+	if body != "" {
+		rendered, errRender := renderMarkdown([]byte(body))
+		if errRender != nil {
+			result.WriteString(template.HTMLEscapeString(body))
+		} else {
+			result.WriteString(rendered)
+		}
+	}
+
+	return result.String()
+}
+
+func splitFrontmatterAndBody(content string) (frontmatter, body string) {
+	if !strings.HasPrefix(content, "---\n") {
+		return "", content
+	}
+
+	rest := content[4:]
+	endIdx := strings.Index(rest, "\n---\n")
+	if endIdx < 0 {
+		endIdx = strings.Index(rest, "\n---")
+		if endIdx < 0 {
+			return "", content
+		}
+	}
+
+	frontmatter = "---\n" + rest[:endIdx] + "\n---"
+	body = strings.TrimPrefix(rest[endIdx+4:], "\n")
+	return frontmatter, body
 }
 
 func buildGOALContent(state composerState) string {
@@ -632,219 +417,6 @@ func buildGOALContent(state composerState) string {
 	return buf.String()
 }
 
-func buildAssistPrompt(panel string, state composerState, _ string) string {
-	var buf bytes.Buffer
-
-	buf.WriteString("You are helping to configure a software factory workflow. ")
-	buf.WriteString("Based on the current configuration, provide suggestions for the '")
-	buf.WriteString(panel)
-	buf.WriteString("' section.\n\n")
-
-	buf.WriteString("Current configuration:\n")
-	buf.WriteString("Description: ")
-	buf.WriteString(state.Description)
-	buf.WriteString("\n")
-	buf.WriteString("Interactive: ")
-	buf.WriteString(state.Interactive)
-	buf.WriteString("\n")
-	buf.WriteString("Agents: ")
-	var agentNames []string
-	for _, a := range state.Agents {
-		if a.Selected {
-			agentNames = append(agentNames, a.Name)
-		}
-	}
-	buf.WriteString(strings.Join(agentNames, ", "))
-	buf.WriteString("\n")
-	buf.WriteString("Flow: ")
-	buf.WriteString(state.Flow)
-	buf.WriteString("\n")
-	buf.WriteString("Tasks: ")
-	buf.WriteString(state.Tasks)
-	buf.WriteString("\n\n")
-
-	switch panel {
-	case "description":
-		buf.WriteString("Suggest an improved project description that clearly explains the goal.\n")
-	case "agents":
-		buf.WriteString("Suggest which agents should be selected based on the project description.\n")
-	case "flow":
-		buf.WriteString("Suggest a workflow DAG (in DOT format) based on the selected agents.\n")
-	case "tasks":
-		buf.WriteString("Suggest a task list (markdown checkbox format) based on the project description.\n")
-	}
-
-	buf.WriteString("\nRespond with JSON containing the suggested value for this panel.\n")
-
-	return buf.String()
-}
-
-func buildCommandPrompt(command string, state composerState, _ string) string {
-	var buf bytes.Buffer
-
-	buf.WriteString("You are helping to configure a software factory workflow.\n")
-	buf.WriteString("The user has requested the following change:\n\n")
-	buf.WriteString(command)
-	buf.WriteString("\n\n")
-	buf.WriteString("Current configuration:\n")
-
-	stateJSON, _ := json.MarshalIndent(state, "", "  ")
-	buf.Write(stateJSON)
-	buf.WriteString("\n\n")
-
-	buf.WriteString("Apply the requested change and return the complete new state as JSON.\n")
-	buf.WriteString("The JSON should match this structure:\n")
-	buf.WriteString(`{
-  "description": "string",
-  "interactive": "yes|no|auto",
-  "completionGate": "string or empty",
-  "agents": [{"name": "agent-name", "selected": true/false, "model": "model-name"}],
-  "flow": "DOT format string",
-  "tasks": "markdown task list"
-}`)
-
-	return buf.String()
-}
-
-func invokeLLMForAssist(prompt string) (string, error) {
-	cmd := exec.Command("opencode", "run", "--format=text")
-	cmd.Stdin = strings.NewReader(prompt)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("opencode failed: %w", err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-func invokeLLMForCommand(prompt string) (composerState, error) {
-	cmd := exec.Command("opencode", "run", "--format=text")
-	cmd.Stdin = strings.NewReader(prompt)
-	output, err := cmd.Output()
-	if err != nil {
-		return composerState{}, fmt.Errorf("opencode failed: %w", err)
-	}
-
-	jsonStart := strings.Index(string(output), "{")
-	jsonEnd := strings.LastIndex(string(output), "}")
-	if jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart {
-		return composerState{}, fmt.Errorf("no valid JSON in response")
-	}
-
-	jsonStr := string(output)[jsonStart : jsonEnd+1]
-
-	var result composerState
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return composerState{}, fmt.Errorf("invalid JSON response: %w", err)
-	}
-
-	return result, nil
-}
-
-func applyAssistResult(panel, result string, state *composerState) {
-	switch panel {
-	case "description":
-		state.Description = extractJSONStringField(result, "description")
-	case "flow":
-		state.Flow = extractJSONStringField(result, "flow")
-	case "tasks":
-		state.Tasks = extractJSONStringField(result, "tasks")
-	case "agents":
-		var agents []composerAgentConf
-		if err := json.Unmarshal([]byte(result), &agents); err == nil {
-			state.Agents = agents
-		}
-	}
-}
-
-func extractJSONStringField(jsonStr, field string) string {
-	var m map[string]any
-	if err := json.Unmarshal([]byte(jsonStr), &m); err != nil {
-		return jsonStr
-	}
-	if val, ok := m[field].(string); ok {
-		return val
-	}
-	return jsonStr
-}
-
-func computeStateDiff(old, updated composerState) composerDiffData {
-	var changes []string
-
-	if old.Description != updated.Description {
-		changes = append(changes, "Description changed")
-	}
-	if old.Interactive != updated.Interactive {
-		changes = append(changes, "Interactive mode changed")
-	}
-	if old.CompletionGate != updated.CompletionGate {
-		changes = append(changes, "Completion gate changed")
-	}
-	if old.Flow != updated.Flow {
-		changes = append(changes, "Workflow flow changed")
-	}
-	if old.Tasks != updated.Tasks {
-		changes = append(changes, "Tasks changed")
-	}
-
-	oldAgentSet := make(map[string]bool)
-	updatedAgentSet := make(map[string]bool)
-	for _, a := range old.Agents {
-		if a.Selected {
-			oldAgentSet[a.Name] = true
-		}
-	}
-	for _, a := range updated.Agents {
-		if a.Selected {
-			updatedAgentSet[a.Name] = true
-		}
-	}
-
-	for name := range updatedAgentSet {
-		if !oldAgentSet[name] {
-			changes = append(changes, "Added agent: "+name)
-		}
-	}
-	for name := range oldAgentSet {
-		if !updatedAgentSet[name] {
-			changes = append(changes, "Removed agent: "+name)
-		}
-	}
-
-	return composerDiffData{
-		HasChanges: len(changes) > 0,
-		OldPreview: buildGOALContent(old),
-		NewPreview: buildGOALContent(updated),
-		Changes:    changes,
-	}
-}
-
-func (s *Server) renderPanelAndPreview(w http.ResponseWriter, workspacePath, panel string, state composerState) {
-	preview := generateGOALPreview(state)
-
-	var flowErr string
-	if state.Flow != "" {
-		if _, errParse := parseFlow(state.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("Hx-Trigger", "assistSuccess")
-
-	data := struct {
-		State     composerState
-		Preview   template.HTML
-		FlowError string
-		Panel     string
-	}{
-		State:     state,
-		Preview:   template.HTML(preview),
-		FlowError: flowErr,
-		Panel:     panel,
-	}
-	executeTemplate(w, templates.Lookup("compose_assist_result.html"), data)
-}
-
 func (s *Server) routeCompose(w http.ResponseWriter, r *http.Request) {
 	workspaceParam := r.URL.Query().Get("workspace")
 	if workspaceParam == "" {
@@ -863,28 +435,36 @@ func (s *Server) routeCompose(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case path == "" || path == "/":
-		s.handleCompose(w, r, workspacePath)
-	case strings.HasPrefix(path, "update/"):
-		panel := strings.TrimPrefix(path, "update/")
-		s.handleComposeUpdatePanel(w, r, workspacePath, panel)
+		s.handleComposeLanding(w, r, workspacePath)
+	case strings.HasPrefix(path, "template/"):
+		templateID := strings.TrimPrefix(path, "template/")
+		s.handleComposeTemplate(w, r, workspacePath, templateID)
+	case strings.HasPrefix(path, "wizard/step/"):
+		stepStr := strings.TrimPrefix(path, "wizard/step/")
+		step := parseWizardStep(stepStr)
+		if r.Method == http.MethodPost {
+			s.handleComposeWizardUpdate(w, r, workspacePath, step)
+		} else {
+			s.handleComposeWizardStep(w, r, workspacePath, step)
+		}
+	case path == "wizard/finish":
+		s.handleComposeWizardFinish(w, r, workspacePath)
+	case path == "templates":
+		s.handleComposeTemplatesJSON(w, r, workspacePath)
 	case path == "preview":
 		s.handleComposePreview(w, r, workspacePath)
 	case path == "save":
 		s.handleComposeSave(w, r, workspacePath)
 	case path == "reset":
 		s.handleComposeReset(w, r, workspacePath)
-	case strings.HasPrefix(path, "assist/"):
-		panel := strings.TrimPrefix(path, "assist/")
-		s.handleComposeAssist(w, r, workspacePath, panel)
-	case path == "command":
-		s.handleComposeCommand(w, r, workspacePath)
-	case path == "apply":
-		s.handleComposeApply(w, r, workspacePath)
-	case path == "agents":
-		s.handleComposeAgents(w, r, workspacePath)
-	case path == "models":
-		s.handleComposeModels(w, r, workspacePath)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func parseWizardStep(s string) int {
+	if len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
+		return int(s[0] - '0')
+	}
+	return 1
 }

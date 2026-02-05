@@ -258,6 +258,33 @@ func TestValidateDirectory(t *testing.T) {
 	}
 }
 
+func TestHandleNewWorkspacePostRedirectsToCompose(t *testing.T) {
+	composerSessionsMu.Lock()
+	composerSessions = make(map[string]*composerSession)
+	composerSessionsMu.Unlock()
+
+	rootDir := t.TempDir()
+	srv := NewServer(rootDir)
+
+	form := url.Values{}
+	form.Set("name", "new-workspace")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/new", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp := httptest.NewRecorder()
+
+	srv.handleNewWorkspacePost(resp, req)
+
+	result := resp.Result()
+	if result.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status = %d; want %d", result.StatusCode, http.StatusSeeOther)
+	}
+
+	location := result.Header.Get("Location")
+	if location != "/compose?workspace=new-workspace" {
+		t.Fatalf("location = %q; want %q", location, "/compose?workspace=new-workspace")
+	}
+}
+
 // TestValidateDirectoryTraversalVariants tests various path traversal attack vectors.
 func TestValidateDirectoryTraversalVariants(t *testing.T) {
 	rootDir := t.TempDir()
