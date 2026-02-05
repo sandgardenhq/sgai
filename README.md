@@ -20,6 +20,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 | [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
 | [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
 | [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
+| [gh](https://cli.github.com/) (GitHub CLI)   | Creates draft PRs from fork merge flow                                    | Optional — merge works without PR creation |
 
 ### Environment Variables
 

@@ -537,6 +537,9 @@ func cmdServe(args []string) {
 	mux.HandleFunc("/trees/refresh", srv.pageTreesRefresh)
 	mux.HandleFunc("GET /workspaces/new", srv.handleNewWorkspaceGet)
 	mux.HandleFunc("POST /workspaces/new", srv.handleNewWorkspacePost)
+	mux.HandleFunc("GET /workspaces/{name}/fork/new", srv.handleNewForkGet)
+	mux.HandleFunc("POST /workspaces/{name}/fork/new", srv.handleNewForkPost)
+	mux.HandleFunc("POST /workspaces/{name}/merge", srv.handleForkMerge)
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
 	mux.HandleFunc("/compose", srv.routeCompose)
 	mux.HandleFunc("/compose/", srv.routeCompose)
@@ -1690,6 +1693,31 @@ func runJJLogForFork(dir string) []jjCommit {
 	return parseJJLogOutput(string(output))
 }
 
+func countForkCommitsAhead(rootDir, forkDir string) int {
+	bookmark := "main"
+	for _, candidate := range []string{"main", "trunk"} {
+		cmd := exec.Command("jj", "log", "-r", candidate, "--no-graph", "-T", "change_id")
+		cmd.Dir = rootDir
+		if err := cmd.Run(); err == nil {
+			bookmark = candidate
+			break
+		}
+	}
+
+	revset := fmt.Sprintf("ancestors(@, 2) ~ ancestors(%s@, 2)", bookmark)
+	cmd := exec.Command("jj", "log", "-r", revset, "--no-graph", "-T", "change_id ++ \"\\n\"")
+	cmd.Dir = forkDir
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed == "" {
+		return 0
+	}
+	return len(strings.Split(trimmed, "\n"))
+}
+
 func parseJJLogOutput(output string) []jjCommit {
 	var commits []jjCommit
 	lines := linesWithTrailingEmpty(output)
@@ -2308,6 +2336,8 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "progress":
 		s.handleWorkspaceTab(w, r, workspacePath, "progress")
+	case "forks":
+		s.handleWorkspaceTab(w, r, workspacePath, "forks")
 	case "spec":
 		http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
 		return
@@ -2467,6 +2497,10 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		return s.renderNoWorkspacePlaceholder(dir)
 	}
 
+	if isRootWorkspace(dir) {
+		return s.renderRootWorkspaceContent(dir, sessionParam, r, "")
+	}
+
 	wfState, _ := state.Load(statePath(dir))
 	statusText := buildTreesStatusText(wfState, dir)
 
@@ -2484,6 +2518,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 
 	needsInput := wfState.NeedsHumanInput()
 	isFork := hasJJDirectory(dir) && !isRootWorkspace(dir)
+	isRoot := isRootWorkspace(dir)
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress))
@@ -2532,6 +2567,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		CurrentModel         string
 		ModelStatuses        map[string]string
 		HasEditedGoal        bool
+		IsRoot               bool
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -2556,6 +2592,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
 		HasEditedGoal:        hasEditedGoal,
+		IsRoot:               isRoot,
 	}
 
 	var buf bytes.Buffer
@@ -2563,6 +2600,106 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		log.Printf("Error rendering workspace template: %v", err)
 		return workspaceContentResult{
 			Content: template.HTML(fmt.Sprintf("<p>Error rendering workspace: %s</p>", err.Error())),
+		}
+	}
+	return workspaceContentResult{
+		Content: template.HTML(buf.String()),
+	}
+}
+
+func (s *Server) renderRootWorkspaceContent(dir, sessionParam string, r *http.Request, errMsg string) workspaceContentResult {
+	type rootForkView struct {
+		Directory   string
+		DirName     string
+		Running     bool
+		CommitAhead int
+		Commits     []jjCommit
+	}
+
+	groups, err := s.scanWorkspaceGroups()
+	if err != nil {
+		return workspaceContentResult{
+			Content: template.HTML("<p>error rendering workspace</p>"),
+		}
+	}
+
+	var forks []rootForkView
+	for _, grp := range groups {
+		if grp.Root.Directory != dir {
+			continue
+		}
+		for _, fork := range grp.Forks {
+			forks = append(forks, rootForkView{
+				Directory:   fork.Directory,
+				DirName:     fork.DirName,
+				Running:     fork.Running,
+				CommitAhead: countForkCommitsAhead(dir, fork.Directory),
+				Commits:     runJJLogForFork(fork.Directory),
+			})
+		}
+		break
+	}
+
+	editorAvailable := s.editorAvailable && isLocalRequest(r)
+	rootName := filepath.Base(dir)
+
+	var tabBuf bytes.Buffer
+	tabData := struct {
+		RootDirName      string
+		Forks            []rootForkView
+		EditorAvailable  bool
+		IsTerminalEditor bool
+		EditorName       string
+	}{
+		RootDirName:      rootName,
+		Forks:            forks,
+		EditorAvailable:  editorAvailable,
+		IsTerminalEditor: s.isTerminalEditor,
+		EditorName:       s.editorName,
+	}
+	if err := templates.Lookup("trees_forks_content.html").Execute(&tabBuf, tabData); err != nil {
+		return workspaceContentResult{
+			Content: template.HTML("<p>error rendering content</p>"),
+		}
+	}
+
+	hasEditedGoal := false
+	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
+		body := extractBody(data)
+		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
+	}
+
+	workspaceData := struct {
+		Directory        string
+		DirName          string
+		TabContent       template.HTML
+		ErrorMessage     string
+		HasEditedGoal    bool
+		CodeAvailable    bool
+		EditorAvailable  bool
+		IsTerminalEditor bool
+		EditorName       string
+		IsRoot           bool
+		Session          string
+	}{
+		Directory:        dir,
+		DirName:          rootName,
+		TabContent:       template.HTML(tabBuf.String()),
+		ErrorMessage:     errMsg,
+		HasEditedGoal:    hasEditedGoal,
+		CodeAvailable:    editorAvailable,
+		EditorAvailable:  editorAvailable,
+		IsTerminalEditor: s.isTerminalEditor,
+		EditorName:       s.editorName,
+		IsRoot:           true,
+		Session:          sessionParam,
+	}
+
+	var buf bytes.Buffer
+	if err := templates.Lookup("trees_root_workspace.html").Execute(&buf, workspaceData); err != nil {
+		log.Println("error rendering root workspace template:", err)
+		return workspaceContentResult{
+			Content: template.HTML("<p>error rendering workspace</p>"),
 		}
 	}
 	return workspaceContentResult{
@@ -2753,14 +2890,125 @@ func validateWorkspaceName(name string) string {
 	}
 	for _, ch := range name {
 		isValid := (ch >= 'a' && ch <= 'z') ||
-			(ch >= 'A' && ch <= 'Z') ||
 			(ch >= '0' && ch <= '9') ||
-			ch == '-' || ch == '_'
+			ch == '-'
 		if !isValid {
-			return "workspace name can only contain letters, numbers, dashes, and underscores"
+			return "workspace name can only contain lowercase letters, numbers, and dashes"
 		}
 	}
 	return ""
+}
+
+func normalizeForkName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	normalized := strings.ReplaceAll(trimmed, "_", " ")
+	parts := strings.Fields(normalized)
+	joined := strings.Join(parts, "-")
+	return strings.ToLower(joined)
+}
+
+func (s *Server) handleNewForkGet(w http.ResponseWriter, r *http.Request) {
+	workspaceName := r.PathValue("name")
+	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
+	if workspacePath == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isRootWorkspace(workspacePath) {
+		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+		return
+	}
+
+	data := struct {
+		RootDir      string
+		DirName      string
+		Directory    string
+		ErrorMessage string
+	}{
+		RootDir:   s.rootDir,
+		DirName:   filepath.Base(workspacePath),
+		Directory: workspacePath,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	executeTemplate(w, templates.Lookup("new_fork.html"), data)
+}
+
+func (s *Server) handleNewForkPost(w http.ResponseWriter, r *http.Request) {
+	workspaceName := r.PathValue("name")
+	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
+	if workspacePath == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isRootWorkspace(workspacePath) {
+		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		s.renderNewForkWithError(w, workspacePath, "failed to parse form")
+		return
+	}
+
+	rawName := r.FormValue("name")
+	name := normalizeForkName(rawName)
+	if errMsg := validateWorkspaceName(name); errMsg != "" {
+		s.renderNewForkWithError(w, workspacePath, errMsg)
+		return
+	}
+
+	parentDir := filepath.Dir(workspacePath)
+	forkPath := filepath.Join(parentDir, name)
+	if _, errStat := os.Stat(forkPath); errStat == nil {
+		s.renderNewForkWithError(w, workspacePath, "a directory with this name already exists")
+		return
+	} else if !os.IsNotExist(errStat) {
+		s.renderNewForkWithError(w, workspacePath, "failed to check workspace path")
+		return
+	}
+
+	cmd := exec.Command("jj", "workspace", "add", forkPath)
+	cmd.Dir = workspacePath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		s.renderNewForkWithError(w, workspacePath, fmt.Sprintf("failed to fork workspace: %v: %s", err, output))
+		return
+	}
+
+	if err := unpackSkeleton(forkPath); err != nil {
+		s.renderNewForkWithError(w, workspacePath, "failed to unpack skeleton")
+		return
+	}
+	if err := addGitExclude(forkPath); err != nil {
+		s.renderNewForkWithError(w, workspacePath, "failed to add git exclude")
+		return
+	}
+	if err := writeGoalExample(forkPath); err != nil {
+		s.renderNewForkWithError(w, workspacePath, "failed to create GOAL.md")
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(forkPath, "spec"), http.StatusSeeOther)
+}
+
+func (s *Server) renderNewForkWithError(w http.ResponseWriter, workspacePath, errMsg string) {
+	data := struct {
+		RootDir      string
+		DirName      string
+		Directory    string
+		ErrorMessage string
+	}{
+		RootDir:      s.rootDir,
+		DirName:      filepath.Base(workspacePath),
+		Directory:    workspacePath,
+		ErrorMessage: errMsg,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	executeTemplate(w, templates.Lookup("new_fork.html"), data)
 }
 
 func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Request) tabContentResult {
@@ -3108,6 +3356,10 @@ func (s *Server) handleWorkspaceStart(w http.ResponseWriter, r *http.Request, wo
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
+	if isRootWorkspace(workspacePath) {
+		http.Error(w, "root workspace cannot start agentic work", http.StatusBadRequest)
+		return
+	}
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
@@ -3382,6 +3634,311 @@ func (s *Server) handleWorkspaceFork(w http.ResponseWriter, r *http.Request, wor
 	}
 
 	http.Redirect(w, r, workspaceURL(targetPath, "spec"), http.StatusSeeOther)
+}
+
+func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "post required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	workspaceName := r.PathValue("name")
+	rootDir := s.resolveWorkspaceNameToPath(workspaceName)
+	if rootDir == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isRootWorkspace(rootDir) {
+		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+		return
+	}
+
+	sessionParam := r.URL.Query().Get("session")
+	renderError := func(errMsg string) {
+		groups, err := s.scanWorkspaceGroups()
+		if err != nil {
+			http.Error(w, "failed to scan workspaces", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "selected_workspace",
+			Value:    rootDir,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		workspaceResult := s.renderRootWorkspaceContent(rootDir, sessionParam, r, errMsg)
+		data := buildWorkspacePageData(groups, rootDir, "forks", sessionParam, workspaceResult.Content)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		executeTemplate(w, templates.Lookup("trees.html"), data)
+	}
+
+	if err := r.ParseForm(); err != nil {
+		renderError("failed to parse form")
+		return
+	}
+
+	forkDirParam := r.FormValue("fork_dir")
+	forkDir, err := s.validateDirectory(forkDirParam)
+	if err != nil {
+		renderError("invalid fork directory")
+		return
+	}
+	if !isForkWorkspace(forkDir) {
+		renderError("fork workspace not found")
+		return
+	}
+	if getRootWorkspacePath(forkDir) != rootDir {
+		renderError("fork does not belong to root")
+		return
+	}
+
+	confirmValue := r.FormValue("confirm_delete")
+	if confirmValue == "" {
+		confirmValue = r.FormValue("confirm")
+	}
+	if confirmValue != "true" {
+		renderError("confirmation required to merge and delete fork")
+		return
+	}
+
+	diffCmd := exec.Command("jj", "diff", "--stat")
+	diffCmd.Dir = forkDir
+	diffOutput, errDiff := diffCmd.CombinedOutput()
+	if errDiff != nil {
+		renderError("failed to collect diff summary")
+		return
+	}
+	if strings.TrimSpace(string(diffOutput)) != "" {
+		renderError("fork has uncommitted changes")
+		return
+	}
+
+	logCmd := exec.Command("jj", "log", "-r", "::@", "--no-graph")
+	logCmd.Dir = forkDir
+	logOutput, errLog := logCmd.CombinedOutput()
+	if errLog != nil {
+		renderError("failed to collect commit history")
+		return
+	}
+
+	goalContent := ""
+	if data, errRead := os.ReadFile(filepath.Join(forkDir, "GOAL.md")); errRead == nil {
+		goalContent = string(data)
+	}
+
+	opencodeAvailable := false
+	if _, errLookup := exec.LookPath("opencode"); errLookup == nil {
+		opencodeAvailable = true
+	}
+
+	forkName := filepath.Base(forkDir)
+	branchName := normalizeForkName(forkName)
+	if branchName == "" {
+		branchName = "fork-merge"
+	}
+	if opencodeAvailable {
+		prompt := strings.Join([]string{
+			"Return a short branch name based on the fork work.",
+			"Use only letters, numbers, dashes, and underscores.",
+			"Fork name: " + forkName,
+			"Commit history:\n" + string(logOutput),
+			"Diff summary:\n" + string(diffOutput),
+			"GOAL:\n" + goalContent,
+		}, "\n")
+		if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
+			normalized := normalizeForkName(result)
+			if validateWorkspaceName(normalized) == "" && normalized != "" {
+				branchName = normalized
+			}
+		}
+	}
+
+	baseBookmark := "main"
+	for _, candidate := range []string{"main", "trunk"} {
+		baseCmd := exec.Command("jj", "log", "-r", candidate, "--no-graph", "-T", "change_id")
+		baseCmd.Dir = rootDir
+		if errBase := baseCmd.Run(); errBase == nil {
+			baseBookmark = candidate
+			break
+		}
+	}
+
+	forkRevset := fmt.Sprintf("ancestors(@) ~ ancestors(%s@)", baseBookmark)
+	rebaseCmd := exec.Command("jj", "rebase", "-s", forkRevset, "-d", baseBookmark)
+	rebaseCmd.Dir = forkDir
+	rebaseOutput, errRebase := rebaseCmd.CombinedOutput()
+	if errRebase != nil {
+		if !strings.Contains(strings.ToLower(string(rebaseOutput)), "conflict") {
+			renderError("failed to rebase fork")
+			return
+		}
+		if !opencodeAvailable {
+			renderError("cannot resolve conflicts without opencode")
+			return
+		}
+		listCmd := exec.Command("jj", "resolve", "--list")
+		listCmd.Dir = forkDir
+		listOutput, errList := listCmd.CombinedOutput()
+		if errList != nil {
+			renderError("failed to list conflicts")
+			return
+		}
+		conflictFiles := strings.Fields(string(listOutput))
+		if len(conflictFiles) == 0 {
+			renderError("failed to detect conflicts")
+			return
+		}
+		for _, file := range conflictFiles {
+			targetPath := file
+			if !filepath.IsAbs(targetPath) {
+				targetPath = filepath.Join(forkDir, targetPath)
+			}
+			content, errRead := os.ReadFile(targetPath)
+			if errRead != nil {
+				renderError("failed to read conflict file")
+				return
+			}
+			prompt := strings.Join([]string{
+				"Resolve the merge conflicts in the following file.",
+				"Return only the resolved file content.",
+				"File: " + file,
+				"Content:\n" + string(content),
+			}, "\n")
+			resolved, errResolve := invokeLLMForAssist(prompt)
+			if errResolve != nil || strings.TrimSpace(resolved) == "" {
+				renderError("failed to resolve conflicts")
+				return
+			}
+			if errWrite := os.WriteFile(targetPath, []byte(resolved), 0644); errWrite != nil {
+				renderError("failed to write resolved file")
+				return
+			}
+		}
+		resolveCmd := exec.Command("jj", "resolve", "--accept=working")
+		resolveCmd.Dir = forkDir
+		if _, errResolve := resolveCmd.CombinedOutput(); errResolve != nil {
+			renderError("failed to record conflict resolution")
+			return
+		}
+	}
+
+	squashFrom := fmt.Sprintf("(%s) ~ @", forkRevset)
+	squashCandidatesCmd := exec.Command("jj", "log", "-r", squashFrom, "--no-graph", "-T", "change_id ++ \"\\n\"")
+	squashCandidatesCmd.Dir = forkDir
+	squashCandidatesOutput, errCandidates := squashCandidatesCmd.CombinedOutput()
+	if errCandidates != nil {
+		renderError("failed to identify squash candidates")
+		return
+	}
+	if strings.TrimSpace(string(squashCandidatesOutput)) != "" {
+		squashCmd := exec.Command("jj", "squash", "--from", squashFrom, "--into", "@")
+		squashCmd.Dir = forkDir
+		if _, errSquash := squashCmd.CombinedOutput(); errSquash != nil {
+			renderError("failed to squash fork changes")
+			return
+		}
+	}
+
+	commitMessage := ""
+	defaultDescCmd := exec.Command("jj", "log", "-r", "::@", "--no-graph", "-T", "description.first_line() ++ \"\\n\"")
+	defaultDescCmd.Dir = forkDir
+	defaultDescOutput, errDefaultDesc := defaultDescCmd.CombinedOutput()
+	if errDefaultDesc == nil {
+		var parts []string
+		for _, line := range strings.Split(string(defaultDescOutput), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed != "" {
+				parts = append(parts, trimmed)
+			}
+		}
+		if len(parts) > 0 {
+			commitMessage = strings.Join(parts, "; ")
+		}
+	}
+	if commitMessage == "" {
+		commitMessage = "merge fork work"
+	}
+	if opencodeAvailable {
+		prompt := strings.Join([]string{
+			"Write a concise commit message summarizing the fork work.",
+			"Commit history:\n" + string(logOutput),
+			"Diff summary:\n" + string(diffOutput),
+			"GOAL:\n" + goalContent,
+		}, "\n")
+		if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil && strings.TrimSpace(result) != "" {
+			commitMessage = strings.TrimSpace(result)
+		}
+	}
+
+	descCmd := exec.Command("jj", "desc", "-m", commitMessage)
+	descCmd.Dir = forkDir
+	if _, errDesc := descCmd.CombinedOutput(); errDesc != nil {
+		renderError("failed to update commit message")
+		return
+	}
+
+	bookmarkCmd := exec.Command("jj", "bookmark", "create", branchName, "-r", "@")
+	bookmarkCmd.Dir = forkDir
+	if _, errBookmark := bookmarkCmd.CombinedOutput(); errBookmark != nil {
+		renderError("failed to create bookmark")
+		return
+	}
+
+	pushCmd := exec.Command("jj", "git", "push", "--bookmark", branchName)
+	pushCmd.Dir = forkDir
+	if _, errPush := pushCmd.CombinedOutput(); errPush != nil {
+		renderError("failed to push bookmark")
+		return
+	}
+
+	if _, errGH := exec.LookPath("gh"); errGH == nil {
+		prTitle := commitMessage
+		prBody := ""
+		if opencodeAvailable {
+			prompt := strings.Join([]string{
+				"Write a GitHub pull request title and body.",
+				"Return the title on a line starting with TITLE: and the body after BODY:.",
+				"Commit history:\n" + string(logOutput),
+				"Diff summary:\n" + string(diffOutput),
+				"GOAL:\n" + goalContent,
+			}, "\n")
+			if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
+				lines := strings.Split(result, "\n")
+				for i, line := range lines {
+					if strings.HasPrefix(line, "TITLE:") {
+						prTitle = strings.TrimSpace(strings.TrimPrefix(line, "TITLE:"))
+					}
+					if strings.HasPrefix(line, "BODY:") {
+						prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
+						break
+					}
+				}
+			}
+		}
+		if prTitle == "" {
+			prTitle = commitMessage
+		}
+		prCmd := exec.Command("gh", "pr", "create", "--draft", "--head", branchName, "--title", prTitle, "--body", prBody)
+		prCmd.Dir = forkDir
+		if _, errPR := prCmd.CombinedOutput(); errPR != nil {
+			renderError("failed to create pull request")
+			return
+		}
+	}
+
+	forgetCmd := exec.Command("jj", "workspace", "forget", filepath.Base(forkDir))
+	forgetCmd.Dir = rootDir
+	if _, errForget := forgetCmd.CombinedOutput(); errForget != nil {
+		renderError("failed to forget fork workspace")
+		return
+	}
+	if errRemove := os.RemoveAll(forkDir); errRemove != nil {
+		renderError("failed to remove fork directory")
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(rootDir, "progress"), http.StatusSeeOther)
 }
 
 func (s *Server) handleWorkspaceUpdateDescription(w http.ResponseWriter, r *http.Request, workspacePath string) {
