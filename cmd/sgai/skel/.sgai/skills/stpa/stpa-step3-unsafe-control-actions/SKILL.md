@@ -1,9 +1,8 @@
 ---
-name: stpa/step3-unsafe-control-actions
-description: STPA Step 3 - Identify Unsafe Control Actions (UCAs) using the 4-type analysis framework.
-when_to_use: After completing STPA Step 2. When analyzing control actions for potential safety issues. When you need to systematically identify what could go wrong with each control action.
-version: 1.0.0
-tags: stpa, safety, uca, unsafe-control-actions
+name: stpa-step3-unsafe-control-actions
+description: STPA Step 3 - Identify Unsafe Control Actions (UCAs) using the 4-type analysis framework. After completing STPA Step 2. When analyzing control actions for potential safety issues. When you need to systematically identify what could go wrong with each control action.
+metadata:
+  tags: stpa, safety, uca, unsafe-control-actions
 ---
 
 # STPA Step 3: Identify Unsafe Control Actions

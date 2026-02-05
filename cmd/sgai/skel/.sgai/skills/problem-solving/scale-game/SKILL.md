@@ -1,8 +1,6 @@
 ---
-name: Scale Game
-description: Test at extremes (1000x bigger/smaller, instant/year-long) to expose fundamental truths hidden at normal scales
-when_to_use: Unsure if approach will scale. Edge cases unclear. Want to validate architecture. "Will this work at production scale?" Need to find fundamental limits.
-version: 1.0.0
+name: scale-game
+description: Test at extremes (1000x bigger/smaller, instant/year-long) to expose fundamental truths hidden at normal scales. Unsure if approach will scale. Edge cases unclear. Want to validate architecture. "Will this work at production scale?" Need to find fundamental limits.
 ---
 
 # Scale Game

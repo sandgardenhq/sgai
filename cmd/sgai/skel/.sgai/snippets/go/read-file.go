@@ -1,7 +1,6 @@
 ---
 name: Read File
-description: Read the contents of a file into a string
-when_to_use: When you need to read an entire file in Go
+description: Read the contents of a file into a string; When you need to read an entire file in Go
 ---
 
 /* Read the entire contents of a file into a string */

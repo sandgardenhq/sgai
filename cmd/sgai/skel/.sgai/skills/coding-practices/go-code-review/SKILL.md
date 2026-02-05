@@ -1,9 +1,8 @@
 ---
 name: go-code-review
-description: Go code review checklist based on official Go style guides
-when_to_use: When reviewing Go code for style, idioms, and best practices
-version: 1.0.0
-languages: go
+description: Go code review checklist based on official Go style guides. When reviewing Go code for style, idioms, and best practices
+metadata:
+    languages: go
 ---
 
 # Go Code Review
@@ -347,7 +346,7 @@ func (s *Service) IsExpired() bool {
 
 **References:**
 - https://pkg.go.dev/slices
-- https://pkg.go.dev/maps  
+- https://pkg.go.dev/maps
 - https://pkg.go.dev/iter
 - https://go.dev/doc/tutorial/generics
 - https://go.dev/blog/testing-time

@@ -1,12 +1,11 @@
 ---
 name: Testing Time-Dependent Code
-description: Patterns for testing time-dependent code with dependency injection
-when_to_use: When writing tests for code that uses time.Now() or time-based logic
+description: Patterns for testing time-dependent code with dependency injection; When writing tests for code that uses time.Now() or time-based logic
 ---
 
 /* Demonstrates patterns for testing time-dependent code.
  * Based on: https://go.dev/blog/testing-time
- * 
+ *
  * Key principle: Inject time dependencies instead of calling time.Now() directly.
  */
 package main

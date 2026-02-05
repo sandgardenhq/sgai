@@ -1,8 +1,6 @@
 ---
 name: antifragility-framework
-description: Black Swan Analysis provides a rigorous methodology for identifying high-impact, unpredictable events while building systems that thrive under volatility.
-when_to_use: You must use this framework when the human partner challenges you on your claims, or when the human partner asks you to create plans from vague instructions
-version: 2.1.0
+description: Black Swan Analysis provides a rigorous methodology for identifying high-impact, unpredictable events while building systems that thrive under volatility. You must use this framework when the human partner challenges you on your claims, or when the human partner asks you to create plans from vague instructions
 ---
 
 <System>

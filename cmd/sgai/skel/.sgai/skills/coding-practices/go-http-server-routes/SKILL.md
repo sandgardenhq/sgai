@@ -1,9 +1,8 @@
 ---
 name: go-http-server-routes
-description: Go 1.22+ enhanced HTTP routing with method matching and wildcards
-when_to_use: When defining HTTP routes using net/http ServeMux in Go 1.22+
-version: 1.0.0
-languages: go
+description: Go 1.22+ enhanced HTTP routing with method matching and wildcards. When defining HTTP routes using net/http ServeMux in Go 1.22+
+metadata:
+    languages: go
 ---
 
 # Go HTTP Server Routes (Go 1.22+)

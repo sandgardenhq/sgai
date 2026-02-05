@@ -1,8 +1,6 @@
 ---
-name: Brainstorming Ideas Into Designs
-description: Interactive idea refinement using Socratic method to develop fully-formed designs
-when_to_use: When your human partner says "I've got an idea", "Let's make/build/create", "I want to implement/add", "What if we". When starting design for complex feature. Before writing implementation plans. When idea needs refinement and exploration. ACTIVATE THIS AUTOMATICALLY when your human partner describes a feature or project idea - don't wait for /brainstorm command.
-version: 2.1.0
+name: brainstorming
+description: Interactive idea refinement using Socratic method to develop fully-formed designs. When your human partner says "I've got an idea", "Let's make/build/create", "I want to implement/add", "What if we". When starting design for complex feature. Before writing implementation plans. When idea needs refinement and exploration. ACTIVATE THIS AUTOMATICALLY when your human partner describes a feature or project idea - don't wait for /brainstorm command.
 ---
 
 # Brainstorming Ideas Into Designs

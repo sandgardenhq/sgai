@@ -1,9 +1,6 @@
 ---
 name: project-completion-verification
-description: Automatically scans GOAL.md for unchecked items, provides completion status summary, and enables coordinator to mark items as complete
-when_to_use: When coordinator needs to verify project completion status or before marking work as complete. When coordinator needs to mark completed items in GOAL.md. Symptoms - manually going through GOAL.md line by line to check task completion, needing quick summary of pending vs completed tasks, verifying all requirements are met before finalizing work.
-version: 1.0.0
-languages: all
+description: Automatically scans GOAL.md for unchecked items, provides completion status summary, and enables coordinator to mark items as complete. When coordinator needs to verify project completion status or before marking work as complete. When coordinator needs to mark completed items in GOAL.md. Symptoms - manually going through GOAL.md line by line to check task completion, needing quick summary of pending vs completed tasks, verifying all requirements are met before finalizing work.
 ---
 
 # Project Completion Verification Automation

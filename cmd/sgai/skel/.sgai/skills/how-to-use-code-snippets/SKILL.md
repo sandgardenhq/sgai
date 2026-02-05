@@ -1,9 +1,6 @@
 ---
 name: how-to-use-code-snippets
-description: Use when you need to find code snippets by language and query
-when_to_use: When looking for code examples, patterns, or snippets in a specific programming language. When you need to search for code snippets quickly. When searching for code patterns or best practices.
-version: 1.0.0
-languages: all
+description: Use when you need to find code snippets by language and query. When looking for code examples, patterns, or snippets in a specific programming language. When you need to search for code snippets quickly. When searching for code patterns or best practices.
 ---
 
 # How to Use Code Snippets

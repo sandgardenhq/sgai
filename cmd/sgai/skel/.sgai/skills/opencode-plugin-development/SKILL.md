@@ -1,8 +1,6 @@
 ---
 name: opencode-plugin-development
-description: Guide for creating and implementing plugins to extend OpenCode functionality, including hooks, custom tools, and event handling
-when_to_use: When you need to add custom functionality to OpenCode, such as notifications, custom tools, or modifying behavior
-version: 1.0.0
+description: Guide for creating and implementing plugins to extend OpenCode functionality, including hooks, custom tools, and event handling. When you need to add custom functionality to OpenCode, such as notifications, custom tools, or modifying behavior.
 ---
 
 # OpenCode Plugin Development

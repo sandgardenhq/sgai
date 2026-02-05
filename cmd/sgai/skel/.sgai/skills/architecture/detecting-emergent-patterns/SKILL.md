@@ -1,8 +1,6 @@
 ---
-name: Detecting Emergent Patterns
-description: Find breakthrough insights by forcing unrelated concepts together, detecting meta-patterns across domains, and discovering simplification cascades
-when_to_use: When stuck on complex problems. When searching for innovative solutions. When same issue appears in different domains. When complexity feels excessive. When conventional approaches aren't working. When seeking radical simplification.
-version: 1.0.0
+name: detecting-emergent-patterns
+description: Find breakthrough insights by forcing unrelated concepts together, detecting meta-patterns across domains, and discovering simplification cascades. When stuck on complex problems. When searching for innovative solutions. When same issue appears in different domains. When complexity feels excessive. When conventional approaches aren't working. When seeking radical simplification.
 ---
 
 # Detecting Emergent Patterns

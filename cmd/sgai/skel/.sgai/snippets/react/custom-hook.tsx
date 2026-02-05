@@ -1,7 +1,6 @@
 ---
 name: Custom Hook
-description: Custom hook pattern with useLocalStorage example
-when_to_use: When creating reusable stateful logic as a custom React hook
+description: Custom hook pattern with useLocalStorage example; When creating reusable stateful logic as a custom React hook
 ---
 
 /* A custom React hook for persisting state in localStorage with type safety */

@@ -1,7 +1,6 @@
 ---
 name: Form with Validation
-description: Form with React Hook Form pattern including typed schema validation
-when_to_use: When building forms with client-side validation, error messages, and type-safe submissions
+description: Form with React Hook Form pattern including typed schema validation; When building forms with client-side validation, error messages, and type-safe submissions
 ---
 
 /* A form component using React Hook Form with typed validation and error display */

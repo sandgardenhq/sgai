@@ -1,8 +1,9 @@
 ---
 name: browser-bug-testing-workflow
 description: You must use this skill when debugging web UI bugs or testing interactive components that require multi-step browser interactions. Automates common UI testing patterns for debugging web applications - starting servers, navigating to pages, interacting with form elements, and verifying expected behaviors without manual step-by-step Playwright commands
-requires:
-  - run-long-running-processes-in-tmux
+metadata:
+  requires:
+    - run-long-running-processes-in-tmux
 ---
 
 # Browser Bug Testing Workflow

@@ -31,7 +31,7 @@ These skills were derived from agent patterns in the [Amplifier](https://github.
 The amplifier agents are specialized long-lived agents with structured JSON output. These skills extract the core problem-solving techniques and adapt them as:
 
 - Scannable quick-reference guides (~60 lines each)
-- Symptom-based discovery via when_to_use
+- Symptom-based discovery via descroption
 - Immediate application without special tooling
 - Composable through dispatch pattern
 

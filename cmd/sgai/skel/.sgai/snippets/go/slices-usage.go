@@ -1,7 +1,6 @@
 ---
 name: Slices Package Usage
-description: Modern Go slices package operations (Go 1.21+)
-when_to_use: When sorting, searching, or manipulating slices - prefer over manual loops and sort.Slice
+description: Modern Go slices package operations (Go 1.21+); When sorting, searching, or manipulating slices - prefer over manual loops and sort.Slice
 ---
 
 /* Demonstrates the slices package for common slice operations.

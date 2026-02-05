@@ -1,8 +1,6 @@
 ---
-name: When Stuck - Problem-Solving Dispatch
-description: Dispatch to the right problem-solving technique based on how you're stuck
-when_to_use: Stuck on a problem. Conventional approaches not working. Need to pick the right problem-solving technique. Not sure which skill applies.
-version: 1.0.0
+name: when-stuck
+description: Problem-Solving Dispatch; Dispatch to the right problem-solving technique based on how you're stuck; Stuck on a problem. Conventional approaches not working. Need to pick the right problem-solving technique. Not sure which skill applies.
 ---
 
 # When Stuck - Problem-Solving Dispatch

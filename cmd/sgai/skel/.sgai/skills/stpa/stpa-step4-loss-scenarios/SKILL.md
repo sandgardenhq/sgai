@@ -1,9 +1,8 @@
 ---
-name: stpa/step4-loss-scenarios
-description: STPA Step 4 - Identify Loss Scenarios by tracing causal pathways back through control loops to understand why UCAs might occur.
-when_to_use: After completing STPA Step 3. When you need to understand WHY unsafe control actions might happen. When developing recommendations and mitigations.
-version: 1.0.0
-tags: stpa, safety, loss-scenarios, causal-analysis, mitigations
+name: stpa-step4-loss-scenarios
+description: STPA Step 4 - Identify Loss Scenarios by tracing causal pathways back through control loops to understand why UCAs might occur. After completing STPA Step 3. When you need to understand WHY unsafe control actions might happen. When developing recommendations and mitigations.
+metadata:
+   tags: stpa, safety, loss-scenarios, causal-analysis, mitigations
 ---
 
 # STPA Step 4: Identify Loss Scenarios

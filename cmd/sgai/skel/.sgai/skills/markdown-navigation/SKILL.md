@@ -1,9 +1,8 @@
 ---
-name: Markdown Navigation
-description: Tool for navigating large markdown files, providing outline and section extraction
-when_to_use: When dealing with large markdown files, need to get outline of sections, extract specific section content. Symptoms - large markdown files, need to navigate structure without reading whole file, extract sections for focused reading, documentation navigation, changelog parsing.
-version: 1.0.0
-languages: all
+name: markdown-navigation
+description: Tool for navigating large markdown files, providing outline and section extraction. When dealing with large markdown files, need to get outline of sections, extract specific section content. Symptoms - large markdown files, need to navigate structure without reading whole file, extract sections for focused reading, documentation navigation, changelog parsing.
+metadata:
+  languages: all
 ---
 
 # Markdown Navigation

@@ -1,8 +1,6 @@
 ---
-name: Incorporate Snippets
-description: Guide for adding new code snippets to the library
-when_to_use: When you need to add a new code snippet to the sgai_find_snippets library, when creating files without proper metadata, when using incorrect filenames or extensions, when adding code without extensive comments
-version: 1.1.0
+name: incorporate-snippets
+description: Guide for adding new code snippets to the library; When you need to add a new code snippet to the sgai_find_snippets library, when creating files without proper metadata, when using incorrect filenames or extensions, when adding code without extensive comments
 ---
 
 # Incorporate Snippets
@@ -18,7 +16,7 @@ Use this skill when:
 - Creating snippet files without frontmatter metadata
 - Using filenames with spaces, special characters, or wrong extensions
 - Adding code without extensive explanatory comments
-- Missing required fields like language, description, or when_to_use
+- Missing required fields like language, description
 
 ## The Process
 
@@ -66,8 +64,7 @@ Snippets must follow this exact format:
 ```
 ---
 name: Snippet Name
-description: Single line description
-when_to_use: When to use this snippet
+description: Single line description; When to use this snippet
 ---
 
 /* Extensive comment explaining the code */

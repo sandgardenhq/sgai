@@ -1,9 +1,8 @@
 ---
 name: go-testing-coverage
-description: Go testing patterns, coverage analysis, and best practices
-when_to_use: When writing tests for Go code or analyzing test coverage
-version: 1.0.0
-languages: go
+description: Go testing patterns, coverage analysis, and best practices. When writing tests for Go code or analyzing test coverage
+metadata:
+    languages: go
 ---
 
 # Go Testing & Coverage

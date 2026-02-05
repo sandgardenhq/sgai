@@ -1,7 +1,6 @@
 ---
 name: Functional Component
-description: Typed React functional component with props interface
-when_to_use: When creating a new React component with TypeScript type safety
+description: Typed React functional component with props interface; When creating a new React component with TypeScript type safety
 ---
 
 /* A typed React functional component with proper props interface and default values */

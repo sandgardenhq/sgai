@@ -1,8 +1,6 @@
 ---
-name: Code Cleanup
-description: Clean up generated code by questioning why things are there and cross-referencing with GOAL.md, even when tempted to skip due to time pressure or thinking it's "good enough"
-when_to_use: After generating code, when tempted to commit messy code, or when noticing clutter that could be removed.
-version: 1.1.0
+name: code-cleanup
+description: Clean up generated code by questioning why things are there and cross-referencing with GOAL.md, even when tempted to skip due to time pressure or thinking it's "good enough". After generating code, when tempted to commit messy code, or when noticing clutter that could be removed.
 ---
 
 # Code Cleanup
