@@ -1,0 +1,17 @@
+<div class="sticky-header-container">
+	<header class="workspace-header-bar">
+		<h3 class="workspace-title" data-tooltip="{{.Directory}}">{{.DirName}}</h3>
+		<nav id="header-actions">{{template "trees_root_actions.html" .}}</nav>
+	</header>
+	{{if .ErrorMessage}}
+	<div class="error-message root-error-message">{{.ErrorMessage}}</div>
+	{{end}}
+	<nav class="tab-nav">
+		<ul>
+			<li><a href="/workspaces/{{.DirName}}/forks" class="active">Forks</a></li>
+		</ul>
+	</nav>
+</div>
+<div id="tab-content" class="tab-content">
+	{{.TabContent}}
+</div>

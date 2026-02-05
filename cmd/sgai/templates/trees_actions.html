@@ -1,5 +1,6 @@
 <div class="header-actions-container">
 	{{if not .Running}}
+	{{if not .IsRoot}}
 	<form action="/workspaces/{{.DirName}}/start" method="post">
 		<input type="hidden" name="directory" value="{{.Directory}}">
 		<input type="hidden" name="auto" value="true">
@@ -9,11 +10,9 @@
 		<input type="hidden" name="directory" value="{{.Directory}}">
 		<button type="submit" class="action-btn outline">Start</button>
 	</form>
+	{{end}}
 	{{if not .IsFork}}
-	<form action="/workspaces/{{.DirName}}/fork" method="post">
-		<input type="hidden" name="dir" value="{{.Directory}}">
-		<button type="submit" class="action-btn outline">Fork</button>
-	</form>
+	<a href="/workspaces/{{.DirName}}/fork/new" role="button" class="action-btn outline">Fork</a>
 	{{end}}
 	<a href="/compose?workspace={{.DirName}}" role="button" class="action-btn outline">Compose GOAL</a>
 	{{if .HasEditedGoal}}
@@ -35,6 +34,7 @@
 	{{end}}
 	{{end}}
 	{{if .Running}}
+	{{if not .IsRoot}}
 	<form action="/workspaces/{{.DirName}}/toggle-mode" method="post">
 		<input type="hidden" name="mode" value="auto">
 		<button type="submit" class="action-btn{{if not .InteractiveAuto}} outline{{end}}">Self-Drive</button>
@@ -47,6 +47,7 @@
 		<input type="hidden" name="directory" value="{{.Directory}}">
 		<button type="submit" class="action-btn outline">Stop</button>
 	</form>
+	{{end}}
 	{{end}}
 	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>
 	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>
