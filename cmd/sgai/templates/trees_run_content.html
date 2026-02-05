@@ -1,5 +1,4 @@
-<article id="adhoc-prompt-container">
-	<header>Run</header>
+<div id="adhoc-prompt-container">
 	<form hx-post="/workspaces/{{.DirName}}/adhoc/submit" hx-target="#adhoc-output" hx-swap="outerHTML">
 		<div class="grid">
 			<select name="model" id="adhoc-model" aria-label="Model" required{{if .AdhocRunning}} disabled{{end}} hx-post="/workspaces/{{.DirName}}/adhoc/save-state" hx-trigger="change" hx-swap="none" hx-include="[name='prompt']">
@@ -18,4 +17,4 @@
 			{{end}}
 		</div>
 	</form>
-</article>
+</div>
