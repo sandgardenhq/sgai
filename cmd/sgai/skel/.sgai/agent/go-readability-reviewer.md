@@ -22,7 +22,7 @@ permission:
 
 Before doing ANY Go work, you MUST call:
 ```
-skills({"name":"coding-practices/go"})
+sgai_find_skills({"name":"coding-practices/go"})
 ```
 This will list all Go coding practice skills. Load and follow relevant ones before proceeding.
 
