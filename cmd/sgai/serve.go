@@ -2383,7 +2383,13 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleAdhocOutput(w, r, workspacePath)
 	case "adhoc/save-state":
 		s.handleAdhocSaveState(w, r, workspacePath)
+	case "steer":
+		s.handleWorkspaceSteer(w, r, workspacePath)
 	default:
+		if after, ok := strings.CutPrefix(action, "messages/"); ok {
+			s.handleWorkspaceMessageAction(w, r, workspacePath, after)
+			return
+		}
 		if after, ok := strings.CutPrefix(action, "retro/"); ok {
 			s.routeWorkspaceRetro(w, r, workspacePath, after)
 			return
@@ -3192,6 +3198,111 @@ func (s *Server) handleWorkspaceResetState(w http.ResponseWriter, r *http.Reques
 	}
 
 	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) handleWorkspaceSteer(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	message := r.FormValue("message")
+	if message == "" {
+		http.Redirect(w, r, workspaceURL(workspacePath, "internals"), http.StatusSeeOther)
+		return
+	}
+
+	wfState, err := state.Load(statePath(workspacePath))
+	if err != nil {
+		http.Error(w, "Failed to load state", http.StatusInternalServerError)
+		return
+	}
+
+	oldestUnreadIdx := findOldestUnreadMessageIndex(wfState.Messages)
+
+	newMsg := state.Message{
+		ID:        generateNewMessageID(wfState.Messages),
+		FromAgent: "Human Partner",
+		ToAgent:   "coordinator",
+		Body:      "Re-steering instruction: " + message,
+		Read:      false,
+	}
+
+	wfState.Messages = insertMessageAt(wfState.Messages, oldestUnreadIdx, newMsg)
+
+	if err := state.Save(statePath(workspacePath), wfState); err != nil {
+		http.Error(w, "Failed to save state", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "internals"), http.StatusSeeOther)
+}
+
+func findOldestUnreadMessageIndex(messages []state.Message) int {
+	for i, msg := range messages {
+		if !msg.Read {
+			return i
+		}
+	}
+	return 0
+}
+
+func generateNewMessageID(messages []state.Message) int {
+	maxID := 0
+	for _, msg := range messages {
+		if msg.ID > maxID {
+			maxID = msg.ID
+		}
+	}
+	return maxID + 1
+}
+
+func insertMessageAt(messages []state.Message, index int, newMsg state.Message) []state.Message {
+	if index >= len(messages) {
+		return append(messages, newMsg)
+	}
+	messages = append(messages[:index+1], messages[index:]...)
+	messages[index] = newMsg
+	return messages
+}
+
+func (s *Server) handleWorkspaceMessageAction(w http.ResponseWriter, r *http.Request, workspacePath, messageIDStr string) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "DELETE required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	messageID, err := strconv.Atoi(messageIDStr)
+	if err != nil {
+		http.Error(w, "Invalid message ID", http.StatusBadRequest)
+		return
+	}
+
+	wfState, err := state.Load(statePath(workspacePath))
+	if err != nil {
+		http.Error(w, "Failed to load state", http.StatusInternalServerError)
+		return
+	}
+
+	wfState.Messages = removeMessageByID(wfState.Messages, messageID)
+
+	if err := state.Save(statePath(workspacePath), wfState); err != nil {
+		http.Error(w, "Failed to save state", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "messages"), http.StatusSeeOther)
+}
+
+func removeMessageByID(messages []state.Message, id int) []state.Message {
+	return slices.DeleteFunc(messages, func(msg state.Message) bool {
+		return msg.ID == id
+	})
 }
 
 // handleWorkspaceOpenVSCode opens the configured editor for a workspace or specific file.
