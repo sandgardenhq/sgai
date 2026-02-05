@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -23,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/adrg/xdg"
 	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/yuin/goldmark"
 	emoji "github.com/yuin/goldmark-emoji"
@@ -753,6 +755,7 @@ type sessionData struct {
 	ProjectMgmtContent   template.HTML
 	HasProjectMgmt       bool
 	HasEditedGoal        bool
+	HasGoalFile          bool
 	CodeAvailable        bool
 	EditorAvailable      bool
 	IsTerminalEditor     bool
@@ -766,7 +769,9 @@ type sessionData struct {
 func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.Request) sessionData {
 	goalContent := ""
 	hasEditedGoal := false
+	hasGoalFile := false
 	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
+		hasGoalFile = true
 		stripped := stripFrontmatter(string(data))
 		if rendered, errRender := renderMarkdown([]byte(stripped)); errRender == nil {
 			goalContent = rendered
@@ -864,6 +869,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 		ProjectMgmtContent:   template.HTML(pmContent),
 		HasProjectMgmt:       projectMgmtExists,
 		HasEditedGoal:        hasEditedGoal,
+		HasGoalFile:          hasGoalFile,
 		CodeAvailable:        editorAvailable,
 		EditorAvailable:      editorAvailable,
 		IsTerminalEditor:     s.isTerminalEditor,
@@ -1618,11 +1624,108 @@ type workspaceInfo struct {
 	NeedsInput   bool
 	InProgress   bool
 	HasWorkspace bool
+	IsPinned     bool
 }
 
 type workspaceGroup struct {
 	Root  workspaceInfo
 	Forks []workspaceInfo
+}
+
+type pinnedProject struct {
+	Path     string `json:"path"`
+	PinnedAt string `json:"pinnedAt"`
+}
+
+type pinnedConfig struct {
+	Pinned []pinnedProject `json:"pinned"`
+}
+
+func pinnedConfigPath() (string, error) {
+	return xdg.ConfigFile("sgai/pinned_projects.json")
+}
+
+func loadPinnedConfig() (*pinnedConfig, error) {
+	configPath, err := pinnedConfigPath()
+	if err != nil {
+		return nil, fmt.Errorf("getting config path: %w", err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &pinnedConfig{}, nil
+		}
+		return nil, fmt.Errorf("reading config file %s: %w", configPath, err)
+	}
+
+	var config pinnedConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("parsing config file %s: %w", configPath, err)
+	}
+
+	return &config, nil
+}
+
+func savePinnedConfig(config *pinnedConfig) error {
+	configPath, err := pinnedConfigPath()
+	if err != nil {
+		return fmt.Errorf("getting config path: %w", err)
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encoding config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("writing config file %s: %w", configPath, err)
+	}
+
+	return nil
+}
+
+func isPinned(path string) bool {
+	config, err := loadPinnedConfig()
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(config.Pinned, func(p pinnedProject) bool {
+		return p.Path == path
+	})
+}
+
+func pinProject(path string) error {
+	config, err := loadPinnedConfig()
+	if err != nil {
+		return err
+	}
+
+	if slices.ContainsFunc(config.Pinned, func(p pinnedProject) bool {
+		return p.Path == path
+	}) {
+		return nil
+	}
+
+	config.Pinned = append(config.Pinned, pinnedProject{
+		Path:     path,
+		PinnedAt: time.Now().UTC().Format(time.RFC3339),
+	})
+
+	return savePinnedConfig(config)
+}
+
+func unpinProject(path string) error {
+	config, err := loadPinnedConfig()
+	if err != nil {
+		return err
+	}
+
+	config.Pinned = slices.DeleteFunc(config.Pinned, func(p pinnedProject) bool {
+		return p.Path == path
+	})
+
+	return savePinnedConfig(config)
 }
 
 func hasJJDirectory(dir string) bool {
@@ -1994,7 +2097,8 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 
 func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace bool) workspaceInfo {
 	running, needsInput := s.getWorkspaceStatus(dir)
-	inProgress := running || needsInput || s.wasEverStarted(dir)
+	pinned := isPinned(dir)
+	inProgress := running || needsInput || s.wasEverStarted(dir) || pinned
 
 	return workspaceInfo{
 		Directory:    dir,
@@ -2004,6 +2108,7 @@ func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace b
 		NeedsInput:   needsInput,
 		InProgress:   inProgress,
 		HasWorkspace: hasWorkspace,
+		IsPinned:     pinned,
 	}
 }
 
@@ -2380,6 +2485,14 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceResetState(w, r, workspacePath)
 	case "fork":
 		s.handleWorkspaceFork(w, r, workspacePath)
+	case "pin":
+		s.handleWorkspacePin(w, r, workspacePath)
+	case "unpin":
+		s.handleWorkspaceUnpin(w, r, workspacePath)
+	case "rename-form":
+		s.handleWorkspaceRenameForm(w, r, workspacePath)
+	case "rename":
+		s.handleWorkspaceRename(w, r, workspacePath)
 	case "update-description":
 		s.handleWorkspaceUpdateDescription(w, r, workspacePath)
 	case "retro/analyze":
@@ -2545,10 +2658,15 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	}
 
 	hasEditedGoal := false
-	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
-		body := extractBody(data)
-		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
+	hasGoalFile := false
+	if _, err := os.Stat(filepath.Join(dir, "GOAL.md")); err == nil {
+		hasGoalFile = true
+		if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
+			body := extractBody(data)
+			hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
+		}
 	}
+	projectPinned := isPinned(dir)
 
 	workspaceData := struct {
 		Directory            string
@@ -2575,6 +2693,8 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		ModelStatuses        map[string]string
 		HasEditedGoal        bool
 		IsRoot               bool
+		HasGoalFile          bool
+		IsPinned             bool
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -2600,6 +2720,8 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		ModelStatuses:        wfState.ModelStatuses,
 		HasEditedGoal:        hasEditedGoal,
 		IsRoot:               isRoot,
+		HasGoalFile:          hasGoalFile,
+		IsPinned:             projectPinned,
 	}
 
 	var buf bytes.Buffer
@@ -3864,7 +3986,7 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	defaultDescOutput, errDefaultDesc := defaultDescCmd.CombinedOutput()
 	if errDefaultDesc == nil {
 		var parts []string
-		for _, line := range strings.Split(string(defaultDescOutput), "\n") {
+		for line := range strings.SplitSeq(string(defaultDescOutput), "\n") {
 			trimmed := strings.TrimSpace(line)
 			if trimmed != "" {
 				parts = append(parts, trimmed)
@@ -3924,10 +4046,10 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 			if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
 				lines := strings.Split(result, "\n")
 				for i, line := range lines {
-					if strings.HasPrefix(line, "TITLE:") {
-						prTitle = strings.TrimSpace(strings.TrimPrefix(line, "TITLE:"))
+					if v, ok := strings.CutPrefix(line, "TITLE:"); ok {
+						prTitle = strings.TrimSpace(v)
 					}
-					if strings.HasPrefix(line, "BODY:") {
+					if _, ok := strings.CutPrefix(line, "BODY:"); ok {
 						prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
 						break
 					}
@@ -3957,6 +4079,114 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, workspaceURL(rootDir, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) handleWorkspacePin(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := pinProject(workspacePath); err != nil {
+		http.Error(w, "failed to pin project", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) handleWorkspaceUnpin(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := unpinProject(workspacePath); err != nil {
+		http.Error(w, "failed to unpin project", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) handleWorkspaceRenameForm(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dirName := filepath.Base(workspacePath)
+	data := struct {
+		Directory string
+		DirName   string
+	}{
+		Directory: workspacePath,
+		DirName:   dirName,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	executeTemplate(w, templates.Lookup("trees_rename_form.html"), data)
+}
+
+func (s *Server) handleWorkspaceRename(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	newName := strings.TrimSpace(r.FormValue("newName"))
+	if errMsg := validateWorkspaceName(newName); errMsg != "" {
+		http.Error(w, errMsg, http.StatusBadRequest)
+		return
+	}
+
+	oldName := filepath.Base(workspacePath)
+	if newName == oldName {
+		http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+		return
+	}
+
+	newPath := filepath.Join(filepath.Dir(workspacePath), newName)
+	if _, err := os.Stat(newPath); err == nil {
+		http.Error(w, "a directory with this name already exists", http.StatusBadRequest)
+		return
+	}
+
+	if err := os.Rename(workspacePath, newPath); err != nil {
+		http.Error(w, "failed to rename directory", http.StatusInternalServerError)
+		return
+	}
+
+	s.mu.Lock()
+	if sess, ok := s.sessions[workspacePath]; ok {
+		delete(s.sessions, workspacePath)
+		s.sessions[newPath] = sess
+	}
+	if s.everStartedDirs[workspacePath] {
+		delete(s.everStartedDirs, workspacePath)
+		s.everStartedDirs[newPath] = true
+	}
+	s.mu.Unlock()
+
+	config, err := loadPinnedConfig()
+	if err == nil {
+		for i, p := range config.Pinned {
+			if p.Path == workspacePath {
+				config.Pinned[i].Path = newPath
+				if errSave := savePinnedConfig(config); errSave != nil {
+					log.Println("failed to update pinned config after rename:", errSave)
+				}
+				break
+			}
+		}
+	}
+
+	http.Redirect(w, r, workspaceURL(newPath, "progress"), http.StatusSeeOther)
 }
 
 func (s *Server) handleWorkspaceUpdateDescription(w http.ResponseWriter, r *http.Request, workspacePath string) {

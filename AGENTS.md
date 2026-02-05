@@ -1,5 +1,7 @@
 THE ONLY ACCEPTABLE PLACE FOR PROJECT_MANAGEMENT.md IS `.sgai/PROJECT_MANAGEMENT.md` -- never place `cmd/sgai/skel/.sgai/PROJECT_MANAGEMENT.md`.
 
+THE ONLY ACCEPTABLE PLACE FOR state.json IS `.sgai/state.json` -- never place `cmd/sgai/skel/.sgai/state.json`; also never edit `.sgai/state.json` yourself.
+
 Every time you are asked to make a source code (or prompt) modification  to `/.sgai` you have to make the modification to `cmd/sgai/skel/.sgai` instead.
 
 In term of Go code style, I prefer total absence of inline comments; organize functions and if blocks in a way that they have intention revealing names, and use that instead.

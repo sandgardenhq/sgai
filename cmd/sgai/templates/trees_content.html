@@ -2,7 +2,9 @@
 
 {{define "attention-indicator"}}{{if .NeedsInput}}<span class="workspace-attention" title="Needs input">●</span>{{end}}{{end}}
 
-{{define "workspace-indicators"}}{{if .Running}}<span class="workspace-spinner" title="Running">⟳</span>{{end}}{{template "attention-indicator" .}}{{end}}
+{{define "pin-indicator"}}{{if .IsPinned}}<span class="workspace-pin-icon" title="Pinned">📌</span>{{end}}{{end}}
+
+{{define "workspace-indicators"}}<span class="workspace-indicators">{{template "pin-indicator" .}}{{if .Running}}<span class="workspace-spinner" title="Running">⟳</span>{{end}}{{template "attention-indicator" .}}</span>{{end}}
 
 <div class="tree-panel" id="tree-panel-content">
 {{if .InProgressWorkspaces}}
@@ -12,7 +14,7 @@
 	<a class="in-progress-item{{if eq .Directory $.SelectedPath}} selected{{end}}"
 		href="{{if .NeedsInput}}/respond?dir={{.Directory}}{{else}}/workspaces/{{.DirName}}/progress{{end}}"
 		title="{{.DirName}}">
-		<span class="workspace-name">{{.DirName}}</span>
+		<span class="workspace-name" data-tooltip="{{.DirName}}" data-placement="right">{{.DirName}}</span>
 		{{template "workspace-indicators" .}}
 	</a>
 	{{end}}
@@ -30,7 +32,7 @@
 		<a class="workspace-link{{if eq .Root.Directory $.SelectedPath}} selected{{end}}"
 			href="/workspaces/{{.Root.DirName}}/progress"
 			title="{{.Root.Directory}}">
-			<span class="workspace-name" title="{{.Root.DirName}}">{{.Root.DirName}}</span>
+			<span class="workspace-name" data-tooltip="{{.Root.DirName}}" data-placement="right">{{.Root.DirName}}</span>
 			{{template "workspace-indicators" .Root}}
 		</a>
 		</summary>
@@ -39,7 +41,7 @@
 		<a class="workspace-child{{if eq .Directory $.SelectedPath}} selected{{end}}"
 			href="/workspaces/{{.DirName}}/progress"
 			title="{{.Directory}}">
-			<span class="workspace-name" title="{{.DirName}}">{{.DirName}}</span>
+			<span class="workspace-name" data-tooltip="{{.DirName}}" data-placement="right">{{.DirName}}</span>
 			{{template "workspace-indicators" .}}
 		</a>
 			{{end}}
@@ -51,7 +53,7 @@
 		<a class="workspace-link{{if eq .Root.Directory $.SelectedPath}} selected{{end}}"
 			href="/workspaces/{{.Root.DirName}}/progress"
 			title="{{.Root.Directory}}">
-			<span class="workspace-name" title="{{.Root.DirName}}">{{.Root.DirName}}</span>
+			<span class="workspace-name" data-tooltip="{{.Root.DirName}}" data-placement="right">{{.Root.DirName}}</span>
 			{{template "workspace-indicators" .Root}}
 		</a>
 	</div>

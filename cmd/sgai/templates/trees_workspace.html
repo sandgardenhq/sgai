@@ -1,13 +1,22 @@
 <div class="sticky-header-container">
 	<header class="workspace-header-bar">
-		<h3 class="workspace-title" title="{{.Directory}}">{{.DirName}}</h3>
-		{{if .TotalExecutionTime}}<span class="execution-timer" data-tooltip="Total execution time">{{.TotalExecutionTime}}</span>{{end}}
+		<div id="workspace-rename-slot">
+			<h3 class="workspace-title" 
+				hx-get="/workspaces/{{.DirName}}/rename-form" 
+				hx-target="#workspace-rename-slot"
+				hx-swap="outerHTML"
+				hx-trigger="click"
+				tabindex="0"
+				data-tooltip="{{.DirName}}"
+				data-placement="bottom"
+				aria-label="Click to rename {{.DirName}}">{{.DirName}}</h3>
+		</div>
+		{{if .TotalExecutionTime}}<span class="execution-timer" title="Total execution time">{{.TotalExecutionTime}}</span>{{end}}
 		<span class="status-badge{{if .Running}} running{{end}}">{{if .Running}}running{{else}}stopped{{end}}</span>
 		<nav id="header-actions">{{template "trees_actions.html" .}}</nav>
 	</header>
 	<div class="status-text-bar">
 		{{if .StatusText}}<div class="trees-status">{{if .CurrentAgent}}<span class="agent-pill">{{.CurrentAgent}} | {{.FormattedModel}}</span> {{end}}{{.StatusText}}</div>{{end}}
-		{{if .ModelStatuses}}<div class="model-consensus-bar">{{range $modelId, $status := .ModelStatuses}}<span class="model-status-pill" data-tooltip="{{$modelId}}: {{$status}}">{{if eq $status "model-working"}}◐{{else if eq $status "model-done"}}●{{else}}✕{{end}} {{shortModelName $modelId}}</span>{{end}}</div>{{end}}
 	</div>
 	<nav class="tab-nav">
 		<ul>

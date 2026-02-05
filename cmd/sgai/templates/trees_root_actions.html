@@ -1,8 +1,15 @@
 <div class="header-actions-container">
-	<a href="/workspaces/{{.DirName}}/fork/new" role="button" class="action-btn outline">Fork</a>
-	<a href="/compose?workspace={{.DirName}}" role="button" class="action-btn outline">Compose GOAL</a>
+	<form action="/workspaces/{{.DirName}}/fork/new" method="get">
+		<button type="submit" class="outline">Fork</button>
+	</form>
+	<form action="/compose" method="get">
+		<input type="hidden" name="workspace" value="{{.DirName}}">
+		<button type="submit" class="outline">Compose GOAL</button>
+	</form>
 	{{if .HasEditedGoal}}
-	<a href="/workspaces/{{.DirName}}/goal" role="button" class="action-btn outline">Edit GOAL</a>
+	<form action="/workspaces/{{.DirName}}/goal" method="get">
+		<button type="submit" class="outline">Edit GOAL</button>
+	</form>
 	{{end}}
 	{{if .CodeAvailable}}
 		{{if .IsTerminalEditor}}
@@ -12,10 +19,10 @@
 		</div>
 		{{else}}
 		<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
-			<button type="submit" class="action-btn outline">Open in Editor</button>
+			<button type="submit" class="outline">Open in Editor</button>
 		</form>
 		{{end}}
 	{{else}}
-	<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
+	<button type="button" class="outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
 	{{end}}
 </div>

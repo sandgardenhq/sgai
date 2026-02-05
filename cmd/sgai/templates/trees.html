@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -271,19 +271,9 @@
 			color: inherit;
 			transition: all 0.15s ease;
 			position: relative;
-			overflow: visible;
-		}
-		/* PicoCSS tooltips for workspace names - position to the right to avoid clipping */
-		.tree-panel .workspace-name[data-tooltip] {
-			position: relative;
-		}
-		.tree-panel .workspace-name[data-tooltip]::before,
-		.tree-panel .workspace-name[data-tooltip]::after {
-			z-index: 1000;
-			white-space: nowrap;
 		}
 		.workspace-link:hover {
-			background-color: color-mix(in srgb, var(--pico-muted-border-color) 60%, transparent);
+			background-color: color-mix(in srgb, var(--pico-primary) 12%, transparent);
 		}
 		.workspace-link.selected {
 			background-color: var(--pico-primary-focus);
@@ -336,7 +326,7 @@
 			border-radius: 1px;
 		}
 		.workspace-child:hover {
-			background-color: color-mix(in srgb, var(--pico-muted-border-color) 60%, transparent);
+			background-color: color-mix(in srgb, var(--pico-primary) 12%, transparent);
 		}
 		.workspace-child.selected {
 			background-color: var(--pico-primary-focus);
@@ -355,6 +345,12 @@
 			text-overflow: ellipsis;
 			white-space: nowrap;
 			font-size: 0.875rem;
+		}
+		.workspace-indicators {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+			flex-shrink: 0;
 		}
 
 		/* Trees status bar with pill and text */
@@ -394,62 +390,50 @@
 		.workspace-header-bar {
 			display: flex;
 			align-items: center;
-			gap: 0.75rem;
+			gap: 0.5rem;
+			row-gap: 0.5rem;
 			margin-bottom: 0.75rem;
 			padding-bottom: 0.75rem;
 			border-bottom: 1px solid var(--pico-muted-border-color);
-			flex-wrap: nowrap;
+			flex-wrap: wrap;
 		}
 		.workspace-title {
 			margin: 0;
-			font-size: 1.25rem;
+			font-size: 1.2rem;
 			font-weight: 600;
 			color: var(--pico-color);
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
-			flex: 0 1 auto;
-			min-width: 0;
-			max-width: fit-content;
+			flex: 1 1 16rem;
+			min-width: 8rem;
+			max-width: 100%;
 		}
 		/* Header actions container - buttons inline with title */
 		#header-actions {
 			display: flex;
 			align-items: center;
 			gap: 0.35rem;
-			flex-shrink: 0;
+			flex-shrink: 1;
+			flex-grow: 1;
+			flex-basis: 100%;
 			margin: 0;
 			padding: 0;
-			margin-left: auto;
+			min-width: 0;
+			justify-content: flex-start;
 		}
 		.header-actions-container {
 			display: flex;
 			align-items: center;
-			gap: 0.35rem;
-			flex-wrap: nowrap;
+			gap: 0.4rem;
+			row-gap: 0.35rem;
+			flex-wrap: wrap;
+			justify-content: flex-start;
 		}
 		.header-actions-container form {
 			display: inline-flex;
 			margin: 0;
 			padding: 0;
-		}
-		.action-btn {
-			margin: 0 !important;
-			padding: 0.35rem 0.6rem !important;
-			font-size: 0.75rem !important;
-			white-space: nowrap;
-			display: inline-block;
-			vertical-align: middle;
-			line-height: 1.2;
-		}
-		.action-btn.attention {
-			background-color: var(--pico-del-color);
-			border-color: var(--pico-del-color);
-			color: white;
-		}
-		.action-btn.attention:hover {
-			background-color: color-mix(in srgb, var(--pico-del-color) 85%, black);
-			border-color: color-mix(in srgb, var(--pico-del-color) 85%, black);
 		}
 		.error-message {
 			color: var(--pico-del-color);
@@ -654,6 +638,7 @@
 			color: var(--pico-muted-color);
 			flex-shrink: 0;
 			white-space: nowrap;
+			align-self: center;
 		}
 
 		/* Status badge styles */
@@ -665,7 +650,7 @@
 			border-radius: 4px;
 			color: var(--pico-muted-color);
 			flex-shrink: 0;
-			align-self: flex-start;
+			align-self: center;
 		}
 		.status-badge.running {
 			background: color-mix(in srgb, var(--pico-primary) 20%, transparent);
@@ -693,39 +678,6 @@
 			vertical-align: middle;
 			white-space: nowrap;
 			cursor: help;
-		}
-
-		/* Multi-model consensus bar - header display */
-		.model-consensus-bar {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 0.5rem;
-			align-items: center;
-			margin-top: 0.35rem;
-		}
-		.model-status-pill {
-			display: inline-flex;
-			align-items: center;
-			gap: 0.25rem;
-			font-size: 0.7rem;
-			padding: 0.15rem 0.5rem;
-			background: color-mix(in srgb, var(--pico-muted-border-color) 40%, transparent);
-			border-radius: 10px;
-			color: var(--pico-muted-color);
-			white-space: nowrap;
-			cursor: help;
-		}
-		.model-status-pill[data-tooltip*="model-working"] {
-			background: color-mix(in srgb, var(--pico-primary) 15%, transparent);
-			color: var(--pico-primary);
-		}
-		.model-status-pill[data-tooltip*="model-done"] {
-			background: color-mix(in srgb, #22c55e 15%, transparent);
-			color: #16a34a;
-		}
-		.model-status-pill[data-tooltip*="model-error"] {
-			background: color-mix(in srgb, #ef4444 15%, transparent);
-			color: #dc2626;
 		}
 
 		/* Multi-model statuses - workflow/progress display */
@@ -778,7 +730,6 @@
 		}
 		/* Remove PicoCSS tooltip underlines from model-related elements */
 		.model-statuses [data-tooltip],
-		.model-consensus-bar [data-tooltip],
 		p > span[data-tooltip] {
 			text-decoration: none !important;
 			border-bottom: none !important;
@@ -1228,8 +1179,9 @@
 		.workspace-spinner {
 			color: var(--pico-primary);
 			animation: spin 1s linear infinite;
-			margin-left: 0.25rem;
+			margin-left: 0;
 			font-size: 0.9rem;
+			line-height: 1;
 		}
 		@keyframes spin {
 			from { transform: rotate(0deg); }
@@ -1237,9 +1189,49 @@
 		}
 		.workspace-attention {
 			color: var(--pico-del-color);
-			margin-left: 0.25rem;
+			margin-left: 0;
 			font-size: 0.6rem;
 			vertical-align: middle;
+			line-height: 1;
+		}
+
+		/* Pin icon in tree panel */
+		.workspace-pin-icon {
+			margin-left: 0;
+			font-size: 0.7rem;
+			vertical-align: middle;
+			line-height: 1;
+		}
+
+
+		/* Rename form inline styling */
+		.workspace-rename-form {
+			display: flex;
+			align-items: center;
+			gap: 0.4rem;
+			margin: 0;
+			padding: 0;
+			flex-wrap: wrap;
+		}
+		.workspace-rename-input {
+			font-size: 1rem;
+			font-weight: 600;
+			padding: 0.3rem 0.5rem;
+			margin: 0;
+			min-width: 12rem;
+			max-width: clamp(12rem, 35vw, 22rem);
+			height: 2rem;
+		}
+
+		/* Make workspace title clickable for rename */
+		.workspace-title {
+			cursor: pointer;
+		}
+		.workspace-title:hover {
+			text-decoration: underline dotted;
+			text-underline-offset: 0.2em;
+			text-decoration-color: var(--pico-primary);
+			color: var(--pico-primary);
 		}
 
 		/* Tree panel footer - fixed button at bottom */
@@ -1292,7 +1284,7 @@
 			margin-bottom: 0.1rem;
 		}
 		.in-progress-item:hover {
-			background-color: color-mix(in srgb, var(--pico-del-color) 15%, transparent);
+			background-color: color-mix(in srgb, var(--pico-primary) 12%, transparent);
 		}
 		.in-progress-item.selected {
 			background-color: var(--pico-primary-focus);
@@ -1766,12 +1758,12 @@
 			}
 			#header-actions {
 				flex: 1 1 auto;
-				justify-content: flex-end;
+				justify-content: flex-start;
 				margin-left: 0;
 			}
 			.header-actions-container {
 				flex-wrap: wrap;
-				justify-content: flex-end;
+				justify-content: flex-start;
 			}
 			/* Stack sequence and messages boxes on mobile */
 			.tab-content .grid {
@@ -1864,49 +1856,9 @@
 </head>
 <body hx-ext="morph">
 	<main class="container-fluid">
-		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s [document.activeElement.id!='commit-description' && document.activeElement.id!='adhoc-prompt' && document.activeElement.id!='steer-input']" hx-swap="morph:innerHTML">
-{{ template "trees_content.html" . }}
+		<div class="tree-container" hx-get="/trees/refresh{{if .SelectedDir}}?workspace={{.SelectedDir}}{{end}}{{if .SelectedTab}}{{if .SelectedDir}}&amp;{{else}}?{{end}}tab={{.SelectedTab}}{{end}}{{if .SelectedSession}}{{if or .SelectedDir .SelectedTab}}&amp;{{else}}?{{end}}session={{.SelectedSession}}{{end}}" hx-trigger="every 2s" hx-target="#tree-panel-content" hx-select="#tree-panel-content" hx-swap="outerHTML">
+	{{ template "trees_content.html" . }}
 		</div>
 	</main>
-	<script>
-	/* Idiomorph configuration: preserve details open state and active element focus/value */
-	Idiomorph.defaults.ignoreActive = true;
-	Idiomorph.defaults.ignoreActiveValue = true;
-	Idiomorph.defaults.callbacks.beforeAttributeUpdated = function(attr, node) {
-		if (attr === 'open' && node.tagName === 'DETAILS') return false;
-	};
-	Idiomorph.defaults.callbacks.beforeNodeMorphed = function(oldNode, newNode) {
-		if (oldNode.id === 'adhoc-prompt-container') return false;
-		if (oldNode.id === 'steer-container') return false;
-		return true;
-	};
-	/* Idiomorph integration: preserve scroll positions during morph swaps */
-	(function() {
-		var scrollState = {}, selectors = '.tree-panel, .log-panel, .retro-panel-embedded';
-		var adhocScrollState = {};
-		document.body.addEventListener('htmx:beforeSwap', function() {
-			scrollState = {};
-			document.querySelectorAll(selectors).forEach(function(el, i) { scrollState[i] = el.scrollTop; });
-			var adhocOutput = document.querySelector('.adhoc-output');
-			if (adhocOutput) {
-				var wasAtBottom = adhocOutput.scrollTop + adhocOutput.clientHeight >= adhocOutput.scrollHeight - 30;
-				adhocScrollState = { scrollTop: adhocOutput.scrollTop, wasAtBottom: wasAtBottom };
-			}
-		});
-		document.body.addEventListener('htmx:afterSwap', function() {
-			document.querySelectorAll(selectors).forEach(function(el, i) {
-				if (scrollState[i] !== undefined) el.scrollTop = scrollState[i];
-			});
-			var adhocOutput = document.querySelector('.adhoc-output');
-			if (adhocOutput && adhocScrollState.wasAtBottom !== undefined) {
-				if (adhocScrollState.wasAtBottom) {
-					adhocOutput.scrollTop = adhocOutput.scrollHeight;
-				} else {
-					adhocOutput.scrollTop = adhocScrollState.scrollTop;
-				}
-			}
-		});
-	})();
-	</script>
 </body>
 </html>

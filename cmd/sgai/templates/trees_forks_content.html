@@ -29,15 +29,15 @@
 							</div>
 							{{else}}
 							<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
-								<button type="submit" class="action-btn outline">Open in Editor</button>
+								<button type="submit" class="outline">Open in Editor</button>
 							</form>
 							{{end}}
 						{{else}}
-						<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
+						<button type="button" class="outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
 						{{end}}
-						<a href="/trees?workspace={{.DirName}}" role="button" class="action-btn outline">Open in sgai</a>
+						<a href="/trees?workspace={{.DirName}}" role="button" class="outline">Open in sgai</a>
 						<details class="merge-confirmation">
-							<summary><span class="action-btn outline">Merge</span></summary>
+							<summary><span role="button" class="outline">Merge</span></summary>
 							<div class="merge-confirmation-panel">
 								<p>This will rebase and squash the fork, create the PR, then delete the fork workspace.</p>
 								<form action="/workspaces/{{$.RootDirName}}/merge" method="post">
@@ -46,7 +46,7 @@
 									<input type="checkbox" name="confirm_delete" value="true" required>
 										I understand this deletes the fork workspace after merge.
 									</label>
-									<button type="submit" class="action-btn attention">Confirm merge</button>
+									<button type="submit" class="contrast">Confirm merge</button>
 								</form>
 							</div>
 						</details>

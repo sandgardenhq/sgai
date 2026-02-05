@@ -1,0 +1,23 @@
+<div id="workspace-rename-slot" hx-preserve>
+	<form hx-post="/workspaces/{{.DirName}}/rename" 
+	      hx-swap="outerHTML"
+	      hx-target="this"
+	      id="workspace-rename-form"
+	      class="workspace-rename-form"
+	      hx-preserve>
+	    <input type="text" 
+	           name="newName" 
+	           value="{{.DirName}}" 
+	           id="rename-input"
+	           class="workspace-rename-input"
+	           hx-preserve
+	           autofocus
+	           required>
+		<button type="submit">Save</button>
+		<a hx-get="/workspaces/{{.DirName}}/progress"
+		   hx-target="#workspace-view"
+		   hx-swap="innerHTML"
+		   role="button" 
+		   class="outline">Cancel</a>
+	</form>
+</div>

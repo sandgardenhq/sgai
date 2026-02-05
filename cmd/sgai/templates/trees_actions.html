@@ -1,22 +1,38 @@
 <div class="header-actions-container">
+	{{if .IsPinned}}
+	<form action="/workspaces/{{.DirName}}/unpin" method="post">
+		<button type="submit" class="secondary" title="Unpin project" aria-label="Unpin project">📌</button>
+	</form>
+	{{else}}
+	<form action="/workspaces/{{.DirName}}/pin" method="post">
+		<button type="submit" class="outline" title="Pin project" aria-label="Pin project">📍</button>
+	</form>
+	{{end}}
 	{{if not .Running}}
 	{{if not .IsRoot}}
 	<form action="/workspaces/{{.DirName}}/start" method="post">
 		<input type="hidden" name="directory" value="{{.Directory}}">
 		<input type="hidden" name="auto" value="true">
-		<button type="submit" class="action-btn outline">Self-drive</button>
+		<button type="submit" class="outline">Self-drive</button>
 	</form>
 	<form action="/workspaces/{{.DirName}}/start" method="post">
 		<input type="hidden" name="directory" value="{{.Directory}}">
-		<button type="submit" class="action-btn outline">Start</button>
+		<button type="submit" class="outline">Start</button>
 	</form>
 	{{end}}
 	{{if not .IsFork}}
-	<a href="/workspaces/{{.DirName}}/fork/new" role="button" class="action-btn outline">Fork</a>
+	<form action="/workspaces/{{.DirName}}/fork/new" method="get">
+		<button type="submit" class="outline">Fork</button>
+	</form>
 	{{end}}
-	<a href="/compose?workspace={{.DirName}}" role="button" class="action-btn outline">Compose GOAL</a>
-	{{if .HasEditedGoal}}
-	<a href="/workspaces/{{.DirName}}/goal" role="button" class="action-btn outline">Edit GOAL</a>
+	<form action="/compose" method="get">
+		<input type="hidden" name="workspace" value="{{.DirName}}">
+		<button type="submit" class="outline">Compose GOAL</button>
+	</form>
+	{{if .HasGoalFile}}
+	<form action="/workspaces/{{.DirName}}/goal" method="get">
+		<button type="submit" class="outline">Edit GOAL</button>
+	</form>
 	{{end}}
 	{{if .CodeAvailable}}
 		{{if .IsTerminalEditor}}
@@ -26,33 +42,43 @@
 		</div>
 		{{else}}
 		<form action="/workspaces/{{.DirName}}/open-vscode" method="post" style="display:inline">
-			<button type="submit" class="action-btn outline">Open in Editor</button>
+			<button type="submit" class="outline">Open in Editor</button>
 		</form>
 		{{end}}
 	{{else}}
-	<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
+	<button type="button" class="outline" disabled title="Editor not available or remote connection">Open in Editor</button>
 	{{end}}
 	{{end}}
 	{{if .Running}}
 	{{if not .IsRoot}}
 	<form action="/workspaces/{{.DirName}}/toggle-mode" method="post">
 		<input type="hidden" name="mode" value="auto">
-		<button type="submit" class="action-btn{{if not .InteractiveAuto}} outline{{end}}">Self-Drive</button>
+		<button type="submit" class="{{if not .InteractiveAuto}}outline{{end}}">Self-Drive</button>
 	</form>
 	<form action="/workspaces/{{.DirName}}/toggle-mode" method="post">
 		<input type="hidden" name="mode" value="yes">
-		<button type="submit" class="action-btn{{if .InteractiveAuto}} outline{{end}}">Start</button>
+		<button type="submit" class="{{if .InteractiveAuto}}outline{{end}}">Start</button>
 	</form>
 	<form action="/workspaces/{{.DirName}}/stop" method="post">
 		<input type="hidden" name="directory" value="{{.Directory}}">
-		<button type="submit" class="action-btn outline">Stop</button>
+		<button type="submit" class="outline">Stop</button>
 	</form>
 	{{end}}
 	{{end}}
-	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>
-	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>
-	<a href="/workspaces/{{.DirName}}/agents" role="button" class="action-btn outline">Agents</a>
+	<form action="/workspaces/{{.DirName}}/skills" method="get">
+		<button type="submit" class="outline">Skills</button>
+	</form>
+	<form action="/workspaces/{{.DirName}}/snippets" method="get">
+		<button type="submit" class="outline">Snippets</button>
+	</form>
+	<form action="/workspaces/{{.DirName}}/agents" method="get">
+		<button type="submit" class="outline">Agents</button>
+	</form>
 	{{if .NeedsInput}}
-	<a href="/respond?dir={{.Directory}}&returnTo={{.ReturnTo}}" role="button" class="action-btn attention">Respond to Agent</a>
+	<form action="/respond" method="get">
+		<input type="hidden" name="dir" value="{{.Directory}}">
+		<input type="hidden" name="returnTo" value="{{.ReturnTo}}">
+		<button type="submit" class="contrast">Respond to Agent</button>
+	</form>
 	{{end}}
 </div>
