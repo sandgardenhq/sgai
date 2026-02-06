@@ -1,6 +1,6 @@
 <div class="sticky-header-container">
 	<header class="workspace-header-bar">
-		<h3 class="workspace-title" title="{{.Directory}}">{{.DirName}}</h3>
+		<h3 class="workspace-title" title="{{.Directory}}">{{if .IsFork}}<a href="/workspaces/{{.DirName}}/rename" style="text-decoration:none;color:inherit">{{.DirName}} ✏️</a>{{else}}{{.DirName}}{{end}}</h3>
 		{{if .TotalExecutionTime}}<span class="execution-timer" data-tooltip="Total execution time">{{.TotalExecutionTime}}</span>{{end}}
 		<span class="status-badge{{if .Running}} running{{end}}">{{if .Running}}running{{else}}stopped{{end}}</span>
 		<nav id="header-actions">{{template "trees_actions.html" .}}</nav>

@@ -547,6 +547,8 @@ func cmdServe(args []string) {
 	mux.HandleFunc("GET /workspaces/{name}/fork/new", srv.handleNewForkGet)
 	mux.HandleFunc("POST /workspaces/{name}/fork/new", srv.handleNewForkPost)
 	mux.HandleFunc("POST /workspaces/{name}/merge", srv.handleForkMerge)
+	mux.HandleFunc("GET /workspaces/{name}/rename", srv.handleRenameForkGet)
+	mux.HandleFunc("POST /workspaces/{name}/rename", srv.handleRenameForkPost)
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
 	mux.HandleFunc("/compose", srv.routeCompose)
 	mux.HandleFunc("/compose/", srv.routeCompose)
@@ -3090,6 +3092,104 @@ func (s *Server) renderNewForkWithError(w http.ResponseWriter, workspacePath, er
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	executeTemplate(w, templates.Lookup("new_fork.html"), data)
+}
+
+func (s *Server) handleRenameForkGet(w http.ResponseWriter, r *http.Request) {
+	workspaceName := r.PathValue("name")
+	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
+	if workspacePath == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isForkWorkspace(workspacePath) {
+		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
+		return
+	}
+	s.renderRenameFork(w, workspacePath, "")
+}
+
+func (s *Server) handleRenameForkPost(w http.ResponseWriter, r *http.Request) {
+	workspaceName := r.PathValue("name")
+	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
+	if workspacePath == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isForkWorkspace(workspacePath) {
+		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
+		return
+	}
+
+	if errParse := r.ParseForm(); errParse != nil {
+		s.renderRenameFork(w, workspacePath, "failed to parse form")
+		return
+	}
+
+	rawName := r.FormValue("name")
+	newName := normalizeForkName(rawName)
+	if errMsg := validateWorkspaceName(newName); errMsg != "" {
+		s.renderRenameFork(w, workspacePath, errMsg)
+		return
+	}
+
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	s.mu.Unlock()
+	if sess != nil {
+		sess.mu.Lock()
+		running := sess.running
+		sess.mu.Unlock()
+		if running {
+			s.renderRenameFork(w, workspacePath, "cannot rename: session is running")
+			return
+		}
+	}
+
+	parentDir := filepath.Dir(workspacePath)
+	newPath := filepath.Join(parentDir, newName)
+	if _, errStat := os.Stat(newPath); errStat == nil {
+		s.renderRenameFork(w, workspacePath, "a directory with this name already exists")
+		return
+	} else if !os.IsNotExist(errStat) {
+		s.renderRenameFork(w, workspacePath, "failed to check target path")
+		return
+	}
+
+	if errRename := os.Rename(workspacePath, newPath); errRename != nil {
+		s.renderRenameFork(w, workspacePath, fmt.Sprintf("failed to rename directory: %v", errRename))
+		return
+	}
+
+	cmd := exec.Command("jj", "workspace", "rename", newName)
+	cmd.Dir = newPath
+	if output, errJJ := cmd.CombinedOutput(); errJJ != nil {
+		log.Println("jj workspace rename failed:", errJJ, string(output))
+	}
+
+	s.mu.Lock()
+	if sess, ok := s.sessions[workspacePath]; ok {
+		delete(s.sessions, workspacePath)
+		s.sessions[newPath] = sess
+	}
+	if s.everStartedDirs[workspacePath] {
+		delete(s.everStartedDirs, workspacePath)
+		s.everStartedDirs[newPath] = true
+	}
+	s.mu.Unlock()
+
+	http.Redirect(w, r, workspaceURL(newPath, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) renderRenameFork(w http.ResponseWriter, workspacePath, errMsg string) {
+	data := struct {
+		DirName      string
+		ErrorMessage string
+	}{
+		DirName:      filepath.Base(workspacePath),
+		ErrorMessage: errMsg,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	executeTemplate(w, templates.Lookup("rename_fork.html"), data)
 }
 
 func (s *Server) renderTabContent(dir, tabName, sessionParam string, r *http.Request) tabContentResult {

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light">
+	<title>Rename Fork - sgai</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		body {
+			display: flex;
+			flex-direction: column;
+		}
+		main.container {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			padding-bottom: 1rem;
+			max-width: 600px;
+		}
+		main.container > article {
+			margin-bottom: 0;
+		}
+		.error-message {
+			color: var(--pico-del-color);
+			background: color-mix(in srgb, var(--pico-del-color) 15%, transparent);
+			padding: 0.75rem 1rem;
+			border-radius: 4px;
+			margin-bottom: 1rem;
+			border-left: 3px solid var(--pico-del-color);
+		}
+		@media (max-width: 768px) {
+			main.container {
+				padding: 0.5rem;
+			}
+			main.container > article {
+				padding: 0.75rem;
+			}
+			main.container > article > header {
+				padding-bottom: 0.5rem;
+				margin-bottom: 0.5rem;
+			}
+		}
+	</style>
+</head>
+<body id="renameForkPage">
+	<main class="container">
+		<article>
+			<header>
+				<nav>
+					<ul><li><a href="/trees">← Back to Workspaces</a></li></ul>
+					<ul><li><strong>Rename Fork</strong></li></ul>
+				</nav>
+			</header>
+			{{if .ErrorMessage}}
+			<div class="error-message">{{.ErrorMessage}}</div>
+			{{end}}
+			<form method="POST" action="/workspaces/{{.DirName}}/rename">
+				<label for="name">New Name:</label>
+				<input type="text" name="name" id="name" placeholder="{{.DirName}}" required
+					autocapitalize="none" spellcheck="false"
+					pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+					title="Use lowercase letters, numbers, and single dashes only">
+				<small>Current name: <strong>{{.DirName}}</strong>. Use lowercase letters, numbers, and single dashes only (kebab-case).</small>
+				<button type="submit">Rename Fork</button>
+			</form>
+		</article>
+	</main>
+</body>
+</html>
