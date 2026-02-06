@@ -118,27 +118,27 @@ flow: |
 Configure per-agent model assignments.
 
 **Available models (see REFERENCE.md for full list):**
-- `anthropic/claude-opus-4-5` - Most capable, highest cost ($$$$)
-- `anthropic/claude-opus-4-5 (max)` - Extended thinking variant
+- `anthropic/claude-opus-4-6` - Most capable, highest cost ($$$$)
+- `anthropic/claude-opus-4-6 (max)` - Extended thinking variant
 - `anthropic/claude-sonnet-4-5` - Balanced capability/cost ($$$)
 - `anthropic/claude-sonnet-4-5 (max)` - Extended thinking variant
 - `google/gemini-2.0-flash-001` - Fast, lower cost ($$)
 - `openai/gpt-4.1` - Alternative high-capability model ($$$)
 
 **Default recommendations:**
-- `coordinator`: `anthropic/claude-opus-4-5 (max)` (always use strongest for coordination)
-- Development agents: `anthropic/claude-opus-4-5` (complex reasoning)
-- Review agents: `anthropic/claude-opus-4-5` (thorough analysis)
+- `coordinator`: `anthropic/claude-opus-4-6 (max)` (always use strongest for coordination)
+- Development agents: `anthropic/claude-opus-4-6` (complex reasoning)
+- Review agents: `anthropic/claude-opus-4-6` (thorough analysis)
 - Frontend agents: `anthropic/claude-sonnet-4-5` (good balance)
 - Utility agents: `anthropic/claude-sonnet-4-5` (cost-effective)
 
 **Present configuration:**
 ```yaml
 models:
-  "coordinator": "anthropic/claude-opus-4-5 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-5"
-  "go-readability-reviewer": "anthropic/claude-opus-4-5"
-  "general-purpose": "anthropic/claude-opus-4-5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
 ```
 
 **Ask:** "Do you want to adjust any model assignments? (e.g., use a faster/cheaper model for certain agents)"
@@ -285,11 +285,11 @@ flow: |
   "go-readability-reviewer" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
 models:
-  "coordinator": "anthropic/claude-opus-4-5 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-5"
-  "go-readability-reviewer": "anthropic/claude-opus-4-5"
-  "general-purpose": "anthropic/claude-opus-4-5"
-  "stpa-analyst": "anthropic/claude-opus-4-5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
+  "stpa-analyst": "anthropic/claude-opus-4-6"
 interactive: yes
 ---
 

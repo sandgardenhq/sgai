@@ -19,7 +19,7 @@ type workflowTemplate struct {
 	Interactive string
 }
 
-const defaultAgentModel = "anthropic/claude-opus-4-5"
+const defaultAgentModel = "anthropic/claude-opus-4-6"
 
 var workflowTemplates = []workflowTemplate{
 	{
