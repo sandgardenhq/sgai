@@ -28,15 +28,15 @@
 		{{if .CurrentModel}}
 		<p><strong>Current Model:</strong> <span data-tooltip="{{.CurrentModel}}">{{shortModelName .CurrentModel}}</span></p>
 		{{end}}
-		{{if .ModelStatuses}}
+		{{if .OrderedModelStatuses}}
 		<div class="model-statuses">
 			<strong>Model Consensus:</strong>
 			<ul>
-			{{range $modelId, $status := .ModelStatuses}}
+			{{range .OrderedModelStatuses}}
 				<li>
-					<span>{{if eq $status "model-working"}}◐{{else if eq $status "model-done"}}●{{else}}✕{{end}}</span>
-					<span data-tooltip="{{$modelId}}">{{shortModelName $modelId}}</span>
-					<small>({{$status}})</small>
+					<span>{{if eq .Status "model-working"}}◐{{else if eq .Status "model-done"}}●{{else}}✕{{end}}</span>
+					<span data-tooltip="{{.ModelID}}">{{shortModelName .ModelID}}</span>
+					<small>({{.Status}})</small>
 				</li>
 			{{end}}
 			</ul>

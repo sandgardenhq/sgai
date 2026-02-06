@@ -7,7 +7,7 @@
 	</header>
 	<div class="status-text-bar">
 		{{if .StatusText}}<div class="trees-status">{{if .CurrentAgent}}<span class="agent-pill">{{.CurrentAgent}} | {{.FormattedModel}}</span> {{end}}{{.StatusText}}</div>{{end}}
-		{{if .ModelStatuses}}<div class="model-consensus-bar">{{range $modelId, $status := .ModelStatuses}}<span class="model-status-pill" data-tooltip="{{$modelId}}: {{$status}}">{{if eq $status "model-working"}}◐{{else if eq $status "model-done"}}●{{else}}✕{{end}} {{shortModelName $modelId}}</span>{{end}}</div>{{end}}
+		{{if .OrderedModelStatuses}}<div class="model-consensus-bar">{{range .OrderedModelStatuses}}<span class="model-status-pill" data-tooltip="{{.ModelID}}: {{.Status}}">{{if eq .Status "model-working"}}◐{{else if eq .Status "model-done"}}●{{else}}✕{{end}} {{shortModelName .ModelID}}</span>{{end}}</div>{{end}}
 	</div>
 	<nav class="tab-nav">
 		<ul>
