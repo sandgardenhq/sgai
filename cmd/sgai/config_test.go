@@ -24,7 +24,7 @@ func TestLoadProjectConfigValidJSON(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, configFileName)
 
-	content := `{"defaultModel": "anthropic/claude-opus-4-5"}`
+	content := `{"defaultModel": "anthropic/claude-opus-4-6"}`
 	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -35,8 +35,8 @@ func TestLoadProjectConfigValidJSON(t *testing.T) {
 		t.Fatalf("loadProjectConfig() error = %v; want nil", err)
 	case config == nil:
 		t.Fatal("loadProjectConfig() = nil; want non-nil config")
-	case config.DefaultModel != "anthropic/claude-opus-4-5":
-		t.Errorf("config.DefaultModel = %q; want %q", config.DefaultModel, "anthropic/claude-opus-4-5")
+	case config.DefaultModel != "anthropic/claude-opus-4-6":
+		t.Errorf("config.DefaultModel = %q; want %q", config.DefaultModel, "anthropic/claude-opus-4-6")
 	}
 }
 
@@ -119,7 +119,7 @@ func TestApplyConfigDefaultsWithEmptyDefaultModel(t *testing.T) {
 }
 
 func TestApplyConfigDefaultsAppliesDefault(t *testing.T) {
-	config := &projectConfig{DefaultModel: "anthropic/claude-opus-4-5"}
+	config := &projectConfig{DefaultModel: "anthropic/claude-opus-4-6"}
 	metadata := GoalMetadata{
 		Models: map[string]any{
 			"agent1": "",
@@ -129,8 +129,8 @@ func TestApplyConfigDefaultsAppliesDefault(t *testing.T) {
 	applyConfigDefaults(config, &metadata)
 
 	models1 := getModelsForAgent(metadata.Models, "agent1")
-	if len(models1) != 1 || models1[0] != "anthropic/claude-opus-4-5" {
-		t.Errorf("agent1 models = %v; want [anthropic/claude-opus-4-5]", models1)
+	if len(models1) != 1 || models1[0] != "anthropic/claude-opus-4-6" {
+		t.Errorf("agent1 models = %v; want [anthropic/claude-opus-4-6]", models1)
 	}
 	models2 := getModelsForAgent(metadata.Models, "agent2")
 	if len(models2) != 1 || models2[0] != "openai/gpt-4" {
@@ -139,7 +139,7 @@ func TestApplyConfigDefaultsAppliesDefault(t *testing.T) {
 }
 
 func TestApplyConfigDefaultsNilModelsMap(t *testing.T) {
-	config := &projectConfig{DefaultModel: "anthropic/claude-opus-4-5"}
+	config := &projectConfig{DefaultModel: "anthropic/claude-opus-4-6"}
 	metadata := GoalMetadata{}
 
 	applyConfigDefaults(config, &metadata)
