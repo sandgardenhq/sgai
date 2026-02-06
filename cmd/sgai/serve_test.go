@@ -1827,3 +1827,221 @@ func TestWriteGoalExample(t *testing.T) {
 		t.Fatal("GOAL.md is empty")
 	}
 }
+
+func setupForkFixture(t *testing.T, rootDir, forkName string) string {
+	t.Helper()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	forkPath := filepath.Join(rootDir, forkName)
+	if err := os.MkdirAll(forkPath, 0755); err != nil {
+		t.Fatalf("failed to create fork workspace: %v", err)
+	}
+	createsgaiDir(t, forkPath)
+	if err := os.MkdirAll(filepath.Join(forkPath, ".jj"), 0755); err != nil {
+		t.Fatalf("failed to create fork jj dir: %v", err)
+	}
+	rootRepoPath := filepath.Join(rootPath, ".jj", "repo")
+	if err := os.WriteFile(filepath.Join(forkPath, ".jj", "repo"), []byte(rootRepoPath), 0644); err != nil {
+		t.Fatalf("failed to create fork repo file: %v", err)
+	}
+	return forkPath
+}
+
+func TestHandleRenameForkGet(t *testing.T) {
+	rootDir := t.TempDir()
+	setupForkFixture(t, rootDir, "my-fork")
+
+	srv := NewServer(rootDir)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/my-fork/rename", nil)
+	req.SetPathValue("name", "my-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkGet(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET rename fork expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Rename Fork") {
+		t.Error("response missing 'Rename Fork' title")
+	}
+	if !strings.Contains(body, "my-fork") {
+		t.Error("response missing current fork name")
+	}
+}
+
+func TestHandleRenameForkGetRejectsRoot(t *testing.T) {
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/root-workspace/rename", nil)
+	req.SetPathValue("name", "root-workspace")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkGet(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET rename fork for root expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleRenameForkPost(t *testing.T) {
+	fakeBinDir := t.TempDir()
+	fakeJJ := filepath.Join(fakeBinDir, "jj")
+	if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("failed to create fake jj: %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	rootDir := t.TempDir()
+	setupForkFixture(t, rootDir, "old-fork")
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("name=new-fork")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/old-fork/rename", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "old-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkPost(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST rename fork expected 303, got %d: %s", rec.Code, rec.Body.String())
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "/workspaces/new-fork/progress") {
+		t.Errorf("POST rename fork redirect = %q; want /workspaces/new-fork/progress", location)
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "new-fork")); err != nil {
+		t.Errorf("new-fork directory should exist: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "old-fork")); !os.IsNotExist(err) {
+		t.Errorf("old-fork directory should not exist after rename")
+	}
+}
+
+func TestHandleRenameForkPostRejectsInvalidName(t *testing.T) {
+	rootDir := t.TempDir()
+	setupForkFixture(t, rootDir, "my-fork")
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("name=bad!name")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/my-fork/rename", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "my-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkPost(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST rename fork invalid expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "workspace name can only contain lowercase letters") {
+		t.Error("POST rename fork invalid expected validation error")
+	}
+}
+
+func TestHandleRenameForkPostRejectsExistingTarget(t *testing.T) {
+	rootDir := t.TempDir()
+	setupForkFixture(t, rootDir, "my-fork")
+	if err := os.MkdirAll(filepath.Join(rootDir, "taken-name"), 0755); err != nil {
+		t.Fatalf("failed to create target dir: %v", err)
+	}
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("name=taken-name")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/my-fork/rename", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "my-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkPost(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST rename fork existing target expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "a directory with this name already exists") {
+		t.Error("expected 'already exists' error message")
+	}
+}
+
+func TestHandleRenameForkPostRejectsRunningSession(t *testing.T) {
+	rootDir := t.TempDir()
+	forkPath := setupForkFixture(t, rootDir, "my-fork")
+
+	srv := NewServer(rootDir)
+	srv.mu.Lock()
+	srv.sessions[forkPath] = &session{running: true}
+	srv.mu.Unlock()
+
+	body := strings.NewReader("name=new-name")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/my-fork/rename", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "my-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkPost(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST rename fork running session expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "cannot rename: session is running") {
+		t.Error("expected 'session is running' error message")
+	}
+}
+
+func TestHandleRenameForkPostRekeysSession(t *testing.T) {
+	fakeBinDir := t.TempDir()
+	fakeJJ := filepath.Join(fakeBinDir, "jj")
+	if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("failed to create fake jj: %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	rootDir := t.TempDir()
+	forkPath := setupForkFixture(t, rootDir, "old-fork")
+
+	srv := NewServer(rootDir)
+	stoppedSession := &session{running: false}
+	srv.mu.Lock()
+	srv.sessions[forkPath] = stoppedSession
+	srv.everStartedDirs[forkPath] = true
+	srv.mu.Unlock()
+
+	body := strings.NewReader("name=new-fork")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/old-fork/rename", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "old-fork")
+	rec := httptest.NewRecorder()
+
+	srv.handleRenameForkPost(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST rename fork rekey expected 303, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	newPath := filepath.Join(rootDir, "new-fork")
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if srv.sessions[forkPath] != nil {
+		t.Error("old fork path should no longer have a session")
+	}
+	if srv.sessions[newPath] != stoppedSession {
+		t.Error("new fork path should have the moved session")
+	}
+	if srv.everStartedDirs[forkPath] {
+		t.Error("old fork path should no longer be in everStartedDirs")
+	}
+	if !srv.everStartedDirs[newPath] {
+		t.Error("new fork path should be in everStartedDirs")
+	}
+}
