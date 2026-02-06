@@ -1639,10 +1639,29 @@ func hassgaiDirectory(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
-func isRootWorkspace(dir string) bool {
+func isJJRepoRoot(dir string) bool {
 	repoPath := filepath.Join(dir, ".jj", "repo")
 	info, err := os.Stat(repoPath)
 	return err == nil && info.IsDir()
+}
+
+func isRootWorkspace(dir string) bool {
+	return isJJRepoRoot(dir) && hasMultipleWorkspaces(dir)
+}
+
+func hasMultipleWorkspaces(dir string) bool {
+	cmd := exec.Command("jj", "workspace", "list")
+	cmd.Dir = dir
+	output, errExec := cmd.Output()
+	if errExec != nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed == "" {
+		return false
+	}
+	lines := strings.Split(trimmed, "\n")
+	return len(lines) > 1
 }
 
 func isForkWorkspace(dir string) bool {
@@ -3000,7 +3019,7 @@ func (s *Server) handleNewForkGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isRootWorkspace(workspacePath) {
+	if !isJJRepoRoot(workspacePath) {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}
@@ -3027,7 +3046,7 @@ func (s *Server) handleNewForkPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isRootWorkspace(workspacePath) {
+	if !isJJRepoRoot(workspacePath) {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}

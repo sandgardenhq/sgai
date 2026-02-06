@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,34 @@ func createsgaiDir(t *testing.T, projectDir string) {
 	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
 		t.Fatalf("Failed to create .sgai dir: %v", err)
 	}
+}
+
+func installFakeJJWithWorkspaceList(t *testing.T, workspaceCount int, extraHandlers string) {
+	t.Helper()
+	fakeBinDir := t.TempDir()
+	fakeJJ := filepath.Join(fakeBinDir, "jj")
+	var workspaceOutput strings.Builder
+	for i := range workspaceCount {
+		if i == 0 {
+			workspaceOutput.WriteString("default: /path/to/root\\n")
+		} else {
+			fmt.Fprintf(&workspaceOutput, "fork-%d: /path/to/fork-%d\\n", i, i)
+		}
+	}
+	var script strings.Builder
+	script.WriteString("#!/bin/sh\n")
+	script.WriteString("if [ \"$1\" = \"workspace\" ] && [ \"$2\" = \"list\" ]; then\n")
+	script.WriteString("  printf \"" + workspaceOutput.String() + "\"\n")
+	script.WriteString("  exit 0\n")
+	script.WriteString("fi\n")
+	if extraHandlers != "" {
+		script.WriteString(extraHandlers)
+	}
+	script.WriteString("exit 0\n")
+	if err := os.WriteFile(fakeJJ, []byte(script.String()), 0755); err != nil {
+		t.Fatalf("failed to create fake jj: %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 type mockEditorOpener struct {
@@ -687,6 +716,8 @@ func TestNormalizeForkName(t *testing.T) {
 }
 
 func TestHandleNewForkGet(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
 	if err := os.MkdirAll(rootPath, 0755); err != nil {
@@ -714,6 +745,8 @@ func TestHandleNewForkGet(t *testing.T) {
 }
 
 func TestHandleNewForkPost(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
 	if err := os.MkdirAll(rootPath, 0755); err != nil {
@@ -723,13 +756,6 @@ func TestHandleNewForkPost(t *testing.T) {
 		t.Fatalf("failed to create jj repo: %v", err)
 	}
 	createsgaiDir(t, rootPath)
-
-	fakeBinDir := t.TempDir()
-	fakeJJ := filepath.Join(fakeBinDir, "jj")
-	if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
-		t.Fatalf("failed to create fake jj: %v", err)
-	}
-	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	srv := NewServer(rootDir)
 	body := strings.NewReader("name=My_Fork")
@@ -757,6 +783,8 @@ func TestHandleNewForkPost(t *testing.T) {
 }
 
 func TestHandleNewForkPostRejectsInvalidName(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
 	if err := os.MkdirAll(rootPath, 0755); err != nil {
@@ -784,7 +812,65 @@ func TestHandleNewForkPostRejectsInvalidName(t *testing.T) {
 	}
 }
 
+func TestHandleNewForkGetSingleWorkspace(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 1, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(rootPath, 0755); err != nil {
+		t.Fatalf("failed to create root workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/root-workspace/fork/new", nil)
+	req.SetPathValue("name", "root-workspace")
+	rec := httptest.NewRecorder()
+
+	srv.handleNewForkGet(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET new fork on single workspace expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleNewForkPostSingleWorkspace(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 1, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(rootPath, 0755); err != nil {
+		t.Fatalf("failed to create root workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("name=my-fork")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/fork/new", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "root-workspace")
+	rec := httptest.NewRecorder()
+
+	srv.handleNewForkPost(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST new fork on single workspace expected 303, got %d: %s", rec.Code, rec.Body.String())
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "/workspaces/my-fork/spec") {
+		t.Errorf("POST new fork redirect = %q; want fork spec page", location)
+	}
+}
+
 func TestHandleWorkspaceStartRejectsRoot(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
 	if err := os.MkdirAll(rootPath, 0755); err != nil {
@@ -805,6 +891,32 @@ func TestHandleWorkspaceStartRejectsRoot(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("POST start root expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleWorkspaceStartAllowsSingleWorkspace(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 1, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "solo-workspace")
+	if err := os.MkdirAll(rootPath, 0755); err != nil {
+		t.Fatalf("failed to create workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("auto=false")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/solo-workspace/start", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	srv.handleWorkspaceStart(rec, req, rootPath)
+
+	if rec.Code == http.StatusBadRequest {
+		t.Fatalf("POST start single workspace should not be rejected as root, got %d", rec.Code)
 	}
 }
 
@@ -833,12 +945,8 @@ func TestHandleForkMergeAcceptsConfirm(t *testing.T) {
 func runForkMergeDirty(t *testing.T, confirmParam string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	fakeBinDir := t.TempDir()
-	fakeJJ := filepath.Join(fakeBinDir, "jj")
-	if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nif [ \"$1\" = \"diff\" ]; then\n  printf \"M file.go\\n\"\n  exit 0\nfi\nexit 0\n"), 0755); err != nil {
-		t.Fatalf("failed to create fake jj: %v", err)
-	}
-	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	diffHandler := "if [ \"$1\" = \"diff\" ]; then\n  printf \"M file.go\\n\"\n  exit 0\nfi\n"
+	installFakeJJWithWorkspaceList(t, 2, diffHandler)
 
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
@@ -936,6 +1044,8 @@ func TestHandleForkMergeRequiresPost(t *testing.T) {
 }
 
 func TestHandleForkMergeRequiresConfirmation(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
 	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
@@ -975,12 +1085,8 @@ func TestHandleForkMergeRequiresConfirmation(t *testing.T) {
 }
 
 func TestRenderRootWorkspaceContent(t *testing.T) {
-	fakeBinDir := t.TempDir()
-	fakeJJ := filepath.Join(fakeBinDir, "jj")
-	if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nif [ \"$1\" = \"log\" ]; then\n  printf \"id1\\n\"\n  exit 0\nfi\nexit 0\n"), 0755); err != nil {
-		t.Fatalf("failed to create fake jj: %v", err)
-	}
-	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	logHandler := "if [ \"$1\" = \"log\" ]; then\n  printf \"id1\\n\"\n  exit 0\nfi\n"
+	installFakeJJWithWorkspaceList(t, 2, logHandler)
 
 	rootDir := t.TempDir()
 	rootPath := filepath.Join(rootDir, "root-workspace")
@@ -1740,6 +1846,101 @@ func TestBuildWorkspacePageData(t *testing.T) {
 		dataWithNeedsInput := buildWorkspacePageData(groupsWithNeedsInput, "/a", "tab", "", "")
 		if !dataWithNeedsInput.HasNeedsInputWorkspace {
 			t.Error("HasNeedsInputWorkspace = false; want true (workspace needs input)")
+		}
+	})
+}
+
+func TestIsRootWorkspace(t *testing.T) {
+	t.Run("noJJRepo", func(t *testing.T) {
+		dir := t.TempDir()
+		if isRootWorkspace(dir) {
+			t.Error("isRootWorkspace() = true; want false for directory without .jj/repo")
+		}
+	})
+
+	t.Run("repoIsFile", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj"), 0755); err != nil {
+			t.Fatalf("failed to create .jj dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".jj", "repo"), []byte("/some/path"), 0644); err != nil {
+			t.Fatalf("failed to create repo file: %v", err)
+		}
+		if isRootWorkspace(dir) {
+			t.Error("isRootWorkspace() = true; want false for .jj/repo as file")
+		}
+	})
+
+	t.Run("singleWorkspace", func(t *testing.T) {
+		installFakeJJWithWorkspaceList(t, 1, "")
+
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
+			t.Fatalf("failed to create jj repo: %v", err)
+		}
+		if isRootWorkspace(dir) {
+			t.Error("isRootWorkspace() = true; want false for single workspace")
+		}
+	})
+
+	t.Run("multipleWorkspaces", func(t *testing.T) {
+		installFakeJJWithWorkspaceList(t, 2, "")
+
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
+			t.Fatalf("failed to create jj repo: %v", err)
+		}
+		if !isRootWorkspace(dir) {
+			t.Error("isRootWorkspace() = false; want true for multiple workspaces")
+		}
+	})
+
+	t.Run("jjCommandFails", func(t *testing.T) {
+		fakeBinDir := t.TempDir()
+		fakeJJ := filepath.Join(fakeBinDir, "jj")
+		if err := os.WriteFile(fakeJJ, []byte("#!/bin/sh\nexit 1\n"), 0755); err != nil {
+			t.Fatalf("failed to create fake jj: %v", err)
+		}
+		t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
+			t.Fatalf("failed to create jj repo: %v", err)
+		}
+		if isRootWorkspace(dir) {
+			t.Error("isRootWorkspace() = true; want false when jj command fails")
+		}
+	})
+}
+
+func TestIsJJRepoRoot(t *testing.T) {
+	t.Run("noJJRepo", func(t *testing.T) {
+		dir := t.TempDir()
+		if isJJRepoRoot(dir) {
+			t.Error("isJJRepoRoot() = true; want false for directory without .jj/repo")
+		}
+	})
+
+	t.Run("repoIsFile", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj"), 0755); err != nil {
+			t.Fatalf("failed to create .jj dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, ".jj", "repo"), []byte("/some/path"), 0644); err != nil {
+			t.Fatalf("failed to create repo file: %v", err)
+		}
+		if isJJRepoRoot(dir) {
+			t.Error("isJJRepoRoot() = true; want false for .jj/repo as file")
+		}
+	})
+
+	t.Run("repoIsDirectory", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
+			t.Fatalf("failed to create jj repo: %v", err)
+		}
+		if !isJJRepoRoot(dir) {
+			t.Error("isJJRepoRoot() = false; want true for .jj/repo as directory")
 		}
 	})
 }
