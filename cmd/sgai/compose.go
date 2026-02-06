@@ -265,7 +265,7 @@ func (s *Server) handleComposeUpdatePanel(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("HX-Trigger", "previewUpdated")
+	w.Header().Set("Hx-Trigger", "previewUpdated")
 
 	data := struct {
 		Preview   template.HTML
@@ -319,13 +319,13 @@ func (s *Server) handleComposeSave(w http.ResponseWriter, r *http.Request, works
 
 	if err := os.WriteFile(goalPath, []byte(goalContent), 0644); err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("HX-Trigger", "saveError")
+		w.Header().Set("Hx-Trigger", "saveError")
 		_, _ = fmt.Fprintf(w, `<div class="save-error">Failed to save: %s</div>`, template.HTMLEscapeString(err.Error()))
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("HX-Trigger", "saveSuccess")
+	w.Header().Set("Hx-Trigger", "saveSuccess")
 	_, _ = w.Write([]byte(`<div class="save-success">GOAL.md saved successfully!</div>`))
 }
 
@@ -361,7 +361,7 @@ func (s *Server) handleComposeAssist(w http.ResponseWriter, r *http.Request, wor
 	result, err := invokeLLMForAssist(prompt)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("HX-Trigger", "assistError")
+		w.Header().Set("Hx-Trigger", "assistError")
 		_, _ = fmt.Fprintf(w, `<div class="assist-error">AI assist failed: %s</div>`, template.HTMLEscapeString(err.Error()))
 		return
 	}
@@ -401,7 +401,7 @@ func (s *Server) handleComposeCommand(w http.ResponseWriter, r *http.Request, wo
 	result, err := invokeLLMForCommand(prompt)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		w.Header().Set("HX-Trigger", "commandError")
+		w.Header().Set("Hx-Trigger", "commandError")
 		_, _ = fmt.Fprintf(w, `<div class="command-error">Command failed: %s</div>`, template.HTMLEscapeString(err.Error()))
 		return
 	}
@@ -829,7 +829,7 @@ func (s *Server) renderPanelAndPreview(w http.ResponseWriter, workspacePath, pan
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("HX-Trigger", "assistSuccess")
+	w.Header().Set("Hx-Trigger", "assistSuccess")
 
 	data := struct {
 		State     composerState
