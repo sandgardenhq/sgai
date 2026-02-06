@@ -740,6 +740,7 @@ type sessionData struct {
 	CurrentAgent         string
 	CurrentModel         string
 	ModelStatuses        map[string]string
+	OrderedModelStatuses []modelStatusDisplay
 	HumanMessage         string
 	RenderedHumanMessage template.HTML
 	Progress             []state.ProgressEntry
@@ -851,6 +852,7 @@ func (s *Server) prepareSessionData(dir string, wfState state.Workflow, r *http.
 		CurrentAgent:         currentAgent,
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
+		OrderedModelStatuses: orderedModelStatuses(dir, wfState.ModelStatuses),
 		HumanMessage:         wfState.HumanMessage,
 		RenderedHumanMessage: renderedHumanMessage,
 		Progress:             reversedProgress,
@@ -2259,6 +2261,65 @@ func buildBaseStatusText(wfState state.Workflow) string {
 	return ""
 }
 
+type modelStatusDisplay struct {
+	ModelID string
+	Status  string
+}
+
+func orderedModelStatuses(dir string, modelStatuses map[string]string) []modelStatusDisplay {
+	if len(modelStatuses) == 0 {
+		return nil
+	}
+
+	modelOrder := modelsForAgentFromGoal(dir, "project-critic-council")
+	ordered := make([]modelStatusDisplay, 0, len(modelStatuses))
+	used := make(map[string]bool)
+
+	for _, modelSpec := range modelOrder {
+		modelID := formatModelID("project-critic-council", modelSpec)
+		status, ok := modelStatuses[modelID]
+		if !ok {
+			continue
+		}
+		ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: status})
+		used[modelID] = true
+	}
+
+	remaining := make([]string, 0, len(modelStatuses))
+	for modelID := range modelStatuses {
+		if used[modelID] {
+			continue
+		}
+		remaining = append(remaining, modelID)
+	}
+	if len(remaining) == 0 {
+		return ordered
+	}
+	if len(ordered) == 0 {
+		ordered = make([]modelStatusDisplay, 0, len(modelStatuses))
+	}
+	if len(remaining) > 1 {
+		slices.Sort(remaining)
+	}
+	for _, modelID := range remaining {
+		ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: modelStatuses[modelID]})
+	}
+	return ordered
+}
+
+func modelsForAgentFromGoal(dir, agent string) []string {
+	goalPath := filepath.Join(dir, "GOAL.md")
+	goalData, errRead := os.ReadFile(goalPath)
+	if errRead != nil {
+		return nil
+	}
+	metadata, errParse := parseYAMLFrontmatter(goalData)
+	if errParse != nil {
+		return nil
+	}
+	return getModelsForAgent(metadata.Models, agent)
+}
+
 func lookupModelForAgent(dir, agentName string) string {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	goalData, err := os.ReadFile(goalPath)
@@ -2573,6 +2634,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		FormattedModel       string
 		CurrentModel         string
 		ModelStatuses        map[string]string
+		OrderedModelStatuses []modelStatusDisplay
 		HasEditedGoal        bool
 		IsRoot               bool
 	}{
@@ -2598,6 +2660,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		FormattedModel:       agentInfo.formattedModel,
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
+		OrderedModelStatuses: orderedModelStatuses(dir, wfState.ModelStatuses),
 		HasEditedGoal:        hasEditedGoal,
 		IsRoot:               isRoot,
 	}
@@ -3181,6 +3244,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		CurrentAgent         string
 		CurrentModel         string
 		ModelStatuses        map[string]string
+		OrderedModelStatuses []modelStatusDisplay
 		NeedsInput           bool
 		RenderedHumanMessage template.HTML
 		GoalContent          template.HTML
@@ -3196,6 +3260,7 @@ func (s *Server) renderTreesEventsTabToBuffer(buf *bytes.Buffer, r *http.Request
 		CurrentAgent:         currentAgent,
 		CurrentModel:         wfState.CurrentModel,
 		ModelStatuses:        wfState.ModelStatuses,
+		OrderedModelStatuses: orderedModelStatuses(dir, wfState.ModelStatuses),
 		NeedsInput:           needsInput,
 		RenderedHumanMessage: renderedHumanMessage,
 		GoalContent:          goalContent,
