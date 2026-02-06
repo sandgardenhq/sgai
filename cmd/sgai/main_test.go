@@ -17,20 +17,20 @@ func TestParseModelAndVariant(t *testing.T) {
 	}{
 		{
 			name:        "noVariant",
-			modelSpec:   "anthropic/claude-opus-4-5",
-			wantModel:   "anthropic/claude-opus-4-5",
+			modelSpec:   "anthropic/claude-opus-4-6",
+			wantModel:   "anthropic/claude-opus-4-6",
 			wantVariant: "",
 		},
 		{
 			name:        "withSpaceBeforeParenthesis",
-			modelSpec:   "anthropic/claude-opus-4-5 (high)",
-			wantModel:   "anthropic/claude-opus-4-5",
+			modelSpec:   "anthropic/claude-opus-4-6 (high)",
+			wantModel:   "anthropic/claude-opus-4-6",
 			wantVariant: "high",
 		},
 		{
 			name:        "noSpaceBeforeParenthesis",
-			modelSpec:   "anthropic/claude-opus-4-5(banana)",
-			wantModel:   "anthropic/claude-opus-4-5",
+			modelSpec:   "anthropic/claude-opus-4-6(banana)",
+			wantModel:   "anthropic/claude-opus-4-6",
 			wantVariant: "banana",
 		},
 		{
@@ -47,14 +47,14 @@ func TestParseModelAndVariant(t *testing.T) {
 		},
 		{
 			name:        "multipleSpacesBeforeParenthesis",
-			modelSpec:   "anthropic/claude-opus-4-5  (high)",
-			wantModel:   "anthropic/claude-opus-4-5",
+			modelSpec:   "anthropic/claude-opus-4-6  (high)",
+			wantModel:   "anthropic/claude-opus-4-6",
 			wantVariant: "high",
 		},
 		{
 			name:        "variantWithSpaces",
-			modelSpec:   "anthropic/claude-opus-4-5 (high quality)",
-			wantModel:   "anthropic/claude-opus-4-5",
+			modelSpec:   "anthropic/claude-opus-4-6 (high quality)",
+			wantModel:   "anthropic/claude-opus-4-6",
 			wantVariant: "high quality",
 		},
 	}
@@ -80,7 +80,7 @@ func TestTryReloadGoalMetadata(t *testing.T) {
 		newContent := `---
 interactive: "auto"
 models:
-  coordinator: anthropic/claude-opus-4-5
+  coordinator: anthropic/claude-opus-4-6
 completionGateScript: make test
 ---
 # New Goal
@@ -101,8 +101,8 @@ completionGateScript: make test
 			t.Errorf("tryReloadGoalMetadata() Interactive = %q; want %q", got.Interactive, "auto")
 		}
 		models := getModelsForAgent(got.Models, "coordinator")
-		if len(models) != 1 || models[0] != "anthropic/claude-opus-4-5" {
-			t.Errorf("tryReloadGoalMetadata() Models[coordinator] = %v; want [anthropic/claude-opus-4-5]", models)
+		if len(models) != 1 || models[0] != "anthropic/claude-opus-4-6" {
+			t.Errorf("tryReloadGoalMetadata() Models[coordinator] = %v; want [anthropic/claude-opus-4-6]", models)
 		}
 		if got.CompletionGateScript != "make test" {
 			t.Errorf("tryReloadGoalMetadata() CompletionGateScript = %q; want %q", got.CompletionGateScript, "make test")

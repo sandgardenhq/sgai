@@ -120,7 +120,7 @@ flow: |
   "backend-go-developer" -> "go-readability-reviewer"
   "go-readability-reviewer" -> "stpa-analyst"
 models:
-  "coordinator": "anthropic/claude-opus-4-5"
+  "coordinator": "anthropic/claude-opus-4-6"
   "backend-go-developer": "anthropic/claude-sonnet-4-5"
 interactive: yes
 ---

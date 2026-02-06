@@ -85,14 +85,14 @@ func TestFormatModelID(t *testing.T) {
 		{
 			name:      "simpleModel",
 			agent:     "backend-go-developer",
-			modelSpec: "anthropic/claude-opus-4-5",
-			want:      "backend-go-developer:anthropic/claude-opus-4-5",
+			modelSpec: "anthropic/claude-opus-4-6",
+			want:      "backend-go-developer:anthropic/claude-opus-4-6",
 		},
 		{
 			name:      "modelWithVariant",
 			agent:     "backend-go-developer",
-			modelSpec: "anthropic/claude-opus-4-5 (max)",
-			want:      "backend-go-developer:anthropic/claude-opus-4-5 (max)",
+			modelSpec: "anthropic/claude-opus-4-6 (max)",
+			want:      "backend-go-developer:anthropic/claude-opus-4-6 (max)",
 		},
 		{
 			name:      "coordinator",
@@ -120,12 +120,12 @@ func TestExtractAgentFromModelID(t *testing.T) {
 	}{
 		{
 			name:    "standardModelID",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-5",
+			modelID: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:    "backend-go-developer",
 		},
 		{
 			name:    "modelIDWithVariant",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-5 (max)",
+			modelID: "backend-go-developer:anthropic/claude-opus-4-6 (max)",
 			want:    "backend-go-developer",
 		},
 		{
@@ -503,12 +503,12 @@ func TestExtractAgentNameFromTarget(t *testing.T) {
 		},
 		{
 			name:   "modelID",
-			target: "backend-go-developer:anthropic/claude-opus-4-5",
+			target: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:   "backend-go-developer",
 		},
 		{
 			name:   "modelIDWithVariant",
-			target: "backend-go-developer:anthropic/claude-opus-4-5 (max)",
+			target: "backend-go-developer:anthropic/claude-opus-4-6 (max)",
 			want:   "backend-go-developer",
 		},
 		{
@@ -550,16 +550,16 @@ func TestMessageMatchesRecipient(t *testing.T) {
 		},
 		{
 			name:         "matchesModelID",
-			msg:          state.Message{ToAgent: "backend-go-developer:anthropic/claude-opus-4-5"},
+			msg:          state.Message{ToAgent: "backend-go-developer:anthropic/claude-opus-4-6"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         true,
 		},
 		{
 			name:         "matchesAgentWhenModelSet",
 			msg:          state.Message{ToAgent: "backend-go-developer"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         true,
 		},
 		{
@@ -573,12 +573,12 @@ func TestMessageMatchesRecipient(t *testing.T) {
 			name:         "noMatchDifferentModel",
 			msg:          state.Message{ToAgent: "backend-go-developer:anthropic/claude-sonnet-4-5"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         false,
 		},
 		{
 			name:         "modelMessageWithoutCurrentModel",
-			msg:          state.Message{ToAgent: "backend-go-developer:anthropic/claude-opus-4-5"},
+			msg:          state.Message{ToAgent: "backend-go-developer:anthropic/claude-opus-4-6"},
 			currentAgent: "backend-go-developer",
 			currentModel: "",
 			want:         false,
@@ -612,16 +612,16 @@ func TestMessageMatchesSender(t *testing.T) {
 		},
 		{
 			name:         "matchesModelID",
-			msg:          state.Message{FromAgent: "backend-go-developer:anthropic/claude-opus-4-5"},
+			msg:          state.Message{FromAgent: "backend-go-developer:anthropic/claude-opus-4-6"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         true,
 		},
 		{
 			name:         "matchesAgentWhenModelSet",
 			msg:          state.Message{FromAgent: "backend-go-developer"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         true,
 		},
 		{
@@ -635,7 +635,7 @@ func TestMessageMatchesSender(t *testing.T) {
 			name:         "noMatchDifferentModel",
 			msg:          state.Message{FromAgent: "backend-go-developer:anthropic/claude-sonnet-4-5"},
 			currentAgent: "backend-go-developer",
-			currentModel: "backend-go-developer:anthropic/claude-opus-4-5",
+			currentModel: "backend-go-developer:anthropic/claude-opus-4-6",
 			want:         false,
 		},
 	}
@@ -701,13 +701,13 @@ func TestExtractModelShortName(t *testing.T) {
 	}{
 		{
 			name:    "standardModelID",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-5",
-			want:    "anthropic/claude-opus-4-5",
+			modelID: "backend-go-developer:anthropic/claude-opus-4-6",
+			want:    "anthropic/claude-opus-4-6",
 		},
 		{
 			name:    "modelIDWithVariant",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-5 (max)",
-			want:    "anthropic/claude-opus-4-5 (max)",
+			modelID: "backend-go-developer:anthropic/claude-opus-4-6 (max)",
+			want:    "anthropic/claude-opus-4-6 (max)",
 		},
 		{
 			name:    "noColon",

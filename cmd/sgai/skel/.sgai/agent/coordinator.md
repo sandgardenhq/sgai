@@ -1,5 +1,5 @@
 ---
-model: "anthropic/claude-opus-4-5 (max)"
+model: "anthropic/claude-opus-4-6 (max)"
 description: Coordinates the work flow.
 mode: primary
 permission:
