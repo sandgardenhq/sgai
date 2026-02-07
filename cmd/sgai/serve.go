@@ -2818,18 +2818,11 @@ func (s *Server) renderRootWorkspaceContent(dir, sessionParam string, r *http.Re
 		}
 	}
 
-	hasEditedGoal := false
-	if data, err := os.ReadFile(filepath.Join(dir, "GOAL.md")); err == nil {
-		body := extractBody(data)
-		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
-	}
-
 	workspaceData := struct {
 		Directory        string
 		DirName          string
 		TabContent       template.HTML
 		ErrorMessage     string
-		HasEditedGoal    bool
 		CodeAvailable    bool
 		EditorAvailable  bool
 		IsTerminalEditor bool
@@ -2841,7 +2834,6 @@ func (s *Server) renderRootWorkspaceContent(dir, sessionParam string, r *http.Re
 		DirName:          rootName,
 		TabContent:       template.HTML(tabBuf.String()),
 		ErrorMessage:     errMsg,
-		HasEditedGoal:    hasEditedGoal,
 		CodeAvailable:    editorAvailable,
 		EditorAvailable:  editorAvailable,
 		IsTerminalEditor: s.isTerminalEditor,
