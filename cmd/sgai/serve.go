@@ -1639,45 +1639,43 @@ type workspaceGroup struct {
 	Forks []workspaceInfo
 }
 
-func hasJJDirectory(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, ".jj"))
-	return err == nil && info.IsDir()
+type workspaceKind string
+
+const (
+	workspaceStandalone workspaceKind = "standalone"
+	workspaceRoot       workspaceKind = "root"
+	workspaceFork       workspaceKind = "fork"
+)
+
+func classifyWorkspace(dir string) workspaceKind {
+	repoPath := filepath.Join(dir, ".jj", "repo")
+	info, errStat := os.Stat(repoPath)
+	if errStat != nil {
+		return workspaceStandalone
+	}
+	if !info.IsDir() {
+		return workspaceFork
+	}
+	cmd := exec.Command("jj", "workspace", "list")
+	cmd.Dir = dir
+	output, errExec := cmd.Output()
+	if errExec != nil {
+		return workspaceStandalone
+	}
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed == "" {
+		return workspaceStandalone
+	}
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) > 1 {
+		return workspaceRoot
+	}
+	return workspaceStandalone
 }
 
 func hassgaiDirectory(dir string) bool {
 	info, err := os.Stat(filepath.Join(dir, ".sgai"))
 	return err == nil && info.IsDir()
-}
-
-func isJJRepoRoot(dir string) bool {
-	repoPath := filepath.Join(dir, ".jj", "repo")
-	info, err := os.Stat(repoPath)
-	return err == nil && info.IsDir()
-}
-
-func isRootWorkspace(dir string) bool {
-	return isJJRepoRoot(dir) && hasMultipleWorkspaces(dir)
-}
-
-func hasMultipleWorkspaces(dir string) bool {
-	cmd := exec.Command("jj", "workspace", "list")
-	cmd.Dir = dir
-	output, errExec := cmd.Output()
-	if errExec != nil {
-		return false
-	}
-	trimmed := strings.TrimSpace(string(output))
-	if trimmed == "" {
-		return false
-	}
-	lines := strings.Split(trimmed, "\n")
-	return len(lines) > 1
-}
-
-func isForkWorkspace(dir string) bool {
-	repoPath := filepath.Join(dir, ".jj", "repo")
-	info, err := os.Stat(repoPath)
-	return err == nil && !info.IsDir()
 }
 
 func getRootWorkspacePath(forkDir string) string {
@@ -2118,23 +2116,14 @@ func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
 	var standaloneGroups []workspaceGroup
 
 	for _, proj := range projects {
-		if !hasJJDirectory(proj.Directory) {
-			standaloneGroups = append(standaloneGroups, workspaceGroup{
-				Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
-			})
-			continue
-		}
-
-		if isRootWorkspace(proj.Directory) {
+		switch classifyWorkspace(proj.Directory) {
+		case workspaceRoot:
 			if _, exists := rootMap[proj.Directory]; !exists {
 				rootMap[proj.Directory] = &workspaceGroup{
 					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, true, proj.HasWorkspace),
 				}
 			}
-			continue
-		}
-
-		if isForkWorkspace(proj.Directory) {
+		case workspaceFork:
 			rootPath := getRootWorkspacePath(proj.Directory)
 			if rootPath == "" {
 				standaloneGroups = append(standaloneGroups, workspaceGroup{
@@ -2142,7 +2131,6 @@ func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
 				})
 				continue
 			}
-
 			if existing, exists := rootMap[rootPath]; exists {
 				existing.Forks = append(existing.Forks, s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace))
 			} else {
@@ -2151,12 +2139,11 @@ func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
 					Forks: []workspaceInfo{s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace)},
 				}
 			}
-			continue
+		default:
+			standaloneGroups = append(standaloneGroups, workspaceGroup{
+				Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
+			})
 		}
-
-		standaloneGroups = append(standaloneGroups, workspaceGroup{
-			Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
-		})
 	}
 
 	var groups []workspaceGroup
@@ -2660,7 +2647,8 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		return s.renderNoWorkspacePlaceholder(dir)
 	}
 
-	if isRootWorkspace(dir) {
+	kind := classifyWorkspace(dir)
+	if kind == workspaceRoot {
 		return s.renderRootWorkspaceContent(dir, sessionParam, r, "")
 	}
 
@@ -2680,8 +2668,8 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	}
 
 	needsInput := wfState.NeedsHumanInput()
-	isFork := hasJJDirectory(dir) && !isRootWorkspace(dir)
-	isRoot := isRootWorkspace(dir)
+	isFork := kind == workspaceFork
+	isRoot := kind == workspaceRoot
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress))
@@ -3095,8 +3083,8 @@ func (s *Server) handleNewForkGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isJJRepoRoot(workspacePath) {
-		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+	if classifyWorkspace(workspacePath) == workspaceFork {
+		http.Error(w, "forks cannot create new forks", http.StatusBadRequest)
 		return
 	}
 
@@ -3122,8 +3110,8 @@ func (s *Server) handleNewForkPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isJJRepoRoot(workspacePath) {
-		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+	if classifyWorkspace(workspacePath) == workspaceFork {
+		http.Error(w, "forks cannot create new forks", http.StatusBadRequest)
 		return
 	}
 
@@ -3196,7 +3184,7 @@ func (s *Server) handleRenameForkGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isForkWorkspace(workspacePath) {
+	if classifyWorkspace(workspacePath) != workspaceFork {
 		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
 		return
 	}
@@ -3210,7 +3198,7 @@ func (s *Server) handleRenameForkPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isForkWorkspace(workspacePath) {
+	if classifyWorkspace(workspacePath) != workspaceFork {
 		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
 		return
 	}
@@ -3504,14 +3492,14 @@ func (s *Server) renderTreesChangesTabToBuffer(buf *bytes.Buffer, dir string) {
 }
 
 func (s *Server) renderTreesCommitsTabToBuffer(buf *bytes.Buffer, dir string) {
-	if !hasJJDirectory(dir) {
+	if _, errStat := os.Stat(filepath.Join(dir, ".jj")); errStat != nil {
 		buf.WriteString("<p><em>Not a jj repository</em></p>")
 		return
 	}
 
 	currentWorkspace := filepath.Base(dir)
 	var commits []jjCommit
-	if isRootWorkspace(dir) {
+	if classifyWorkspace(dir) == workspaceRoot {
 		commits = runJJLogForRoot(dir)
 	} else {
 		commits = runJJLogForFork(dir)
@@ -3634,7 +3622,7 @@ func (s *Server) handleWorkspaceStart(w http.ResponseWriter, r *http.Request, wo
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
 		return
 	}
-	if isRootWorkspace(workspacePath) {
+	if classifyWorkspace(workspacePath) == workspaceRoot {
 		http.Error(w, "root workspace cannot start agentic work", http.StatusBadRequest)
 		return
 	}
@@ -3938,7 +3926,7 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isRootWorkspace(rootDir) {
+	if classifyWorkspace(rootDir) != workspaceRoot {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}
@@ -3974,7 +3962,7 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 		renderError("invalid fork directory")
 		return
 	}
-	if !isForkWorkspace(forkDir) {
+	if classifyWorkspace(forkDir) != workspaceFork {
 		renderError("fork workspace not found")
 		return
 	}
