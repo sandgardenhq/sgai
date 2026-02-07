@@ -556,6 +556,7 @@ func cmdServe(args []string) {
 	mux.HandleFunc("GET /workspaces/{name}/fork/new", srv.handleNewForkGet)
 	mux.HandleFunc("POST /workspaces/{name}/fork/new", srv.handleNewForkPost)
 	mux.HandleFunc("POST /workspaces/{name}/merge", srv.handleForkMerge)
+	mux.HandleFunc("POST /workspaces/{name}/delete-fork", srv.handleForkDelete)
 	mux.HandleFunc("GET /workspaces/{name}/rename", srv.handleRenameForkGet)
 	mux.HandleFunc("POST /workspaces/{name}/rename", srv.handleRenameForkPost)
 	mux.HandleFunc("/workspaces/", srv.routeWorkspace)
@@ -1673,6 +1674,14 @@ func classifyWorkspace(dir string) workspaceKind {
 	return workspaceStandalone
 }
 
+func isRootWorkspace(dir string) bool {
+	return classifyWorkspace(dir) == workspaceRoot
+}
+
+func isForkWorkspace(dir string) bool {
+	return classifyWorkspace(dir) == workspaceFork
+}
+
 func hassgaiDirectory(dir string) bool {
 	info, err := os.Stat(filepath.Join(dir, ".sgai"))
 	return err == nil && info.IsDir()
@@ -2609,6 +2618,14 @@ type tabContentResult struct {
 
 func workspaceURL(workspacePath, action string) string {
 	return "/workspaces/" + url.PathEscape(filepath.Base(workspacePath)) + "/" + action
+}
+
+func htmxRedirect(w http.ResponseWriter, r *http.Request, url string) {
+	if r.Header.Get("Hx-Request") == "true" {
+		w.Header().Set("Hx-Redirect", url)
+		return
+	}
+	http.Redirect(w, r, url, http.StatusSeeOther)
 }
 
 func baseDirName(path string) string {
@@ -3963,15 +3980,6 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	confirmValue := r.FormValue("confirm_delete")
-	if confirmValue == "" {
-		confirmValue = r.FormValue("confirm")
-	}
-	if confirmValue != "true" {
-		renderError("confirmation required to merge and delete fork")
-		return
-	}
-
 	diffCmd := exec.Command("jj", "diff", "--stat")
 	diffCmd.Dir = forkDir
 	diffOutput, errDiff := diffCmd.CombinedOutput()
@@ -4116,7 +4124,7 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	defaultDescOutput, errDefaultDesc := defaultDescCmd.CombinedOutput()
 	if errDefaultDesc == nil {
 		var parts []string
-		for _, line := range strings.Split(string(defaultDescOutput), "\n") {
+		for line := range strings.SplitSeq(string(defaultDescOutput), "\n") {
 			trimmed := strings.TrimSpace(line)
 			if trimmed != "" {
 				parts = append(parts, trimmed)
@@ -4176,8 +4184,8 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 			if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
 				lines := strings.Split(result, "\n")
 				for i, line := range lines {
-					if strings.HasPrefix(line, "TITLE:") {
-						prTitle = strings.TrimSpace(strings.TrimPrefix(line, "TITLE:"))
+					if after, ok := strings.CutPrefix(line, "TITLE:"); ok {
+						prTitle = strings.TrimSpace(after)
 					}
 					if strings.HasPrefix(line, "BODY:") {
 						prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
@@ -4208,7 +4216,60 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, workspaceURL(rootDir, "progress"), http.StatusSeeOther)
+	htmxRedirect(w, r, workspaceURL(rootDir, "progress"))
+}
+
+func (s *Server) handleForkDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "post required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	workspaceName := r.PathValue("name")
+	rootDir := s.resolveWorkspaceNameToPath(workspaceName)
+	if rootDir == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+	if !isRootWorkspace(rootDir) {
+		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	forkDirParam := r.FormValue("fork_dir")
+	forkDir, err := s.validateDirectory(forkDirParam)
+	if err != nil {
+		http.Error(w, "invalid fork directory", http.StatusBadRequest)
+		return
+	}
+	if !isForkWorkspace(forkDir) {
+		http.Error(w, "fork workspace not found", http.StatusBadRequest)
+		return
+	}
+	if getRootWorkspacePath(forkDir) != rootDir {
+		http.Error(w, "fork does not belong to root", http.StatusBadRequest)
+		return
+	}
+
+	s.stopSession(forkDir)
+
+	forgetCmd := exec.Command("jj", "workspace", "forget", filepath.Base(forkDir))
+	forgetCmd.Dir = rootDir
+	if _, errForget := forgetCmd.CombinedOutput(); errForget != nil {
+		http.Error(w, "failed to forget fork workspace", http.StatusInternalServerError)
+		return
+	}
+	if errRemove := os.RemoveAll(forkDir); errRemove != nil {
+		http.Error(w, "failed to remove fork directory", http.StatusInternalServerError)
+		return
+	}
+
+	htmxRedirect(w, r, workspaceURL(rootDir, "forks"))
 }
 
 func (s *Server) handleWorkspaceUpdateDescription(w http.ResponseWriter, r *http.Request, workspacePath string) {

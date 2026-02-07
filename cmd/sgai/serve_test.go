@@ -923,30 +923,6 @@ func TestHandleWorkspaceStartAllowsSingleWorkspace(t *testing.T) {
 }
 
 func TestHandleForkMergeRejectsDirtyFork(t *testing.T) {
-	rec := runForkMergeDirty(t, "confirm_delete=true")
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("POST merge dirty expected 200, got %d", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "fork has uncommitted changes") {
-		t.Fatalf("POST merge dirty missing error message")
-	}
-}
-
-func TestHandleForkMergeAcceptsConfirm(t *testing.T) {
-	rec := runForkMergeDirty(t, "confirm=true")
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("POST merge confirm expected 200, got %d", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "fork has uncommitted changes") {
-		t.Fatalf("POST merge confirm missing error message")
-	}
-}
-
-func runForkMergeDirty(t *testing.T, confirmParam string) *httptest.ResponseRecorder {
-	t.Helper()
-
 	diffHandler := "if [ \"$1\" = \"diff\" ]; then\n  printf \"M file.go\\n\"\n  exit 0\nfi\n"
 	installFakeJJWithWorkspaceList(t, 2, diffHandler)
 
@@ -971,7 +947,7 @@ func runForkMergeDirty(t *testing.T, confirmParam string) *httptest.ResponseReco
 	}
 
 	srv := NewServer(rootDir)
-	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath) + "&" + confirmParam)
+	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath))
 	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/merge", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetPathValue("name", "root-workspace")
@@ -980,7 +956,252 @@ func runForkMergeDirty(t *testing.T, confirmParam string) *httptest.ResponseReco
 
 	srv.handleForkMerge(rec, req)
 
-	return rec
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST merge dirty expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "fork has uncommitted changes") {
+		t.Fatalf("POST merge dirty missing error message")
+	}
+}
+
+func TestHandleForkDeleteRequiresPost(t *testing.T) {
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/root-workspace/delete-fork", nil)
+	req.SetPathValue("name", "root-workspace")
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET delete-fork expected 405, got %d", rec.Code)
+	}
+}
+
+func TestHandleForkDeleteRejectsNonRoot(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 1, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "solo-workspace")
+	if err := os.MkdirAll(rootPath, 0755); err != nil {
+		t.Fatalf("failed to create workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("fork_dir=/tmp/fake")
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/solo-workspace/delete-fork", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "solo-workspace")
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST delete-fork non-root expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleForkDeleteRejectsNonFork(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	notForkPath := filepath.Join(rootDir, "not-a-fork")
+	if err := os.MkdirAll(notForkPath, 0755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+	createsgaiDir(t, notForkPath)
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("fork_dir=" + url.QueryEscape(notForkPath))
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/delete-fork", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "root-workspace")
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST delete-fork non-fork expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleForkDeleteSuccess(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	forkPath := filepath.Join(rootDir, "fork-workspace")
+	if err := os.MkdirAll(forkPath, 0755); err != nil {
+		t.Fatalf("failed to create fork workspace: %v", err)
+	}
+	createsgaiDir(t, forkPath)
+	rootRepoPath := filepath.Join(rootPath, ".jj", "repo")
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(forkPath, ".jj", "repo")), 0755); err != nil {
+		t.Fatalf("failed to create fork jj dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(forkPath, ".jj", "repo"), []byte(rootRepoPath), 0644); err != nil {
+		t.Fatalf("failed to create fork repo file: %v", err)
+	}
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath))
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/delete-fork", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "root-workspace")
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("POST delete-fork expected 303, got %d", rec.Code)
+	}
+	if _, errStat := os.Stat(forkPath); !os.IsNotExist(errStat) {
+		t.Fatalf("fork directory should have been removed")
+	}
+}
+
+func TestHandleForkDeleteHTMXRedirect(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	forkPath := filepath.Join(rootDir, "fork-workspace")
+	if err := os.MkdirAll(forkPath, 0755); err != nil {
+		t.Fatalf("failed to create fork workspace: %v", err)
+	}
+	createsgaiDir(t, forkPath)
+	rootRepoPath := filepath.Join(rootPath, ".jj", "repo")
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(forkPath, ".jj", "repo")), 0755); err != nil {
+		t.Fatalf("failed to create fork jj dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(forkPath, ".jj", "repo"), []byte(rootRepoPath), 0644); err != nil {
+		t.Fatalf("failed to create fork repo file: %v", err)
+	}
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath))
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/delete-fork", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Hx-Request", "true")
+	req.SetPathValue("name", "root-workspace")
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTMX delete-fork expected 200, got %d", rec.Code)
+	}
+	hxRedirect := rec.Header().Get("Hx-Redirect")
+	if hxRedirect == "" {
+		t.Fatalf("HTMX delete-fork missing HX-Redirect header")
+	}
+	if !strings.Contains(hxRedirect, "root-workspace") {
+		t.Fatalf("HTMX delete-fork redirect should point to root workspace, got %q", hxRedirect)
+	}
+}
+
+func TestHandleForkDeleteRejectsForkFromDifferentRoot(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 2, "")
+
+	rootDir := t.TempDir()
+	rootPath := filepath.Join(rootDir, "root-workspace")
+	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create root jj repo: %v", err)
+	}
+	createsgaiDir(t, rootPath)
+
+	otherRootPath := filepath.Join(rootDir, "other-root")
+	if err := os.MkdirAll(filepath.Join(otherRootPath, ".jj", "repo"), 0755); err != nil {
+		t.Fatalf("failed to create other root jj repo: %v", err)
+	}
+
+	forkPath := filepath.Join(rootDir, "fork-workspace")
+	if err := os.MkdirAll(forkPath, 0755); err != nil {
+		t.Fatalf("failed to create fork workspace: %v", err)
+	}
+	createsgaiDir(t, forkPath)
+	otherRepoPath := filepath.Join(otherRootPath, ".jj", "repo")
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(forkPath, ".jj", "repo")), 0755); err != nil {
+		t.Fatalf("failed to create fork jj dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(forkPath, ".jj", "repo"), []byte(otherRepoPath), 0644); err != nil {
+		t.Fatalf("failed to create fork repo file: %v", err)
+	}
+
+	srv := NewServer(rootDir)
+	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath))
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/delete-fork", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("name", "root-workspace")
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+
+	srv.handleForkDelete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST delete-fork wrong root expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHtmxRedirect(t *testing.T) {
+	t.Run("htmxRequest", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+		req.Header.Set("Hx-Request", "true")
+		rec := httptest.NewRecorder()
+
+		htmxRedirect(rec, req, "/redirect-target")
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("HTMX redirect expected 200, got %d", rec.Code)
+		}
+		if got := rec.Header().Get("Hx-Redirect"); got != "/redirect-target" {
+			t.Fatalf("HX-Redirect = %q; want %q", got, "/redirect-target")
+		}
+	})
+
+	t.Run("standardRequest", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+		rec := httptest.NewRecorder()
+
+		htmxRedirect(rec, req, "/redirect-target")
+
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("standard redirect expected 303, got %d", rec.Code)
+		}
+		if got := rec.Header().Get("Location"); got != "/redirect-target" {
+			t.Fatalf("Location = %q; want %q", got, "/redirect-target")
+		}
+	})
 }
 
 func TestRenderNewForkWithError(t *testing.T) {
@@ -1042,47 +1263,6 @@ func TestHandleForkMergeRequiresPost(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET merge expected 405, got %d", rec.Code)
-	}
-}
-
-func TestHandleForkMergeRequiresConfirmation(t *testing.T) {
-	installFakeJJWithWorkspaceList(t, 2, "")
-
-	rootDir := t.TempDir()
-	rootPath := filepath.Join(rootDir, "root-workspace")
-	if err := os.MkdirAll(filepath.Join(rootPath, ".jj", "repo"), 0755); err != nil {
-		t.Fatalf("failed to create root jj repo: %v", err)
-	}
-	createsgaiDir(t, rootPath)
-
-	forkPath := filepath.Join(rootDir, "fork-workspace")
-	if err := os.MkdirAll(forkPath, 0755); err != nil {
-		t.Fatalf("failed to create fork workspace: %v", err)
-	}
-	createsgaiDir(t, forkPath)
-	rootRepoPath := filepath.Join(rootPath, ".jj", "repo")
-	if err := os.MkdirAll(filepath.Dir(filepath.Join(forkPath, ".jj", "repo")), 0755); err != nil {
-		t.Fatalf("failed to create fork jj dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(forkPath, ".jj", "repo"), []byte(rootRepoPath), 0644); err != nil {
-		t.Fatalf("failed to create fork repo file: %v", err)
-	}
-
-	srv := NewServer(rootDir)
-	body := strings.NewReader("fork_dir=" + url.QueryEscape(forkPath))
-	req := httptest.NewRequest(http.MethodPost, "/workspaces/root-workspace/merge", body)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetPathValue("name", "root-workspace")
-	req.RemoteAddr = "127.0.0.1:1234"
-	rec := httptest.NewRecorder()
-
-	srv.handleForkMerge(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("POST merge missing confirmation expected 200, got %d", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "confirmation required") {
-		t.Fatalf("POST merge missing confirmation error message")
 	}
 }
 
