@@ -1407,7 +1407,7 @@ func dotSGAILinePresent(content []byte) bool {
 }
 
 func ensureJJ(dir string) {
-	if isForkWorkspace(dir) {
+	if classifyWorkspace(dir) == workspaceFork {
 		return
 	}
 	cmd := exec.Command("jj", "status")
@@ -1469,7 +1469,7 @@ func initializeWorkspaceDir(dir string) error {
 }
 
 func initializeJJ(dir string) error {
-	if isForkWorkspace(dir) {
+	if classifyWorkspace(dir) == workspaceFork {
 		return nil
 	}
 	cmd := exec.Command("jj", "status")

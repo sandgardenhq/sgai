@@ -1852,11 +1852,11 @@ func TestBuildWorkspacePageData(t *testing.T) {
 	})
 }
 
-func TestIsRootWorkspace(t *testing.T) {
+func TestClassifyWorkspace(t *testing.T) {
 	t.Run("noJJRepo", func(t *testing.T) {
 		dir := t.TempDir()
-		if isRootWorkspace(dir) {
-			t.Error("isRootWorkspace() = true; want false for directory without .jj/repo")
+		if got := classifyWorkspace(dir); got != workspaceStandalone {
+			t.Errorf("classifyWorkspace() = %q; want %q for directory without .jj/repo", got, workspaceStandalone)
 		}
 	})
 
@@ -1868,8 +1868,8 @@ func TestIsRootWorkspace(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, ".jj", "repo"), []byte("/some/path"), 0644); err != nil {
 			t.Fatalf("failed to create repo file: %v", err)
 		}
-		if isRootWorkspace(dir) {
-			t.Error("isRootWorkspace() = true; want false for .jj/repo as file")
+		if got := classifyWorkspace(dir); got != workspaceFork {
+			t.Errorf("classifyWorkspace() = %q; want %q for .jj/repo as file", got, workspaceFork)
 		}
 	})
 
@@ -1880,8 +1880,8 @@ func TestIsRootWorkspace(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
 			t.Fatalf("failed to create jj repo: %v", err)
 		}
-		if isRootWorkspace(dir) {
-			t.Error("isRootWorkspace() = true; want false for single workspace")
+		if got := classifyWorkspace(dir); got != workspaceStandalone {
+			t.Errorf("classifyWorkspace() = %q; want %q for single workspace", got, workspaceStandalone)
 		}
 	})
 
@@ -1892,8 +1892,8 @@ func TestIsRootWorkspace(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
 			t.Fatalf("failed to create jj repo: %v", err)
 		}
-		if !isRootWorkspace(dir) {
-			t.Error("isRootWorkspace() = false; want true for multiple workspaces")
+		if got := classifyWorkspace(dir); got != workspaceRoot {
+			t.Errorf("classifyWorkspace() = %q; want %q for multiple workspaces", got, workspaceRoot)
 		}
 	})
 
@@ -1909,40 +1909,8 @@ func TestIsRootWorkspace(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
 			t.Fatalf("failed to create jj repo: %v", err)
 		}
-		if isRootWorkspace(dir) {
-			t.Error("isRootWorkspace() = true; want false when jj command fails")
-		}
-	})
-}
-
-func TestIsJJRepoRoot(t *testing.T) {
-	t.Run("noJJRepo", func(t *testing.T) {
-		dir := t.TempDir()
-		if isJJRepoRoot(dir) {
-			t.Error("isJJRepoRoot() = true; want false for directory without .jj/repo")
-		}
-	})
-
-	t.Run("repoIsFile", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, ".jj"), 0755); err != nil {
-			t.Fatalf("failed to create .jj dir: %v", err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, ".jj", "repo"), []byte("/some/path"), 0644); err != nil {
-			t.Fatalf("failed to create repo file: %v", err)
-		}
-		if isJJRepoRoot(dir) {
-			t.Error("isJJRepoRoot() = true; want false for .jj/repo as file")
-		}
-	})
-
-	t.Run("repoIsDirectory", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, ".jj", "repo"), 0755); err != nil {
-			t.Fatalf("failed to create jj repo: %v", err)
-		}
-		if !isJJRepoRoot(dir) {
-			t.Error("isJJRepoRoot() = false; want true for .jj/repo as directory")
+		if got := classifyWorkspace(dir); got != workspaceStandalone {
+			t.Errorf("classifyWorkspace() = %q; want %q when jj command fails", got, workspaceStandalone)
 		}
 	})
 }
