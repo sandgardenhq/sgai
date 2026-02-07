@@ -1639,19 +1639,9 @@ type workspaceGroup struct {
 	Forks []workspaceInfo
 }
 
-func jjWorkspaceRoot(dir string) (string, error) {
-	cmd := exec.Command("jj", "workspace", "root")
-	cmd.Dir = dir
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(strings.TrimSpace(string(output))), nil
-}
-
-func isJJWorkspace(dir string) bool {
-	_, err := jjWorkspaceRoot(dir)
-	return err == nil
+func hasJJDirectory(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, ".jj"))
+	return err == nil && info.IsDir()
 }
 
 func hassgaiDirectory(dir string) bool {
@@ -1659,28 +1649,49 @@ func hassgaiDirectory(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
+func isJJRepoRoot(dir string) bool {
+	repoPath := filepath.Join(dir, ".jj", "repo")
+	info, err := os.Stat(repoPath)
+	return err == nil && info.IsDir()
+}
+
 func isRootWorkspace(dir string) bool {
-	root, err := jjWorkspaceRoot(dir)
-	if err != nil {
+	return isJJRepoRoot(dir) && hasMultipleWorkspaces(dir)
+}
+
+func hasMultipleWorkspaces(dir string) bool {
+	cmd := exec.Command("jj", "workspace", "list")
+	cmd.Dir = dir
+	output, errExec := cmd.Output()
+	if errExec != nil {
 		return false
 	}
-	return root == filepath.Clean(dir)
+	trimmed := strings.TrimSpace(string(output))
+	if trimmed == "" {
+		return false
+	}
+	lines := strings.Split(trimmed, "\n")
+	return len(lines) > 1
 }
 
 func isForkWorkspace(dir string) bool {
-	root, err := jjWorkspaceRoot(dir)
-	if err != nil {
-		return false
-	}
-	return root != filepath.Clean(dir)
+	repoPath := filepath.Join(dir, ".jj", "repo")
+	info, err := os.Stat(repoPath)
+	return err == nil && !info.IsDir()
 }
 
 func getRootWorkspacePath(forkDir string) string {
-	root, err := jjWorkspaceRoot(forkDir)
+	repoPath := filepath.Join(forkDir, ".jj", "repo")
+	content, err := os.ReadFile(repoPath)
 	if err != nil {
 		return ""
 	}
-	return root
+	rootPath := strings.TrimSpace(string(content))
+	if rootPath == "" {
+		return ""
+	}
+	jjDir := filepath.Dir(rootPath)
+	return filepath.Dir(jjDir)
 }
 
 type jjCommit struct {
@@ -2107,7 +2118,7 @@ func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
 	var standaloneGroups []workspaceGroup
 
 	for _, proj := range projects {
-		if !isJJWorkspace(proj.Directory) {
+		if !hasJJDirectory(proj.Directory) {
 			standaloneGroups = append(standaloneGroups, workspaceGroup{
 				Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
 			})
@@ -2669,7 +2680,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 	}
 
 	needsInput := wfState.NeedsHumanInput()
-	isFork := isForkWorkspace(dir)
+	isFork := hasJJDirectory(dir) && !isRootWorkspace(dir)
 	isRoot := isRootWorkspace(dir)
 	returnToURL := buildReturnToURL(dir, tabName, sessionParam)
 
@@ -2921,6 +2932,13 @@ func unpackSkeleton(workspacePath string) error {
 }
 
 func initJJ(dir string) error {
+	cmd := exec.Command("jj", "status")
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		return nil
+	} else if isExecNotFound(err) {
+		return nil
+	}
 	initCmd := exec.Command("jj", "git", "init", "--colocate")
 	initCmd.Dir = dir
 	if errInit := initCmd.Run(); errInit != nil {
@@ -3077,7 +3095,7 @@ func (s *Server) handleNewForkGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isRootWorkspace(workspacePath) {
+	if !isJJRepoRoot(workspacePath) {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}
@@ -3104,7 +3122,7 @@ func (s *Server) handleNewForkPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not found", http.StatusNotFound)
 		return
 	}
-	if !isRootWorkspace(workspacePath) {
+	if !isJJRepoRoot(workspacePath) {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}
@@ -3486,7 +3504,7 @@ func (s *Server) renderTreesChangesTabToBuffer(buf *bytes.Buffer, dir string) {
 }
 
 func (s *Server) renderTreesCommitsTabToBuffer(buf *bytes.Buffer, dir string) {
-	if !isJJWorkspace(dir) {
+	if !hasJJDirectory(dir) {
 		buf.WriteString("<p><em>Not a jj repository</em></p>")
 		return
 	}
@@ -4118,7 +4136,7 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	defaultDescOutput, errDefaultDesc := defaultDescCmd.CombinedOutput()
 	if errDefaultDesc == nil {
 		var parts []string
-		for line := range strings.SplitSeq(string(defaultDescOutput), "\n") {
+		for _, line := range strings.Split(string(defaultDescOutput), "\n") {
 			trimmed := strings.TrimSpace(line)
 			if trimmed != "" {
 				parts = append(parts, trimmed)
@@ -4178,8 +4196,8 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 			if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
 				lines := strings.Split(result, "\n")
 				for i, line := range lines {
-					if after, ok := strings.CutPrefix(line, "TITLE:"); ok {
-						prTitle = strings.TrimSpace(after)
+					if strings.HasPrefix(line, "TITLE:") {
+						prTitle = strings.TrimSpace(strings.TrimPrefix(line, "TITLE:"))
 					}
 					if strings.HasPrefix(line, "BODY:") {
 						prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
