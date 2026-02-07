@@ -36,20 +36,14 @@
 						<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
 						{{end}}
 						<a href="/trees?workspace={{.DirName}}" role="button" class="action-btn outline">Open in sgai</a>
-						<details class="merge-confirmation">
-							<summary><span class="action-btn outline">Merge</span></summary>
-							<div class="merge-confirmation-panel">
-								<p>This will rebase and squash the fork, create the PR, then delete the fork workspace.</p>
-								<form action="/workspaces/{{$.RootDirName}}/merge" method="post">
-									<input type="hidden" name="fork_dir" value="{{.Directory}}">
-									<label class="merge-confirmation-check">
-									<input type="checkbox" name="confirm_delete" value="true" required>
-										I understand this deletes the fork workspace after merge.
-									</label>
-									<button type="submit" class="action-btn attention">Confirm merge</button>
-								</form>
-							</div>
-						</details>
+						<button hx-post="/workspaces/{{$.RootDirName}}/merge"
+							hx-vals='{"fork_dir": "{{.Directory}}"}'
+							hx-confirm="This will rebase, squash, create a PR, then delete the fork workspace. Are you sure?"
+							class="action-btn outline">Merge</button>
+						<button hx-post="/workspaces/{{$.RootDirName}}/delete-fork"
+							hx-vals='{"fork_dir": "{{.Directory}}"}'
+							hx-confirm="This will permanently delete the fork '{{.DirName}}' and all its changes. Are you sure?"
+							class="action-btn attention">Delete</button>
 					</div>
 				</td>
 			</tr>
