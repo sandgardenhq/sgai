@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -23,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/adrg/xdg"
 	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/yuin/goldmark"
 	emoji "github.com/yuin/goldmark-emoji"
@@ -266,6 +268,8 @@ type Server struct {
 	mu               sync.Mutex
 	sessions         map[string]*session
 	everStartedDirs  map[string]bool
+	pinnedDirs       map[string]bool
+	pinnedConfigDir  string
 	rootDir          string
 	editorAvailable  bool
 	isTerminalEditor bool
@@ -303,6 +307,8 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 	return &Server{
 		sessions:         make(map[string]*session),
 		everStartedDirs:  make(map[string]bool),
+		pinnedDirs:       make(map[string]bool),
+		pinnedConfigDir:  filepath.Join(xdg.ConfigHome, "sgai"),
 		adhocStates:      make(map[string]*adhocPromptState),
 		rootDir:          absRootDir,
 		editorAvailable:  editorAvail,
@@ -535,6 +541,9 @@ func cmdServe(args []string) {
 	}
 
 	srv := NewServer(rootDir)
+	if err := srv.loadPinnedProjects(); err != nil {
+		log.Println("warning: failed to load pinned projects:", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", srv.redirectToTrees)
@@ -1621,6 +1630,7 @@ type workspaceInfo struct {
 	Running      bool
 	NeedsInput   bool
 	InProgress   bool
+	Pinned       bool
 	HasWorkspace bool
 }
 
@@ -2017,7 +2027,8 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 
 func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace bool) workspaceInfo {
 	running, needsInput := s.getWorkspaceStatus(dir)
-	inProgress := running || needsInput || s.wasEverStarted(dir)
+	pinned := s.isPinned(dir)
+	inProgress := running || needsInput || s.wasEverStarted(dir) || pinned
 
 	return workspaceInfo{
 		Directory:    dir,
@@ -2026,6 +2037,7 @@ func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace b
 		Running:      running,
 		NeedsInput:   needsInput,
 		InProgress:   inProgress,
+		Pinned:       pinned,
 		HasWorkspace: hasWorkspace,
 	}
 }
@@ -2034,6 +2046,66 @@ func (s *Server) wasEverStarted(dir string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.everStartedDirs[dir]
+}
+
+func (s *Server) pinnedFilePath() string {
+	return filepath.Join(s.pinnedConfigDir, "pinned.json")
+}
+
+func (s *Server) loadPinnedProjects() error {
+	data, errRead := os.ReadFile(s.pinnedFilePath())
+	if errRead != nil {
+		if os.IsNotExist(errRead) {
+			return nil
+		}
+		return fmt.Errorf("reading pinned projects: %w", errRead)
+	}
+	var dirs []string
+	if errJSON := json.Unmarshal(data, &dirs); errJSON != nil {
+		return fmt.Errorf("parsing pinned projects: %w", errJSON)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pinnedDirs = make(map[string]bool, len(dirs))
+	for _, d := range dirs {
+		s.pinnedDirs[d] = true
+	}
+	return nil
+}
+
+func (s *Server) savePinnedProjects() error {
+	s.mu.Lock()
+	dirs := slices.Collect(maps.Keys(s.pinnedDirs))
+	s.mu.Unlock()
+	slices.Sort(dirs)
+	if errDir := os.MkdirAll(s.pinnedConfigDir, 0o755); errDir != nil {
+		return fmt.Errorf("creating pin config directory: %w", errDir)
+	}
+	data, errJSON := json.Marshal(dirs)
+	if errJSON != nil {
+		return fmt.Errorf("encoding pinned projects: %w", errJSON)
+	}
+	if errWrite := os.WriteFile(s.pinnedFilePath(), data, 0o644); errWrite != nil {
+		return fmt.Errorf("writing pinned projects: %w", errWrite)
+	}
+	return nil
+}
+
+func (s *Server) isPinned(dir string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pinnedDirs[dir]
+}
+
+func (s *Server) togglePin(dir string) error {
+	s.mu.Lock()
+	if s.pinnedDirs[dir] {
+		delete(s.pinnedDirs, dir)
+	} else {
+		s.pinnedDirs[dir] = true
+	}
+	s.mu.Unlock()
+	return s.savePinnedProjects()
 }
 
 func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
@@ -2456,6 +2528,8 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceStart(w, r, workspacePath)
 	case "toggle-mode":
 		s.handleToggleMode(w, r, workspacePath)
+	case "toggle-pin":
+		s.handleTogglePin(w, r, workspacePath)
 	case "stop":
 		s.handleWorkspaceStop(w, r, workspacePath)
 	case "reset-state":
@@ -2658,6 +2732,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		OrderedModelStatuses []modelStatusDisplay
 		HasEditedGoal        bool
 		IsRoot               bool
+		Pinned               bool
 	}{
 		Directory:            dir,
 		DirName:              filepath.Base(dir),
@@ -2684,6 +2759,7 @@ func (s *Server) renderWorkspaceContent(dir, tabName, sessionParam string, r *ht
 		OrderedModelStatuses: orderedModelStatuses(dir, wfState.ModelStatuses),
 		HasEditedGoal:        hasEditedGoal,
 		IsRoot:               isRoot,
+		Pinned:               s.isPinned(dir),
 	}
 
 	var buf bytes.Buffer
@@ -3633,6 +3709,18 @@ func (s *Server) handleToggleMode(w http.ResponseWriter, r *http.Request, worksp
 		sess.mu.Unlock()
 	}
 
+	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
+}
+
+func (s *Server) handleTogglePin(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	if errToggle := s.togglePin(workspacePath); errToggle != nil {
+		http.Error(w, "failed to toggle pin", http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, workspaceURL(workspacePath, "progress"), http.StatusSeeOther)
 }
 
