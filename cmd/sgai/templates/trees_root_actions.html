@@ -1,9 +1,5 @@
 <div class="header-actions-container">
 	<a href="/workspaces/{{.DirName}}/fork/new" role="button" class="action-btn outline">Fork</a>
-	<a href="/compose?workspace={{.DirName}}" role="button" class="action-btn outline">Compose GOAL</a>
-	{{if .HasEditedGoal}}
-	<a href="/workspaces/{{.DirName}}/goal" role="button" class="action-btn outline">Edit GOAL</a>
-	{{end}}
 	{{if .CodeAvailable}}
 		{{if .IsTerminalEditor}}
 		<div class="terminal-editor-workspace-path">
