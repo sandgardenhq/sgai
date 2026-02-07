@@ -2,7 +2,7 @@
 
 {{define "attention-indicator"}}{{if .NeedsInput}}<span class="workspace-attention" title="Needs input">●</span>{{end}}{{end}}
 
-{{define "workspace-indicators"}}{{if .Running}}<span class="workspace-spinner" title="Running">⟳</span>{{end}}{{template "attention-indicator" .}}{{end}}
+{{define "workspace-indicators"}}{{if .Pinned}}<span class="workspace-pinned" data-tooltip="Pinned">📌</span>{{end}}{{if .Running}}<span class="workspace-spinner" title="Running">⟳</span>{{end}}{{template "attention-indicator" .}}{{end}}
 
 <div class="tree-panel" id="tree-panel-content">
 {{if .InProgressWorkspaces}}

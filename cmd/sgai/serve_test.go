@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
@@ -2245,4 +2247,277 @@ func TestHandleRenameForkPostRekeysSession(t *testing.T) {
 	if !srv.everStartedDirs[newPath] {
 		t.Error("new fork path should be in everStartedDirs")
 	}
+}
+
+func TestPinnedFilePath(t *testing.T) {
+	srv := &Server{pinnedConfigDir: "/tmp/test-sgai"}
+	want := "/tmp/test-sgai/pinned.json"
+	got := srv.pinnedFilePath()
+	if got != want {
+		t.Errorf("pinnedFilePath() = %q; want %q", got, want)
+	}
+}
+
+func TestLoadPinnedProjects(t *testing.T) {
+	t.Run("missingFile", func(t *testing.T) {
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: t.TempDir(),
+		}
+		if err := srv.loadPinnedProjects(); err != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
+		}
+		if len(srv.pinnedDirs) != 0 {
+			t.Errorf("pinnedDirs should be empty; got %d entries", len(srv.pinnedDirs))
+		}
+	})
+
+	t.Run("emptyArray", func(t *testing.T) {
+		configDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), []byte("[]"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.loadPinnedProjects(); err != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
+		}
+		if len(srv.pinnedDirs) != 0 {
+			t.Errorf("pinnedDirs should be empty; got %d entries", len(srv.pinnedDirs))
+		}
+	})
+
+	t.Run("withPaths", func(t *testing.T) {
+		configDir := t.TempDir()
+		data, _ := json.Marshal([]string{"/path/to/a", "/path/to/b"})
+		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.loadPinnedProjects(); err != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
+		}
+		if len(srv.pinnedDirs) != 2 {
+			t.Fatalf("pinnedDirs should have 2 entries; got %d", len(srv.pinnedDirs))
+		}
+		if !srv.pinnedDirs["/path/to/a"] {
+			t.Error("expected /path/to/a to be pinned")
+		}
+		if !srv.pinnedDirs["/path/to/b"] {
+			t.Error("expected /path/to/b to be pinned")
+		}
+	})
+
+	t.Run("invalidJSON", func(t *testing.T) {
+		configDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), []byte("{invalid"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.loadPinnedProjects(); err == nil {
+			t.Error("loadPinnedProjects() should return error for invalid JSON")
+		}
+	})
+}
+
+func TestSavePinnedProjects(t *testing.T) {
+	t.Run("createsDirectoryAndFile", func(t *testing.T) {
+		configDir := filepath.Join(t.TempDir(), "sgai")
+		srv := &Server{
+			pinnedDirs:      map[string]bool{"/path/to/a": true, "/path/to/b": true},
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.savePinnedProjects(); err != nil {
+			t.Fatalf("savePinnedProjects() unexpected error: %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(configDir, "pinned.json"))
+		if err != nil {
+			t.Fatalf("failed to read pinned.json: %v", err)
+		}
+		var dirs []string
+		if err := json.Unmarshal(data, &dirs); err != nil {
+			t.Fatalf("failed to parse pinned.json: %v", err)
+		}
+		if len(dirs) != 2 {
+			t.Fatalf("expected 2 paths; got %d", len(dirs))
+		}
+		if dirs[0] != "/path/to/a" || dirs[1] != "/path/to/b" {
+			t.Errorf("unexpected paths: %v", dirs)
+		}
+	})
+
+	t.Run("emptyPinnedDirs", func(t *testing.T) {
+		configDir := filepath.Join(t.TempDir(), "sgai")
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.savePinnedProjects(); err != nil {
+			t.Fatalf("savePinnedProjects() unexpected error: %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(configDir, "pinned.json"))
+		if err != nil {
+			t.Fatalf("failed to read pinned.json: %v", err)
+		}
+		var dirs []string
+		if err := json.Unmarshal(data, &dirs); err != nil {
+			t.Fatalf("failed to parse pinned.json: %v", err)
+		}
+		if len(dirs) != 0 {
+			t.Errorf("expected empty array; got %v", dirs)
+		}
+	})
+}
+
+func TestIsPinned(t *testing.T) {
+	srv := &Server{
+		mu:         sync.Mutex{},
+		pinnedDirs: map[string]bool{"/pinned/project": true},
+	}
+	if !srv.isPinned("/pinned/project") {
+		t.Error("isPinned(/pinned/project) = false; want true")
+	}
+	if srv.isPinned("/not/pinned") {
+		t.Error("isPinned(/not/pinned) = true; want false")
+	}
+}
+
+func TestTogglePin(t *testing.T) {
+	t.Run("pinAndUnpin", func(t *testing.T) {
+		configDir := filepath.Join(t.TempDir(), "sgai")
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.togglePin("/path/to/project"); err != nil {
+			t.Fatalf("togglePin() unexpected error: %v", err)
+		}
+		if !srv.isPinned("/path/to/project") {
+			t.Error("project should be pinned after first toggle")
+		}
+		if err := srv.togglePin("/path/to/project"); err != nil {
+			t.Fatalf("togglePin() unexpected error: %v", err)
+		}
+		if srv.isPinned("/path/to/project") {
+			t.Error("project should not be pinned after second toggle")
+		}
+	})
+
+	t.Run("persistsToDisk", func(t *testing.T) {
+		configDir := filepath.Join(t.TempDir(), "sgai")
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.togglePin("/path/to/project"); err != nil {
+			t.Fatalf("togglePin() unexpected error: %v", err)
+		}
+		srv2 := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv2.loadPinnedProjects(); err != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
+		}
+		if !srv2.isPinned("/path/to/project") {
+			t.Error("pinned project should persist across server instances")
+		}
+	})
+}
+
+func TestCollectInProgressWorkspacesWithPinned(t *testing.T) {
+	t.Run("pinnedWorkspaceIncludedInProgress", func(t *testing.T) {
+		groups := []workspaceGroup{
+			{Root: workspaceInfo{Directory: "/a", InProgress: false, Pinned: false}},
+			{Root: workspaceInfo{Directory: "/b", InProgress: true, Pinned: true}},
+		}
+		got := collectInProgressWorkspaces(groups)
+		if len(got) != 1 {
+			t.Fatalf("expected 1 in-progress workspace; got %d", len(got))
+		}
+		if got[0].Directory != "/b" {
+			t.Errorf("expected /b; got %q", got[0].Directory)
+		}
+		if !got[0].Pinned {
+			t.Error("expected workspace to have Pinned=true")
+		}
+	})
+
+	t.Run("pinnedForkIncludedInProgress", func(t *testing.T) {
+		groups := []workspaceGroup{
+			{
+				Root: workspaceInfo{Directory: "/a", InProgress: false},
+				Forks: []workspaceInfo{
+					{Directory: "/a/fork1", InProgress: true, Pinned: true},
+				},
+			},
+		}
+		got := collectInProgressWorkspaces(groups)
+		if len(got) != 1 {
+			t.Fatalf("expected 1 in-progress workspace; got %d", len(got))
+		}
+		if !got[0].Pinned {
+			t.Error("expected fork to have Pinned=true")
+		}
+	})
+}
+
+func TestHandleTogglePin(t *testing.T) {
+	rootDir := t.TempDir()
+	projectDir := filepath.Join(rootDir, "test-project")
+	if err := os.MkdirAll(filepath.Join(projectDir, ".sgai"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	configDir := filepath.Join(t.TempDir(), "sgai")
+	srv := &Server{
+		sessions:         make(map[string]*session),
+		everStartedDirs:  make(map[string]bool),
+		pinnedDirs:       make(map[string]bool),
+		pinnedConfigDir:  configDir,
+		adhocStates:      make(map[string]*adhocPromptState),
+		rootDir:          rootDir,
+		editorAvailable:  false,
+		isTerminalEditor: false,
+		editorName:       "",
+		editor:           &mockEditorOpener{},
+	}
+
+	t.Run("postTogglesPin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/toggle-pin", nil)
+		rec := httptest.NewRecorder()
+		srv.handleTogglePin(rec, req, projectDir)
+		if rec.Code != http.StatusSeeOther {
+			t.Errorf("expected status %d; got %d", http.StatusSeeOther, rec.Code)
+		}
+		if !srv.isPinned(projectDir) {
+			t.Error("project should be pinned after toggle")
+		}
+	})
+
+	t.Run("secondPostUnpins", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/toggle-pin", nil)
+		rec := httptest.NewRecorder()
+		srv.handleTogglePin(rec, req, projectDir)
+		if srv.isPinned(projectDir) {
+			t.Error("project should be unpinned after second toggle")
+		}
+	})
+
+	t.Run("getNonAllowed", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/workspaces/test-project/toggle-pin", nil)
+		rec := httptest.NewRecorder()
+		srv.handleTogglePin(rec, req, projectDir)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("expected status %d; got %d", http.StatusMethodNotAllowed, rec.Code)
+		}
+	})
 }

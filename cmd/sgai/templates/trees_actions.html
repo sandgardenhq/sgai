@@ -52,6 +52,9 @@
 	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>
 	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>
 	<a href="/workspaces/{{.DirName}}/agents" role="button" class="action-btn outline">Agents</a>
+	<form action="/workspaces/{{.DirName}}/toggle-pin" method="post">
+		<button type="submit" class="action-btn outline">{{if .Pinned}}Unpin{{else}}Pin{{end}}</button>
+	</form>
 	{{if .NeedsInput}}
 	<a href="/respond?dir={{.Directory}}&returnTo={{.ReturnTo}}" role="button" class="action-btn attention">Respond to Agent</a>
 	{{end}}
