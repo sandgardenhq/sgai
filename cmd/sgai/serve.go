@@ -3067,7 +3067,7 @@ func normalizeForkName(name string) string {
 }
 
 func invokeLLMForAssist(prompt string) (string, error) {
-	cmd := exec.Command("opencode", "run", "--thinking")
+	cmd := exec.Command("opencode", "run", "--title", "llm-assist")
 	cmd.Stdin = strings.NewReader(prompt)
 	output, errRun := cmd.Output()
 	if errRun != nil {

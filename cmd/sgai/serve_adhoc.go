@@ -105,7 +105,7 @@ func (s *Server) handleAdhocSubmit(w http.ResponseWriter, r *http.Request, works
 	st.selectedModel = model
 	st.promptText = prompt
 
-	cmd := exec.Command("opencode", "run", "-m", model)
+	cmd := exec.Command("opencode", "run", "-m", model, "--title", "adhoc ["+model+"]")
 	cmd.Dir = workspacePath
 	cmd.Stdin = strings.NewReader(prompt)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}

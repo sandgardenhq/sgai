@@ -335,7 +335,7 @@ Report what was created.`, improvementsPath, sessionPath, string(content)))
 }
 
 func runAgent(prefix, agentName, message string) {
-	cmd := exec.Command("opencode", "run", "--agent", agentName)
+	cmd := exec.Command("opencode", "run", "--agent", agentName, "--title", agentName)
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR=.sgai")
 	cmd.Stdin = strings.NewReader(message)
 	cmd.Stdout = os.Stdout
