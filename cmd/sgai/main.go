@@ -765,6 +765,18 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				todoNudge := fmt.Sprintf("\nYou have %d pending TODO items. Please complete them before marking agent-done.\n", pendingTodosCount)
 				msg += todoNudge
 			}
+
+			if cfg.agent != "coordinator" {
+				outboxPending := 0
+				for _, m := range wfState.Messages {
+					if m.FromAgent == cfg.agent && !m.Read {
+						outboxPending++
+					}
+				}
+				if outboxPending > 0 {
+					msg += "\nYou have sent messages that haven't been read yet. For the recipient agents to process them, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). They cannot run while you hold control.\n"
+				}
+			}
 		}
 
 		cmd := exec.CommandContext(ctx, "opencode", args...)
