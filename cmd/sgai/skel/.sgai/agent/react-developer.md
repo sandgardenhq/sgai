@@ -74,6 +74,16 @@ All React code should be written in TypeScript with proper type annotations.
 - Shared UI state: Zustand, Jotai
 - Server state: TanStack Query, SWR
 
+**UI Components:** shadcn/ui (preferred over custom components)
+
+**SSE:** `useSyncExternalStore` for Server-Sent Events external store pattern (NOT React Context)
+
+**App State:** `useReducer+Context` for app state management (NOT Redux/Zustand)
+
+**API Client:** Typed API client in `lib/api.ts`
+
+**Data Loading:** React 19 `use()` + Suspense for initial data fetching, SSE for live updates
+
 **Routing:** React Router, TanStack Router
 
 **Form Handling:** React Hook Form, Formik
@@ -82,17 +92,19 @@ All React code should be written in TypeScript with proper type annotations.
 
 **Styling:** CSS Modules, Tailwind CSS, styled-components
 
-**Build Tooling:** Vite, Next.js, Remix
+**Build Tooling:**
+- **Build tool:** bun build (native bundler) — `bun build ./src/main.tsx --outdir ./dist --splitting --minify`
+- **Dev server:** `bun run dev.ts` (Bun.serve() with watch + proxy to Go API on :8181)
 
 ---
 
 ## Starter Project Template
 
 ```bash
-npm create vite@latest my-app -- --template react-ts
-cd my-app
-npm install
-npm run dev
+cd cmd/sgai/webapp
+bun init
+bun add react react-dom react-router
+bun add -d typescript @types/react @types/react-dom tailwindcss
 ```
 
 **Recommended project structure:**

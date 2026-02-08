@@ -4,7 +4,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ## Features
 
-- **Web dashboard** — Monitor and control agent execution via HTMX + PicoCSS web UI with real-time status visualization, start/stop controls, and human-in-the-loop response interface
+- **Web dashboard** — Monitor and control agent execution via React SPA with real-time SSE updates, start/stop controls, and human-in-the-loop response interface
 - **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
 - **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
 - **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
@@ -17,6 +17,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 | Dependency                                   | Purpose                                                                   |                           |
 |----------------------------------------------|---------------------------------------------------------------------------|---------------------------|
+| [bun](https://bun.sh)                        | JavaScript runtime and bundler — builds the React frontend                |                           |
 | [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
 | [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
 | [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
@@ -39,6 +40,7 @@ Or from source:
 ```sh
 git clone https://github.com/sandgardenhq/sgai.git
 cd sgai
+cd cmd/sgai/webapp && bun install && cd ../../..
 make build
 ```
 
@@ -47,7 +49,7 @@ make build
 1. **Install dependencies via Homebrew:**
 
    ```sh
-   brew install anomalyco/tap/opencode jj graphviz
+   brew install anomalyco/tap/opencode jj graphviz oven-sh/bun/bun
    ```
 
 2. **Log in to your AI provider:**
@@ -159,6 +161,40 @@ not implementation. Focus on outcomes.
 ```sh
 sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
+```
+
+## Frontend Development
+
+The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
+
+### Frontend Stack
+
+| Technology                                    | Purpose                                 |
+|-----------------------------------------------|-----------------------------------------|
+| [React 19](https://react.dev)                 | UI framework                            |
+| [TypeScript](https://www.typescriptlang.org)  | Type-safe JavaScript                    |
+| [Tailwind CSS v4](https://tailwindcss.com)    | Utility-first CSS                       |
+| [shadcn/ui](https://ui.shadcn.com) + Radix UI | Accessible component library            |
+| [React Router](https://reactrouter.com)       | Client-side routing                     |
+| [Lucide React](https://lucide.dev)            | Icons                                   |
+
+### Build Commands
+
+```sh
+cd cmd/sgai/webapp
+
+bun install          # Install frontend dependencies
+bun run build        # Production build → dist/
+bun run dev.ts       # Dev server with file watching (proxies API to Go backend)
+bun test src/        # Run unit/component tests
+```
+
+`make build` runs the full pipeline: frontend build (`bun install` + `bun run build`) → Go lint → Go binary.
+
+After making frontend changes, always run:
+
+```sh
+bun run build && make build
 ```
 
 ## Contributing

@@ -371,7 +371,7 @@ func TestAgentFilesHaveNoModelVariants(t *testing.T) {
 }
 
 func TestBuildRetrospectiveGoalHasNoModels(t *testing.T) {
-	content := buildRetrospectiveGoalContent("/tmp/test-session")
+	content := buildRetrospectiveGoalContent("/tmp/test-session", "")
 	metadata, err := parseYAMLFrontmatter([]byte(content))
 	if err != nil {
 		t.Fatal("failed to parse retrospective GOAL frontmatter:", err)

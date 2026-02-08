@@ -1,6 +1,6 @@
 THE ONLY ACCEPTABLE PLACE FOR PROJECT_MANAGEMENT.md IS `.sgai/PROJECT_MANAGEMENT.md` -- never place `cmd/sgai/skel/.sgai/PROJECT_MANAGEMENT.md`.
 
-Every time you are asked to make a source code (or prompt) modification  to `/.sgai` you have to make the modification to `cmd/sgai/skel/.sgai` instead.
+Every time you are asked to make a source code (or prompt) modification  to `/.sgai` you have to make the modification to `sgai/` (the overlay directory) instead.
 
 In term of Go code style, I prefer total absence of inline comments; organize functions and if blocks in a way that they have intention revealing names, and use that instead.
 
@@ -15,12 +15,23 @@ Always make sure you use tmux and playwright to test the changes.
 For tests:
 use listen address `-listen-addr 127.0.0.1:8181`
 use directory ./verification
+use `make build` to generate the binary
 
 In terms of layout, UI, style, when something doesn't fit a container, use ellipsis with tooltip - refer to https://picocss.com/docs/tooltip
 
 
-CRITICAL: it must be a pure HTMX and PicoCSS implementation, some light touch CSS to make looks be good is OK; some Javascript to hook up Idiomorph HTMX extension, may be acceptable upon human partner approval; otherwise, NEVER USE CUSTOM JAVASCRIPT.
+CRITICAL: During the React migration (M0-M6), the codebase supports BOTH HTMX+PicoCSS and React+shadcn/ui interfaces simultaneously via cookie-based UI switcher. HTMX code remains unchanged; React code lives in cmd/sgai/webapp/. After M7, React is the sole interface.
 CRITICAL: use playwright screenshots (and the skill to operate playwright) to verify the application is working correctly.
+
+For React/TypeScript code in cmd/sgai/webapp/, use bun for building, testing, and running scripts. Build command: `bun run build`. Dev server: `bun run dev.ts`. Tests: `bun test`.
+
+React components must use shadcn/ui components where possible. Do not create custom implementations when a shadcn component exists. Reference: https://ui.shadcn.com/docs
+
+React tests: bun test for unit/component tests (vitest-compatible API), Playwright for E2E tests. Dual-cookie test pattern: run identical flows with sgai-ui=htmx and sgai-ui=react cookies.
+
+Use useSyncExternalStore for external data sources (SSE store). Use useReducer+Context for app state management. Do NOT use Redux, Zustand, or other state management libraries. No optimistic updates for critical workflow actions.
+
+When modifying cmd/sgai/webapp/, always run `bun run build && make build` to verify both the React build and Go binary compile correctly.
 
 CRITICAL(code quality): ensure good Go code quality by calling `make lint`
 

@@ -153,6 +153,25 @@ Reference the skill's priority categories when flagging issues:
 - [ ] Mocks are at appropriate level (network, not component)
 - [ ] Tests use proper queries (`getByRole` > `getByTestId`)
 
+### SSE Store Pattern
+- [ ] SSE subscription uses `useSyncExternalStore`, NOT React Context
+- [ ] SSE store is an external module, not inside a component
+- [ ] Auto-reconnect with exponential backoff implemented
+- [ ] Connection status indicator visible when disconnected >2s
+
+### Hook Composition
+- [ ] Domain hooks properly combine initial fetch + SSE updates
+- [ ] Custom hooks follow naming convention and are testable
+
+### shadcn Usage
+- [ ] shadcn/ui components used where available (not custom implementations)
+- [ ] Proper accessibility defaults from shadcn preserved
+
+### Critical Workflow Actions
+- [ ] No optimistic updates for critical actions (start/stop/respond)
+- [ ] sessionStorage persistence for form inputs (persist on keystroke, clear on submit)
+- [ ] `beforeunload` handlers on forms with unsaved data
+
 ---
 
 ## 5. Anti-Patterns to Flag

@@ -6,3 +6,9 @@ updates:
       - dependency-type: "all"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/cmd/sgai/webapp"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-type: "all"
