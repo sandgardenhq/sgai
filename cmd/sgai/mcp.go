@@ -977,7 +977,7 @@ func sendMessage(workingDir, toAgent, body string) (string, error) {
 
 	result := fmt.Sprintf("Message sent successfully to %s.\nFrom: %s\nTo: %s\nBody: %s", toAgent, fromAgent, toAgent, body)
 	if currentAgent != "coordinator" {
-		result += "\n\nIMPORTANT: Since you are not the coordinator, consider yielding control back to the main loop using sgai_update_workflow_state({status: 'agent-done'}) after completing your message-related tasks."
+		result += "\n\nIMPORTANT: To receive a response from the target agent, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). The target agent cannot run until you yield."
 	}
 	return result, nil
 }
