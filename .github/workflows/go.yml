@@ -35,6 +35,9 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
 
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+
     - name: Build
       run: make build
 

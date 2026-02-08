@@ -1,0 +1,40 @@
+{
+  "name": "sgai-webapp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "dev": "bun run dev.ts",
+    "test": "bun test src/",
+    "test:e2e": "bunx playwright test",
+    "test:e2e:parity": "bunx playwright test e2e/parity/"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "react-markdown": "^9.1.0",
+    "radix-ui": "^1.4.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router": "^7.6.2",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.5.0",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/cli": "^4.1.18",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/bun": "^1.2.14",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "happy-dom": "^18.0.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,8 +1,0 @@
-<div id="adhoc-output"{{if .Running}} hx-get="/workspaces/{{.DirName}}/adhoc/output" hx-trigger="every 1s" hx-swap="morph:outerHTML"{{end}}>
-	<pre class="adhoc-output">{{.Output}}</pre>
-	{{if .Running}}
-	<button type="submit" disabled aria-busy="true">Running...</button>
-	{{else}}
-	<button type="submit">Submit</button>
-	{{end}}
-</div>

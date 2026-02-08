@@ -503,6 +503,27 @@ func handleResource(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### JSON API Conventions
+
+- `/api/v1/*` JSON endpoints live in `serve_api.go`
+- Share business logic with HTMX handlers — extract into common functions, don't reimplement
+- JSON error response format: `{"error": "message", "code": "ERROR_CODE"}`
+- All mutating endpoints must be idempotent (e.g., "Start Session" on running session returns current state)
+
+### SSE Event Publishing
+
+- SSE events emitted via structural middleware/wrapper, not manual publish calls
+- Events published AFTER transaction commit (deferred event publishing pattern)
+- Typed event names: `workspace:update`, `session:update`, `messages:new`, `todos:update`, `log:append`, `changes:update`, `events:new`, `compose:update`
+
+### Cookie-Based UI Switcher
+
+- `sgai-ui` cookie: `htmx` (default) or `react`
+- Middleware checks cookie, routes to HTML template or SPA index.html
+- Cookie switch triggers full page reload
+- SPA catch-all: serve `index.html` for ALL routes when `sgai-ui=react`, EXCEPT `/api/v1/*` and static assets
+- Explicit API routing BEFORE SPA catch-all
+
 ---
 
 ## Project Structure

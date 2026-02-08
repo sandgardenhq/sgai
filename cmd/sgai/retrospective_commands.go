@@ -168,7 +168,8 @@ func cmdRetrospectiveAnalyze(args []string) {
 		return
 	}
 
-	goalContent := buildRetrospectiveGoalContent(absSessionPath)
+	coordinatorModel := coordinatorModelFromCurrentDir()
+	goalContent := buildRetrospectiveGoalContent(absSessionPath, coordinatorModel)
 	goalPath := filepath.Join(tempDir, "GOAL.md")
 	if err := os.WriteFile(goalPath, []byte(goalContent), 0644); err != nil {
 		log.Println("failed to write GOAL.md:", err)
@@ -198,16 +199,41 @@ func cmdRetrospectiveAnalyze(args []string) {
 	fmt.Println("[analyze] Analysis complete for session:", sessionID)
 }
 
-func buildRetrospectiveGoalContent(absSessionPath string) string {
+func buildRetrospectiveGoalContent(absSessionPath, coordinatorModel string) string {
+	var modelsSection string
+	if coordinatorModel != "" {
+		modelsSection = fmt.Sprintf(`models:
+  "coordinator": "%s"
+  "retrospective-session-analyzer": "%s"
+  "retrospective-code-analyzer": "%s"
+  "retrospective-refiner": "%s"
+`, coordinatorModel, coordinatorModel, coordinatorModel, coordinatorModel)
+	}
 	return fmt.Sprintf(`---
 flow: |
   "coordinator" -> "retrospective-session-analyzer"
   "retrospective-session-analyzer" -> "retrospective-code-analyzer"
   "retrospective-code-analyzer" -> "retrospective-refiner"
-interactive: auto
+%sinteractive: auto
 ---
 Analyze session: %s
-`, absSessionPath)
+`, modelsSection, absSessionPath)
+}
+
+func coordinatorModelFromCurrentDir() string {
+	goalData, errRead := os.ReadFile("GOAL.md")
+	if errRead != nil {
+		return ""
+	}
+	metadata, errParse := parseYAMLFrontmatter(goalData)
+	if errParse != nil {
+		return ""
+	}
+	models := getModelsForAgent(metadata.Models, "coordinator")
+	if len(models) == 0 {
+		return ""
+	}
+	return models[0]
 }
 
 func findMostRecentSession() string {
