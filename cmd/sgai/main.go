@@ -736,6 +736,11 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		if capturedSessionID != "" {
 			args = append(args, "--session", capturedSessionID)
 		}
+		title := cfg.agent
+		if modelSpec != "" {
+			title = cfg.agent + " [" + modelSpec + "]"
+		}
+		args = append(args, "--title", title)
 
 		var msg string
 		if humanResponse != "" {
