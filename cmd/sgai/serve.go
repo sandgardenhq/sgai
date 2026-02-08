@@ -191,19 +191,18 @@ type editorPreset struct {
 }
 
 var editorPresets = map[string]editorPreset{
-	"code":   {command: "code -g {path}", isTerminal: false},
-	"cursor": {command: "cursor {path}", isTerminal: false},
-	"zed":    {command: "zed {path}", isTerminal: false},
-	"subl":   {command: "subl {path}", isTerminal: false},
-	"idea":   {command: "idea {path}", isTerminal: false},
-	"emacs":  {command: "emacsclient -n {path}", isTerminal: false},
-	"nvim":   {command: "nvim {path}", isTerminal: true},
-	"vim":    {command: "vim {path}", isTerminal: true},
-	"atom":   {command: "atom {path}", isTerminal: false},
+	"code":   {command: "code", isTerminal: false},
+	"cursor": {command: "cursor", isTerminal: false},
+	"zed":    {command: "zed", isTerminal: false},
+	"subl":   {command: "subl", isTerminal: false},
+	"idea":   {command: "idea", isTerminal: false},
+	"emacs":  {command: "emacsclient -n", isTerminal: false},
+	"nvim":   {command: "nvim", isTerminal: true},
+	"vim":    {command: "vim", isTerminal: true},
+	"atom":   {command: "atom", isTerminal: false},
 }
 
 // configurableEditor implements editorOpener with configurable editor support.
-// It supports preset editors and custom commands with {path} placeholders.
 type configurableEditor struct {
 	name       string
 	command    string
@@ -211,19 +210,11 @@ type configurableEditor struct {
 }
 
 func (e *configurableEditor) open(path string) error {
-	cmdLine := e.command
-	if strings.Contains(cmdLine, "{path}") {
-		cmdLine = strings.ReplaceAll(cmdLine, "{path}", path)
-	} else {
-		cmdLine = cmdLine + " " + path
-	}
-
-	parts := strings.Fields(cmdLine)
-	if len(parts) == 0 {
-		return fmt.Errorf("empty editor command")
-	}
-
-	return exec.Command(parts[0], parts[1:]...).Run()
+	cmd := exec.Command(e.command, path)
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
 }
 
 func resolveEditor(configEditor string) (name, command string, isTerminal bool) {
