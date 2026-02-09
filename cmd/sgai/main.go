@@ -241,7 +241,7 @@ func runWorkflow(ctx context.Context, args []string) {
 	for _, agent := range allAgents {
 		longestNameLen = max(longestNameLen, len(agent))
 	}
-	paddedsgai := "sgai" + strings.Repeat(" ", longestNameLen-len("sgai"))
+	paddedsgai := "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
@@ -696,7 +696,7 @@ func runSingleModelIteration(ctx context.Context, cfg multiModelConfig, wfState 
 }
 
 func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, modelSpec string) state.Workflow {
-	paddedAgentName := cfg.agent + strings.Repeat(" ", cfg.longestNameLen-len(cfg.agent))
+	paddedAgentName := cfg.agent + strings.Repeat(" ", max(0, cfg.longestNameLen-len(cfg.agent)))
 	var humanResponse string
 	var capturedSessionID string
 	outputCapture := newRingWriter()
@@ -1312,7 +1312,7 @@ func findFirstPendingMessageAgent(s state.Workflow) string {
 	}
 	for _, msg := range s.Messages {
 		if !msg.Read {
-			return msg.ToAgent
+			return extractAgentFromModelID(msg.ToAgent)
 		}
 	}
 	return ""

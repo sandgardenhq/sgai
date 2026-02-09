@@ -197,6 +197,68 @@ No frontmatter here.
 	})
 }
 
+func TestFindFirstPendingMessageAgent(t *testing.T) {
+	t.Run("noMessages", func(t *testing.T) {
+		wf := state.Workflow{}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want empty string", got)
+		}
+	})
+
+	t.Run("allRead", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b", Read: true},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want empty string", got)
+		}
+	})
+
+	t.Run("plainAgentName", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "agent-b" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "agent-b")
+		}
+	})
+
+	t.Run("modelQualifiedID", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "project-critic-council:openai/gpt-5.2", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "project-critic-council" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "project-critic-council")
+		}
+	})
+
+	t.Run("firstUnreadWins", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b:openai/gpt-5.2", Read: false},
+				{ToAgent: "agent-c", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "agent-b" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "agent-b")
+		}
+	})
+}
+
 func TestCanResumeWorkflow(t *testing.T) {
 	checksum := "abc123"
 
