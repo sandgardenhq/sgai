@@ -821,3 +821,154 @@ func TestBuildMultiModelSection(t *testing.T) {
 		})
 	}
 }
+
+func TestCountUnreadInbox(t *testing.T) {
+	cases := []struct {
+		name         string
+		messages     []state.Message
+		agent        string
+		currentModel string
+		want         int
+	}{
+		{
+			name:         "plainAgentMatch",
+			messages:     []state.Message{{ToAgent: "backend-go-developer", Read: false}},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         1,
+		},
+		{
+			name:         "modelQualifiedMatch",
+			messages:     []state.Message{{ToAgent: "project-critic-council:openai/gpt-5.2", Read: false}},
+			agent:        "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         1,
+		},
+		{
+			name: "skipsReadMessages",
+			messages: []state.Message{
+				{ToAgent: "backend-go-developer", Read: true},
+				{ToAgent: "backend-go-developer", Read: false},
+			},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         1,
+		},
+		{
+			name: "mixedPlainAndModelQualified",
+			messages: []state.Message{
+				{ToAgent: "project-critic-council", Read: false},
+				{ToAgent: "project-critic-council:openai/gpt-5.2", Read: false},
+				{ToAgent: "project-critic-council:openai/gpt-5.2", Read: true},
+			},
+			agent:        "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         2,
+		},
+		{
+			name: "noMatchDifferentAgent",
+			messages: []state.Message{
+				{ToAgent: "coordinator", Read: false},
+			},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         0,
+		},
+		{
+			name:         "emptyMessages",
+			messages:     nil,
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         0,
+		},
+		{
+			name: "modelQualifiedWithoutCurrentModel",
+			messages: []state.Message{
+				{ToAgent: "project-critic-council:openai/gpt-5.2", Read: false},
+			},
+			agent:        "project-critic-council",
+			currentModel: "",
+			want:         0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := countUnreadInbox(tc.messages, tc.agent, tc.currentModel)
+			if got != tc.want {
+				t.Errorf("countUnreadInbox() = %d; want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCountUnreadOutbox(t *testing.T) {
+	cases := []struct {
+		name         string
+		messages     []state.Message
+		agent        string
+		currentModel string
+		want         int
+	}{
+		{
+			name:         "plainAgentMatch",
+			messages:     []state.Message{{FromAgent: "backend-go-developer", Read: false}},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         1,
+		},
+		{
+			name:         "modelQualifiedMatch",
+			messages:     []state.Message{{FromAgent: "project-critic-council:openai/gpt-5.2", Read: false}},
+			agent:        "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         1,
+		},
+		{
+			name: "skipsReadMessages",
+			messages: []state.Message{
+				{FromAgent: "backend-go-developer", Read: true},
+				{FromAgent: "backend-go-developer", Read: false},
+			},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         1,
+		},
+		{
+			name: "mixedPlainAndModelQualified",
+			messages: []state.Message{
+				{FromAgent: "project-critic-council", Read: false},
+				{FromAgent: "project-critic-council:openai/gpt-5.2", Read: false},
+				{FromAgent: "project-critic-council:openai/gpt-5.2", Read: true},
+			},
+			agent:        "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         2,
+		},
+		{
+			name: "noMatchDifferentAgent",
+			messages: []state.Message{
+				{FromAgent: "coordinator", Read: false},
+			},
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         0,
+		},
+		{
+			name:         "emptyMessages",
+			messages:     nil,
+			agent:        "backend-go-developer",
+			currentModel: "",
+			want:         0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := countUnreadOutbox(tc.messages, tc.agent, tc.currentModel)
+			if got != tc.want {
+				t.Errorf("countUnreadOutbox() = %d; want %d", got, tc.want)
+			}
+		})
+	}
+}

@@ -241,7 +241,7 @@ func runWorkflow(ctx context.Context, args []string) {
 	for _, agent := range allAgents {
 		longestNameLen = max(longestNameLen, len(agent))
 	}
-	paddedsgai := "sgai" + strings.Repeat(" ", longestNameLen-len("sgai"))
+	paddedsgai := "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
@@ -696,10 +696,14 @@ func runSingleModelIteration(ctx context.Context, cfg multiModelConfig, wfState 
 }
 
 func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, modelSpec string) state.Workflow {
-	paddedAgentName := cfg.agent + strings.Repeat(" ", cfg.longestNameLen-len(cfg.agent))
+	paddedAgentName := cfg.agent + strings.Repeat(" ", max(0, cfg.longestNameLen-len(cfg.agent)))
 	var humanResponse string
 	var capturedSessionID string
 	outputCapture := newRingWriter()
+	currentModel := ""
+	if modelSpec != "" {
+		currentModel = formatModelID(cfg.agent, modelSpec)
+	}
 
 	for {
 		if ctx.Err() != nil {
@@ -754,12 +758,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				msg += multiModelSection
 			}
 
-			pendingCount := 0
-			for _, m := range wfState.Messages {
-				if m.ToAgent == cfg.agent {
-					pendingCount++
-				}
-			}
+			pendingCount := countUnreadInbox(wfState.Messages, cfg.agent, currentModel)
 			if pendingCount > 0 {
 				msgNotification := fmt.Sprintf("\nYOU HAVE %d PENDING MESSAGE(S). YOU MUST CALL `sgai_check_inbox()` TO READ THEM.\n", pendingCount)
 				msg = msgNotification + msg
@@ -772,12 +771,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			}
 
 			if cfg.agent != "coordinator" {
-				outboxPending := 0
-				for _, m := range wfState.Messages {
-					if m.FromAgent == cfg.agent && !m.Read {
-						outboxPending++
-					}
-				}
+				outboxPending := countUnreadOutbox(wfState.Messages, cfg.agent, currentModel)
 				if outboxPending > 0 {
 					msg += "\nYou have sent messages that haven't been read yet. For the recipient agents to process them, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). They cannot run while you hold control.\n"
 				}
@@ -960,7 +954,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				log.Fatalln("failed to save state:", err)
 			}
 
-			if agentHasUnreadOutgoingMessages(newState, cfg.agent) {
+			if agentHasUnreadOutgoingMessages(newState, cfg.agent, currentModel) {
 				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "sent message(s), yielding control...")
 				return newState
 			}
@@ -991,13 +985,33 @@ func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag
 	return runMultiModelAgent(ctx, cfg, wfState, metadata, iterationCounter)
 }
 
-func agentHasUnreadOutgoingMessages(s state.Workflow, agentName string) bool {
+func agentHasUnreadOutgoingMessages(s state.Workflow, agentName, currentModel string) bool {
 	for _, msg := range s.Messages {
-		if msg.FromAgent == agentName && !msg.Read {
+		if messageMatchesSender(msg, agentName, currentModel) && !msg.Read {
 			return true
 		}
 	}
 	return false
+}
+
+func countUnreadInbox(messages []state.Message, agent, currentModel string) int {
+	count := 0
+	for _, m := range messages {
+		if messageMatchesRecipient(m, agent, currentModel) && !m.Read {
+			count++
+		}
+	}
+	return count
+}
+
+func countUnreadOutbox(messages []state.Message, agent, currentModel string) int {
+	count := 0
+	for _, m := range messages {
+		if messageMatchesSender(m, agent, currentModel) && !m.Read {
+			count++
+		}
+	}
+	return count
 }
 
 func nextMessageID(messages []state.Message) int {
@@ -1312,7 +1326,7 @@ func findFirstPendingMessageAgent(s state.Workflow) string {
 	}
 	for _, msg := range s.Messages {
 		if !msg.Read {
-			return msg.ToAgent
+			return extractAgentFromModelID(msg.ToAgent)
 		}
 	}
 	return ""

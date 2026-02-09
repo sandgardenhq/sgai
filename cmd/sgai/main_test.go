@@ -197,6 +197,150 @@ No frontmatter here.
 	})
 }
 
+func TestFindFirstPendingMessageAgent(t *testing.T) {
+	t.Run("noMessages", func(t *testing.T) {
+		wf := state.Workflow{}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want empty string", got)
+		}
+	})
+
+	t.Run("allRead", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b", Read: true},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want empty string", got)
+		}
+	})
+
+	t.Run("plainAgentName", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "agent-b" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "agent-b")
+		}
+	})
+
+	t.Run("modelQualifiedID", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "project-critic-council:openai/gpt-5.2", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "project-critic-council" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "project-critic-council")
+		}
+	})
+
+	t.Run("firstUnreadWins", func(t *testing.T) {
+		wf := state.Workflow{
+			Messages: []state.Message{
+				{ToAgent: "agent-a", Read: true},
+				{ToAgent: "agent-b:openai/gpt-5.2", Read: false},
+				{ToAgent: "agent-c", Read: false},
+			},
+		}
+		got := findFirstPendingMessageAgent(wf)
+		if got != "agent-b" {
+			t.Errorf("findFirstPendingMessageAgent() = %q; want %q", got, "agent-b")
+		}
+	})
+}
+
+func TestAgentHasUnreadOutgoingMessages(t *testing.T) {
+	cases := []struct {
+		name         string
+		messages     []state.Message
+		agentName    string
+		currentModel string
+		want         bool
+	}{
+		{
+			name:         "plainAgentMatch",
+			messages:     []state.Message{{FromAgent: "backend-go-developer", Read: false}},
+			agentName:    "backend-go-developer",
+			currentModel: "",
+			want:         true,
+		},
+		{
+			name:         "modelQualifiedMatch",
+			messages:     []state.Message{{FromAgent: "project-critic-council:openai/gpt-5.2", Read: false}},
+			agentName:    "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         true,
+		},
+		{
+			name:         "readMessageIgnored",
+			messages:     []state.Message{{FromAgent: "backend-go-developer", Read: true}},
+			agentName:    "backend-go-developer",
+			currentModel: "",
+			want:         false,
+		},
+		{
+			name:         "noMessages",
+			messages:     nil,
+			agentName:    "backend-go-developer",
+			currentModel: "",
+			want:         false,
+		},
+		{
+			name:         "differentAgent",
+			messages:     []state.Message{{FromAgent: "coordinator", Read: false}},
+			agentName:    "backend-go-developer",
+			currentModel: "",
+			want:         false,
+		},
+		{
+			name: "mixedReadAndUnread",
+			messages: []state.Message{
+				{FromAgent: "backend-go-developer", Read: true},
+				{FromAgent: "backend-go-developer", Read: false},
+			},
+			agentName:    "backend-go-developer",
+			currentModel: "",
+			want:         true,
+		},
+		{
+			name:         "modelQualifiedWithoutCurrentModel",
+			messages:     []state.Message{{FromAgent: "project-critic-council:openai/gpt-5.2", Read: false}},
+			agentName:    "project-critic-council",
+			currentModel: "",
+			want:         false,
+		},
+		{
+			name: "plainAgentMatchWhenModelSet",
+			messages: []state.Message{
+				{FromAgent: "project-critic-council", Read: false},
+			},
+			agentName:    "project-critic-council",
+			currentModel: "project-critic-council:openai/gpt-5.2",
+			want:         true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			wf := state.Workflow{Messages: tc.messages}
+			got := agentHasUnreadOutgoingMessages(wf, tc.agentName, tc.currentModel)
+			if got != tc.want {
+				t.Errorf("agentHasUnreadOutgoingMessages() = %v; want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCanResumeWorkflow(t *testing.T) {
 	checksum := "abc123"
 
