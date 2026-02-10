@@ -48,6 +48,9 @@
 		<button type="submit" class="action-btn outline">Stop</button>
 	</form>
 	{{end}}
+	<form action="/workspaces/{{.DirName}}/open-opencode" method="post" style="display:inline">
+		<button type="submit" class="action-btn outline">Open In OpenCode</button>
+	</form>
 	{{end}}
 	<a href="/workspaces/{{.DirName}}/skills" role="button" class="action-btn outline">Skills</a>
 	<a href="/workspaces/{{.DirName}}/snippets" role="button" class="action-btn outline">Snippets</a>

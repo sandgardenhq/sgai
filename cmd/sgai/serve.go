@@ -2551,6 +2551,8 @@ func (s *Server) routeWorkspace(w http.ResponseWriter, r *http.Request) {
 		s.handleWorkspaceRetroDelete(w, r, workspacePath)
 	case "open-vscode":
 		s.handleWorkspaceOpenVSCode(w, r, workspacePath)
+	case "open-opencode":
+		s.handleWorkspaceOpenInOpenCode(w, r, workspacePath)
 	case "skills":
 		s.handleWorkspaceSkills(w, r, workspacePath)
 	case "snippets":
@@ -3882,6 +3884,108 @@ func (s *Server) handleWorkspaceOpenVSCode(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, workspaceURL(workspacePath, "spec"), http.StatusSeeOther)
 }
 
+func (s *Server) handleWorkspaceOpenInOpenCode(w http.ResponseWriter, r *http.Request, workspacePath string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !isLocalRequest(r) {
+		http.Error(w, "opencode can only be opened from localhost", http.StatusForbidden)
+		return
+	}
+
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	s.mu.Unlock()
+	if sess == nil {
+		http.Error(w, "factory is not running", http.StatusConflict)
+		return
+	}
+	sess.mu.Lock()
+	running := sess.running
+	sess.mu.Unlock()
+	if !running {
+		http.Error(w, "factory is not running", http.StatusConflict)
+		return
+	}
+
+	wfState, errState := state.Load(statePath(workspacePath))
+	if errState != nil {
+		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
+		return
+	}
+	currentAgent := wfState.CurrentAgent
+	sessionID := wfState.SessionID
+
+	modelSpec := lookupModelForAgent(workspacePath, currentAgent)
+	model, variant := parseModelAndVariant(modelSpec)
+
+	interactive := "yes"
+	if data, errRead := os.ReadFile(filepath.Join(workspacePath, "GOAL.md")); errRead == nil {
+		fm := parseFrontmatterMap(data)
+		if v, ok := fm["interactive"]; ok {
+			interactive = v
+		}
+	}
+
+	execPath, errExec := os.Executable()
+	if errExec != nil {
+		http.Error(w, "failed to resolve executable path", http.StatusInternalServerError)
+		return
+	}
+
+	opencodeCmd := fmt.Sprintf("opencode --session %q --agent %q", sessionID, currentAgent)
+	if model != "" {
+		opencodeCmd += fmt.Sprintf(" --model %q", model)
+	}
+	if variant != "" {
+		opencodeCmd += fmt.Sprintf(" --variant %q", variant)
+	}
+
+	scriptContent := fmt.Sprintf("#!/bin/bash\ntrap 'rm -f \"$0\"' EXIT\ncd %q\nexport OPENCODE_CONFIG_DIR=.sgai\nexport SGAI_MCP_EXECUTABLE=%q\nexport SGAI_MCP_INTERACTIVE=%q\n%s\n",
+		workspacePath, execPath, interactive, opencodeCmd)
+
+	scriptPath, errScript := writeOpenCodeScript(scriptContent)
+	if errScript != nil {
+		http.Error(w, "failed to prepare opencode script", http.StatusInternalServerError)
+		return
+	}
+
+	if errOpen := openInTerminal(scriptPath); errOpen != nil {
+		_ = os.Remove(scriptPath)
+		http.Error(w, "failed to open terminal", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, workspaceURL(workspacePath, "spec"), http.StatusSeeOther)
+}
+
+func writeOpenCodeScript(content string) (string, error) {
+	tmpFile, errTmp := os.CreateTemp("", "sgai-opencode-*.sh")
+	if errTmp != nil {
+		return "", errTmp
+	}
+
+	if _, errWrite := tmpFile.WriteString(content); errWrite != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpFile.Name())
+		return "", errWrite
+	}
+
+	if errClose := tmpFile.Close(); errClose != nil {
+		_ = os.Remove(tmpFile.Name())
+		return "", errClose
+	}
+
+	if errChmod := os.Chmod(tmpFile.Name(), 0755); errChmod != nil {
+		_ = os.Remove(tmpFile.Name())
+		return "", errChmod
+	}
+
+	return tmpFile.Name(), nil
+}
+
 func (s *Server) handleWorkspaceFork(w http.ResponseWriter, r *http.Request, workspacePath string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST required", http.StatusMethodNotAllowed)
@@ -3996,30 +4100,23 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 		goalContent = string(data)
 	}
 
-	opencodeAvailable := false
-	if _, errLookup := exec.LookPath("opencode"); errLookup == nil {
-		opencodeAvailable = true
-	}
-
 	forkName := filepath.Base(forkDir)
 	branchName := normalizeForkName(forkName)
 	if branchName == "" {
 		branchName = "fork-merge"
 	}
-	if opencodeAvailable {
-		prompt := strings.Join([]string{
-			"Return a short branch name based on the fork work.",
-			"Use only letters, numbers, dashes, and underscores.",
-			"Fork name: " + forkName,
-			"Commit history:\n" + string(logOutput),
-			"Diff summary:\n" + string(diffOutput),
-			"GOAL:\n" + goalContent,
-		}, "\n")
-		if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
-			normalized := normalizeForkName(result)
-			if validateWorkspaceName(normalized) == "" && normalized != "" {
-				branchName = normalized
-			}
+	prompt := strings.Join([]string{
+		"Return a short branch name based on the fork work.",
+		"Use only letters, numbers, dashes, and underscores.",
+		"Fork name: " + forkName,
+		"Commit history:\n" + string(logOutput),
+		"Diff summary:\n" + string(diffOutput),
+		"GOAL:\n" + goalContent,
+	}, "\n")
+	if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
+		normalized := normalizeForkName(result)
+		if validateWorkspaceName(normalized) == "" && normalized != "" {
+			branchName = normalized
 		}
 	}
 
@@ -4040,10 +4137,6 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	if errRebase != nil {
 		if !strings.Contains(strings.ToLower(string(rebaseOutput)), "conflict") {
 			renderError("failed to rebase fork")
-			return
-		}
-		if !opencodeAvailable {
-			renderError("cannot resolve conflicts without opencode")
 			return
 		}
 		listCmd := exec.Command("jj", "resolve", "--list")
@@ -4128,16 +4221,14 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	if commitMessage == "" {
 		commitMessage = "merge fork work"
 	}
-	if opencodeAvailable {
-		prompt := strings.Join([]string{
-			"Write a concise commit message summarizing the fork work.",
-			"Commit history:\n" + string(logOutput),
-			"Diff summary:\n" + string(diffOutput),
-			"GOAL:\n" + goalContent,
-		}, "\n")
-		if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil && strings.TrimSpace(result) != "" {
-			commitMessage = strings.TrimSpace(result)
-		}
+	commitPrompt := strings.Join([]string{
+		"Write a concise commit message summarizing the fork work.",
+		"Commit history:\n" + string(logOutput),
+		"Diff summary:\n" + string(diffOutput),
+		"GOAL:\n" + goalContent,
+	}, "\n")
+	if result, errPrompt := invokeLLMForAssist(commitPrompt); errPrompt == nil && strings.TrimSpace(result) != "" {
+		commitMessage = strings.TrimSpace(result)
 	}
 
 	descCmd := exec.Command("jj", "desc", "-m", commitMessage)
@@ -4164,24 +4255,22 @@ func (s *Server) handleForkMerge(w http.ResponseWriter, r *http.Request) {
 	if _, errGH := exec.LookPath("gh"); errGH == nil {
 		prTitle := commitMessage
 		prBody := ""
-		if opencodeAvailable {
-			prompt := strings.Join([]string{
-				"Write a GitHub pull request title and body.",
-				"Return the title on a line starting with TITLE: and the body after BODY:.",
-				"Commit history:\n" + string(logOutput),
-				"Diff summary:\n" + string(diffOutput),
-				"GOAL:\n" + goalContent,
-			}, "\n")
-			if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
-				lines := strings.Split(result, "\n")
-				for i, line := range lines {
-					if after, ok := strings.CutPrefix(line, "TITLE:"); ok {
-						prTitle = strings.TrimSpace(after)
-					}
-					if strings.HasPrefix(line, "BODY:") {
-						prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
-						break
-					}
+		prPrompt := strings.Join([]string{
+			"Write a GitHub pull request title and body.",
+			"Return the title on a line starting with TITLE: and the body after BODY:.",
+			"Commit history:\n" + string(logOutput),
+			"Diff summary:\n" + string(diffOutput),
+			"GOAL:\n" + goalContent,
+		}, "\n")
+		if result, errPrompt := invokeLLMForAssist(prPrompt); errPrompt == nil {
+			lines := strings.Split(result, "\n")
+			for i, line := range lines {
+				if after, ok := strings.CutPrefix(line, "TITLE:"); ok {
+					prTitle = strings.TrimSpace(after)
+				}
+				if strings.HasPrefix(line, "BODY:") {
+					prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
+					break
 				}
 			}
 		}

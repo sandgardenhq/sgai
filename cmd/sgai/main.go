@@ -51,6 +51,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if os.Args[1] != "help" && os.Args[1] != "-h" && os.Args[1] != "--help" {
+		if _, err := exec.LookPath("opencode"); err != nil {
+			log.Fatalln("opencode is required but not found in PATH")
+		}
+	}
+
 	switch os.Args[1] {
 	case "serve":
 		cmdServe(os.Args[2:])

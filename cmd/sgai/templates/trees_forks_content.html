@@ -35,6 +35,11 @@
 						{{else}}
 						<button type="button" class="action-btn outline" disabled data-tooltip="Editor not available or remote connection">Open in Editor</button>
 						{{end}}
+					{{if .Running}}
+					<form action="/workspaces/{{.DirName}}/open-opencode" method="post" style="display:inline">
+						<button type="submit" class="action-btn outline">Open In OpenCode</button>
+					</form>
+					{{end}}
 						<a href="/trees?workspace={{.DirName}}" role="button" class="action-btn outline">Open in sgai</a>
 						<button hx-post="/workspaces/{{$.RootDirName}}/merge"
 							hx-vals='{"fork_dir": "{{.Directory}}"}'

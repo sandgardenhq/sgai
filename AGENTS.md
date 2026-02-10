@@ -37,3 +37,8 @@ You must use the skill `run-long-running-processes-in-tmux`
 - Repository Mode: is when a repository is served by SGAI in a way that it can actually run software.
 - Forked Mode: is when a root repository has at least one child, it displays the fork (dashboard-style) mode.
 **CRITICAL** when a Root Repository run out of children, it must revert back from Forked Mode to Repository Mode.
+
+
+# Safe Assumptions
+
+"OpenCode" (aka `opencode`) is always installed and available.

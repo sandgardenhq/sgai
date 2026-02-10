@@ -537,6 +537,91 @@ func TestHandleWorkspaceOpenVSCodeEditorError(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspaceOpenInOpenCodeMethodNotAllowed(t *testing.T) {
+	rootDir := t.TempDir()
+	validProject := filepath.Join(rootDir, "test-project")
+	if err := os.MkdirAll(validProject, 0755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
+	}
+	createsgaiDir(t, validProject)
+
+	srv := NewServer(rootDir)
+
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/test-project/open-opencode", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	rec := httptest.NewRecorder()
+
+	srv.handleWorkspaceOpenInOpenCode(rec, req, validProject)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET request should return 405 Method Not Allowed, got %d", rec.Code)
+	}
+}
+
+func TestHandleWorkspaceOpenInOpenCodeForbiddenForRemote(t *testing.T) {
+	rootDir := t.TempDir()
+	validProject := filepath.Join(rootDir, "test-project")
+	if err := os.MkdirAll(validProject, 0755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
+	}
+	createsgaiDir(t, validProject)
+
+	srv := NewServer(rootDir)
+
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-opencode", nil)
+	req.RemoteAddr = "192.168.1.100:54321"
+	rec := httptest.NewRecorder()
+
+	srv.handleWorkspaceOpenInOpenCode(rec, req, validProject)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Remote request should return 403 Forbidden, got %d", rec.Code)
+	}
+}
+
+func TestHandleWorkspaceOpenInOpenCodeFactoryNotRunning(t *testing.T) {
+	rootDir := t.TempDir()
+	validProject := filepath.Join(rootDir, "test-project")
+	if err := os.MkdirAll(validProject, 0755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
+	}
+	createsgaiDir(t, validProject)
+
+	srv := NewServer(rootDir)
+
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-opencode", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	rec := httptest.NewRecorder()
+
+	srv.handleWorkspaceOpenInOpenCode(rec, req, validProject)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("request with factory not running should return 409 Conflict, got %d", rec.Code)
+	}
+}
+
+func TestHandleWorkspaceOpenInOpenCodeFactoryNotRunningSessionExists(t *testing.T) {
+	rootDir := t.TempDir()
+	validProject := filepath.Join(rootDir, "test-project")
+	if err := os.MkdirAll(validProject, 0755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
+	}
+	createsgaiDir(t, validProject)
+
+	srv := NewServer(rootDir)
+	srv.sessions[validProject] = &session{running: false}
+
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/test-project/open-opencode", nil)
+	req.RemoteAddr = "127.0.0.1:54321"
+	rec := httptest.NewRecorder()
+
+	srv.handleWorkspaceOpenInOpenCode(rec, req, validProject)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("request with session stopped should return 409 Conflict, got %d", rec.Code)
+	}
+}
+
 func TestNewServerWithConfigEditorFallback(t *testing.T) {
 	t.Run("fallbackToDefaultWhenEnvEditorUnavailable", func(t *testing.T) {
 		rootDir := t.TempDir()
