@@ -17,3 +17,7 @@ models:
 interactive: yes
 ---
 
+One or two paragraphs explaining what you want to do
+
+- [ ] a list of verifiable checks to help agents to communicate their progress
+  - [ ] they can even be nested
