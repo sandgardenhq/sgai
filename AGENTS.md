@@ -26,3 +26,14 @@ CRITICAL(code quality): ensure good Go code quality by calling `make lint`
 
 You must use the skill `browser-bug-testing-workflow` - remember to use visual diffs and screenshots to evaluate the problem
 You must use the skill `run-long-running-processes-in-tmux`
+
+
+# Terminology
+
+- Standalone Repository: a repository that has only _one_ `jj workspace` -- itself.
+- Root Repository: a repository that has more than one `jj workspace`, and it is the root (it is the one in which `.jj/repo` is a directory and not a file)
+- Forked Repository: a repository that is part of a `jj workspace, and it is not the root (it is the one in which `.jj/repo` is a text file, whose content points to the parent).
+
+- Repository Mode: is when a repository is served by SGAI in a way that it can actually run software.
+- Forked Mode: is when a root repository has at least one child, it displays the fork (dashboard-style) mode.
+**CRITICAL** when a Root Repository run out of children, it must revert back from Forked Mode to Repository Mode.
