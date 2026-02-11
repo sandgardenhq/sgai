@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes a dependency update for `github.com/modelcontextprotocol/go-sdk`.
+- **Summary**: This update addresses a dependency version change for `github.com/modelcontextprotocol/go-sdk`.
 
 ### Additional Changes
 
