@@ -8,14 +8,7 @@
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Updated `golang.org/x/tools` to keep the development toolchain current and compatible with upstream changes."
-  ]
-}
-
-```
+- Updated `golang.org/x/tools` to keep the development toolchain current and compatible with upstream changes.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
