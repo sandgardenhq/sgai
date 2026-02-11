@@ -17,6 +17,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 | Dependency                                   | Purpose                                                                   |                           |
 |----------------------------------------------|---------------------------------------------------------------------------|---------------------------|
+| [Node.js](https://nodejs.org)                | JavaScript runtime — provides `npx` for MCP server auto-installation      |                           |
 | [bun](https://bun.sh)                        | JavaScript runtime and bundler — builds the React frontend                |                           |
 | [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
 | [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
@@ -49,7 +50,7 @@ make build
 1. **Install dependencies via Homebrew:**
 
    ```sh
-   brew install anomalyco/tap/opencode jj graphviz oven-sh/bun/bun
+   brew install node anomalyco/tap/opencode jj graphviz oven-sh/bun/bun
    ```
 
 2. **Log in to your AI provider:**
