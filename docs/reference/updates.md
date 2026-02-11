@@ -1,6 +1,6 @@
 # Updates
 
-## 0.0.0+20260211 — Corrected completed workspace state
+## 0.0.0+20260211 — Corrected workspace state persistence
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
@@ -8,7 +8,7 @@
 
 ### Bug Fixes
 
-- Fixed completed workspaces to no longer retain an "ever-started" state after a session ends.
+- Fixed completed workspaces to no longer retain an `ever-started` state after a session ends.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
