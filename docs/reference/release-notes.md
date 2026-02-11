@@ -6,16 +6,9 @@
 - **Version**: 0.0.0+20260211
 - **Summary**: This release includes updates across new features, bug fixes, and additional changes.
 
-<!-- BEGIN NEW_RELEASE_NOTES -->
-```json
-{
-  "Additional Changes": [
-    "Updated `golang.org/x/term` from `v0.39.0` to `v0.40.0` in `go.mod` and `go.sum`."
-  ]
-}
+### Additional Changes
 
-```
-<!-- END NEW_RELEASE_NOTES -->
+- Updated `golang.org/x/term` from `v0.39.0` to `v0.40.0` in `go.mod` and `go.sum`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
