@@ -9,7 +9,7 @@
 ```json
 {
   "Additional Changes": [
-    "Updated the Markdown rendering dependency so the project uses a newer supported version. Specifically, the `react-markdown` package was upgraded to `v10.1.0` and the Bun lockfile was refreshed to reflect the new resolved dependency graph."
+    "Updated the Markdown rendering dependency by upgrading `react-markdown` to `v10.1.0` and refreshing the Bun lockfile."
   ]
 }
 
