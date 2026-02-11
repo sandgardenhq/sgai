@@ -11,7 +11,7 @@
 ```json
 {
   "Additional Changes": [
-    "We updated a Go tooling dependency to keep the development toolchain current and compatible with upstream changes. Specifically, the indirect module dependency `golang.org/x/tools` was bumped from v0.41.0 to v0.42.0."
+    "Updated `golang.org/x/tools` to keep the development toolchain current and compatible with upstream changes."
   ]
 }
 
