@@ -10,7 +10,7 @@
 ```json
 {
   "Additional Changes": [
-    "We updated a Go dependency to a newer version to keep the project current and compatible with recent upstream changes. Specifically, we bumped `golang.org/x/term` from `v0.39.0` to `v0.40.0` in `go.mod` and `go.sum` to pick up the latest module updates."
+    "Updated `golang.org/x/term` from `v0.39.0` to `v0.40.0` in `go.mod` and `go.sum`."
   ]
 }
 
