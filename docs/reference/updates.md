@@ -11,7 +11,7 @@
 ```json
 {
   "Bug Fixes": [
-    "Completed workspaces no longer retain an \"ever-started\" state after a session ends. This change clears the persisted ever-started tracking flag for completed workspaces on session termination to prevent stale status from carrying into subsequent sessions."
+    "Completed workspaces no longer retain an \"ever-started\" state after a session ends."
   ]
 }
 
