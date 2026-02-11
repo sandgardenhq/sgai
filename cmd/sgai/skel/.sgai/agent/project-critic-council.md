@@ -1,5 +1,4 @@
 ---
-model: "anthropic/claude-opus-4-6 (max)"
 description: Multi-model council that strictly evaluates whether GOAL.md items are truly complete. Requests changes through coordinator.
 mode: primary
 permission:

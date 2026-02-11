@@ -1,8 +1,10 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
@@ -331,6 +333,61 @@ func TestCanResumeWorkflow(t *testing.T) {
 			t.Error("expected canResumeWorkflow = false for unknown status")
 		}
 	})
+}
+
+func TestAgentFilesHaveNoModelVariants(t *testing.T) {
+	agentsFS, err := fs.Sub(skelFS, "skel/.sgai/agent")
+	if err != nil {
+		t.Fatal("failed to access skeleton agents FS:", err)
+	}
+
+	err = fs.WalkDir(agentsFS, ".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		content, errRead := fs.ReadFile(agentsFS, path)
+		if errRead != nil {
+			t.Errorf("failed to read %s: %v", path, errRead)
+			return nil
+		}
+		fm := parseFrontmatterMap(content)
+		modelVal := strings.Trim(fm["model"], "\"")
+		if modelVal == "" {
+			return nil
+		}
+		_, variant := parseModelAndVariant(modelVal)
+		if variant != "" {
+			t.Errorf("agent file %s has model with variant %q: %q (variants must be specified in GOAL.md models section, not agent files)",
+				path, variant, modelVal)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal("failed to walk agent files:", err)
+	}
+}
+
+func TestBuildRetrospectiveGoalHasNoModels(t *testing.T) {
+	content := buildRetrospectiveGoalContent("/tmp/test-session")
+	metadata, err := parseYAMLFrontmatter([]byte(content))
+	if err != nil {
+		t.Fatal("failed to parse retrospective GOAL frontmatter:", err)
+	}
+	if len(metadata.Models) != 0 {
+		t.Errorf("retrospective GOAL.md should have no models section, got %v", metadata.Models)
+	}
+	for agent, modelVal := range metadata.Models {
+		models := getModelsForAgent(metadata.Models, agent)
+		for _, m := range models {
+			_, variant := parseModelAndVariant(m)
+			if variant != "" {
+				t.Errorf("retrospective GOAL.md model for %s has variant %q: %v", agent, variant, modelVal)
+			}
+		}
+	}
 }
 
 func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
