@@ -13,6 +13,10 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 - **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
 - **Go-native** — Single binary, fast startup, minimal dependencies
 
+## Guides
+
+- [React web UI (sgai serve)](./docs/guides/react-web-ui.md)
+
 ## Prerequisites
 
 | Dependency                                   | Purpose                                                                   |                           |
