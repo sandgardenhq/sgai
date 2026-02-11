@@ -4,18 +4,11 @@
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This update covers the changes included in the raw payload below.
+- **Summary**: This update addresses a workflow state persistence issue affecting completed workspaces.
 
-### Raw payload
+### Bug Fixes
 
-```json
-{
-  "Bug Fixes": [
-    "Completed workspaces no longer retain an \"ever-started\" state after a session ends."
-  ]
-}
-
-```
+- Fixed completed workspaces to no longer retain an "ever-started" state after a session ends.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
