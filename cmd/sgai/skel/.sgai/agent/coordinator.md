@@ -1,5 +1,4 @@
 ---
-model: "anthropic/claude-opus-4-6 (max)"
 description: Coordinates the work flow.
 mode: primary
 permission:
@@ -263,14 +262,14 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
 
 - Step Name: ASK-PROJECT-CRITIC-COUNCIL
   BEFORE you can mark the workflow as complete, you SHOULD send a message to project-critic-council asking them to verify all GOAL.md checkboxes are genuinely complete. This is VERY STRONGLY ENCOURAGED.
-  
+
   ```
   sgai_send_message({
     toAgent: "project-critic-council",
     body: "Please verify all checked items in GOAL.md are genuinely complete before I mark the workflow as finished."
   })
   ```
-  
+
   Then set status to "agent-done" to let project-critic-council evaluate.
   When project-critic-council responds, review their verdict before proceeding to MARK-COMPLETE.
 
