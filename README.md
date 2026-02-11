@@ -69,7 +69,6 @@ make build
    completionGateScript: make test
    flow: |
      "general-purpose"
-     "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
    interactive: yes
    ---
 
