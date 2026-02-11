@@ -1,14 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260211 — Release updates
+## 0.0.0+20260211 — Updated Markdown rendering dependency
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes the latest updates.
+- **Summary**: This release includes an updated Markdown rendering dependency.
 
 ### Additional Changes
 
-- Updated the Markdown rendering dependency by upgrading `react-markdown` to `v10.1.0` and refreshing the Bun lockfile.
+- Updated the Markdown rendering dependency by upgrading `react-markdown` to `v10.1.0` and refreshing `bun.lockb`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
