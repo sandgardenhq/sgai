@@ -410,7 +410,7 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 		sess.mu.Lock()
 		sess.running = false
 		sess.mu.Unlock()
-
+		s.clearEverStartedOnCompletion(workspacePath)
 	}()
 
 	return startSessionResult{sess: sess}
@@ -1273,6 +1273,19 @@ func (s *Server) wasEverStarted(dir string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.everStartedDirs[dir]
+}
+
+func (s *Server) clearEverStartedOnCompletion(dir string) {
+	wfState, err := state.Load(statePath(dir))
+	if err != nil {
+		return
+	}
+	if wfState.Status != state.StatusComplete {
+		return
+	}
+	s.mu.Lock()
+	delete(s.everStartedDirs, dir)
+	s.mu.Unlock()
 }
 
 func (s *Server) pinnedFilePath() string {

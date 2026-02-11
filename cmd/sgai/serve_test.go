@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 func createsgaiDir(t *testing.T, projectDir string) {
@@ -851,6 +853,63 @@ func TestTogglePin(t *testing.T) {
 		}
 		if !srv2.isPinned("/path/to/project") {
 			t.Error("pinned project should persist across server instances")
+		}
+	})
+}
+
+func writeStateFile(t *testing.T, dir, status string) {
+	t.Helper()
+	wf := state.Workflow{Status: status}
+	if err := state.Save(statePath(dir), wf); err != nil {
+		t.Fatalf("failed to write state file: %v", err)
+	}
+}
+
+func TestClearEverStartedOnCompletion(t *testing.T) {
+	t.Run("completedWorkspace", func(t *testing.T) {
+		dir := t.TempDir()
+		writeStateFile(t, dir, state.StatusComplete)
+		srv := &Server{
+			everStartedDirs: map[string]bool{dir: true},
+		}
+		srv.clearEverStartedOnCompletion(dir)
+		if srv.everStartedDirs[dir] {
+			t.Error("everStartedDirs should be cleared for completed workspace")
+		}
+	})
+
+	t.Run("workingWorkspace", func(t *testing.T) {
+		dir := t.TempDir()
+		writeStateFile(t, dir, state.StatusWorking)
+		srv := &Server{
+			everStartedDirs: map[string]bool{dir: true},
+		}
+		srv.clearEverStartedOnCompletion(dir)
+		if !srv.everStartedDirs[dir] {
+			t.Error("everStartedDirs should persist for working workspace")
+		}
+	})
+
+	t.Run("agentDoneWorkspace", func(t *testing.T) {
+		dir := t.TempDir()
+		writeStateFile(t, dir, state.StatusAgentDone)
+		srv := &Server{
+			everStartedDirs: map[string]bool{dir: true},
+		}
+		srv.clearEverStartedOnCompletion(dir)
+		if !srv.everStartedDirs[dir] {
+			t.Error("everStartedDirs should persist for agent-done workspace")
+		}
+	})
+
+	t.Run("missingStateFile", func(t *testing.T) {
+		dir := t.TempDir()
+		srv := &Server{
+			everStartedDirs: map[string]bool{dir: true},
+		}
+		srv.clearEverStartedOnCompletion(dir)
+		if !srv.everStartedDirs[dir] {
+			t.Error("everStartedDirs should persist when state file is missing")
 		}
 	})
 }
