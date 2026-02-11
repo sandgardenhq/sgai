@@ -11,14 +11,14 @@ This document describes user-visible changes by release.
 ```json
 {
   "Additional Changes": [
-    "The installation documentation now lists Node.js as a required dependency to avoid setup mismatches. The Homebrew install command was updated to include Node.js explicitly.",
-    "A dedicated migration goals document was added to clarify the intended React migration outcomes and scope. Obsolete migration-related agent and skill definitions were removed to prevent referencing outdated React migration components."
+    "Updated the installation documentation to list Node.js as a required dependency and added Node.js to the Homebrew install command.",
+    "Added a dedicated React migration goals document to clarify intended outcomes and removed obsolete migration-related agent and skill definitions."
   ],
   "Breaking Changes": [
-    "The legacy HTMX compose/adhoc/retro web UI has been removed in favor of the new React single-page application interface. This change deletes the corresponding HTMX handlers and templates and standardizes browser interactions on the new `/api/v1` JSON+SSE API surface."
+    "Removed the legacy HTMX compose/adhoc/retro web UI in favor of the React single-page application interface and standardized browser interactions on the `/api/v1` JSON+SSE API surface."
   ],
   "New Features": [
-    "A new web interface is now available, providing a modern single-page experience for using SGAI through the browser. The HTMX-based compose/adhoc/retro UI handlers and templates were removed and replaced with a Bun-built React SPA using shadcn/ui, backed by new `/api/v1` JSON + Server-Sent Events (SSE) endpoints."
+    "Added a Bun-built React single-page application web interface using shadcn/ui, backed by new `/api/v1` JSON and Server-Sent Events (SSE) endpoints."
   ]
 }
 
