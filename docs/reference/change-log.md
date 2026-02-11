@@ -1,21 +1,14 @@
 # Change log
 
-## 0.0.0+20260211 — Updates
+## 0.0.0+20260211 — Updated Go SDK dependency
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes an updated Go SDK dependency.
 
-### Changes
+### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Updated the Go SDK dependency to a newer release to keep the project current and compatible with upstream changes. Specifically, the module dependency `github.com/modelcontextprotocol/go-sdk` was bumped from `v1.2.0` to `v1.3.0` in the dependency set."
-  ]
-}
-
-```
+- Updated the module dependency `github.com/modelcontextprotocol/go-sdk` from `v1.2.0` to `v1.3.0`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
