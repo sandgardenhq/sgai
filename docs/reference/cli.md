@@ -46,14 +46,14 @@ Options:
 
 ## Troubleshooting
 
-### Workspace looks like it is still running after a session ends
+### Workspace still looks like it is running after a session ends
 
-Some session views keep per-workspace “ever started” state to decide whether to show a running indicator (for example, a spinner).
+Some session views keep per-workspace “ever started” state to decide whether to show a running indicator.
 
-If a workspace is already complete, `sgai serve` clears that “ever started” marker when the session ends. If you still see a workspace shown as running:
+If a workspace status is `complete`, `sgai serve` clears that “ever started” marker when the session ends. If you still see a workspace shown as running:
 
-1. Check the workspace workflow state to confirm the status is complete.
-2. If the workflow state file is missing or the status is not complete, the running indicator may stay on because `sgai serve` does not clear the marker in those cases.
+1. Check the workspace workflow state to confirm the status is `complete`.
+2. If the workflow state file is missing, or the status is not `complete`, the running indicator may stay on because `sgai serve` does not clear the marker in those cases.
 
 See [Workflow state](./workflow-state.md) for where the state file lives and which statuses are considered complete.
 
