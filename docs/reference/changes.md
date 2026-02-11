@@ -6,23 +6,20 @@ This document describes user-visible changes by release.
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes a new React web UI, removes the legacy HTMX UI, and updates related documentation.
 
-```json
-{
-  "Additional Changes": [
-    "Updated the installation documentation to list Node.js as a required dependency and added Node.js to the Homebrew install command.",
-    "Added a dedicated React migration goals document to clarify intended outcomes and removed obsolete migration-related agent and skill definitions."
-  ],
-  "Breaking Changes": [
-    "Removed the legacy HTMX compose/adhoc/retro web UI in favor of the React single-page application interface and standardized browser interactions on the `/api/v1` JSON+SSE API surface."
-  ],
-  "New Features": [
-    "Added a Bun-built React single-page application web interface using shadcn/ui, backed by new `/api/v1` JSON and Server-Sent Events (SSE) endpoints."
-  ]
-}
+### New Features
 
-```
+- Added a Bun-built React single-page application web interface using shadcn/ui, backed by new `/api/v1` JSON and Server-Sent Events (SSE) endpoints.
+
+### Breaking Changes
+
+- Removed the legacy HTMX compose/adhoc/retro web UI in favor of the React single-page application interface and standardized browser interactions on the `/api/v1` JSON+SSE API surface.
+
+### Additional Changes
+
+- Updated the installation documentation to list Node.js as a required dependency and added Node.js to the Homebrew install command.
+- Added a dedicated React migration goals document to clarify intended outcomes and removed obsolete migration-related agent and skill definitions.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
