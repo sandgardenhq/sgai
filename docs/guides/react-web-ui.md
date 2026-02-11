@@ -38,7 +38,7 @@ Run these commands from the repository root:
 
 ## Build the Go binary (includes the embedded frontend)
 
-`make build` runs the frontend build step (`bun install` + `bun run build.ts`) and then builds the Go binary.
+`make build` runs the frontend build step (`bun install` + `bun run build`) and then builds the Go binary.
 
 ```sh
 make build
@@ -59,6 +59,51 @@ The webapp includes a Bun dev server script:
 cd cmd/sgai/webapp
 bun run dev.ts
 ```
+
+## Compose wizard behavior (GOAL.md composer)
+
+The React UI implements the multi-step GOAL composer as a wizard.
+
+### Step data persistence
+
+Wizard step fields persist in `sessionStorage` so a refresh does not wipe in-progress inputs.
+
+- Step 1 persists a project description.
+- Step 2 persists the selected tech stack.
+- Step 3 persists whether safety analysis is enabled.
+- Step 4 persists interactive settings and a completion gate value.
+
+Wizard state management and `sessionStorage` integration live in:
+
+- `cmd/sgai/webapp/src/hooks/useComposeWizard.ts`
+
+### Auto-save and unload protection
+
+The wizard tracks whether there are unsaved changes and registers a `beforeunload` handler to warn about navigating away while the wizard is dirty.
+
+It also periodically auto-saves drafts (every 30 seconds) after initial load when a workspace is available.
+
+### Preview rendering
+
+The preview panel renders a server-provided preview response with optional flow errors. The preview UI lives in:
+
+- `cmd/sgai/webapp/src/components/ComposePreview.tsx`
+
+## Responding to agent questions (multi-choice + free text)
+
+The React UI includes a response form workflow for pending questions.
+
+### Local state persistence
+
+Selections and free-text input persist in `sessionStorage` keyed by workspace, and restore only when the stored `questionId` matches the currently pending question.
+
+Response form state management and persistence live in:
+
+- `cmd/sgai/webapp/src/hooks/useResponseForm.ts`
+
+### Unload protection
+
+The response form also tracks unsaved changes and adds a `beforeunload` handler while active.
 
 ## API endpoints used by the React UI
 
