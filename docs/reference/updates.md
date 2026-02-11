@@ -1,10 +1,10 @@
 # Updates
 
-## 0.0.0+20260211 — TBD
+## 0.0.0+20260211 — Corrected completed workspace state
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This update addresses a workflow state persistence issue affecting completed workspaces.
+- **Summary**: This release includes a fix for a workspace state persistence issue affecting completed workspaces.
 
 ### Bug Fixes
 
@@ -14,7 +14,7 @@
 
 - **Date**: 2026-01-27
 - **Version**: 0.0.0+20260127
-- **Summary**: This update covers improved CI and cross-platform test reliability.
+- **Summary**: This release includes improved CI and cross-platform test reliability.
 
 ### Bug Fixes
 
