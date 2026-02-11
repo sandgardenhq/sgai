@@ -2,19 +2,19 @@
 
 This document describes user-visible changes by release.
 
-## 0.0.0+20260211 — Additional changes
+## 0.0.0+20260211 — React web UI and `/api/v1` API
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes a new React web UI, removes the legacy HTMX UI, and updates related documentation.
+- **Summary**: This release includes a new React single-page application web interface, removes the legacy HTMX UI, and updates related documentation.
 
 ### New Features
 
-- Added a Bun-built React single-page application web interface using shadcn/ui, backed by new `/api/v1` JSON and Server-Sent Events (SSE) endpoints.
+- Added a `bun`-built React single-page application web interface using `shadcn/ui`, backed by new `/api/v1` JSON and `SSE` endpoints.
 
 ### Breaking Changes
 
-- Removed the legacy HTMX compose/adhoc/retro web UI in favor of the React single-page application interface and standardized browser interactions on the `/api/v1` JSON+SSE API surface.
+- Removed the legacy HTMX compose/adhoc/retro web UI and updated browser interactions to use the React single-page application interface and the `/api/v1` JSON+`SSE` API.
 
 ### Additional Changes
 
