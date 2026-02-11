@@ -6,14 +6,9 @@
 - **Version**: 0.0.0+20260211
 - **Summary**: This release includes the latest updates.
 
-```json
-{
-  "Additional Changes": [
-    "Updated the Markdown rendering dependency by upgrading `react-markdown` to `v10.1.0` and refreshing the Bun lockfile."
-  ]
-}
+### Additional Changes
 
-```
+- Updated the Markdown rendering dependency by upgrading `react-markdown` to `v10.1.0` and refreshing the Bun lockfile.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
