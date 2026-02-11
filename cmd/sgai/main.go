@@ -205,10 +205,6 @@ func runWorkflow(ctx context.Context, args []string) {
 		log.Fatalln("failed to change directory to", dir, err)
 	}
 
-	if err := validateModels(metadata.Models); err != nil {
-		log.Fatalln(err)
-	}
-
 	executablePath, err := os.Executable()
 	if err != nil {
 		log.Fatalln("failed to get executable path:", err)
@@ -217,6 +213,12 @@ func runWorkflow(ctx context.Context, args []string) {
 	flowDag, err := parseFlow(metadata.Flow, dir)
 	if err != nil {
 		log.Fatalln("failed to parse flow:", err)
+	}
+
+	ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+	if err := validateModels(metadata.Models); err != nil {
+		log.Fatalln(err)
 	}
 
 	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
@@ -475,6 +477,25 @@ func applyInteractiveOverride(wfState *state.Workflow, interactive *string, stat
 		return
 	}
 	fmt.Println("["+paddedsgai+"]", "interactive mode switched to", override)
+}
+
+func ensureImplicitProjectCriticCouncilModel(flowDag *dag, metadata *GoalMetadata) {
+	if metadata.Models == nil {
+		metadata.Models = make(map[string]any)
+	}
+	_, existsInDag := flowDag.Nodes["project-critic-council"]
+	if !existsInDag {
+		return
+	}
+	_, existsInModels := metadata.Models["project-critic-council"]
+	if existsInModels {
+		return
+	}
+	coordinatorModel, hasCoordinator := metadata.Models["coordinator"]
+	if !hasCoordinator {
+		return
+	}
+	metadata.Models["project-critic-council"] = coordinatorModel
 }
 
 func selectModelForAgent(metadataModels map[string]any, agent string) string {

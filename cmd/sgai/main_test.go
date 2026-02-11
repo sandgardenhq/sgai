@@ -332,3 +332,143 @@ func TestCanResumeWorkflow(t *testing.T) {
 		}
 	})
 }
+
+func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
+	t.Run("implicitGetsCoordinatorModelWithVariant", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":            {Name: "coordinator"},
+				"project-critic-council": {Name: "project-critic-council"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: map[string]any{
+				"coordinator": "anthropic/claude-opus-4-6 (max)",
+			},
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		got, exists := metadata.Models["project-critic-council"]
+		if !exists {
+			t.Fatal("expected project-critic-council to exist in Models")
+		}
+		want := "anthropic/claude-opus-4-6 (max)"
+		if got != want {
+			t.Errorf("project-critic-council model = %v; want %v", got, want)
+		}
+	})
+
+	t.Run("explicitModelNotOverridden", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":            {Name: "coordinator"},
+				"project-critic-council": {Name: "project-critic-council"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: map[string]any{
+				"coordinator":            "anthropic/claude-opus-4-6 (max)",
+				"project-critic-council": []any{"anthropic/claude-opus-4-6", "openai/gpt-5.2"},
+			},
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		got := metadata.Models["project-critic-council"]
+		gotSlice, ok := got.([]any)
+		if !ok {
+			t.Fatalf("expected []any, got %T", got)
+		}
+		if len(gotSlice) != 2 {
+			t.Fatalf("expected 2 models, got %d", len(gotSlice))
+		}
+		if gotSlice[0] != "anthropic/claude-opus-4-6" || gotSlice[1] != "openai/gpt-5.2" {
+			t.Errorf("project-critic-council models = %v; want [anthropic/claude-opus-4-6 openai/gpt-5.2]", gotSlice)
+		}
+	})
+
+	t.Run("coordinatorHasNoModel", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":            {Name: "coordinator"},
+				"project-critic-council": {Name: "project-critic-council"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: map[string]any{},
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		if _, exists := metadata.Models["project-critic-council"]; exists {
+			t.Error("expected project-critic-council to NOT exist in Models when coordinator has no model")
+		}
+	})
+
+	t.Run("nilModelsMap", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":            {Name: "coordinator"},
+				"project-critic-council": {Name: "project-critic-council"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: nil,
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		if metadata.Models == nil {
+			t.Fatal("expected Models to be initialized")
+		}
+		if _, exists := metadata.Models["project-critic-council"]; exists {
+			t.Error("expected project-critic-council to NOT exist in Models when coordinator has no model")
+		}
+	})
+
+	t.Run("projectCriticCouncilNotInDag", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator": {Name: "coordinator"},
+				"planner":     {Name: "planner"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: map[string]any{
+				"coordinator": "anthropic/claude-opus-4-6 (max)",
+			},
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		if _, exists := metadata.Models["project-critic-council"]; exists {
+			t.Error("expected project-critic-council to NOT exist in Models when not in DAG")
+		}
+	})
+
+	t.Run("coordinatorModelWithoutVariant", func(t *testing.T) {
+		flowDag := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":            {Name: "coordinator"},
+				"project-critic-council": {Name: "project-critic-council"},
+			},
+		}
+		metadata := GoalMetadata{
+			Models: map[string]any{
+				"coordinator": "anthropic/claude-opus-4-6",
+			},
+		}
+
+		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+
+		got, exists := metadata.Models["project-critic-council"]
+		if !exists {
+			t.Fatal("expected project-critic-council to exist in Models")
+		}
+		want := "anthropic/claude-opus-4-6"
+		if got != want {
+			t.Errorf("project-critic-council model = %v; want %v", got, want)
+		}
+	})
+}
