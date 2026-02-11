@@ -3919,7 +3919,7 @@ func (s *Server) handleWorkspaceOpenInOpenCode(w http.ResponseWriter, r *http.Re
 	sessionID := wfState.SessionID
 
 	modelSpec := lookupModelForAgent(workspacePath, currentAgent)
-	model, variant := parseModelAndVariant(modelSpec)
+	model, _ := parseModelAndVariant(modelSpec)
 
 	interactive := "yes"
 	if data, errRead := os.ReadFile(filepath.Join(workspacePath, "GOAL.md")); errRead == nil {
@@ -3939,10 +3939,6 @@ func (s *Server) handleWorkspaceOpenInOpenCode(w http.ResponseWriter, r *http.Re
 	if model != "" {
 		opencodeCmd += fmt.Sprintf(" --model %q", model)
 	}
-	if variant != "" {
-		opencodeCmd += fmt.Sprintf(" --variant %q", variant)
-	}
-
 	scriptContent := fmt.Sprintf("#!/bin/bash\ntrap 'rm -f \"$0\"' EXIT\ncd %q\nexport OPENCODE_CONFIG_DIR=.sgai\nexport SGAI_MCP_EXECUTABLE=%q\nexport SGAI_MCP_INTERACTIVE=%q\n%s\n",
 		workspacePath, execPath, interactive, opencodeCmd)
 
