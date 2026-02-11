@@ -6,7 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/google/jsonschema-go v0.4.2
 	github.com/mactaggart/gographviz v0.0.0-20250815040658-9ffd0326c418
-	github.com/modelcontextprotocol/go-sdk v1.2.0
+	github.com/modelcontextprotocol/go-sdk v1.3.0
 	github.com/yuin/goldmark v1.7.16
 	github.com/yuin/goldmark-emoji v1.0.6
 	golang.org/x/term v0.40.0
