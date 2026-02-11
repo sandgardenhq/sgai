@@ -1,6 +1,6 @@
 # Release Notes
 
-## 0.0.0+20260211 — Release notes update
+## 0.0.0+20260211 — Updated Go tooling dependency
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
