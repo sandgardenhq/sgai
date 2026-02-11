@@ -1,10 +1,10 @@
 # Release Notes
 
-## 0.0.0+20260211 — Release notes update
+## 0.0.0+20260211 — Dependency update
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
-- **Summary**: This release includes updates across new features, bug fixes, and additional changes.
+- **Summary**: This release includes a Go module dependency update.
 
 ### Additional Changes
 
