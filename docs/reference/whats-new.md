@@ -8,4 +8,4 @@
 
 ### New Features
 
-- Added the ability to pin or unpin root workspaces even when they have forks, making it easier to keep important workspaces readily accessible.
+- Added the ability to pin or unpin root workspaces even when they have forks, making it easier to keep important workspaces accessible.
