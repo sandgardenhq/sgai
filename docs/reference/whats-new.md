@@ -1,10 +1,10 @@
 # What's new
 
-## 0.0.0+20260212
+## 0.0.0+20260212 — Workspace pinning for forked roots
 
 - **Date**: 2026-02-12
-- **Version**: `0.0.0+20260212`
-- **Summary**: This update addresses recent improvements.
+- **Version**: 0.0.0+20260212
+- **Summary**: This release includes workspace pinning updates.
 
 ### New Features
 
