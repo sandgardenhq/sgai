@@ -10,6 +10,6 @@
 
 ### New Features
 
-- Updated `find_skills` to present human-readable skill display names instead of file paths or raw content.
+- Updated MCP skill discovery output to present human-readable skill display names instead of file paths or raw content.
 
 <!-- END NEW_RELEASE_NOTES -->
