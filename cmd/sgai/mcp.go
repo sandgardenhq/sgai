@@ -267,7 +267,7 @@ func cmdMCP(_ []string) {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_skills",
-		Description: "Find skills by name. Returns content for exact matches or lists for searches.",
+		Description: "Search for skills by name or keywords. Returns skill names and descriptions. Use the 'skill' tool to load a skill's full content.",
 		InputSchema: findSkillsSchema,
 	}, mcpCtx.findSkillsHandler)
 
@@ -597,6 +597,20 @@ func findSkills(workingDir, name string) (string, error) {
 		return "", fmt.Errorf("failed to access skills: %w", err)
 	}
 
+	skillDisplayName := func(frontmatter map[string]string, relName string) string {
+		if n := frontmatter["name"]; n != "" {
+			return n
+		}
+		return filepath.Base(relName)
+	}
+
+	skillSteeringMessage := func(name, desc string) string {
+		return fmt.Sprintf(
+			"Found skill '%s': %s. Use the 'skill({\"name\":%q})' to load its full content.",
+			name, desc, name,
+		)
+	}
+
 	if name == "" {
 		var skills []string
 		for _, file := range skillFiles {
@@ -611,7 +625,7 @@ func findSkills(workingDir, name string) (string, error) {
 			if desc == "" {
 				desc = "No description"
 			}
-			skills = append(skills, fmt.Sprintf("%s: %s", relName, desc))
+			skills = append(skills, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
 		}
 		return strings.Join(skills, "\n"), nil
 	}
@@ -624,7 +638,13 @@ func findSkills(workingDir, name string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return string(content), nil
+			frontmatter := parseFrontmatterMap(content)
+			displayName := skillDisplayName(frontmatter, relName)
+			desc := frontmatter["description"]
+			if desc == "" {
+				desc = "No description"
+			}
+			return skillSteeringMessage(displayName, desc), nil
 		}
 	}
 
@@ -642,7 +662,7 @@ func findSkills(workingDir, name string) (string, error) {
 			if desc == "" {
 				desc = "No description"
 			}
-			prefixMatches = append(prefixMatches, fmt.Sprintf("%s: %s", relName, desc))
+			prefixMatches = append(prefixMatches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
 		}
 	}
 	if len(prefixMatches) > 0 {
@@ -650,9 +670,8 @@ func findSkills(workingDir, name string) (string, error) {
 	}
 
 	var basenameMatches []struct {
-		path    string
-		content string
-		desc    string
+		name string
+		desc string
 	}
 	for _, file := range skillFiles {
 		relName, _ := filepath.Rel(skillsDir, file)
@@ -669,19 +688,18 @@ func findSkills(workingDir, name string) (string, error) {
 				desc = "No description"
 			}
 			basenameMatches = append(basenameMatches, struct {
-				path    string
-				content string
-				desc    string
-			}{relName, string(content), desc})
+				name string
+				desc string
+			}{skillDisplayName(frontmatter, relName), desc})
 		}
 	}
 	if len(basenameMatches) == 1 {
-		return basenameMatches[0].content, nil
+		return skillSteeringMessage(basenameMatches[0].name, basenameMatches[0].desc), nil
 	}
 	if len(basenameMatches) > 1 {
 		var matches []string
 		for _, m := range basenameMatches {
-			matches = append(matches, fmt.Sprintf("%s: %s", m.path, m.desc))
+			matches = append(matches, fmt.Sprintf("%s: %s", m.name, m.desc))
 		}
 		return strings.Join(matches, "\n"), nil
 	}
@@ -705,7 +723,7 @@ func findSkills(workingDir, name string) (string, error) {
 			if desc == "" {
 				desc = "No description"
 			}
-			matches = append(matches, fmt.Sprintf("%s: %s", relName, desc))
+			matches = append(matches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
 		}
 	}
 	return strings.Join(matches, "\n"), nil
