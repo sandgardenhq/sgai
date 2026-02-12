@@ -16,7 +16,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 - [`sgai.example.json`](../../sgai.example.json)
 - [`opencode.json`](../../opencode.json)
 
-## Release notes
+## Release Notes
 
 ### 0.0.0+20260212 — Clarified coordinator skills workflow
 
