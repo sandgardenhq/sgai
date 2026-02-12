@@ -27,7 +27,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 ```json
 {
   "Additional Changes": [
-    "The coordinator documentation was updated to make the instructions easier to follow when working with skills. It now correctly references `sgai_find_skills` and the `skill` object, and clarifies how to list skills and update workflow state."
+    "Updated coordinator documentation to clarify the skills workflow, including `sgai_find_skills`, the `skill` object, and `update_workflow_state`."
   ]
 }
 
