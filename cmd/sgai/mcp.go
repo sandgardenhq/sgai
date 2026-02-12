@@ -234,6 +234,10 @@ type askUserQuestionArgs struct {
 	Questions []questionItem `json:"questions" jsonschema:"Array of questions to present to the user"`
 }
 
+type askUserWorkGateArgs struct {
+	Summary string `json:"summary" jsonschema:"A comprehensive summary of the definition for the human to review before approving. Must include: GOAL items, brainstorming decisions, task breakdown, and validation criteria."`
+}
+
 // cmdMCP starts an MCP server exposing sgai custom tools via stdio transport.
 // It reads SGAI_MCP_WORKING_DIRECTORY and SGAI_MCP_INTERACTIVE.
 func cmdMCP(_ []string) {
@@ -360,13 +364,13 @@ func cmdMCP(_ []string) {
 				InputSchema: askUserQuestionSchema,
 			}, mcpCtx.askUserQuestionHandler)
 
-			askUserWorkGateSchema, err := jsonschema.For[struct{}](nil)
+			askUserWorkGateSchema, err := jsonschema.For[askUserWorkGateArgs](nil)
 			if err != nil {
 				log.Fatalln("failed to create ask_user_work_gate schema:", err)
 			}
 			mcp.AddTool(server, &mcp.Tool{
 				Name:        "ask_user_work_gate",
-				Description: "Present the work gate approval question to the human partner. No arguments needed - the question and choices are hardcoded. When approved, the session switches to self-driving mode for the remainder of the session.",
+				Description: "Present the work gate approval question to the human partner. Requires a summary of what is being approved. When approved, the session switches to self-driving mode for the remainder of the session.",
 				InputSchema: askUserWorkGateSchema,
 			}, mcpCtx.askUserWorkGateHandler)
 		}
@@ -484,8 +488,8 @@ func (c *mcpContext) askUserQuestionHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) askUserWorkGateHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := askUserWorkGate(c.workingDir)
+func (c *mcpContext) askUserWorkGateHandler(_ context.Context, _ *mcp.CallToolRequest, args askUserWorkGateArgs) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := askUserWorkGate(c.workingDir, args.Summary)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -544,7 +548,11 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 	return result.String(), nil
 }
 
-func askUserWorkGate(workingDir string) (string, error) {
+func askUserWorkGate(workingDir, summary string) (string, error) {
+	if strings.TrimSpace(summary) == "" {
+		return "Error: A summary is required. You must compile a comprehensive summary (GOAL items, brainstorming decisions, task breakdown, validation criteria) before asking for work gate approval.", nil
+	}
+
 	statePath := filepath.Join(workingDir, ".sgai", "state.json")
 
 	currentState, err := state.Load(statePath)
@@ -555,24 +563,26 @@ func askUserWorkGate(workingDir string) (string, error) {
 		}
 	}
 
+	questionText := summary + "\n\n---\n\nIs the definition complete? May I begin implementation?"
+
 	currentState.MultiChoiceQuestion = &state.MultiChoiceQuestion{
 		Questions: []state.QuestionItem{
 			{
-				Question:    "Is the definition complete? May I begin implementation?",
+				Question:    questionText,
 				Choices:     []string{workGateApprovalText, "Not ready yet, need more clarification"},
 				MultiSelect: false,
 			},
 		},
 		IsWorkGate: true,
 	}
-	currentState.HumanMessage = "Is the definition complete? May I begin implementation?"
+	currentState.HumanMessage = questionText
 	currentState.Status = state.StatusWaitingForHuman
 
 	if err := state.Save(statePath, currentState); err != nil {
 		return "", fmt.Errorf("failed to save state: %w", err)
 	}
 
-	return "Presented work gate question to user:\n\nQuestion: Is the definition complete? May I begin implementation?\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false", nil
+	return "Presented work gate question to user:\n\nQuestion: " + questionText + "\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false", nil
 }
 
 func findSkills(workingDir, name string) (string, error) {
