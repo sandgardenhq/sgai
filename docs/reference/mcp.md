@@ -102,3 +102,23 @@ Input:
 
 - `questions`: array of `{ "question": string, "choices": string[], "multiSelect": boolean }`
 
+### `ask_user_work_gate` (coordinator only)
+
+Ask the human partner to confirm that the current plan is ready for implementation.
+
+Input:
+
+```json
+{
+  "summary": "..."
+}
+```
+
+Fields:
+
+- `summary` (string, required)
+
+  Provide a comprehensive summary of what is being approved.
+
+  The approval dialog shows this summary first, then a separator line, then the approval question.
+
