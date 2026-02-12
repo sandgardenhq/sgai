@@ -475,10 +475,16 @@ func cmdServe(args []string) {
 	srv.registerAPIRoutes(mux)
 	handler := srv.spaMiddleware(mux)
 
-	log.Println("sgai serve listening on http://" + *listenAddr)
-	if err := http.ListenAndServe(*listenAddr, handler); err != nil {
-		log.Fatalln("server error:", err)
-	}
+	baseURL := "http://" + *listenAddr
+	log.Println("sgai serve listening on", baseURL)
+
+	go func() {
+		if err := http.ListenAndServe(*listenAddr, handler); err != nil {
+			log.Fatalln("server error:", err)
+		}
+	}()
+
+	startMenuBar(baseURL, srv)
 }
 
 func renderDotToSVG(dotContent string) string {
