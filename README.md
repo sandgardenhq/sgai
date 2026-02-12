@@ -190,6 +190,8 @@ bun run dev.ts       # Dev server with file watching (proxies API to Go backend)
 bun test src/        # Run unit/component tests
 ```
 
+`bun install` writes the dependency lockfile to `cmd/sgai/webapp/bun.lock`.
+
 `make build` runs the full pipeline: frontend build (`bun install` + `bun run build`) → Go lint → Go binary.
 
 After making frontend changes, always run:
