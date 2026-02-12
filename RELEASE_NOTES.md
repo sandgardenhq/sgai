@@ -1,5 +1,15 @@
 # Release Notes
 
+## 0.0.0+20260211 — Updates and fixes
+
+- **Date**: 2026-02-11
+- **Version**: 0.0.0+20260211
+- **Summary**: This release includes updates across features, fixes, and documentation.
+
+```json
+%NEW_RELEASE_NOTES%
+```
+
 ## 0.0.0+20260127 — Improved CI test reliability
 
 - **Date**: 2026-01-27
