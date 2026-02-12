@@ -204,17 +204,23 @@ The user will give you a file name "@GOAL.md", if the file is empty, the right t
 
 THE VERY FIRST THING YOU DO IS TO READ THE "@GOAL.md" AND "@.sgai/PROJECT_MANAGEMENT.md" FILES.
 
-You must call the `skills` tool with an empty `name` to learn all available skills and understand usage. If a skill meets your needs/goals, you MUST use it.
+At the start of any task, list available skills and then follow the best-match skill instructions.
 
-IMPORTANT: Don't try `List()` or `Glob()` to find for skills - you must ALWAYS use the `skills` tool.
+1. Communicate what is happening by calling `sgai_update_workflow_state({"task":"listing skills"})`.
+2. Call `sgai_find_skills({"name":""})` to list all skills.
+   - `name` uses string submatching.
+   - An empty `name` lists every available skill.
+3. If a skill meets the needs/goals, use it.
 
-If `skills` returns matching skills:
+IMPORTANT: Don't try `List()` or `Glob()` to find skills. Always use `sgai_find_skills`.
+
+If `sgai_find_skills` returns matching skills:
 1. You MUST ADD the skill you found to the TODO list, so the human partner can see it.
-2. Call `skills` with the exact name to get the content.
+2. Call `skill` with the exact name to get the content.
 3. You MUST COMMUNICATE you are going to use the skill: "I'm using [Skill] skill"
 4. You MUST FOLLOW the skill strictly, SKILLs are strictly written and you MUST KEEP yourself within their instructions, on doubt, log the doubt in the "@.sgai/PROJECT_MANAGEMENT.md" (see below more about this file)
 
-IMPORTANT: searching, selecting, and using skills are themselves individual tasks / todo items. YOU MUST ALWAYS MARK THEM AS TODO ITEMS, NEVER SKIP THEM. This includes calls to the `skills` tool.
+IMPORTANT: searching, selecting, and using skills are themselves individual tasks / todo items. YOU MUST ALWAYS MARK THEM AS TODO ITEMS, NEVER SKIP THEM. This includes calls to `sgai_find_skills`, `skill`, and related calls.
 
 IMPORTANT: communicating you're using a skill is mandatory, without that your human partner cannot know what you are thinking or doing.
 
@@ -228,11 +234,11 @@ You can use Python3 and bash for scripting, YOU MUST check the environment for `
 
 The master plan has these steps (if any of these files don't exist, YOU MUST CALL sgai_update_workflow_state and HALT, YOU MUST NOT TRY CREATING THESE FILES), REMEMBER THESE STEPS MUST BE DONE IN ORDER, YOU CANNOT SKIP STEPS, IF YOU DO, YOU VIOLATED THE CONTRACT:
 - Step Name: GOAL
-  Read @GOAL.md - if you need to mark project updates use skills({"name":"project-completion-verification"}) before making file edits
+  Read @GOAL.md - if you need to mark project updates use skill({"name":"project-completion-verification"}) before making file edits
 - Step Name: CREATE-PROJECT_MANAGEMENT-FILE
-  If `@.sgai/PROJECT_MANAGEMENT.md` is missing, you must create `@.sgai/PROJECT_MANAGEMENT.md` and make sure that you log there important decisions, questions, doubts, processes, mistakes, backtracks, progresses of this project. You will use that to correctly skip phases between interactions. If you need to mark project progress use skills({"name":"project-completion-verification"}) before making file edits
+  If `@.sgai/PROJECT_MANAGEMENT.md` is missing, you must create `@.sgai/PROJECT_MANAGEMENT.md` and make sure that you log there important decisions, questions, doubts, processes, mistakes, backtracks, progresses of this project. You will use that to correctly skip phases between interactions. If you need to mark project progress use skill({"name":"project-completion-verification"}) before making file edits
 - Step Name: BRAINSTORMING
-  Use the skills tool with name 'product-design/brainstorming' to get the content, so that you and your human partner are on the same page on what and how things need to be done. You MUST LOG in the `@.sgai/PROJECT_MANAGEMENT.md` the decisions around brainstorming, and you MAY ONLY MAKE PROGRESS AFTER THIS STEP IS COMPLETE. If the BRAINSTORMING step is already done and properly logged in `@.sgai/PROJECT_MANAGEMENT.md`, then you can move to step PRODUCE-PRODUCT-DESIGN or WORK-GATE.
+  Use `skill({"name":"product-design/brainstorming"})` to get the content, so that you and your human partner are on the same page on what and how things need to be done. You MUST LOG in the `@.sgai/PROJECT_MANAGEMENT.md` the decisions around brainstorming, and you MAY ONLY MAKE PROGRESS AFTER THIS STEP IS COMPLETE. If the BRAINSTORMING step is already done and properly logged in `@.sgai/PROJECT_MANAGEMENT.md`, then you can move to step PRODUCE-PRODUCT-DESIGN or WORK-GATE.
   **CRITICAL**: you must use `sgai_ask_user_question` to interview the human-partner for brainstorming
   **IMPORTANT: Post-Brainstorm Updates**
   After the BRAINSTORM session is complete and consensus is reached with the human partner:
