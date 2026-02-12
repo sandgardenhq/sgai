@@ -190,6 +190,20 @@ bun run dev.ts       # Dev server with file watching (proxies API to Go backend)
 bun test src/        # Run unit/component tests
 ```
 
+#### Troubleshooting: happy-dom version mismatches
+
+Some tests and test setup rely on `happy-dom` and its companion package
+`@happy-dom/global-registrator`. Keep their versions in sync.
+
+If `bun install` fails or CI breaks after a dependency bump (for example, a Dependabot
+upgrade), check `cmd/sgai/webapp/package.json` to confirm `happy-dom` and
+`@happy-dom/global-registrator` target compatible versions, then regenerate the lockfile:
+
+```sh
+cd cmd/sgai/webapp
+bun install
+```
+
 `make build` runs the full pipeline: frontend build (`bun install` + `bun run build`) → Go lint → Go binary.
 
 After making frontend changes, always run:
