@@ -184,7 +184,7 @@ The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embe
 The frontend uses `react-markdown`.
 
 `react-markdown` 10.x removes the `className` prop.
-Wrap `<Markdown>` with an element (such as a `<div>`) and put classes on the wrapper instead.
+Wrap `<ReactMarkdown>` with an element (such as a `<div>`) and put classes on the wrapper instead.
 
 ### Build Commands
 
