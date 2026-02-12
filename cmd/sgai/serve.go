@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log"
 	"maps"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -444,6 +445,22 @@ func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
 	return "badge-stopped", "Stopped"
 }
 
+func dashboardBaseURL(listenAddr string) string {
+	host, port, errSplit := net.SplitHostPort(listenAddr)
+	if errSplit != nil {
+		return "http://" + listenAddr
+	}
+
+	switch host {
+	case "", "0.0.0.0":
+		host = "127.0.0.1"
+	case "::":
+		host = "::1"
+	}
+
+	return "http://" + net.JoinHostPort(host, port)
+}
+
 func cmdServe(args []string) {
 	serveFlags := flag.NewFlagSet("serve", flag.ExitOnError)
 	listenAddr := serveFlags.String("listen-addr", "127.0.0.1:8080", "HTTP server listen address")
@@ -471,7 +488,7 @@ func cmdServe(args []string) {
 	srv.registerAPIRoutes(mux)
 	handler := srv.spaMiddleware(mux)
 
-	baseURL := "http://" + *listenAddr
+	baseURL := dashboardBaseURL(*listenAddr)
 	log.Println("sgai serve listening on", baseURL)
 
 	go func() {
