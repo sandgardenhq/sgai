@@ -11,7 +11,7 @@ This page summarizes notable changes by build date.
 ```json
 {
   "Additional Changes": [
-    "The documentation was cleaned up to remove outdated migration instructions and UI switcher details that are no longer applicable. Specifically, we removed HTMX-to-React migration guidance and cookie-based UI switcher documentation, deleted the shadcn mapping skill, narrowed the React best practices skill to generic Vercel rules, and added a GOAL entry to capture and track this cleanup work."
+    "Updated documentation to remove outdated migration instructions and UI switcher details that are no longer applicable."
   ]
 }
 
