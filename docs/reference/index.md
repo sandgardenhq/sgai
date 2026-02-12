@@ -18,17 +18,12 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 ## Release notes
 
-### 0.0.0+20260212 — Updates
+### 0.0.0+20260212 — Clarified coordinator skills workflow
 
 - **Date**: 2026-02-12
 - **Version**: 0.0.0+20260212
-- **Summary**: This release includes additional updates across features and fixes.
+- **Summary**: This release includes a documentation update that clarifies the coordinator skills workflow.
 
-```json
-{
-  "Additional Changes": [
-    "Updated coordinator documentation to clarify the skills workflow, including `sgai_find_skills`, the `skill` object, and `update_workflow_state`."
-  ]
-}
+#### Additional Changes
 
-```
+- Updated coordinator documentation to clarify the skills workflow, including `sgai_find_skills`, the `skill` object, and `update_workflow_state`.
