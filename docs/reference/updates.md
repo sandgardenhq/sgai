@@ -8,14 +8,9 @@ This page summarizes notable changes by build date.
 - **Version**: 0.0.0+20260212
 - **Summary**: This update covers the items listed below.
 
-```json
-{
-  "Additional Changes": [
-    "Updated documentation to remove outdated migration instructions and UI switcher details that are no longer applicable."
-  ]
-}
+### Additional Changes
 
-```
+- Updated documentation to remove outdated migration instructions and UI switcher details that are no longer applicable.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
