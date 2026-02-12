@@ -44,6 +44,26 @@ Options:
 
   Default: `127.0.0.1:8080`
 
+#### macos menu bar factory monitor
+
+On macOS (`darwin`), `sgai serve` also starts a menu bar status item.
+
+The status item:
+
+- Shows an attention badge in the title.
+  - `● <count>` when one or more factories need attention
+  - `○ sgai` when none need attention
+- Provides a dropdown menu with:
+  - **Open Dashboard** (opens the `sgai serve` base URL)
+  - A list of factories that need attention
+    - `⚠ <name> (Needs Input)` opens `/workspaces/<name>/respond`
+    - `■ <name> (Stopped)` opens `/workspaces/<name>/progress`
+  - A status line: `<running> running, <attention> need attention`
+
+The menu updates on server-sent events (SSE) from `sgai serve`.
+
+On non-macOS platforms (`!darwin`), the menu bar implementation is not available.
+
 ### `sgai sessions`
 
 List all sessions in `.sgai/retrospectives`.
