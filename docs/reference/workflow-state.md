@@ -28,6 +28,8 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 - The coordinator communicates with the human partner through `ask_user_question`.
 - The workflow state file stores the active question in `multiChoiceQuestion`.
 
+Some coordinator prompts include context in the stored question text. For example, the work-gate approval prompt includes a human-readable summary followed by the approval question.
+
 ## Workflow object shape
 
 `state.json` stores a JSON object with fields used by the CLI, web UI, and MCP tools.
