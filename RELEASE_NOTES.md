@@ -6,9 +6,7 @@
 - **Version**: 0.0.0+20260211
 - **Summary**: This release includes updates across features, fixes, and documentation.
 
-```json
 %NEW_RELEASE_NOTES%
-```
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
