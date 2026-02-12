@@ -92,6 +92,8 @@ make build
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
 
+   On macOS, `sgai serve` also starts a menu bar status item that shows how many factories need attention and links to the relevant pages in the dashboard.
+
 ## How It Works
 
 ```
