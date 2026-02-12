@@ -23,6 +23,11 @@ If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`
   - When `name` is empty, lists available skills.
   - When `name` matches a skill name, returns the skill content.
 
+Notes:
+
+- Skills are identified by their skill name (from the skill frontmatter `name`, when present).
+- Use the `skills` tool to list/search skills and the `skills` tool with an exact `name` to load full content.
+
 ### `find_snippets`
 
 - Input: `{ "language": "...", "query": "..." }` (both optional)
