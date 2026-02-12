@@ -41,6 +41,16 @@ Input fields:
 - `task`
 - `addProgress`
 
+Use `task` to share what the current agent is doing (for example, announcing that a skill is being used).
+
+Example:
+
+```json
+{
+  "task": "Using skill: test-driven-development"
+}
+```
+
 #### Status values depend on the current agent
 
 `update_workflow_state.status` only allows:
