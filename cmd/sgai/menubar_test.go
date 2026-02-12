@@ -92,6 +92,55 @@ func TestCountRunning(t *testing.T) {
 	}
 }
 
+func TestCountActive(t *testing.T) {
+	cases := []struct {
+		name  string
+		items []menuBarItem
+		want  int
+	}{
+		{
+			name:  "empty",
+			items: nil,
+			want:  0,
+		},
+		{
+			name: "allRunning",
+			items: []menuBarItem{
+				{name: "a", running: true},
+				{name: "b", running: true},
+			},
+			want: 2,
+		},
+		{
+			name: "mixed",
+			items: []menuBarItem{
+				{name: "a", running: true},
+				{name: "b", stopped: true},
+				{name: "c", needsInput: true},
+				{name: "d"},
+			},
+			want: 3,
+		},
+		{
+			name: "noneActive",
+			items: []menuBarItem{
+				{name: "a"},
+				{name: "b"},
+			},
+			want: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := countActive(tc.items)
+			if got != tc.want {
+				t.Errorf("countActive() = %d; want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFilterAttentionItems(t *testing.T) {
 	items := []menuBarItem{
 		{name: "a", running: true},
@@ -233,7 +282,7 @@ func TestWorkspaceItemSubpath(t *testing.T) {
 
 func TestAllocTag(t *testing.T) {
 	saved := globalMenuBar
-	defer func() { globalMenuBar = saved }()
+	t.Cleanup(func() { globalMenuBar = saved })
 
 	globalMenuBar = &menuBarState{
 		tags: make(map[int]menuBarAction),

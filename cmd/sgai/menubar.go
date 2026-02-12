@@ -55,6 +55,16 @@ func countRunning(items []menuBarItem) int {
 	return count
 }
 
+func countActive(items []menuBarItem) int {
+	count := 0
+	for _, item := range items {
+		if item.running || item.stopped || item.needsInput {
+			count++
+		}
+	}
+	return count
+}
+
 func filterAttentionItems(items []menuBarItem) []menuBarItem {
 	var result []menuBarItem
 	for _, item := range items {

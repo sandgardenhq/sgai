@@ -331,6 +331,49 @@ func TestIsLocalRequest(t *testing.T) {
 	}
 }
 
+func TestDashboardBaseURL(t *testing.T) {
+	cases := []struct {
+		name       string
+		listenAddr string
+		want       string
+	}{
+		{
+			name:       "loopbackV4",
+			listenAddr: "127.0.0.1:8181",
+			want:       "http://127.0.0.1:8181",
+		},
+		{
+			name:       "wildcardV4",
+			listenAddr: "0.0.0.0:8181",
+			want:       "http://127.0.0.1:8181",
+		},
+		{
+			name:       "wildcardV6",
+			listenAddr: "[::]:8181",
+			want:       "http://[::1]:8181",
+		},
+		{
+			name:       "emptyHost",
+			listenAddr: ":8181",
+			want:       "http://127.0.0.1:8181",
+		},
+		{
+			name:       "hostname",
+			listenAddr: "example.test:8080",
+			want:       "http://example.test:8080",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := dashboardBaseURL(tc.listenAddr)
+			if got != tc.want {
+				t.Errorf("dashboardBaseURL(%q) = %q; want %q", tc.listenAddr, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestHandleAPIOpenInOpenCodeNoRunningSessionFromLocalhost(t *testing.T) {
 	rootDir := t.TempDir()
 	validProject := filepath.Join(rootDir, "test-project")

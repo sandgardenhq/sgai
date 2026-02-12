@@ -86,8 +86,10 @@ func rebuildMenuFromServer(srv *Server) {
 	baseURL := menuBarBaseURL
 	globalMenuBar.mu.Unlock()
 
+	runningCount := countRunning(items)
 	attentionCount := countAttention(items)
-	setMenuTitle(attentionCount)
+	totalActive := countActive(items)
+	setMenuTitle(runningCount, totalActive, attentionCount)
 
 	C.MenuBarClear()
 
@@ -96,34 +98,24 @@ func rebuildMenuFromServer(srv *Server) {
 
 	C.MenuBarAddSeparator()
 
-	needsAttention := filterAttentionItems(items)
-	if len(needsAttention) == 0 {
-		addMenuEntry("No factories need attention", 0, false)
-	} else {
-		summary := fmt.Sprintf("%d factory(ies) need attention", len(needsAttention))
-		addMenuEntry(summary, 0, false)
-		C.MenuBarAddSeparator()
-		for _, item := range needsAttention {
-			label := formatMenuItemLabel(item)
-			itemURL := workspaceURL(baseURL, item.name, workspaceItemSubpath(item))
-			tag := allocTag(menuBarAction{actionURL: itemURL})
-			addMenuEntry(label, tag, true)
-		}
+	for _, item := range filterAttentionItems(items) {
+		label := formatMenuItemLabel(item)
+		itemURL := workspaceURL(baseURL, item.name, workspaceItemSubpath(item))
+		tag := allocTag(menuBarAction{actionURL: itemURL})
+		addMenuEntry(label, tag, true)
 	}
 
-	C.MenuBarAddSeparator()
-
-	runningCount := countRunning(items)
-	statusLine := fmt.Sprintf("%d running, %d need attention", runningCount, attentionCount)
-	addMenuEntry(statusLine, 0, false)
 }
 
-func setMenuTitle(attentionCount int) {
+func setMenuTitle(runningCount, totalActive, attentionCount int) {
 	var title string
-	if attentionCount > 0 {
-		title = fmt.Sprintf("\u25CF %d", attentionCount)
-	} else {
-		title = "\u25CB sgai"
+	switch {
+	case totalActive == 0:
+		title = "\u25CF sgai"
+	case attentionCount > 0:
+		title = fmt.Sprintf("\u26A0 %d/%d", runningCount, totalActive)
+	default:
+		title = fmt.Sprintf("\u25CF %d/%d", runningCount, totalActive)
 	}
 	cTitle := C.CString(title)
 	defer C.free(unsafe.Pointer(cTitle))
