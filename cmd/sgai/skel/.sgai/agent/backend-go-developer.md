@@ -516,14 +516,6 @@ func handleResource(w http.ResponseWriter, r *http.Request) {
 - Events published AFTER transaction commit (deferred event publishing pattern)
 - Typed event names: `workspace:update`, `session:update`, `messages:new`, `todos:update`, `log:append`, `changes:update`, `events:new`, `compose:update`
 
-### Cookie-Based UI Switcher
-
-- `sgai-ui` cookie: `htmx` (default) or `react`
-- Middleware checks cookie, routes to HTML template or SPA index.html
-- Cookie switch triggers full page reload
-- SPA catch-all: serve `index.html` for ALL routes when `sgai-ui=react`, EXCEPT `/api/v1/*` and static assets
-- Explicit API routing BEFORE SPA catch-all
-
 ---
 
 ## Project Structure
