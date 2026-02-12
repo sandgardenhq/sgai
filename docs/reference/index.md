@@ -10,6 +10,10 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 - [Workflow state (`.sgai/state.json`)](./workflow-state.md)
 - [MCP server](./mcp.md)
 
+## Release notes
+
+- [Release notes](../../RELEASE_NOTES.md)
+
 ## Examples
 
 - [`GOAL.example.md`](../../GOAL.example.md)
