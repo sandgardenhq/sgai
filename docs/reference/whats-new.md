@@ -1,14 +1,8 @@
 # What's New
 
-## 0.0.0+20260212 — Maintenance updates
+This page summarizes notable user-facing updates.
 
-- **Date**: 2026-02-12
-- **Version**: 0.0.0+20260212
-- **Summary**: This release includes maintenance updates.
+## macOS menu bar status indicator (2026-02-12)
 
-{
-  "New Features": [
-    "sgai now shows a status indicator in the macOS menu bar so you can see the workspace state at a glance. This adds a macOS status item that reflects the current workspace state and updates the `serve` workflow so it can run alongside the menu bar UI, with supporting helpers, tests, and a small lint invocation adjustment."
-  ]
-}
+- Added a macOS menu bar status indicator that reflects the current workspace state when running `sgai serve`.
 
