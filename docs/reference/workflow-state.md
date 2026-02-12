@@ -28,6 +28,20 @@ The MCP tool `update_workflow_state` uses a per-agent JSON schema.
 - The coordinator communicates with the human partner through `ask_user_question`.
 - The workflow state file stores the active question in `multiChoiceQuestion`.
 
+## Communicate what you are doing with `task`
+
+Use the workflow state's `task` field to communicate the current activity (for example, when starting to use a skill).
+
+When interacting through the MCP server, set `task` via the `update_workflow_state` tool.
+
+```json
+{
+  "task": "Using skill: brainstorming"
+}
+```
+
+Some skill templates and integrations refer to this same action as calling `sgai_update_workflow_state({"task": "..."})`.
+
 ## Workflow object shape
 
 `state.json` stores a JSON object with fields used by the CLI, web UI, and MCP tools.
