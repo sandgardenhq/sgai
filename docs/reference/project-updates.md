@@ -1,7 +1,3 @@
----
-title: Project updates
----
-
 # Project updates
 
 This page covers project changes by release date.
@@ -14,5 +10,5 @@ This page covers project changes by release date.
 
 ### New Features
 
- - Added validation in the `work-gate` approval dialog that requires a complete, user-visible planned-work summary before you can confirm the definition.
+- Added validation in the `work-gate` approval dialog that requires a complete, user-visible planned-work summary before you can confirm the definition.
 
