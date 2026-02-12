@@ -2,11 +2,11 @@
 
 This page summarizes notable changes by build date.
 
-## 0.0.0+20260212 — February 2026 update
+## 0.0.0+20260212 — Documentation cleanup
 
 - **Date**: 2026-02-12
 - **Version**: 0.0.0+20260212
-- **Summary**: This update covers the items listed below.
+- **Summary**: This release includes documentation cleanup to remove outdated migration instructions and UI switcher details.
 
 ### Additional Changes
 
@@ -16,7 +16,7 @@ This page summarizes notable changes by build date.
 
 - **Date**: 2026-01-27
 - **Version**: 0.0.0+20260127
-- **Summary**: This update includes improved CI and cross-platform test reliability.
+- **Summary**: This release includes improved CI and cross-platform test reliability.
 
 ### Bug Fixes
 
