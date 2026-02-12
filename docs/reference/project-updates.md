@@ -15,3 +15,4 @@ This page covers project changes by release date.
 ### New Features
 
 - Added a requirement for the work-gate approval dialog to show a complete, user-visible summary of the planned work before you can confirm that the definition is complete.
+
