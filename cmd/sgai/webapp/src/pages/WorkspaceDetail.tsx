@@ -468,6 +468,16 @@ export function WorkspaceDetail(): JSX.Element | null {
                       Open in OpenCode
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={detail.pinned ? "secondary" : "outline"}
+                    onClick={handlePinToggle}
+                    disabled={isPinPending}
+                    aria-pressed={detail.pinned}
+                  >
+                    {detail.pinned ? "Unpin" : "Pin"}
+                  </Button>
                 </>
               ) : (
                 <>

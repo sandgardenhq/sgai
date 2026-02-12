@@ -258,7 +258,7 @@ describe("WorkspaceDetail", () => {
     expect(await screen.findByRole("button", { name: "Open in OpenCode" })).toBeDefined();
   });
 
-  it("shows only fork and open editor actions for root workspaces with forks", async () => {
+  it("shows fork, open editor, and pin actions for root workspaces with forks", async () => {
     const rootWithForks = {
       ...workspaceDetail,
       isRoot: true,
@@ -286,7 +286,7 @@ describe("WorkspaceDetail", () => {
     expect(screen.queryByRole("button", { name: "Skills" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Snippets" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Agents" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Pin" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Pin" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Unpin" })).toBeNull();
   });
 
