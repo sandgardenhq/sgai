@@ -1,6 +1,6 @@
 # Release Notes
 
-## 0.0.0+20260211 — React web UI and `/api/v1` API
+## 0.0.0+20260211 — React web UI and `/api/v1`
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
@@ -10,7 +10,7 @@
 
 - Added a React 19 single-page web UI embedded in the `sgai` binary and served by `sgai serve`.
 - Added a `/api/v1/*` JSON API for workspace and session workflows.
-- Added a Server-Sent Events stream at `GET /api/v1/events/stream`.
+- Added a Server-Sent Events stream at `GET /api/v1/events/stream` for real-time updates.
 - Added fork lifecycle APIs (`POST /api/v1/workspaces/{name}/fork`, `/merge`, `/delete-fork`, and `/rename`).
 - Added an ad-hoc prompt runner at `POST /api/v1/workspaces/{name}/adhoc`.
 - Added an `Open in OpenCode` action at `POST /api/v1/workspaces/{name}/open-opencode`.
@@ -19,7 +19,7 @@
 
 ### Breaking Changes
 
-- Removed the ability to start agentic work in root workspaces.
+- Removed the ability to start agentic work in root workspaces by enforcing session start from forks only.
 
 ### Bug Fixes
 
