@@ -242,15 +242,22 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
 - Step Name: WORK-GATE
   Before asking the human partner for approval:
   1. Append all brainstorming decisions with timestamps to 'Agent Decisions Log' section in @.sgai/PROJECT_MANAGEMENT.md
+  2. Compile a comprehensive summary of what is being approved. This summary MUST include:
+     - **GOAL items**: List all items from @GOAL.md
+     - **Key brainstorming decisions**: Summarize the decisions made during brainstorming
+     - **Implementation plan / task breakdown**: The concrete steps that will be taken
+     - **Validation criteria**: How completion will be verified
 
   Check your context, @GOAL.md, and @.sgai/PROJECT_MANAGEMENT.md and verify if the human already cleared the WORK-GATE with "DEFINITION IS COMPLETE, BUILD MAY BEGIN" and act accordingly.
-  You MUST ask your human partner if you are allowed to start working. Use the `sgai_ask_user_work_gate` tool:
+  You MUST ask your human partner if you are allowed to start working. Use the `sgai_ask_user_work_gate` tool with the compiled summary:
 
   ```
-  sgai_ask_user_work_gate()
+  sgai_ask_user_work_gate({
+    summary: "## What Will Be Built\n- [list GOAL items]\n\n## Key Decisions\n- [brainstorming decisions]\n\n## Implementation Plan\n- [task breakdown]\n\n## Validation Criteria\n- [how completion will be verified]"
+  })
   ```
 
-  No arguments are needed - the question and choices are hardcoded. When the human approves, the session automatically switches to self-driving mode.
+  The summary parameter is mandatory. The human partner will see this summary in the approval dialog so they know exactly what they are approving. When the human approves, the session automatically switches to self-driving mode.
 
   If the human partner selects "DEFINITION IS COMPLETE, BUILD MAY BEGIN", log this decision into @.sgai/PROJECT_MANAGEMENT, and hand-over control to specialized agents to execute the work.
   If the human partner selects "Not ready yet, need more clarification", return to the BRAINSTORMING step to gather more requirements.
