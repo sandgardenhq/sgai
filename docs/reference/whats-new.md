@@ -9,7 +9,7 @@
 ```json
 {
   "New Features": [
-    "You can now pin or unpin root workspaces even when they have forks, making it easier to keep important workspaces readily accessible. This adds a pin/unpin control on forked root workspaces and updates the associated automated tests and goals documentation to cover the new behavior."
+    "You can now pin or unpin root workspaces even when they have forks, making it easier to keep important workspaces readily accessible."
   ]
 }
 
