@@ -179,6 +179,13 @@ The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embe
 | [React Router](https://reactrouter.com)       | Client-side routing                     |
 | [Lucide React](https://lucide.dev)            | Icons                                   |
 
+#### Markdown rendering
+
+The frontend uses `react-markdown`.
+
+`react-markdown` 10.x removes the `className` prop.
+Wrap `<Markdown>` with an element (such as a `<div>`) and put classes on the wrapper instead.
+
 ### Build Commands
 
 ```sh
