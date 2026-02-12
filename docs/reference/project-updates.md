@@ -17,7 +17,7 @@ This page covers project changes by release date.
 ```json
 {
   "New Features": [
-    "The work-gate approval dialog now requires a complete, user-visible summary of the planned work before prompting you to confirm that the definition is complete. Specifically, the approval modal blocks completion until a comprehensive planned-work summary is populated and displayed in the dialog UI."
+    "The work-gate approval dialog now requires a complete, user-visible summary of the planned work before enabling you to confirm that the definition is complete."
   ]
 }
 
