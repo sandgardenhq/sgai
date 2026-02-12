@@ -1,20 +1,15 @@
 # Recent updates
 
-## 0.0.0+20260212 — Release updates
+## 0.0.0+20260212 — Improved skill discovery output
 
 - **Date**: 2026-02-12
 - **Version**: 0.0.0+20260212
-- **Summary**: This release includes product updates and maintenance changes.
+- **Summary**: This release includes improved MCP skill discovery output.
 
 <!-- BEGIN NEW_RELEASE_NOTES -->
 
-```json
-{
-  "New Features": [
-    "The `sgai` `find_skills` output now presents human-readable skill display names so clients can identify skills without relying on file paths or raw content. Specifically, `find_skills` has been updated to steer integrations toward using the `skill` tool for retrieval and execution instead of returning file paths or full content payloads."
-  ]
-}
+### New Features
 
-```
+- Updated `find_skills` to present human-readable skill display names instead of file paths or raw content.
 
 <!-- END NEW_RELEASE_NOTES -->
