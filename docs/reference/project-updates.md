@@ -14,11 +14,6 @@ This page covers project changes by release date.
 
 ### Additional Changes
 
-```json
-{
-  "New Features": [
-    "The work-gate approval dialog now requires a complete, user-visible summary of the planned work before enabling you to confirm that the definition is complete."
-  ]
-}
+### New Features
 
-```
+- Added a requirement for the work-gate approval dialog to show a complete, user-visible summary of the planned work before you can confirm that the definition is complete.
