@@ -62,12 +62,11 @@ If a skill has a checklist, YOU MUST create TodoWrite todos for EACH item.
 
 ## Announcing Skill Usage
 
-Before using a skill, announce that you are using it.
-"I'm using [Skill Name] to [what you're doing]."
+Before using a skill, announce that you are using it through `sgai_update_workflow_state({"task":"I'm using [Skill Name] to [what you're doing]."})`
 
 **Examples:**
-- "I'm using the brainstorming skill to refine your idea into a design."
-- "I'm using the test-driven-development skill to implement this feature."
+- `sgai_update_workflow_state({"task":"I'm using the brainstorming skill to refine your idea into a design."})`
+- `sgai_update_workflow_state({"task":"I'm using the test-driven-development skill to implement this feature."})`
 
 **Why:** Transparency helps your human partner understand your process and catch errors early. It also confirms you actually read the skill.
 
