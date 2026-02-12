@@ -303,7 +303,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const agentModelLabel = [agentLabel, modelLabel].filter(Boolean).join(" | ");
   const fullAgentModelLabel = [detail.currentAgent, detail.currentModel].filter(Boolean).join(" | ");
   const statusLine = detail.task?.trim() || detail.status?.trim();
-  const showStatusLine = Boolean(agentModelLabel || statusLine);
+  const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
   const selfDriveLabel = detail.running ? "Self-Drive" : "Self-drive";
   const showForkAction = !detail.isFork && !detail.running;
