@@ -18,12 +18,12 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 ## Recent changes
 
-### 0.0.0+20260212 — Updated skill announcements
+### 0.0.0+20260212 — Improved skill announcement state updates
 
 - **Date**: 2026-02-12
 - **Version**: 0.0.0+20260212
 - **Summary**: This update covers the changes listed below.
 
-#### Additional Changes
+### Additional Changes
 
 - Updated skill usage announcements to call `sgai_update_workflow_state` so workflow state updates are enforced consistently.
