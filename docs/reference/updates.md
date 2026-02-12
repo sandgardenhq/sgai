@@ -7,3 +7,4 @@ This page summarizes notable changes to `sgai`.
 ### Web dashboard
 
 - Updated the root repository view in forked mode to hide the workspace status line to reduce UI clutter.
+- Updated the root repository view in forked mode to hide the workspace status line for a cleaner UI.
