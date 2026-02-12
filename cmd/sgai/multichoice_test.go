@@ -261,7 +261,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := askUserWorkGate(workDir)
+		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -276,7 +276,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
-		_, err := askUserWorkGate(workDir)
+		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -298,7 +298,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			},
 		})
 
-		_, err := askUserWorkGate(workDir)
+		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -313,7 +313,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	t.Run("setsHumanMessage", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
-		_, err := askUserWorkGate(workDir)
+		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -328,7 +328,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	t.Run("hasTwoChoices", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
 
-		_, err := askUserWorkGate(workDir)
+		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -341,6 +341,58 @@ func TestAskUserWorkGateStress(t *testing.T) {
 
 		if len(loadedState.MultiChoiceQuestion.Questions[0].Choices) != 2 {
 			t.Errorf("expected 2 choices, got %d", len(loadedState.MultiChoiceQuestion.Questions[0].Choices))
+		}
+	})
+
+	t.Run("emptySummaryReturnsError", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		result, err := askUserWorkGate(workDir, "")
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		if !strings.Contains(result, "Error:") {
+			t.Errorf("expected error message for empty summary, got: %q", result)
+		}
+	})
+
+	t.Run("whitespaceSummaryReturnsError", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		result, err := askUserWorkGate(workDir, "   \t\n  ")
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		if !strings.Contains(result, "Error:") {
+			t.Errorf("expected error message for whitespace-only summary, got: %q", result)
+		}
+	})
+
+	t.Run("summaryAppearsInQuestionText", func(t *testing.T) {
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+
+		summary := "## What Will Be Built\n- Feature X\n\n## Key Decisions\n- Use approach A"
+
+		_, err := askUserWorkGate(workDir, summary)
+		if err != nil {
+			t.Fatalf("askUserWorkGate error: %v", err)
+		}
+
+		loadedState := loadState(t, workDir)
+
+		questionText := loadedState.MultiChoiceQuestion.Questions[0].Question
+		if !strings.Contains(questionText, summary) {
+			t.Errorf("expected question to contain summary, got: %q", questionText)
+		}
+
+		if !strings.Contains(questionText, "Is the definition complete?") {
+			t.Errorf("expected question to contain approval prompt, got: %q", questionText)
+		}
+
+		if !strings.Contains(loadedState.HumanMessage, summary) {
+			t.Errorf("expected HumanMessage to contain summary, got: %q", loadedState.HumanMessage)
 		}
 	})
 }
