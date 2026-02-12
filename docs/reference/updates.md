@@ -11,7 +11,7 @@ This page summarizes notable updates by date.
 ```json
 {
   "Additional Changes": [
-    "Updated a development-only dependency used for test environment setup. Specifically, bumped the `@happy-dom/global-registrator` devDependency to `20.6.1` and regenerated the `bun.lock` file to reflect the updated lock state."
+    "Updated the development-only test environment dependency `@happy-dom/global-registrator` to `20.6.1` and regenerated `bun.lock`."
   ]
 }
 
