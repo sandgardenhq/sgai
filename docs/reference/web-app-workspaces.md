@@ -10,7 +10,7 @@ This page explains how to pin and unpin a root workspace when you are working in
 ## Pin or unpin a root workspace
 
 1. Open the root workspace in the web app.
-2. Find the **Pin** button near the workspace details.
+2. Find the **Pin** button.
 3. Select **Pin** to pin the workspace.
 4. Select **Unpin** to unpin the workspace.
 
