@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-12
 - **Version**: `0.0.0+20260212`
-- **Summary**: This update addresses recent improvements and maintenance changes.
+- **Summary**: This update addresses recent improvements.
 
 ```json
 {
