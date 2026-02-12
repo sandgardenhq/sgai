@@ -1,6 +1,6 @@
 # Release Notes
 
-## 0.0.0+20260211 — React web UI and API layer
+## 0.0.0+20260211 — React web UI and `/api/v1` API
 
 - **Date**: 2026-02-11
 - **Version**: 0.0.0+20260211
@@ -8,7 +8,7 @@
 
 ### New Features
 
-- Added a React 19 single-page web UI embedded in the `sgai` binary.
+- Added a React 19 single-page web UI embedded in the `sgai` binary and served by `sgai serve`.
 - Added a `/api/v1/*` JSON API for workspace and session workflows.
 - Added a Server-Sent Events stream at `GET /api/v1/events/stream`.
 - Added fork lifecycle APIs (`POST /api/v1/workspaces/{name}/fork`, `/merge`, `/delete-fork`, and `/rename`).
@@ -25,7 +25,7 @@
 
 - Fixed new-workspace initialization so fork and session operations work immediately.
 - Fixed forked-mode detection so repositories only enter forked mode when `jj workspace list` reports multiple workspaces.
-- Fixed `Open in Editor` by restoring editor resolution across supported presets.
+- Fixed `Open in Editor` by restoring editor resolution and invocation across supported presets.
 - Fixed implicit `project-critic-council` injection to match the coordinator model.
 - Fixed a `strings: negative Repeat count` panic during workflow execution.
 - Updated `/respond` rendering to use the shared Markdown-to-HTML pipeline.
