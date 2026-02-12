@@ -19,15 +19,13 @@ use `make build` to generate the binary
 
 In terms of layout, UI, style, when something doesn't fit a container, use ellipsis with tooltip - refer to https://picocss.com/docs/tooltip
 
-
-CRITICAL: During the React migration (M0-M6), the codebase supports BOTH HTMX+PicoCSS and React+shadcn/ui interfaces simultaneously via cookie-based UI switcher. HTMX code remains unchanged; React code lives in cmd/sgai/webapp/. After M7, React is the sole interface.
 CRITICAL: use playwright screenshots (and the skill to operate playwright) to verify the application is working correctly.
 
 For React/TypeScript code in cmd/sgai/webapp/, use bun for building, testing, and running scripts. Build command: `bun run build`. Dev server: `bun run dev.ts`. Tests: `bun test`.
 
 React components must use shadcn/ui components where possible. Do not create custom implementations when a shadcn component exists. Reference: https://ui.shadcn.com/docs
 
-React tests: bun test for unit/component tests (vitest-compatible API), Playwright for E2E tests. Dual-cookie test pattern: run identical flows with sgai-ui=htmx and sgai-ui=react cookies.
+React tests: bun test for unit/component tests (vitest-compatible API), Playwright for E2E tests.
 
 Use useSyncExternalStore for external data sources (SSE store). Use useReducer+Context for app state management. Do NOT use Redux, Zustand, or other state management libraries. No optimistic updates for critical workflow actions.
 
