@@ -10,7 +10,7 @@ This page summarizes notable changes by build date.
 
 ### Additional Changes
 
-- Updated documentation to remove outdated migration instructions and UI switcher details that are no longer applicable.
+- Removed outdated migration instructions and UI switcher details from documentation.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
