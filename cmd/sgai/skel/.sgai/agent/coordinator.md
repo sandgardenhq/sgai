@@ -52,7 +52,7 @@ You are the SOLE owner of GOAL.md checkbox state. No other agent can or should e
 
 ## How to Mark Checkboxes
 
-1. Use `skills({"name":"project-completion-verification"})` to check current status
+1. Use `skill({"name":"project-completion-verification"})` to check current status
 2. Use the Edit tool to change `- [ ]` to `- [x]` for completed items in GOAL.md
 3. Re-run the verification to confirm the mark was applied
 4. Log the marking in .sgai/PROJECT_MANAGEMENT.md
