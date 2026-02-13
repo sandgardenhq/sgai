@@ -202,13 +202,8 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   useEffect(() => {
     if (!workspaceName) return;
-    refreshPendingQuestion();
-  }, [workspaceName, refreshPendingQuestion]);
-
-  useEffect(() => {
-    if (!workspaceName) return;
     const sessionWorkspace = getWorkspaceNameFromEvent(sessionUpdateEvent);
-    if (sessionWorkspace === workspaceName) {
+    if (!sessionWorkspace || sessionWorkspace === workspaceName) {
       refreshPendingQuestion();
     }
   }, [sessionUpdateEvent, workspaceName, refreshPendingQuestion]);
@@ -226,22 +221,17 @@ export function WorkspaceDetail(): JSX.Element | null {
     const parsed = parseExecTime(detail.totalExecTime ?? "");
     if (parsed !== null) {
       setExecTimeSeconds(parsed);
-      return;
-    }
-    if (detail.running) {
+    } else if (detail.running) {
       setExecTimeSeconds(0);
-      return;
+    } else {
+      setExecTimeSeconds(null);
     }
-    setExecTimeSeconds(null);
-  }, [detail?.totalExecTime, detail?.running]);
-
-  useEffect(() => {
-    if (!detail?.running) return;
+    if (!detail.running) return;
     const timer = setInterval(() => {
       setExecTimeSeconds((prev) => (prev === null ? prev : prev + 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [detail?.running]);
+  }, [detail?.totalExecTime, detail?.running]);
 
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
@@ -311,12 +301,14 @@ export function WorkspaceDetail(): JSX.Element | null {
   const showEditGoalAction = detail.hasSgai || Boolean(detail.goalContent?.trim());
   const showOpenEditorAction = !detail.running;
   const showOpenOpencodeAction = detail.running;
+  const isActionDisabled = detail.running || isStartStopPending || isSelfDrivePending;
+
   const handleStart = () => {
     if (!workspaceName) return;
     setActionError(null);
     startStartStopTransition(async () => {
       try {
-        const response = await api.workspaces.start(workspaceName, false);
+        const response = await api.workspaces.start(workspaceName, detail.interactiveAuto);
         setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
         setRefreshKey((k) => k + 1);
       } catch (err) {
@@ -496,7 +488,7 @@ export function WorkspaceDetail(): JSX.Element | null {
                     size="sm"
                     variant={detail.interactiveAuto ? "default" : "outline"}
                     onClick={handleSelfDrive}
-                    disabled={isSelfDrivePending}
+                    disabled={isActionDisabled}
                     aria-pressed={detail.interactiveAuto}
                   >
                     {selfDriveLabel}
@@ -506,7 +498,7 @@ export function WorkspaceDetail(): JSX.Element | null {
                     size="sm"
                     variant={detail.running ? "default" : "outline"}
                     onClick={handleStart}
-                    disabled={isStartStopPending}
+                    disabled={isActionDisabled}
                   >
                     Start
                   </Button>

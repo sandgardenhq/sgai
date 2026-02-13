@@ -426,7 +426,6 @@ export interface ApiComposerAgentConf {
 
 export interface ApiComposerState {
   description: string;
-  interactive: string;
   completionGate: string;
   agents: ApiComposerAgentConf[];
   flow: string;
@@ -439,7 +438,6 @@ export interface ApiWizardState {
   description?: string;
   techStack: string[];
   safetyAnalysis: boolean;
-  interactive: string;
   completionGate?: string;
 }
 
@@ -464,7 +462,6 @@ export interface ApiComposeTemplateEntry {
   icon: string;
   agents: ApiComposerAgentConf[];
   flow: string;
-  interactive: string;
 }
 
 export interface ApiComposeTemplatesResponse {

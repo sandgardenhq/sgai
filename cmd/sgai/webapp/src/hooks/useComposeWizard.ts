@@ -16,7 +16,6 @@ export interface WizardStepData {
   description: string;
   techStack: string[];
   safetyAnalysis: boolean;
-  interactive: string;
   completionGate: string;
 }
 
@@ -60,7 +59,6 @@ function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizard
     description: data.description,
     techStack: data.techStack,
     safetyAnalysis: data.safetyAnalysis,
-    interactive: data.interactive,
     completionGate: data.completionGate,
   };
 }
@@ -179,7 +177,6 @@ function buildComposerStateFromData(
 
   return {
     description: data.description,
-    interactive: data.interactive,
     completionGate: data.completionGate,
     agents: hasUserAgents ? agents : (serverState?.agents ?? []),
     flow: hasUserAgents ? flow : (serverState?.flow ?? ""),
@@ -216,7 +213,6 @@ const DEFAULT_WIZARD_DATA: WizardStepData = {
   description: "",
   techStack: [],
   safetyAnalysis: false,
-  interactive: "yes",
   completionGate: "",
 };
 
@@ -268,7 +264,6 @@ export function useComposeWizard({
           description: stateResp.wizard.description ?? stateResp.state.description ?? "",
           techStack: stateResp.wizard.techStack ?? [],
           safetyAnalysis: stateResp.wizard.safetyAnalysis ?? false,
-          interactive: stateResp.wizard.interactive ?? stateResp.state.interactive ?? "yes",
           completionGate: stateResp.wizard.completionGate ?? stateResp.state.completionGate ?? "",
         };
 
@@ -286,9 +281,6 @@ export function useComposeWizard({
               merged.safetyAnalysis = storedStep.safetyAnalysis;
             }
             if (step === 4) {
-              if (storedStep.interactive !== undefined) {
-                merged.interactive = storedStep.interactive;
-              }
               if (storedStep.completionGate !== undefined) {
                 merged.completionGate = storedStep.completionGate;
               }
@@ -331,7 +323,6 @@ export function useComposeWizard({
         break;
       case 4:
         saveStepToStorage(4, {
-          interactive: wizardData.interactive,
           completionGate: wizardData.completionGate,
         });
         break;

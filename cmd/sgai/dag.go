@@ -401,7 +401,7 @@ func buildMultiModelSection(currentModel string, models map[string]any, currentA
 	return sb.String()
 }
 
-func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactive string) string {
+func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, selfDrive bool) string {
 	predecessors := d.getPredecessors(currentAgent)
 	predecessorsStr := strings.Join(predecessors, ", ")
 	if predecessorsStr == "" {
@@ -461,7 +461,7 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 		msg += snippetNudge
 	}
 
-	if interactive == "yes" {
+	if !selfDrive {
 		msg += "\n\nCRITICAL: think hard and ASK ME QUESTIONS BEFORE BUILDING\n"
 	}
 

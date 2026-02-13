@@ -63,8 +63,8 @@ describe("ComposeLanding", () => {
   test("renders template cards when templates load", async () => {
     fetchSpy = mockFetch({
       templates: [
-        { id: "basic", name: "Basic Project", description: "A simple project", icon: "📦", agents: [], flow: "", interactive: "yes" },
-        { id: "fullstack", name: "Full Stack", description: "Frontend + Backend", icon: "🌐", agents: [], flow: "", interactive: "yes" },
+        { id: "basic", name: "Basic Project", description: "A simple project", icon: "📦", agents: [], flow: "" },
+        { id: "fullstack", name: "Full Stack", description: "Frontend + Backend", icon: "🌐", agents: [], flow: "" },
       ],
     });
 
@@ -128,7 +128,7 @@ describe("ComposeLanding", () => {
   test("template card links include workspace param", async () => {
     fetchSpy = mockFetch({
       templates: [
-        { id: "basic", name: "Basic", description: "desc", icon: "📦", agents: [], flow: "", interactive: "yes" },
+        { id: "basic", name: "Basic", description: "desc", icon: "📦", agents: [], flow: "" },
       ],
     });
 

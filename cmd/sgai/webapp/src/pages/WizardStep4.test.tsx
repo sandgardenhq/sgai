@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mockComposeState = {
   workspace: "test-ws",
-  state: { description: "", interactive: "yes", completionGate: "make test", agents: [], flow: "", tasks: "" },
-  wizard: { currentStep: 4, techStack: [], safetyAnalysis: false, interactive: "yes", completionGate: "make test" },
+  state: { description: "", completionGate: "make test", agents: [], flow: "", tasks: "" },
+  wizard: { currentStep: 4, techStack: [], safetyAnalysis: false, completionGate: "make test" },
   techStackItems: [],
 };
 
@@ -49,16 +49,6 @@ describe("WizardStep4", () => {
     expect(screen.getByText("Step 4: Settings")).toBeTruthy();
   });
 
-  test("renders interactive mode select", async () => {
-    fetchSpy = mockFetchSequence([mockComposeState, mockPreview]);
-    await act(async () => { renderWithRouter(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    const select = screen.getByLabelText("Interactive Mode");
-    expect(select).toBeTruthy();
-    expect((select as HTMLSelectElement).value).toBe("yes");
-  });
-
   test("renders completion gate input with server value", async () => {
     fetchSpy = mockFetchSequence([mockComposeState, mockPreview]);
     await act(async () => { renderWithRouter(); });
@@ -67,20 +57,6 @@ describe("WizardStep4", () => {
     const input = screen.getByLabelText("Completion Gate Script");
     expect(input).toBeTruthy();
     expect((input as HTMLInputElement).value).toBe("make test");
-  });
-
-  test("changes interactive mode", async () => {
-    fetchSpy = mockFetchSequence([mockComposeState, mockPreview, { saved: true }, mockPreview]);
-    await act(async () => { renderWithRouter(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    const select = screen.getByLabelText("Interactive Mode");
-    await act(async () => {
-      fireEvent.change(select, { target: { value: "auto" } });
-    });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    expect((select as HTMLSelectElement).value).toBe("auto");
   });
 
   test("changes completion gate", async () => {
@@ -95,23 +71,6 @@ describe("WizardStep4", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
     expect((input as HTMLInputElement).value).toBe("npm run test");
-  });
-
-  test("persists settings to sessionStorage", async () => {
-    fetchSpy = mockFetchSequence([mockComposeState, mockPreview, { saved: true }, mockPreview]);
-    await act(async () => { renderWithRouter(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    const select = screen.getByLabelText("Interactive Mode");
-    await act(async () => {
-      fireEvent.change(select, { target: { value: "no" } });
-    });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    const stored = sessionStorage.getItem("compose-wizard-step-4");
-    expect(stored).toBeTruthy();
-    const parsed = JSON.parse(stored!);
-    expect(parsed.interactive).toBe("no");
   });
 
   test("renders navigation with Review & Save button", async () => {

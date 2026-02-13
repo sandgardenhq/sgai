@@ -41,10 +41,9 @@ describe("useComposeWizard storage functions", () => {
   });
 
   it("saveStepToStorage and loadStepFromStorage round-trip for step 4", () => {
-    saveStepToStorage(4, { interactive: "auto", completionGate: "make test" });
+    saveStepToStorage(4, { completionGate: "make test" });
     const loaded = loadStepFromStorage(4);
     expect(loaded).not.toBeNull();
-    expect(loaded!.interactive).toBe("auto");
     expect(loaded!.completionGate).toBe("make test");
   });
 
@@ -65,7 +64,7 @@ describe("useComposeWizard storage functions", () => {
     saveStepToStorage(1, { description: "data" });
     saveStepToStorage(2, { techStack: ["go"] });
     saveStepToStorage(3, { safetyAnalysis: true });
-    saveStepToStorage(4, { interactive: "yes" });
+    saveStepToStorage(4, { completionGate: "make test" });
 
     clearAllWizardStorage();
 

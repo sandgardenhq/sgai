@@ -29,7 +29,6 @@ func (s *Server) getAdhocState(workspacePath string) *adhocPromptState {
 	return st
 }
 
-
 type lockedWriter struct {
 	mu  *sync.Mutex
 	buf *bytes.Buffer

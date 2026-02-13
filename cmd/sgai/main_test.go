@@ -80,7 +80,6 @@ func TestTryReloadGoalMetadata(t *testing.T) {
 		goalPath := filepath.Join(tmpDir, "GOAL.md")
 
 		newContent := `---
-interactive: "auto"
 models:
   coordinator: anthropic/claude-opus-4-6
 completionGateScript: make test
@@ -92,16 +91,15 @@ completionGateScript: make test
 		}
 
 		original := GoalMetadata{
-			Interactive:          "no",
 			Models:               map[string]any{"coordinator": "old-model"},
 			CompletionGateScript: "old-command",
 		}
 
-		got := tryReloadGoalMetadata(goalPath, original)
-
-		if got.Interactive != "auto" {
-			t.Errorf("tryReloadGoalMetadata() Interactive = %q; want %q", got.Interactive, "auto")
+		got, errReloadGoalMetadata := tryReloadGoalMetadata(goalPath, original)
+		if errReloadGoalMetadata != nil {
+			t.Fatalf("tryReloadGoalMetadata() unexpected error: %v", errReloadGoalMetadata)
 		}
+
 		models := getModelsForAgent(got.Models, "coordinator")
 		if len(models) != 1 || models[0] != "anthropic/claude-opus-4-6" {
 			t.Errorf("tryReloadGoalMetadata() Models[coordinator] = %v; want [anthropic/claude-opus-4-6]", models)
@@ -116,16 +114,15 @@ completionGateScript: make test
 		goalPath := filepath.Join(tmpDir, "nonexistent.md")
 
 		original := GoalMetadata{
-			Interactive:          "auto",
 			Models:               map[string]any{"coordinator": "original-model"},
 			CompletionGateScript: "make test",
 		}
 
-		got := tryReloadGoalMetadata(goalPath, original)
-
-		if got.Interactive != original.Interactive {
-			t.Errorf("tryReloadGoalMetadata() Interactive = %q; want %q", got.Interactive, original.Interactive)
+		got, errReloadGoalMetadata := tryReloadGoalMetadata(goalPath, original)
+		if errReloadGoalMetadata != nil {
+			t.Fatalf("tryReloadGoalMetadata() unexpected error: %v", errReloadGoalMetadata)
 		}
+
 		gotModels := getModelsForAgent(got.Models, "coordinator")
 		origModels := getModelsForAgent(original.Models, "coordinator")
 		if len(gotModels) != len(origModels) || (len(gotModels) > 0 && gotModels[0] != origModels[0]) {
@@ -136,7 +133,7 @@ completionGateScript: make test
 		}
 	})
 
-	t.Run("parseErrorPreservesOriginalMetadata", func(t *testing.T) {
+	t.Run("parseErrorReturnsError", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		goalPath := filepath.Join(tmpDir, "GOAL.md")
 
@@ -152,23 +149,13 @@ models:
 		}
 
 		original := GoalMetadata{
-			Interactive: "no",
-			Models:      map[string]any{"coordinator": "preserve-me"},
-			Flow:        "preserved-flow",
+			Models: map[string]any{"coordinator": "preserve-me"},
+			Flow:   "preserved-flow",
 		}
 
-		got := tryReloadGoalMetadata(goalPath, original)
-
-		if got.Interactive != original.Interactive {
-			t.Errorf("tryReloadGoalMetadata() Interactive = %q; want %q", got.Interactive, original.Interactive)
-		}
-		gotModels := getModelsForAgent(got.Models, "coordinator")
-		origModels := getModelsForAgent(original.Models, "coordinator")
-		if len(gotModels) != len(origModels) || (len(gotModels) > 0 && gotModels[0] != origModels[0]) {
-			t.Errorf("tryReloadGoalMetadata() Models[coordinator] = %v; want %v", gotModels, origModels)
-		}
-		if got.Flow != original.Flow {
-			t.Errorf("tryReloadGoalMetadata() Flow = %q; want %q", got.Flow, original.Flow)
+		_, errReloadGoalMetadata := tryReloadGoalMetadata(goalPath, original)
+		if errReloadGoalMetadata == nil {
+			t.Fatal("tryReloadGoalMetadata() expected error for invalid frontmatter")
 		}
 	})
 
@@ -184,17 +171,34 @@ No frontmatter here.
 		}
 
 		original := GoalMetadata{
-			Interactive: "yes",
-			Models:      map[string]any{"agent": "old-model"},
+			Models: map[string]any{"agent": "old-model"},
 		}
 
-		got := tryReloadGoalMetadata(goalPath, original)
-
-		if got.Interactive != "" {
-			t.Errorf("tryReloadGoalMetadata() Interactive = %q; want empty string", got.Interactive)
+		got, errReloadGoalMetadata := tryReloadGoalMetadata(goalPath, original)
+		if errReloadGoalMetadata != nil {
+			t.Fatalf("tryReloadGoalMetadata() unexpected error: %v", errReloadGoalMetadata)
 		}
+
 		if len(got.Models) != 0 {
 			t.Errorf("tryReloadGoalMetadata() Models should be empty, got %v", got.Models)
+		}
+	})
+}
+
+func TestApplyWorkGateApproval(t *testing.T) {
+	t.Run("locksAutoModeAfterApproval", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		statePath := filepath.Join(tmpDir, "state.json")
+		wf := state.Workflow{WorkGateApproved: true}
+
+		if shouldContinue := applyWorkGateApproval(&wf, statePath, "sgai"); shouldContinue {
+			t.Fatal("applyWorkGateApproval should not request loop continue on successful save")
+		}
+		if !wf.InteractiveAutoLock {
+			t.Fatal("interactive auto lock should be enabled")
+		}
+		if wf.WorkGateApproved {
+			t.Fatal("work gate approved flag should be cleared")
 		}
 	})
 }

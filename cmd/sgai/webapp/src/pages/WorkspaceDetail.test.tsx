@@ -40,6 +40,7 @@ let mockEventSources: MockEventSource[] = [];
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
+  window.sessionStorage.clear();
   mockEventSources = [];
   (globalThis as unknown as { EventSource: typeof MockEventSource }).EventSource =
     class extends MockEventSource {

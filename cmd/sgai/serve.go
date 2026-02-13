@@ -371,11 +371,7 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 		return startSessionResult{startError: fmt.Errorf("failed to find sgai executable")}
 	}
 
-	interactiveFlag := "--interactive=yes"
-	if autoMode {
-		interactiveFlag = "--interactive=auto"
-	}
-	cmd := exec.Command(sgaiPath, interactiveFlag, workspacePath)
+	cmd := exec.Command(sgaiPath, workspacePath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 
 type composerState struct {
 	Description    string              `json:"description"`
-	Interactive    string              `json:"interactive"`
 	CompletionGate string              `json:"completionGate"`
 	Agents         []composerAgentConf `json:"agents"`
 	Flow           string              `json:"flow"`
@@ -66,7 +65,6 @@ func loadComposerStateFromDisk(dir string) composerState {
 
 	st := composerState{
 		Description:    extractDescriptionFromBody(bodyContent),
-		Interactive:    metadata.Interactive,
 		CompletionGate: metadata.CompletionGateScript,
 		Flow:           metadata.Flow,
 		Tasks:          extractTasksFromBody(bodyContent),
@@ -93,7 +91,6 @@ func loadComposerStateFromDisk(dir string) composerState {
 
 func defaultComposerState() composerState {
 	return composerState{
-		Interactive: "yes",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 		},
@@ -213,12 +210,6 @@ func buildGOALContent(st composerState) string {
 			buf.WriteString(a.Model)
 			buf.WriteString("\"\n")
 		}
-	}
-
-	if st.Interactive != "" {
-		buf.WriteString("interactive: ")
-		buf.WriteString(st.Interactive)
-		buf.WriteString("\n")
 	}
 
 	if st.CompletionGate != "" {

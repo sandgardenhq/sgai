@@ -81,12 +81,6 @@ func main() {
 		return
 	}
 
-	flagSet := flag.NewFlagSet("sgai-main", flag.ContinueOnError)
-	flagSet.String("interactive", "auto", "interactive mode: yes, no, auto")
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
-		log.Fatalln(err)
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -97,7 +91,7 @@ func printUsage() {
 	fmt.Println(`sgai - AI-powered software factory
 
 Usage:
-  sgai [--interactive] [--fresh] <target_directory>   Run workflow for GOAL.md
+  sgai [--fresh] <target_directory>   Run workflow for GOAL.md
   sgai serve [--listen-addr addr]           Start web server for session management
   sgai sessions                             List all sessions in .sgai/retrospectives
   sgai status [target_directory]            Show workflow status summary
@@ -106,7 +100,6 @@ Usage:
   sgai list-agents [target_directory]       List available agents
 
 Options:
-  --interactive   Interactive mode: yes (open $EDITOR), no (exit), auto (self-driving)
   --fresh         Force a fresh start (don't resume existing workflow)
 
 Serve Options:
@@ -140,18 +133,12 @@ Examples:
 // runWorkflow executes the main workflow loop for a target directory.
 // It handles flow mode workflows, agent iteration, and human interaction.
 func runWorkflow(ctx context.Context, args []string) {
-	defaultInteractive := "auto"
-	if os.Getenv("EDITOR") != "" {
-		defaultInteractive = "yes"
-	}
-
 	flagSet := flag.NewFlagSet("sgai", flag.ExitOnError)
-	interactiveFlag := flagSet.String("interactive", defaultInteractive, "interactive mode: yes (open $EDITOR), no (exit), auto (self-driving)")
 	freshFlag := flagSet.Bool("fresh", false, "force a fresh start (delete state.json and PROJECT_MANAGEMENT.md)")
 	flagSet.Parse(args) //nolint:errcheck // ExitOnError FlagSet exits on error, never returns non-nil
 
 	if flagSet.NArg() < 1 {
-		log.Fatalln("usage: sgai [--interactive] <target_directory>")
+		log.Fatalln("usage: sgai [--fresh] <target_directory>")
 	}
 
 	dir, err := filepath.Abs(flagSet.Arg(0))
@@ -183,21 +170,6 @@ func runWorkflow(ctx context.Context, args []string) {
 	}
 
 	applyConfigDefaults(projectConfig, &metadata)
-
-	flagInteractiveExplicit := false
-	flagSet.Visit(func(f *flag.Flag) {
-		if f.Name == "interactive" {
-			flagInteractiveExplicit = true
-		}
-	})
-
-	interactive := metadata.Interactive
-	if flagInteractiveExplicit {
-		interactive = *interactiveFlag
-	} else if interactive == "" {
-		interactive = defaultInteractive
-	}
-	interactive = normalizeInteractive(interactive)
 
 	if err := initializeWorkspaceDir(dir); err != nil {
 		log.Fatalln("failed to initialize workspace directory:", err)
@@ -232,7 +204,6 @@ func runWorkflow(ctx context.Context, args []string) {
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalln("failed to read state.json:", err)
 	}
-
 	newChecksum, err := computeGoalChecksum(goalPath)
 	if err != nil {
 		log.Fatalln("failed to compute GOAL.md checksum:", err)
@@ -341,8 +312,6 @@ func runWorkflow(ctx context.Context, args []string) {
 	var iterationCounter int
 	var previousAgent string
 
-	fmt.Println("["+paddedsgai+"]", "interactive mode:", interactive)
-
 	defer func() {
 		notifyMsg := fmt.Sprintf("JOB COMPLETE - %s", filepath.Base(dir))
 		notify.Send("sgai", notifyMsg)
@@ -372,12 +341,16 @@ func runWorkflow(ctx context.Context, args []string) {
 		}
 		previousAgent = currentAgent
 
-		metadata = tryReloadGoalMetadata(goalPath, metadata)
-		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, interactive, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
-		if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
+		var errReloadGoalMetadata error
+		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(goalPath, metadata)
+		if errReloadGoalMetadata != nil {
+			log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 			return
 		}
-		applyInteractiveOverride(&wfState, &interactive, stateJSONPath, paddedsgai)
+		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+		if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
+			return
+		}
 		if wfState.Status == state.StatusComplete {
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
@@ -418,12 +391,16 @@ func runWorkflow(ctx context.Context, args []string) {
 				return
 			}
 
-			metadata = tryReloadGoalMetadata(goalPath, metadata)
-			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, interactive, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
-			if applyWorkGateApproval(&wfState, &interactive, stateJSONPath, paddedsgai) {
+			var errReloadGoalMetadata error
+			metadata, errReloadGoalMetadata = tryReloadGoalMetadata(goalPath, metadata)
+			if errReloadGoalMetadata != nil {
+				log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 				return
 			}
-			applyInteractiveOverride(&wfState, &interactive, stateJSONPath, paddedsgai)
+			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+			if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
+				return
+			}
 
 			if wfState.Status == state.StatusComplete {
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
@@ -454,11 +431,11 @@ func runWorkflow(ctx context.Context, args []string) {
 	}
 }
 
-func applyWorkGateApproval(wfState *state.Workflow, interactive *string, stateJSONPath, paddedsgai string) bool {
+func applyWorkGateApproval(wfState *state.Workflow, stateJSONPath, paddedsgai string) bool {
 	if !wfState.WorkGateApproved {
 		return false
 	}
-	*interactive = "auto"
+	wfState.InteractiveAutoLock = true
 	wfState.WorkGateApproved = false
 	if err := state.Save(stateJSONPath, *wfState); err != nil {
 		log.Println("failed to save state:", err)
@@ -466,23 +443,6 @@ func applyWorkGateApproval(wfState *state.Workflow, interactive *string, stateJS
 	}
 	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto mode")
 	return false
-}
-
-func applyInteractiveOverride(wfState *state.Workflow, interactive *string, stateJSONPath, paddedsgai string) {
-	override := wfState.InteractiveOverride
-	if override == "" {
-		return
-	}
-	if override != "auto" && override != "yes" {
-		return
-	}
-	*interactive = override
-	wfState.InteractiveOverride = ""
-	if err := state.Save(stateJSONPath, *wfState); err != nil {
-		log.Println("failed to save state:", err)
-		return
-	}
-	fmt.Println("["+paddedsgai+"]", "interactive mode switched to", override)
 }
 
 func ensureImplicitProjectCriticCouncilModel(flowDag *dag, metadata *GoalMetadata) {
@@ -621,7 +581,6 @@ type multiModelConfig struct {
 	agent            string
 	flowDag          *dag
 	statePath        string
-	interactive      string
 	retrospectiveDir string
 	longestNameLen   int
 	paddedsgai       string
@@ -645,7 +604,11 @@ func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state
 			return wfState
 		}
 
-		metadata = tryReloadGoalMetadata(cfg.goalPath, metadata)
+		var errReloadGoalMetadata error
+		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(cfg.goalPath, metadata)
+		if errReloadGoalMetadata != nil {
+			log.Fatalln("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
+		}
 		newModels := getModelsForAgent(metadata.Models, cfg.agent)
 
 		if len(newModels) <= 1 {
@@ -774,7 +737,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			msg = humanResponse
 			humanResponse = ""
 		} else {
-			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, cfg.interactive)
+			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractiveAutoLock)
 
 			multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
 			if multiModelSection != "" {
@@ -811,11 +774,15 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			}
 		}
 
+		interactiveEnv := "yes"
+		if wfState.InteractiveAutoLock {
+			interactiveEnv = "auto"
+		}
 		cmd := exec.CommandContext(ctx, "opencode", args...)
 		cmd.Env = append(os.Environ(),
 			"OPENCODE_CONFIG_DIR=.sgai",
 			"SGAI_MCP_EXECUTABLE="+cfg.executablePath,
-			"SGAI_MCP_INTERACTIVE="+cfg.interactive)
+			"SGAI_MCP_INTERACTIVE="+interactiveEnv)
 		cmd.Stdin = strings.NewReader(msg)
 
 		stderrWriter := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
@@ -920,35 +887,18 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			notifyMsg := fmt.Sprintf("QUESTION - %s", filepath.Base(cfg.dir))
 			notify.Send("sgai", notifyMsg)
 
-			if newState.MultiChoiceQuestion != nil && len(newState.MultiChoiceQuestion.Questions) > 0 && term.IsTerminal(int(os.Stdin.Fd())) {
-				switch cfg.interactive {
-				case "yes":
+			if !newState.InteractiveAutoLock {
+				hasMultiChoice := newState.MultiChoiceQuestion != nil && len(newState.MultiChoiceQuestion.Questions) > 0
+				isTTY := term.IsTerminal(int(os.Stdin.Fd()))
+				switch {
+				case hasMultiChoice && isTTY:
 					fmt.Println("["+cfg.paddedsgai+"]", "multi-choice question requested...")
 					handleMultiChoiceQuestion(cfg.dir, cfg.statePath, newState.MultiChoiceQuestion)
-				case "no":
-					for i, q := range newState.MultiChoiceQuestion.Questions {
-						fmt.Printf("["+cfg.paddedsgai+"] question %d:\n", i+1)
-						fmt.Println(q.Question)
-						for j, choice := range q.Choices {
-							fmt.Printf("  [%d] %s\n", j+1, choice)
-						}
-					}
-					os.Exit(2)
-				}
-			} else {
-				switch cfg.interactive {
-				case "yes":
-					if term.IsTerminal(int(os.Stdin.Fd())) {
-						fmt.Println("["+cfg.paddedsgai+"]", "human input requested, opening editor...")
-						launchEditorForResponse(cfg.dir, newState.HumanMessage, cfg.statePath)
-					} else {
-						fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
-					}
-				case "no":
-					fmt.Println("["+cfg.paddedsgai+"]", "message:")
-					fmt.Println(newState.Task)
-					fmt.Println(newState.HumanMessage)
-					os.Exit(2)
+				case isTTY:
+					fmt.Println("["+cfg.paddedsgai+"]", "human input requested, opening editor...")
+					launchEditorForResponse(cfg.dir, newState.HumanMessage, cfg.statePath)
+				default:
+					fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
 				}
 			}
 
@@ -1002,14 +952,13 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 	}
 }
 
-func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, interactive, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, executablePath string) state.Workflow {
+func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, executablePath string) state.Workflow {
 	cfg := multiModelConfig{
 		dir:              dir,
 		goalPath:         goalPath,
 		agent:            agent,
 		flowDag:          flowDag,
 		statePath:        statePath,
-		interactive:      interactive,
 		retrospectiveDir: retrospectiveDir,
 		longestNameLen:   longestNameLen,
 		paddedsgai:       paddedsgai,
@@ -1093,13 +1042,12 @@ func countPendingTodos(wfState state.Workflow, agent string) int {
 }
 
 // GoalMetadata represents the YAML frontmatter in GOAL.md files.
-// It configures workflow flow, per-agent models, and interactive mode.
+// It configures workflow flow, per-agent models, and completion gate command.
 // Models can be either a single string or an array of strings per agent
 // (for multi-model support).
 type GoalMetadata struct {
 	Flow                 string         `json:"flow,omitempty" yaml:"flow,omitempty"`
 	Models               map[string]any `json:"models,omitempty" yaml:"models,omitempty"`
-	Interactive          string         `json:"interactive,omitempty" yaml:"interactive,omitempty"`
 	CompletionGateScript string         `json:"completionGateScript,omitempty" yaml:"completionGateScript,omitempty"`
 }
 
@@ -1272,19 +1220,22 @@ func fetchValidModels() (map[string]bool, error) {
 }
 
 // tryReloadGoalMetadata attempts to reload GOAL.md frontmatter from disk.
-// If reload succeeds, returns new metadata; if it fails, returns current unchanged.
-func tryReloadGoalMetadata(goalPath string, current GoalMetadata) GoalMetadata {
-	content, err := os.ReadFile(goalPath)
-	if err != nil {
-		return current
+// If the file is unavailable, it preserves current metadata.
+func tryReloadGoalMetadata(goalPath string, current GoalMetadata) (GoalMetadata, error) {
+	content, errRead := os.ReadFile(goalPath)
+	if errRead != nil {
+		if os.IsNotExist(errRead) {
+			return current, nil
+		}
+		return current, fmt.Errorf("failed to read GOAL.md: %w", errRead)
 	}
 
-	newMetadata, err := parseYAMLFrontmatter(content)
-	if err != nil {
-		return current
+	newMetadata, errParse := parseYAMLFrontmatter(content)
+	if errParse != nil {
+		return current, errParse
 	}
 
-	return newMetadata
+	return newMetadata, nil
 }
 
 // parseYAMLFrontmatter extracts YAML frontmatter from content delimited by "---".
@@ -1319,19 +1270,6 @@ func parseYAMLFrontmatter(content []byte) (GoalMetadata, error) {
 
 //go:embed skel/**
 var skelFS embed.FS
-
-func normalizeInteractive(value string) string {
-	switch strings.ToLower(value) {
-	case "1", "t", "true", "yes":
-		return "yes"
-	case "no", "0", "f", "false":
-		return "no"
-	case "auto", "":
-		return "auto"
-	default:
-		return value
-	}
-}
 
 func findFirstPendingMessageAgent(s state.Workflow) string {
 	if len(s.Messages) == 0 {

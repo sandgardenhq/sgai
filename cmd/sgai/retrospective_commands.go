@@ -214,7 +214,7 @@ flow: |
   "coordinator" -> "retrospective-session-analyzer"
   "retrospective-session-analyzer" -> "retrospective-code-analyzer"
   "retrospective-code-analyzer" -> "retrospective-refiner"
-%sinteractive: auto
+%s
 ---
 Analyze session: %s
 `, modelsSection, absSessionPath)
