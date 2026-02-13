@@ -13,7 +13,6 @@ const templatesResponse = {
       icon: "📦",
       agents: [],
       flow: "flow",
-      interactive: "yes",
     },
   ],
 };
@@ -70,7 +69,6 @@ describe("ComposeTemplateRedirect", () => {
     });
 
     expect(draftBody).toContain("\"fromTemplate\":\"basic\"");
-    expect(draftBody).toContain("\"interactive\":\"yes\"");
     expect(draftBody).toContain("\"flow\":\"flow\"");
   });
 });

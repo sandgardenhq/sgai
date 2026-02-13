@@ -7,7 +7,6 @@ type workflowTemplate struct {
 	Icon        string
 	Agents      []composerAgentConf
 	Flow        string
-	Interactive string
 }
 
 const defaultAgentModel = "anthropic/claude-opus-4-6"
@@ -27,7 +26,6 @@ var workflowTemplates = []workflowTemplate{
 		Flow: `"backend-go-developer" -> "go-readability-reviewer"
 "backend-go-developer" -> "stpa-analyst"
 "go-readability-reviewer" -> "stpa-analyst"`,
-		Interactive: "yes",
 	},
 	{
 		ID:          "frontend",
@@ -39,8 +37,7 @@ var workflowTemplates = []workflowTemplate{
 			{Name: "htmx-picocss-frontend-developer", Selected: true, Model: defaultAgentModel},
 			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        `"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"`,
-		Interactive: "yes",
+		Flow: `"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"`,
 	},
 	{
 		ID:          "fullstack",
@@ -60,7 +57,6 @@ var workflowTemplates = []workflowTemplate{
 "go-readability-reviewer" -> "stpa-analyst"
 "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
 "htmx-picocss-frontend-reviewer" -> "stpa-analyst"`,
-		Interactive: "yes",
 	},
 	{
 		ID:          "research",
@@ -72,8 +68,7 @@ var workflowTemplates = []workflowTemplate{
 			{Name: "general-purpose", Selected: true, Model: defaultAgentModel},
 			{Name: "project-critic-council", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        `"general-purpose" -> "project-critic-council"`,
-		Interactive: "yes",
+		Flow: `"general-purpose" -> "project-critic-council"`,
 	},
 	{
 		ID:          "custom",
@@ -83,8 +78,7 @@ var workflowTemplates = []workflowTemplate{
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        "",
-		Interactive: "yes",
+		Flow: "",
 	},
 	{
 		ID:          "react",
@@ -96,8 +90,7 @@ var workflowTemplates = []workflowTemplate{
 			{Name: "react-developer", Selected: true, Model: defaultAgentModel},
 			{Name: "react-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        `"react-developer" -> "react-reviewer"`,
-		Interactive: "yes",
+		Flow: `"react-developer" -> "react-reviewer"`,
 	},
 	{
 		ID:          "shell",
@@ -109,8 +102,7 @@ var workflowTemplates = []workflowTemplate{
 			{Name: "shell-script-coder", Selected: true, Model: defaultAgentModel},
 			{Name: "shell-script-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        `"shell-script-coder" -> "shell-script-reviewer"`,
-		Interactive: "yes",
+		Flow: `"shell-script-coder" -> "shell-script-reviewer"`,
 	},
 	{
 		ID:          "website",
@@ -122,8 +114,7 @@ var workflowTemplates = []workflowTemplate{
 			{Name: "webmaster", Selected: true, Model: defaultAgentModel},
 			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow:        `"webmaster" -> "htmx-picocss-frontend-reviewer"`,
-		Interactive: "yes",
+		Flow: `"webmaster" -> "htmx-picocss-frontend-reviewer"`,
 	},
 	{
 		ID:          "c4docs",
@@ -140,7 +131,6 @@ var workflowTemplates = []workflowTemplate{
 		Flow: `"c4-code" -> "c4-component"
 "c4-component" -> "c4-container"
 "c4-container" -> "c4-context"`,
-		Interactive: "yes",
 	},
 	{
 		ID:          "claudesdk",
@@ -155,7 +145,6 @@ var workflowTemplates = []workflowTemplate{
 		},
 		Flow: `"general-purpose" -> "agent-sdk-verifier-ts"
 "general-purpose" -> "agent-sdk-verifier-py"`,
-		Interactive: "yes",
 	},
 	{
 		ID:          "openaisdk",
@@ -170,7 +159,6 @@ var workflowTemplates = []workflowTemplate{
 		},
 		Flow: `"general-purpose" -> "openai-sdk-verifier-ts"
 "general-purpose" -> "openai-sdk-verifier-py"`,
-		Interactive: "yes",
 	},
 }
 
@@ -180,7 +168,6 @@ type wizardState struct {
 	Description    string
 	TechStack      []string
 	SafetyAnalysis bool
-	Interactive    string
 	CompletionGate string
 }
 
@@ -188,7 +175,6 @@ func defaultWizardState() wizardState {
 	return wizardState{
 		CurrentStep:    1,
 		SafetyAnalysis: false,
-		Interactive:    "yes",
 	}
 }
 

@@ -142,33 +142,6 @@ func TestBuildUpdateWorkflowStateSchemaStatusEnum(t *testing.T) {
 	}
 }
 
-func TestIsSelfDriveMode(t *testing.T) {
-	tests := []struct {
-		name        string
-		interactive string
-		want        bool
-	}{
-		{"auto", "auto", true},
-		{"yes", "yes", false},
-		{"no", "no", false},
-		{"empty", "", false},
-		{"uppercaseAuto", "Auto", false},
-		{"allUppercaseAuto", "AUTO", false},
-		{"leadingWhitespace", " auto", false},
-		{"trailingWhitespace", "auto ", false},
-		{"removedAutoSession", "auto-session", false},
-		{"arbitraryString", "self-drive", false},
-		{"graph", "graph", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isSelfDriveMode(tt.interactive); got != tt.want {
-				t.Errorf("isSelfDriveMode(%q) = %v, want %v", tt.interactive, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseYAMLFrontmatterWithCompletionGateScript(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -188,7 +161,6 @@ completionGateScript: ./check-success.sh
 			content: `---
 flow: |
   "coordinator" -> "developer"
-interactive: yes
 completionGateScript: make test
 ---
 # Goal content`,

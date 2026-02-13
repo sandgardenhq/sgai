@@ -2,7 +2,6 @@ import { useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectOption } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WizardLayout } from "@/components/WizardLayout";
 import { useComposeWizard } from "@/hooks/useComposeWizard";
@@ -28,13 +27,6 @@ export function WizardStep4() {
     return <MissingWorkspaceNotice />;
   }
 
-  const handleInteractiveChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setWizardData((prev) => ({ ...prev, interactive: e.target.value }));
-    },
-    [setWizardData],
-  );
-
   const handleCompletionGateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setWizardData((prev) => ({ ...prev, completionGate: e.target.value }));
@@ -49,7 +41,7 @@ export function WizardStep4() {
       fetchPreview();
     }, 500);
     return () => clearTimeout(timer);
-  }, [wizardData.interactive, wizardData.completionGate, isLoading, fetchPreview]);
+  }, [wizardData.completionGate, isLoading, fetchPreview]);
 
   if (isLoading) {
     return (
@@ -79,19 +71,6 @@ export function WizardStep4() {
         </p>
 
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="interactive">Interactive Mode</Label>
-            <Select
-              id="interactive"
-              value={wizardData.interactive}
-              onChange={handleInteractiveChange}
-            >
-              <SelectOption value="yes">Yes — Ask for confirmation at each step</SelectOption>
-              <SelectOption value="no">No — Run automatically without prompts</SelectOption>
-              <SelectOption value="auto">Auto — Decide based on context</SelectOption>
-            </Select>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="completiongate">Completion Gate Script</Label>
             <Input

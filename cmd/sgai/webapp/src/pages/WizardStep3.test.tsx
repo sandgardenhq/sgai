@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mockComposeState = {
   workspace: "test-ws",
-  state: { description: "", interactive: "yes", completionGate: "", agents: [], flow: "", tasks: "" },
-  wizard: { currentStep: 3, techStack: [], safetyAnalysis: false, interactive: "yes" },
+  state: { description: "", completionGate: "", agents: [], flow: "", tasks: "" },
+  wizard: { currentStep: 3, techStack: [], safetyAnalysis: false },
   techStackItems: [],
 };
 

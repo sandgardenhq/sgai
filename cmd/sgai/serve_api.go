@@ -726,14 +726,15 @@ func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request
 func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailResponse {
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	var running, interactiveAuto bool
+	interactiveAuto := wfState.InteractiveAutoLock
+	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
 	s.mu.Unlock()
 	if sess != nil {
 		sess.mu.Lock()
 		running = sess.running
-		interactiveAuto = sess.interactiveAuto
+		interactiveAuto = interactiveAuto || sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -965,14 +966,15 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	var running, interactiveAuto bool
+	interactiveAuto := wfState.InteractiveAutoLock
+	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
 	s.mu.Unlock()
 	if sess != nil {
 		sess.mu.Lock()
 		running = sess.running
-		interactiveAuto = sess.interactiveAuto
+		interactiveAuto = interactiveAuto || sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -1591,6 +1593,13 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	wfState, errLoadState := state.Load(statePath(workspacePath))
+	if errLoadState != nil && !os.IsNotExist(errLoadState) {
+		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
+		return
+	}
+	req.Auto = wfState.InteractiveAutoLock || req.Auto
+
 	result := s.startSession(workspacePath, req.Auto)
 
 	if result.alreadyRunning {
@@ -1757,7 +1766,6 @@ type apiWizardState struct {
 	Description    string   `json:"description,omitempty"`
 	TechStack      []string `json:"techStack"`
 	SafetyAnalysis bool     `json:"safetyAnalysis"`
-	Interactive    string   `json:"interactive"`
 	CompletionGate string   `json:"completionGate,omitempty"`
 }
 
@@ -1882,7 +1890,6 @@ type apiComposeTemplateEntry struct {
 	Icon        string              `json:"icon"`
 	Agents      []composerAgentConf `json:"agents"`
 	Flow        string              `json:"flow"`
-	Interactive string              `json:"interactive"`
 }
 
 type apiComposeTemplatesResponse struct {
@@ -3165,6 +3172,12 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 		sess.mu.Unlock()
 	}
 
+	wfState, errLoadState := state.Load(statePath(workspacePath))
+	if errLoadState != nil && !os.IsNotExist(errLoadState) {
+		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
+		return
+	}
+
 	if wasRunning {
 		var oldPid int
 		sess.mu.Lock()
@@ -3179,6 +3192,9 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newAutoMode := !wasAuto
+	if wfState.InteractiveAutoLock {
+		newAutoMode = true
+	}
 	result := s.startSession(workspacePath, newAutoMode)
 	if result.startError != nil {
 		http.Error(w, result.startError.Error(), http.StatusInternalServerError)
@@ -3315,11 +3331,14 @@ func (s *Server) handleAPIOpenInOpenCode(w http.ResponseWriter, r *http.Request)
 	}
 
 	interactive := "yes"
-	if data, errRead := os.ReadFile(filepath.Join(workspacePath, "GOAL.md")); errRead == nil {
-		fm := parseFrontmatterMap(data)
-		if v, ok := fm["interactive"]; ok {
-			interactive = v
-		}
+	autoMode := wfState.InteractiveAutoLock
+	if sess != nil {
+		sess.mu.Lock()
+		autoMode = autoMode || sess.interactiveAuto
+		sess.mu.Unlock()
+	}
+	if autoMode {
+		interactive = "auto"
 	}
 
 	execPath, errExec := os.Executable()

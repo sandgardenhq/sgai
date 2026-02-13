@@ -8,7 +8,6 @@ const mockComposeState = {
   workspace: "test-ws",
   state: {
     description: "Existing description",
-    interactive: "yes",
     completionGate: "",
     agents: [],
     flow: "",
@@ -18,7 +17,6 @@ const mockComposeState = {
     currentStep: 1,
     techStack: [],
     safetyAnalysis: false,
-    interactive: "yes",
     description: "Existing description",
   },
   techStackItems: [],

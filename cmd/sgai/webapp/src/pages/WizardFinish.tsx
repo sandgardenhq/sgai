@@ -15,7 +15,6 @@ import {
   Save,
   FileText,
   Users,
-  Settings,
   ShieldCheck,
   Terminal,
   CheckCircle2,
@@ -163,19 +162,6 @@ export function WizardFinish() {
                 <div className="text-xs text-muted-foreground mb-1">Safety Analysis</div>
                 <div className="font-semibold text-sm">
                   {wizardData.safetyAnalysis ? "Enabled" : "Disabled"}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Interactive Mode */}
-          <Card className="py-3">
-            <CardContent className="flex items-start gap-3 px-4 py-0">
-              <Settings className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground mb-1">Interactive Mode</div>
-                <div className="font-semibold text-sm" title={wizardData.interactive}>
-                  {wizardData.interactive}
                 </div>
               </div>
             </CardContent>

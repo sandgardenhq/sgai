@@ -58,9 +58,6 @@ func TestHandleAPIComposeState(t *testing.T) {
 		if result.Workspace != workspaceName {
 			t.Errorf("workspace = %q; want %q", result.Workspace, workspaceName)
 		}
-		if result.State.Interactive != "yes" {
-			t.Errorf("interactive = %q; want %q", result.State.Interactive, "yes")
-		}
 		if len(result.TechStackItems) == 0 {
 			t.Error("techStackItems should not be empty")
 		}
@@ -74,7 +71,6 @@ flow: |
 models:
   "coordinator": "anthropic/claude-opus-4-6"
   "backend-go-developer": "anthropic/claude-opus-4-6"
-interactive: yes
 completionGateScript: make test
 ---
 
@@ -250,7 +246,6 @@ func TestHandleAPIComposeSave(t *testing.T) {
 		cs.mu.Lock()
 		cs.state.Description = "Saved project"
 		cs.state.Tasks = "- Saved task"
-		cs.state.Interactive = "yes"
 		cs.mu.Unlock()
 
 		mux := http.NewServeMux()
@@ -356,7 +351,6 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 		draftBody := `{
 			"state": {
 				"description": "Draft description",
-				"interactive": "no",
 				"completionGate": "make test",
 				"agents": [{"name": "coordinator", "selected": true, "model": "anthropic/claude-opus-4-6"}],
 				"flow": "",
@@ -365,8 +359,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 			"wizard": {
 				"currentStep": 2,
 				"techStack": ["go", "react"],
-				"safetyAnalysis": true,
-				"interactive": "no"
+				"safetyAnalysis": true
 			}
 		}`
 
@@ -414,7 +407,6 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 		draftBody := `{
 			"state": {
 				"description": "Idempotent draft",
-				"interactive": "yes",
 				"agents": [],
 				"flow": "",
 				"tasks": ""
@@ -422,8 +414,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 			"wizard": {
 				"currentStep": 1,
 				"techStack": [],
-				"safetyAnalysis": false,
-				"interactive": "yes"
+				"safetyAnalysis": false
 			}
 		}`
 
@@ -505,7 +496,6 @@ func TestHandleAPIComposeSaveConcurrentDrafts(t *testing.T) {
 			draftBody := `{
 				"state": {
 					"description": "concurrent draft",
-					"interactive": "yes",
 					"agents": [],
 					"flow": "",
 					"tasks": ""
@@ -513,8 +503,7 @@ func TestHandleAPIComposeSaveConcurrentDrafts(t *testing.T) {
 				"wizard": {
 					"currentStep": 1,
 					"techStack": [],
-					"safetyAnalysis": false,
-					"interactive": "yes"
+					"safetyAnalysis": false
 				}
 			}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/compose/draft?workspace="+workspaceName, strings.NewReader(draftBody))

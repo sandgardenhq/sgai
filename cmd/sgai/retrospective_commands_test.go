@@ -24,7 +24,6 @@ func TestBuildRetrospectiveGoalContent(t *testing.T) {
 				`"retrospective-code-analyzer": "anthropic/claude-opus-4-6 (max)"`,
 				`"retrospective-refiner": "anthropic/claude-opus-4-6 (max)"`,
 				"Analyze session: /tmp/retro-session",
-				"interactive: auto",
 			},
 		},
 		{
@@ -33,7 +32,6 @@ func TestBuildRetrospectiveGoalContent(t *testing.T) {
 			coordinatorModel: "",
 			wantContains: []string{
 				"Analyze session: /tmp/retro-session",
-				"interactive: auto",
 			},
 			wantNotContains: []string{
 				"models:",

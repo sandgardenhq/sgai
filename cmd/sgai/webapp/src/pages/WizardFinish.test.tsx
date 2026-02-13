@@ -8,7 +8,6 @@ const mockComposeState = {
   workspace: "test-ws",
   state: {
     description: "Build a web app",
-    interactive: "yes",
     completionGate: "make test",
     agents: [{ name: "developer", selected: true, model: "claude" }],
     flow: "",
@@ -18,7 +17,6 @@ const mockComposeState = {
     currentStep: 4,
     techStack: ["go", "react"],
     safetyAnalysis: true,
-    interactive: "yes",
     description: "Build a web app",
     completionGate: "make test",
   },
@@ -90,14 +88,6 @@ describe("WizardFinish", () => {
     await act(async () => { renderWithRouter(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 100)); });
     expect(screen.getByText("Enabled")).toBeTruthy();
-  });
-
-  test("renders interactive mode", async () => {
-    fetchSpy = mockFetchSequence([mockComposeState, mockPreview, { saved: true }, mockPreview]);
-    await act(async () => { renderWithRouter(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 100)); });
-    expect(screen.getByText("Interactive Mode")).toBeTruthy();
-    expect(screen.getByText("yes")).toBeTruthy();
   });
 
   test("renders completion gate", async () => {

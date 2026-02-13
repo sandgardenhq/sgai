@@ -245,7 +245,6 @@ func cmdMCP(_ []string) {
 	if workingDir == "" {
 		workingDir = "."
 	}
-	interactive := os.Getenv("SGAI_MCP_INTERACTIVE")
 	absDir, err := filepath.Abs(workingDir)
 	if err != nil {
 		log.Fatalln("failed to resolve working directory:", err)
@@ -353,7 +352,7 @@ func cmdMCP(_ []string) {
 			InputSchema: projectTodoReadSchema,
 		}, mcpCtx.projectTodoReadHandler)
 
-		if !isSelfDriveMode(interactive) {
+		if !wfState.InteractiveAutoLock {
 			askUserQuestionSchema, err := jsonschema.For[askUserQuestionArgs](nil)
 			if err != nil {
 				log.Fatalln("failed to create ask_user_question schema:", err)
@@ -1232,10 +1231,6 @@ func messageMatchesSender(msg state.Message, currentAgent, currentModel string) 
 		return true
 	}
 	return false
-}
-
-func isSelfDriveMode(interactive string) bool {
-	return interactive == "auto"
 }
 
 func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
