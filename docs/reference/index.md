@@ -12,7 +12,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 #### New Features
 
-- Added live log streaming updates so clients can refresh logs in real time.
+- Added live log streaming so clients can refresh logs in real time.
 
 ## Topics
 
