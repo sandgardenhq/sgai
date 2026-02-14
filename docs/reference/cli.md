@@ -5,26 +5,22 @@ This page describes the `sgai` command-line interface.
 ## Usage
 
 ```sh
-sgai [--interactive] [--fresh] <target_directory>
+sgai [--fresh] <target_directory>
 ```
 
 `sgai` expects a `GOAL.md` file in the target directory.
 
 ## Global options
 
-- `--interactive`
-
-  Interactive mode.
-
-  Accepted values:
-
-  - `yes` (open `$EDITOR` for human responses)
-  - `no`
-  - `auto` (self-driving)
-
 - `--fresh`
 
   Force a fresh start (do not resume existing workflow).
+
+## Interaction behavior
+
+`sgai` prompts for human input when the workflow asks a question and standard input is a TTY.
+
+After the workflow passes its completion gate (the point where a run is considered approved), `sgai` switches to a self-driving mode and stops prompting for human input.
 
 ## Commands
 
