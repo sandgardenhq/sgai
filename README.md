@@ -110,6 +110,7 @@ The web dashboard shows:
 - Start/Stop controls for the engine
 - Session management and retrospective browsing
 - Goal editing and agent/skill/snippet listing
+- Live-updating logs in the Log tab (new log output appears without a manual refresh)
 - Human response interface for agent questions
 
 ## GOAL.md Reference
