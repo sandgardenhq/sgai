@@ -55,6 +55,11 @@ The workflow file also stores whether the run has switched into automatic mode a
 
 - `interactiveAutoLock` (boolean)
 
+Use `interactiveAutoLock` to understand whether the workflow is running in automatic mode.
+
+- `true`: the run is auto-locked (automatic mode)
+- `false`: the run is not auto-locked
+
 When `interactiveAutoLock` is `true`, the server surfaces that state through its API as `interactiveAuto` in workspace detail/session responses.
 
 ## Messages
