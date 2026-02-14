@@ -164,6 +164,8 @@ sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
+When `--listen-addr` uses a wildcard host (for example, `0.0.0.0:8080` or `[::]:8080`), `sgai serve` still opens the dashboard using a loopback URL (`127.0.0.1` / `::1`). This avoids sending your browser to a non-routable wildcard address.
+
 ## Frontend Development
 
 The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
