@@ -13,7 +13,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 ```json
 {
   "New Features": [
-    "Live log streaming now updates clients immediately when new log lines are captured so you can watch logs refresh in real time. The server now publishes an SSE `log:append` event for each captured log line, and a GOALS file was added to document the log live-reload scope and requirements."
+    "Live log streaming now updates clients immediately when new log lines are captured so you can watch logs refresh in real time."
   ]
 }
 
