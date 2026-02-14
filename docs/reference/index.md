@@ -2,13 +2,13 @@
 
 Reference pages for the `sgai` CLI and its workspace file formats.
 
-## Whats new
+## What's new
 
-### 0.0.0+20260214  Updates
+### 0.0.0+20260214 — Live log streaming
 
 - **Date**: 2026-02-14
 - **Version**: 0.0.0+20260214
-- **Summary**: This release includes the updates captured in the structured release notes payload below.
+- **Summary**: This release includes live log streaming updates.
 
 #### New Features
 
