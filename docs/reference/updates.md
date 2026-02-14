@@ -2,7 +2,11 @@
 
 This page summarizes recent changes to `sgai`.
 
-## 2026-02-14
+## 0.0.0+20260214 — Interactive mode workflow locking
+
+- **Date**: 2026-02-14
+- **Version**: 0.0.0+20260214
+- **Summary**: This release includes configuration updates for interactive execution.
 
 ### Additional Changes
 
