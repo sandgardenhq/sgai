@@ -46,6 +46,17 @@ Options:
 
   Note: When the host is a wildcard address (for example, `0.0.0.0:8080` or `[::]:8080`), `sgai` opens the dashboard URL using a loopback host (`127.0.0.1` / `::1`).
 
+#### macOS menu bar status
+
+On macOS, `sgai` shows a compact status summary in the menu bar.
+
+The summary uses this format:
+
+- Normal: `⏺ <running> / <total>`
+- Warning: `⚠ <running> / <total>`
+
+The menu only shows per-factory entries such as `<factory> (Needs Input)` and `<factory> (Stopped)`.
+
 ### `sgai sessions`
 
 List all sessions in `.sgai/retrospectives`.
