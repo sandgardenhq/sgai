@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiCommitEntry, ApiCommitsResponse } from "@/types";
 
 interface CommitsTabProps {
@@ -74,7 +74,7 @@ export function CommitsTab({ workspaceName }: CommitsTabProps) {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const changesEvent = useSSEEvent("changes:update");
+  const changesEvent = useWorkspaceSSEEvent(workspaceName, "changes:update");
 
   useEffect(() => {
     if (!workspaceName) return;

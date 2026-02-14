@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiEventsResponse, ApiEventEntry, ApiModelStatusEntry } from "@/types";
 
 interface EventsTabProps {
@@ -143,7 +143,7 @@ export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
   const [goalOpenError, setGoalOpenError] = useState<string | null>(null);
   const [isGoalOpenPending, startGoalOpenTransition] = useTransition();
 
-  const eventsEvent = useSSEEvent("events:new");
+  const eventsEvent = useWorkspaceSSEEvent(workspaceName, "events:new");
 
   useEffect(() => {
     if (!workspaceName) return;

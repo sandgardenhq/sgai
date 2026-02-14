@@ -16,16 +16,15 @@ export const Workbench: Plugin = async ({ directory }) => {
       config.instructions?.unshift(directory + "/.sgai/AGENTS.md");
       config.model = "opencode/big-pickle";
 
-      // Configure MCP server for sgai custom tools
+      // Configure MCP server for sgai custom tools (remote HTTP)
       if (!config.mcp) {
         config.mcp = {};
       }
       config.mcp.sgai = {
-        type: "local",
-        command: [process.env.SGAI_MCP_EXECUTABLE || "sgai", "mcp"],
-        environment: {
-          SGAI_MCP_WORKING_DIRECTORY: directory,
-          SGAI_MCP_INTERACTIVE: process.env.SGAI_MCP_INTERACTIVE || "yes"
+        type: "remote",
+        url: process.env.SGAI_MCP_URL,
+        headers: {
+          "X-SGAI-Agent-Identity": process.env.SGAI_AGENT_IDENTITY || ""
         }
       };
     },

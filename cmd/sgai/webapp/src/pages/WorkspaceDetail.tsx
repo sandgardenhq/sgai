@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useSSEEvent, useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiWorkspaceDetailResponse } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +20,6 @@ const CommitsTab = lazy(() => import("./tabs/CommitsTab").then((m) => ({ default
 const EventsTab = lazy(() => import("./tabs/EventsTab").then((m) => ({ default: m.EventsTab })));
 const ForksTab = lazy(() => import("./tabs/ForksTab").then((m) => ({ default: m.ForksTab })));
 const RetrospectivesTab = lazy(() => import("./tabs/RetrospectivesTab").then((m) => ({ default: m.RetrospectivesTab })));
-
-function getWorkspaceNameFromEvent(event: unknown): string | null {
-  if (!event || typeof event !== "object" || !("workspace" in event)) {
-    return null;
-  }
-  const workspace = (event as { workspace?: unknown }).workspace;
-  return typeof workspace === "string" ? workspace : null;
-}
 
 function parseExecTime(value: string | undefined | null): number | null {
   if (!value) return null;
@@ -129,7 +121,6 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [hasPendingQuestion, setHasPendingQuestion] = useState(false);
   const previousWorkspaceRef = useRef<string | null>(null);
   const [isStartStopPending, startStartStopTransition] = useTransition();
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
@@ -139,18 +130,8 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isResetPending, startResetTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
 
-  const sessionUpdateEvent = useSSEEvent("session:update");
+  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
   const workspaceUpdateEvent = useSSEEvent("workspace:update");
-
-  const refreshPendingQuestion = useCallback(async () => {
-    if (!workspaceName) return;
-    try {
-      const pending = await api.workspaces.pendingQuestion(workspaceName);
-      setHasPendingQuestion(Boolean(pending));
-    } catch {
-      setHasPendingQuestion(false);
-    }
-  }, [workspaceName]);
 
   useEffect(() => {
     if (!workspaceName) return;
@@ -193,20 +174,10 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   useEffect(() => {
     if (!workspaceName) return;
-    const sessionWorkspace = getWorkspaceNameFromEvent(sessionUpdateEvent);
-    const updateWorkspace = getWorkspaceNameFromEvent(workspaceUpdateEvent);
-    if (sessionWorkspace === workspaceName || updateWorkspace === workspaceName) {
+    if (sessionUpdateEvent !== null || workspaceUpdateEvent !== null) {
       setRefreshKey((k) => k + 1);
     }
   }, [sessionUpdateEvent, workspaceUpdateEvent, workspaceName]);
-
-  useEffect(() => {
-    if (!workspaceName) return;
-    const sessionWorkspace = getWorkspaceNameFromEvent(sessionUpdateEvent);
-    if (!sessionWorkspace || sessionWorkspace === workspaceName) {
-      refreshPendingQuestion();
-    }
-  }, [sessionUpdateEvent, workspaceName, refreshPendingQuestion]);
 
   useEffect(() => {
     if (!workspaceName || !detail?.running) return;
@@ -473,7 +444,7 @@ export function WorkspaceDetail(): JSX.Element | null {
                 </>
               ) : (
                 <>
-                  {hasPendingQuestion && (
+                  {detail?.needsInput && (
                     <Button
                       type="button"
                       size="sm"

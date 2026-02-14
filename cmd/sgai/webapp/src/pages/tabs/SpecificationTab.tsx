@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiWorkspaceDetailResponse } from "@/types";
 
 interface SpecificationTabProps {
@@ -26,7 +26,7 @@ export function SpecificationTab({ workspaceName }: SpecificationTabProps) {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const sessionUpdateEvent = useSSEEvent("session:update");
+  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
 
   useEffect(() => {
     if (!workspaceName) return;

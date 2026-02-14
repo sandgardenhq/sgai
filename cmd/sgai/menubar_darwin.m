@@ -90,3 +90,9 @@ void MenuBarOpenURL(const char *urlStr) {
 void MenuBarRunLoop(void) {
 	[NSApp run];
 }
+
+void MenuBarStop(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[NSApp terminate:nil];
+	});
+}

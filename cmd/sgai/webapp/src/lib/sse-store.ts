@@ -197,3 +197,31 @@ export function resetDefaultSSEStore(): void {
     defaultStore = null;
   }
 }
+
+const workspaceStores = new Map<string, SSEStore>();
+
+export function getWorkspaceSSEStore(workspaceName: string): SSEStore {
+  const existing = workspaceStores.get(workspaceName);
+  if (existing) {
+    return existing;
+  }
+  const url = `/api/v1/workspaces/${encodeURIComponent(workspaceName)}/events/stream`;
+  const store = createSSEStore(url);
+  workspaceStores.set(workspaceName, store);
+  return store;
+}
+
+export function destroyWorkspaceSSEStore(workspaceName: string): void {
+  const store = workspaceStores.get(workspaceName);
+  if (store) {
+    store.destroy();
+    workspaceStores.delete(workspaceName);
+  }
+}
+
+export function resetAllWorkspaceSSEStores(): void {
+  for (const store of workspaceStores.values()) {
+    store.destroy();
+  }
+  workspaceStores.clear();
+}

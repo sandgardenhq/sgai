@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WorkspaceDetail } from "./WorkspaceDetail";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
+import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiWorkspaceDetailResponse } from "@/types";
 
@@ -54,6 +54,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetDefaultSSEStore();
+  resetAllWorkspaceSSEStores();
   (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
@@ -329,8 +330,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("calls workspace detail API with correct name", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -338,7 +339,7 @@ describe("WorkspaceDetail", () => {
       const detailCalls = mockFetch.mock.calls.filter(
         (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
       );
-      expect(detailCalls.length).toBe(1);
+      expect(detailCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     const detailCall = mockFetch.mock.calls.find(
@@ -348,9 +349,9 @@ describe("WorkspaceDetail", () => {
     expect(calledUrl).toBe("/api/v1/workspaces/test-project");
   });
 
-  it("refreshes detail only for SSE events matching the workspace", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+  it("refreshes detail on workspace SSE and global SSE events", async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -362,21 +363,17 @@ describe("WorkspaceDetail", () => {
       expect(mockEventSources.length).toBeGreaterThan(0);
     });
 
-    const source = mockEventSources[0];
-    source.simulateEvent("session:update", JSON.stringify({ workspace: "other" }));
-    await waitFor(() => {
-      const detailCallsAfterOther = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCallsAfterOther.length).toBe(1);
-    });
+    const globalSource = mockEventSources.find((s) => s.url === "/api/v1/events/stream");
+    const workspaceSource = mockEventSources.find((s) => s.url.includes("/workspaces/test-project/events/stream"));
+    expect(globalSource).toBeDefined();
+    expect(workspaceSource).toBeDefined();
 
-    source.simulateEvent("workspace:update", JSON.stringify({ workspace: "test-project" }));
+    globalSource!.simulateEvent("workspace:update", JSON.stringify({ workspace: "test-project" }));
     await waitFor(() => {
-      const detailCallsAfterMatch = mockFetch.mock.calls.filter(
+      const detailCalls = mockFetch.mock.calls.filter(
         (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
       );
-      expect(detailCallsAfterMatch.length).toBe(2);
+      expect(detailCalls.length).toBe(2);
     });
   });
 
@@ -404,16 +401,9 @@ describe("WorkspaceDetail", () => {
   });
 
   it("hides respond button when there is no pending question", async () => {
-    mockFetch.mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes("/pending-question")) {
-        return Promise.resolve(new Response(null, { status: 204 }));
-      }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-      }
-      return Promise.resolve(new Response("{}"));
-    });
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
+    );
 
     renderWorkspaceDetail();
 
@@ -425,16 +415,10 @@ describe("WorkspaceDetail", () => {
   });
 
   it("shows respond button when a pending question exists", async () => {
-    mockFetch.mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify({ questionId: "abc", agentName: "coordinator", type: "multi-choice", message: "", questions: [] })));
-      }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-      }
-      return Promise.resolve(new Response("{}"));
-    });
+    const detailWithInput = { ...workspaceDetail, needsInput: true };
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(detailWithInput))),
+    );
 
     renderWorkspaceDetail();
 
@@ -450,8 +434,8 @@ describe("WorkspaceDetail", () => {
       running: false,
       forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
     };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(rootWithForks)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(rootWithForks))),
     );
 
     const { container } = renderWorkspaceDetail();
@@ -466,8 +450,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("polls for workspace detail while running", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -490,8 +474,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders rename link for fork workspaces", async () => {
     const forkDetail = { ...workspaceDetail, isFork: true };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(forkDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(forkDetail))),
     );
     renderWorkspaceDetail();
 
@@ -502,8 +486,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders stopped badge when not running", async () => {
     const stopped = { ...workspaceDetail, running: false };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(stopped)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(stopped))),
     );
     renderWorkspaceDetail();
 

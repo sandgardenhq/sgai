@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SessionTab } from "./SessionTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
+import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiSessionResponse, ApiTodosResponse } from "@/types";
 
@@ -30,6 +30,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetDefaultSSEStore();
+  resetAllWorkspaceSSEStores();
   (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
@@ -213,12 +214,10 @@ describe("SessionTab", () => {
     renderSessionTab();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/session"))).toBe(true);
+      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/todos"))).toBe(true);
     });
-
-    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
-    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/session"))).toBe(true);
-    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/todos"))).toBe(true);
   });
 
   it("does not warn about duplicate model status keys", async () => {

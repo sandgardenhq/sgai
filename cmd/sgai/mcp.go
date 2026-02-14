@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -238,146 +241,166 @@ type askUserWorkGateArgs struct {
 	Summary string `json:"summary" jsonschema:"A comprehensive summary of the definition for the human to review before approving. Must include: GOAL items, brainstorming decisions, task breakdown, and validation criteria."`
 }
 
-// cmdMCP starts an MCP server exposing sgai custom tools via stdio transport.
-// It reads SGAI_MCP_WORKING_DIRECTORY and SGAI_MCP_INTERACTIVE.
-func cmdMCP(_ []string) {
-	workingDir := os.Getenv("SGAI_MCP_WORKING_DIRECTORY")
-	if workingDir == "" {
-		workingDir = "."
-	}
-	absDir, err := filepath.Abs(workingDir)
+func mustSchema[T any]() *jsonschema.Schema {
+	s, err := jsonschema.For[T](nil)
 	if err != nil {
-		log.Fatalln("failed to resolve working directory:", err)
+		panic(fmt.Sprintf("failed to create schema: %v", err))
+	}
+	return s
+}
+
+var (
+	schemaFindSkills       = mustSchema[findSkillsArgs]()
+	schemaFindSnippets     = mustSchema[findSnippetsArgs]()
+	schemaSendMessage      = mustSchema[sendMessageArgs]()
+	schemaEmpty            = mustSchema[struct{}]()
+	schemaProjectTodoWrite = mustSchema[projectTodoWriteArgs]()
+	schemaAskUserQuestion  = mustSchema[askUserQuestionArgs]()
+	schemaAskUserWorkGate  = mustSchema[askUserWorkGateArgs]()
+)
+
+func startMCPHTTPServer(workingDir string) (string, func(), error) {
+	listener, errListen := net.Listen("tcp", "127.0.0.1:0")
+	if errListen != nil {
+		return "", nil, fmt.Errorf("failed to listen on random port: %w", errListen)
 	}
 
-	wfState, err := state.Load(filepath.Join(absDir, ".sgai", "state.json"))
-	if err != nil && !os.IsNotExist(err) {
-		log.Fatalln("failed to load workflow state:", err)
+	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return buildMCPServer(workingDir, r)
+	}, nil)
+
+	serveMux := http.NewServeMux()
+	serveMux.Handle("/mcp", handler)
+
+	httpServer := &http.Server{Handler: serveMux}
+	go func() {
+		if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Println("MCP HTTP server error:", err)
+		}
+	}()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	url := fmt.Sprintf("http://127.0.0.1:%d/mcp", addr.Port)
+
+	closeFn := func() {
+		if err := httpServer.Close(); err != nil {
+			log.Println("failed to close MCP HTTP server:", err)
+		}
 	}
 
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "coordinator"
+	return url, closeFn, nil
+}
+
+func parseAgentIdentityHeader(r *http.Request) (name, model, variant string) {
+	identity := r.Header.Get("X-Sgai-Agent-Identity")
+	if identity == "" {
+		return "coordinator", "", ""
 	}
+	parts := strings.SplitN(identity, "|", 3)
+	name = parts[0]
+	if len(parts) >= 2 {
+		model = parts[1]
+	}
+	if len(parts) >= 3 {
+		variant = parts[2]
+	}
+	if name == "" {
+		name = "coordinator"
+	}
+	return name, model, variant
+}
+
+func buildMCPServer(workingDir string, r *http.Request) *mcp.Server {
+	agentName, _, _ := parseAgentIdentityHeader(r)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "sgai"}, nil)
+	mcpCtx := &mcpContext{workingDir: workingDir}
 
-	mcpCtx := &mcpContext{workingDir: absDir}
+	registerCommonTools(server, mcpCtx, agentName)
 
-	findSkillsSchema, err := jsonschema.For[findSkillsArgs](nil)
-	if err != nil {
-		log.Fatalln("failed to create find_skills schema:", err)
+	if agentName == "coordinator" {
+		registerCoordinatorTools(server, mcpCtx, workingDir)
 	}
+
+	return server
+}
+
+func registerCommonTools(server *mcp.Server, mcpCtx *mcpContext, agentName string) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_skills",
 		Description: "Search for skills by name or keywords. Returns skill names and descriptions. Use the 'skill' tool to load a skill's full content.",
-		InputSchema: findSkillsSchema,
+		InputSchema: schemaFindSkills,
 	}, mcpCtx.findSkillsHandler)
 
-	findSnippetsSchema, err := jsonschema.For[findSnippetsArgs](nil)
-	if err != nil {
-		log.Fatalln("failed to create find_snippets schema:", err)
-	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_snippets",
 		Description: "Find code snippets by language and query.",
-		InputSchema: findSnippetsSchema,
+		InputSchema: schemaFindSnippets,
 	}, mcpCtx.findSnippetsHandler)
 
-	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(currentAgent)
+	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(agentName)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_workflow_state",
 		Description: updateWorkflowStateDescription,
 		InputSchema: updateWorkflowStateSchema,
 	}, mcpCtx.updateWorkflowStateHandler)
 
-	sendMessageSchema, err := jsonschema.For[sendMessageArgs](nil)
-	if err != nil {
-		log.Fatalln("failed to create send_message schema:", err)
-	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_message",
 		Description: "Send a message to another agent in the workflow. The message will be stored and delivered when the target agent starts.",
-		InputSchema: sendMessageSchema,
+		InputSchema: schemaSendMessage,
 	}, mcpCtx.sendMessageHandler)
 
-	checkInboxSchema, err := jsonschema.For[struct{}](nil)
-	if err != nil {
-		log.Fatalln("failed to create check_inbox schema:", err)
-	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "check_inbox",
 		Description: "Check for messages sent to the current agent. Returns all unread messages from other agents.",
-		InputSchema: checkInboxSchema,
+		InputSchema: schemaEmpty,
 	}, mcpCtx.checkInboxHandler)
 
-	checkOutboxSchema, err := jsonschema.For[struct{}](nil)
-	if err != nil {
-		log.Fatalln("failed to create check_outbox schema:", err)
-	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "check_outbox",
 		Description: "Check for messages you have already sent. Returns all messages sent by the current agent.",
-		InputSchema: checkOutboxSchema,
+		InputSchema: schemaEmpty,
 	}, mcpCtx.checkOutboxHandler)
+}
 
-	if currentAgent == "coordinator" {
-		peekMessageBusSchema, err := jsonschema.For[struct{}](nil)
-		if err != nil {
-			log.Fatalln("failed to create peek_message_bus schema:", err)
-		}
-		mcp.AddTool(server, &mcp.Tool{
-			Name:        "peek_message_bus",
-			Description: "Check all messages in the system (both pending and read). Returns all messages in reverse chronological order (most recent first). Coordinator-only tool for monitoring inter-agent communication.",
-			InputSchema: peekMessageBusSchema,
-		}, mcpCtx.peekMessageBusHandler)
+func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, workingDir string) {
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "peek_message_bus",
+		Description: "Check all messages in the system (both pending and read). Returns all messages in reverse chronological order (most recent first). Coordinator-only tool for monitoring inter-agent communication.",
+		InputSchema: schemaEmpty,
+	}, mcpCtx.peekMessageBusHandler)
 
-		projectTodoWriteSchema, err := jsonschema.For[projectTodoWriteArgs](nil)
-		if err != nil {
-			log.Fatalln("failed to create project_todowrite schema:", err)
-		}
-		mcp.AddTool(server, &mcp.Tool{
-			Name:        "project_todowrite",
-			Description: todoWriteDescription,
-			InputSchema: projectTodoWriteSchema,
-		}, mcpCtx.projectTodoWriteHandler)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_todowrite",
+		Description: todoWriteDescription,
+		InputSchema: schemaProjectTodoWrite,
+	}, mcpCtx.projectTodoWriteHandler)
 
-		projectTodoReadSchema, err := jsonschema.For[struct{}](nil)
-		if err != nil {
-			log.Fatalln("failed to create project_todoread schema:", err)
-		}
-		mcp.AddTool(server, &mcp.Tool{
-			Name:        "project_todoread",
-			Description: todoReadDescription,
-			InputSchema: projectTodoReadSchema,
-		}, mcpCtx.projectTodoReadHandler)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_todoread",
+		Description: todoReadDescription,
+		InputSchema: schemaEmpty,
+	}, mcpCtx.projectTodoReadHandler)
 
-		if !wfState.InteractiveAutoLock {
-			askUserQuestionSchema, err := jsonschema.For[askUserQuestionArgs](nil)
-			if err != nil {
-				log.Fatalln("failed to create ask_user_question schema:", err)
-			}
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "ask_user_question",
-				Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
-				InputSchema: askUserQuestionSchema,
-			}, mcpCtx.askUserQuestionHandler)
-
-			askUserWorkGateSchema, err := jsonschema.For[askUserWorkGateArgs](nil)
-			if err != nil {
-				log.Fatalln("failed to create ask_user_work_gate schema:", err)
-			}
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "ask_user_work_gate",
-				Description: "Present the work gate approval question to the human partner. Requires a summary of what is being approved. When approved, the session switches to self-driving mode for the remainder of the session.",
-				InputSchema: askUserWorkGateSchema,
-			}, mcpCtx.askUserWorkGateHandler)
-		}
+	statePath := filepath.Join(workingDir, ".sgai", "state.json")
+	wfState, errLoad := state.Load(statePath)
+	if errLoad != nil && !os.IsNotExist(errLoad) {
+		log.Println("failed to load workflow state for interactive check:", errLoad)
 	}
 
-	transport := &mcp.StdioTransport{}
-	if err := server.Run(context.Background(), transport); err != nil {
-		log.Fatalln("MCP server error:", err)
+	if !wfState.InteractiveAutoLock {
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        "ask_user_question",
+			Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
+			InputSchema: schemaAskUserQuestion,
+		}, mcpCtx.askUserQuestionHandler)
+
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        "ask_user_work_gate",
+			Description: "Present the work gate approval question to the human partner. Requires a summary of what is being approved. When approved, the session switches to self-driving mode for the remainder of the session.",
+			InputSchema: schemaAskUserWorkGate,
+		}, mcpCtx.askUserWorkGateHandler)
 	}
 }
 

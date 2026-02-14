@@ -1,5 +1,5 @@
-import { useSyncExternalStore, useCallback } from "react";
-import { getDefaultSSEStore } from "../lib/sse-store";
+import { useSyncExternalStore, useCallback, useMemo } from "react";
+import { getDefaultSSEStore, getWorkspaceSSEStore } from "../lib/sse-store";
 import type { SSEEventType, ConnectionStatus, SSEStoreSnapshot } from "../types";
 
 export function useSSEStore(): SSEStoreSnapshot {
@@ -13,6 +13,32 @@ export function useSSEStore(): SSEStoreSnapshot {
 
 export function useSSEEvent<T = unknown>(eventType: SSEEventType): T | null {
   const store = getDefaultSSEStore();
+
+  const getSnapshot = useCallback(
+    () => store.getSnapshot().events[eventType] as T | null,
+    [eventType, store],
+  );
+
+  const getServerSnapshot = useCallback(
+    () => null as T | null,
+    [],
+  );
+
+  return useSyncExternalStore(
+    store.subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+}
+
+export function useWorkspaceSSEEvent<T = unknown>(
+  workspaceName: string,
+  eventType: SSEEventType,
+): T | null {
+  const store = useMemo(
+    () => getWorkspaceSSEStore(workspaceName),
+    [workspaceName],
+  );
 
   const getSnapshot = useCallback(
     () => store.getSnapshot().events[eventType] as T | null,

@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiMessagesResponse, ApiMessageEntry } from "@/types";
 
 interface MessagesTabProps {
@@ -61,7 +61,7 @@ export function MessagesTab({ workspaceName }: MessagesTabProps) {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const messagesEvent = useSSEEvent("messages:new");
+  const messagesEvent = useWorkspaceSSEEvent(workspaceName, "messages:new");
 
   useEffect(() => {
     if (!workspaceName) return;

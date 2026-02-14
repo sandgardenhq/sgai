@@ -15,12 +15,13 @@ extern void MenuBarAddItem(const char *title, int tag, int enabled);
 extern void MenuBarAddSeparator(void);
 extern void MenuBarOpenURL(const char *urlStr);
 extern void MenuBarRunLoop(void);
+extern void MenuBarStop(void);
 */
 import "C"
 
 import (
+	"context"
 	"fmt"
-	"runtime"
 	"unsafe"
 )
 
@@ -39,18 +40,21 @@ func goMenuItemClicked(tag C.int) {
 	C.MenuBarOpenURL(cURL)
 }
 
-func startMenuBar(baseURL string, srv *Server) {
+func startMenuBar(ctx context.Context, baseURL string, srv *Server) {
 	menuBarBaseURL = baseURL
 
-	runtime.LockOSThread()
 	C.MenuBarInit()
 
-	go menuBarUpdateLoop(srv)
+	go menuBarUpdateLoop(ctx, srv)
+	go func() {
+		<-ctx.Done()
+		C.MenuBarStop()
+	}()
 
 	C.MenuBarRunLoop()
 }
 
-func menuBarUpdateLoop(srv *Server) {
+func menuBarUpdateLoop(ctx context.Context, srv *Server) {
 	ch := srv.sseBroker.subscribe()
 	defer srv.sseBroker.unsubscribe(ch)
 
@@ -58,6 +62,8 @@ func menuBarUpdateLoop(srv *Server) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-ch.done:
 			return
 		case <-ch.events:

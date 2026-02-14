@@ -2,6 +2,8 @@
 
 package main
 
-func startMenuBar(_ string, _ *Server) {
-	select {}
+import "context"
+
+func startMenuBar(ctx context.Context, _ string, _ *Server) {
+	<-ctx.Done()
 }

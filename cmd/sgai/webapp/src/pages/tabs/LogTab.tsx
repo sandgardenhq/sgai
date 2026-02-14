@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiLogResponse, ApiLogEntry } from "@/types";
 
 interface LogTabProps {
@@ -35,7 +35,7 @@ export function LogTab({ workspaceName }: LogTabProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const logEvent = useSSEEvent("log:append");
+  const logEvent = useWorkspaceSSEEvent(workspaceName, "log:append");
 
   useEffect(() => {
     if (!workspaceName) return;
