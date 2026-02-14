@@ -1,6 +1,4 @@
-# Updates
-
-This page summarizes recent changes to `sgai`.
+# Release Notes
 
 ## 0.0.0+20260214 — Interactive mode workflow locking
 
@@ -10,5 +8,4 @@ This page summarizes recent changes to `sgai`.
 
 ### Additional Changes
 
-- Removed `interactive` configuration from Markdown front matter and the CLI, replacing it with a persisted workflow auto-lock flag enforced across the CLI, MCP tools, server APIs, and the web UI.
 - Removed `interactive` configuration from Markdown front matter and the CLI, replacing it with a persisted workflow auto-lock flag enforced across the CLI, MCP tools, server APIs, and the web UI.
