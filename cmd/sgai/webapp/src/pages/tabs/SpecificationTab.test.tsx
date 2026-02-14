@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SpecificationTab } from "./SpecificationTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
+import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import type { ApiWorkspaceDetailResponse } from "@/types";
 
 class MockEventSource {
@@ -29,6 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetDefaultSSEStore();
+  resetAllWorkspaceSSEStores();
   (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
@@ -76,7 +77,7 @@ describe("SpecificationTab", () => {
   });
 
   it("renders GOAL.md content when data loads", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(workspaceDetailResponse)));
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
     renderSpecificationTab();
 
     await waitFor(() => {
@@ -87,7 +88,7 @@ describe("SpecificationTab", () => {
   });
 
   it("renders PROJECT_MANAGEMENT.md when available", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(workspaceDetailResponse)));
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
     const { container } = renderSpecificationTab();
     const view = within(container);
 
@@ -101,7 +102,7 @@ describe("SpecificationTab", () => {
 
   it("renders empty state when no GOAL.md", async () => {
     const noGoalResponse = { ...workspaceDetailResponse, goalContent: "", hasProjectMgmt: false, pmContent: "" };
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(noGoalResponse)));
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(noGoalResponse))));
     renderSpecificationTab();
 
     await waitFor(() => {
@@ -119,14 +120,12 @@ describe("SpecificationTab", () => {
   });
 
   it("calls workspace detail API on mount", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(workspaceDetailResponse)));
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
     renderSpecificationTab();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project"))).toBe(true);
     });
-
-    const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain("/api/v1/workspaces/test-project");
   });
 });

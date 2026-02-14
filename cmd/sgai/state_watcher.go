@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -20,16 +21,21 @@ type workspaceStateSnapshot struct {
 }
 
 func (s *Server) startStateWatcher() {
-	go s.stateWatcherLoop()
+	go s.stateWatcherLoop(s.shutdownCtx)
 }
 
-func (s *Server) stateWatcherLoop() {
+func (s *Server) stateWatcherLoop(ctx context.Context) {
 	snapshots := make(map[string]workspaceStateSnapshot)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		s.pollWorkspaceStates(snapshots)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.pollWorkspaceStates(snapshots)
+		}
 	}
 }
 
@@ -82,7 +88,7 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 		return
 	}
 
-	s.emitStateChangeEvents(name, prev, current)
+	s.emitStateChangeEvents(name, dir, prev, current)
 }
 
 func buildStateSnapshot(modTime time.Time, wfState state.Workflow) workspaceStateSnapshot {
@@ -96,23 +102,32 @@ func buildStateSnapshot(modTime time.Time, wfState state.Workflow) workspaceStat
 	}
 }
 
-func (s *Server) emitStateChangeEvents(workspaceName string, prev, current workspaceStateSnapshot) {
+func (s *Server) emitStateChangeEvents(workspaceName, workspacePath string, prev, current workspaceStateSnapshot) {
 	data := map[string]string{"workspace": workspaceName}
+	var publishedToWorkspace bool
 
 	if prev.status != current.status || prev.needsInput != current.needsInput {
-		s.sseBroker.publish(sseEvent{Type: "session:update", Data: data})
+		s.publishToWorkspace(workspacePath, sseEvent{Type: "session:update", Data: data})
+		publishedToWorkspace = true
 	}
 
 	if current.progressLen > prev.progressLen {
-		s.sseBroker.publish(sseEvent{Type: "events:new", Data: data})
+		s.publishToWorkspace(workspacePath, sseEvent{Type: "events:new", Data: data})
+		publishedToWorkspace = true
 	}
 
 	if prev.todosHash != current.todosHash {
-		s.sseBroker.publish(sseEvent{Type: "todos:update", Data: data})
+		s.publishToWorkspace(workspacePath, sseEvent{Type: "todos:update", Data: data})
+		publishedToWorkspace = true
 	}
 
 	if prev.messagesHash != current.messagesHash {
-		s.sseBroker.publish(sseEvent{Type: "messages:new", Data: data})
+		s.publishToWorkspace(workspacePath, sseEvent{Type: "messages:new", Data: data})
+		publishedToWorkspace = true
+	}
+
+	if publishedToWorkspace {
+		s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: data})
 	}
 }
 

@@ -266,7 +266,7 @@ describe("Dashboard", () => {
     expect(calledUrl).toBe("/api/v1/workspaces");
   });
 
-  it("refreshes workspace list on session updates", async () => {
+  it("refreshes workspace list on workspace updates", async () => {
     const initialResponse: ApiWorkspacesResponse = {
       workspaces: workspacesResponse.workspaces.map((workspace) => ({
         ...workspace,
@@ -295,7 +295,7 @@ describe("Dashboard", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    mockEventSources[0].simulateEvent("session:update", JSON.stringify({ workspace: "project-alpha" }));
+    mockEventSources[0].simulateEvent("workspace:update", JSON.stringify({ workspace: "project-alpha" }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);

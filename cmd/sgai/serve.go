@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -16,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -115,10 +118,13 @@ func stripFrontmatter(content string) string {
 type session struct {
 	mu              sync.Mutex
 	cmd             *exec.Cmd
+	cancel          context.CancelFunc
 	running         bool
 	interactiveAuto bool
 	outputLog       *circularLogBuffer
 	retroTempDir    string
+	mcpCloseOnce    sync.Once
+	mcpCloseFn      func()
 }
 
 type editorOpener interface {
@@ -210,8 +216,10 @@ type Server struct {
 	isTerminalEditor bool
 	editorName       string
 	editor           editorOpener
+	shutdownCtx      context.Context
 
-	sseBroker *sseBroker
+	sseBroker        *sseBroker
+	workspaceBrokers map[string]*sseBroker
 
 	adhocStates map[string]*adhocPromptState
 }
@@ -246,12 +254,35 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		pinnedConfigDir:  filepath.Join(xdg.ConfigHome, "sgai"),
 		adhocStates:      make(map[string]*adhocPromptState),
 		sseBroker:        newSSEBroker(),
+		workspaceBrokers: make(map[string]*sseBroker),
 		rootDir:          absRootDir,
 		editorAvailable:  editorAvail,
 		isTerminalEditor: editor.isTerminal,
 		editorName:       editor.name,
 		editor:           editor,
 	}
+}
+
+func (s *Server) workspaceBroker(workspacePath string) *sseBroker {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.workspaceBrokers[workspacePath]
+	if !ok {
+		b = newSSEBroker()
+		s.workspaceBrokers[workspacePath] = b
+	}
+	return b
+}
+
+func (s *Server) publishToWorkspace(workspacePath string, evt sseEvent) {
+	s.workspaceBroker(workspacePath).publish(evt)
+}
+
+func (s *Server) publishGlobalAndWorkspace(workspaceName, workspacePath string, detailedEvt sseEvent) {
+	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
+		"workspace": workspaceName,
+	}})
+	s.publishToWorkspace(workspacePath, detailedEvt)
 }
 
 func (s *Server) validateDirectory(dir string) (string, error) {
@@ -357,57 +388,41 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 		return startSessionResult{alreadyRunning: true, sess: sess}
 	}
 
-	sess = &session{running: true, interactiveAuto: autoMode}
+	sess = &session{running: true, interactiveAuto: autoMode, outputLog: newCircularLogBuffer()}
 	s.sessions[workspacePath] = sess
 	s.everStartedDirs[workspacePath] = true
 	s.mu.Unlock()
 
 	resetHumanCommunication(workspacePath)
 
-	sgaiPath, err := os.Executable()
-	if err != nil {
+	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath)
+	if errMCP != nil {
 		sess.mu.Lock()
 		sess.running = false
 		sess.mu.Unlock()
-		return startSessionResult{startError: fmt.Errorf("failed to find sgai executable")}
+		return startSessionResult{startError: errMCP}
 	}
+	sess.mu.Lock()
+	sess.mcpCloseFn = mcpCloseFn
+	sess.mu.Unlock()
 
-	cmd := exec.Command(sgaiPath, workspacePath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		return startSessionResult{startError: fmt.Errorf("failed to create stdout pipe")}
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		return startSessionResult{startError: fmt.Errorf("failed to create stderr pipe")}
-	}
+	ctx, cancel := context.WithCancel(s.shutdownCtx)
+	sess.mu.Lock()
+	sess.cancel = cancel
+	sess.mu.Unlock()
 
-	sess.cmd = cmd
-
-	if err := cmd.Start(); err != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		return startSessionResult{startError: fmt.Errorf("failed to start sgai")}
-	}
-
-	go s.captureOutput(stdout, stderr, workspacePath, fmt.Sprintf("[%s] ", filepath.Base(workspacePath)))
+	logWriter := newSessionLogWriter(sess, workspacePath, s, filepath.Base(workspacePath))
 
 	go func() {
-		if err := cmd.Wait(); err != nil {
-			log.Printf("sgai process exited with error: %v", err)
-		}
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		s.clearEverStartedOnCompletion(workspacePath)
+		defer func() {
+			sess.mcpCloseOnce.Do(mcpCloseFn)
+			sess.mu.Lock()
+			sess.running = false
+			sess.mu.Unlock()
+			s.clearEverStartedOnCompletion(workspacePath)
+		}()
+
+		runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
 	}()
 
 	return startSessionResult{sess: sess}
@@ -420,10 +435,11 @@ func (s *Server) stopSession(workspacePath string) {
 
 	if sess != nil {
 		sess.mu.Lock()
-		if sess.running && sess.cmd != nil && sess.cmd.Process != nil {
-			if err := syscall.Kill(-sess.cmd.Process.Pid, syscall.SIGTERM); err != nil {
-				log.Println("signal failed:", err)
-			}
+		if sess.cancel != nil {
+			sess.cancel()
+		}
+		if sess.mcpCloseFn != nil {
+			sess.mcpCloseOnce.Do(sess.mcpCloseFn)
 		}
 		sess.running = false
 		sess.mu.Unlock()
@@ -478,7 +494,11 @@ func cmdServe(args []string) {
 		}
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	srv := NewServer(rootDir)
+	srv.shutdownCtx = ctx
 	if err := srv.loadPinnedProjects(); err != nil {
 		log.Println("warning: failed to load pinned projects:", err)
 	}
@@ -488,16 +508,22 @@ func cmdServe(args []string) {
 	srv.registerAPIRoutes(mux)
 	handler := srv.spaMiddleware(mux)
 
+	httpServer := &http.Server{Addr: *listenAddr, Handler: handler}
+
 	baseURL := dashboardBaseURL(*listenAddr)
 	log.Println("sgai serve listening on", baseURL)
 
 	go func() {
-		if err := http.ListenAndServe(*listenAddr, handler); err != nil {
-			log.Fatalln("server error:", err)
+		if errListen := httpServer.ListenAndServe(); errListen != nil && !errors.Is(errListen, http.ErrServerClosed) {
+			log.Fatalln("server error:", errListen)
 		}
 	}()
 
-	startMenuBar(baseURL, srv)
+	_ = startMenuBar
+	<-ctx.Done()
+	if errClose := httpServer.Close(); errClose != nil {
+		log.Println("http server close:", errClose)
+	}
 }
 
 func renderDotToSVG(dotContent string) string {
@@ -837,7 +863,7 @@ func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bo
 	for i, entry := range sequence {
 		startTime, err := time.Parse(time.RFC3339, entry.StartTime)
 		if err != nil {
-			log.Printf("prepareAgentSequenceDisplay: skipping entry with invalid timestamp %q: %v", entry.StartTime, err)
+			log.Println("prepareAgentSequenceDisplay: skipping entry with invalid timestamp:", entry.StartTime, err)
 			continue
 		}
 		var elapsed time.Duration

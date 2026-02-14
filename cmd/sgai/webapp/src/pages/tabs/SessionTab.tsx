@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiSessionResponse, ApiAgentCost, ApiStepCost, ApiTodosResponse, ApiTodoEntry } from "@/types";
 
 interface SessionTabProps {
@@ -212,8 +212,8 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const [pmOpenError, setPmOpenError] = useState<string | null>(null);
   const [isPmOpenPending, startPmOpenTransition] = useTransition();
 
-  const sessionUpdateEvent = useSSEEvent("session:update");
-  const todosEvent = useSSEEvent("todos:update");
+  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
+  const todosEvent = useWorkspaceSSEEvent(workspaceName, "todos:update");
 
   useEffect(() => {
     if (!workspaceName) return;

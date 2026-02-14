@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"container/ring"
 	"fmt"
 	"io"
@@ -12,9 +11,7 @@ import (
 )
 
 const (
-	scannerBufSize    = 64 * 1024
-	scannerMaxBufSize = 1024 * 1024
-	outputBufferSize  = 30
+	outputBufferSize = 30
 )
 
 type logLine struct {
@@ -164,30 +161,48 @@ func rotateLogFile(logPath string) error {
 	return os.Rename(logPath, logPath+".old")
 }
 
-func (s *Server) captureOutput(stdout, stderr io.ReadCloser, sessionKey, prefix string) {
-	capturePipe := func(r io.ReadCloser) {
-		scanner := bufio.NewScanner(r)
-		scanner.Buffer(make([]byte, scannerBufSize), scannerMaxBufSize)
+type sessionLogWriter struct {
+	mu            sync.Mutex
+	partial       []byte
+	sess          *session
+	workspacePath string
+	srv           *Server
+	workspaceName string
+}
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Println(prefix + line)
+func newSessionLogWriter(sess *session, workspacePath string, srv *Server, workspaceName string) *sessionLogWriter {
+	return &sessionLogWriter{
+		sess:          sess,
+		workspacePath: workspacePath,
+		srv:           srv,
+		workspaceName: workspaceName,
+	}
+}
 
-			s.mu.Lock()
-			sess := s.sessions[sessionKey]
-			if sess != nil {
-				if sess.outputLog == nil {
-					sess.outputLog = newCircularLogBuffer()
-				}
-				sess.outputLog.add(logLine{prefix: prefix, text: line})
-			}
-			s.mu.Unlock()
-			if sess != nil {
-				s.sseBroker.publish(sseEvent{Type: "log:append", Data: map[string]string{"workspace": sessionKey}})
-			}
-		}
+func (w *sessionLogWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	n := len(data)
+	combined := w.partial
+	combined = append(combined, data...)
+	lines := splitLines(combined)
+
+	for i := 0; i < len(lines)-1; i++ {
+		w.addLine(lines[i])
 	}
 
-	go capturePipe(stdout)
-	go capturePipe(stderr)
+	if len(combined) > 0 && combined[len(combined)-1] == '\n' {
+		w.addLine(lines[len(lines)-1])
+		w.partial = nil
+	} else {
+		w.partial = []byte(lines[len(lines)-1])
+	}
+
+	return n, nil
+}
+
+func (w *sessionLogWriter) addLine(text string) {
+	w.sess.outputLog.add(logLine{text: text})
+	w.srv.publishToWorkspace(w.workspacePath, sseEvent{Type: "log:append", Data: map[string]string{"workspace": w.workspaceName}})
 }

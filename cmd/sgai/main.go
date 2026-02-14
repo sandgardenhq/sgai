@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -18,9 +17,9 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,7 +28,6 @@ import (
 
 	"github.com/sandgardenhq/sgai/pkg/notify"
 	"github.com/sandgardenhq/sgai/pkg/state"
-	"golang.org/x/term"
 	"sigs.k8s.io/yaml"
 )
 
@@ -46,93 +44,52 @@ func parseModelAndVariant(modelSpec string) (model, variant string) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
+	runtime.LockOSThread()
+	subcommand := ""
+	if len(os.Args) >= 2 {
+		subcommand = os.Args[1]
 	}
 
-	if os.Args[1] != "help" && os.Args[1] != "-h" && os.Args[1] != "--help" {
+	if subcommand != "help" && subcommand != "-h" && subcommand != "--help" {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			log.Fatalln("opencode is required but not found in PATH")
 		}
 	}
 
-	switch os.Args[1] {
-	case "serve":
-		cmdServe(os.Args[2:])
-		return
-	case "sessions":
-		cmdSessions(os.Args[2:])
-		return
-	case "retrospective":
-		cmdRetrospective(os.Args[2:])
-		return
-	case "list-agents":
-		cmdListAgents(os.Args[2:])
-		return
-	case "status":
-		cmdStatus(os.Args[2:])
-		return
-	case "mcp":
-		cmdMCP(os.Args[2:])
-		return
+	switch subcommand {
 	case "help", "-h", "--help":
 		printUsage()
 		return
+	case "serve":
+		cmdServe(os.Args[2:])
+		return
+	default:
+		cmdServe(os.Args[1:])
+		return
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	runWorkflow(ctx, os.Args[1:])
 }
 
 func printUsage() {
 	fmt.Println(`sgai - AI-powered software factory
 
 Usage:
-  sgai [--fresh] <target_directory>   Run workflow for GOAL.md
-  sgai serve [--listen-addr addr]           Start web server for session management
-  sgai sessions                             List all sessions in .sgai/retrospectives
-  sgai status [target_directory]            Show workflow status summary
-  sgai retrospective analyze [session-id]   Analyze a session (default: most recent)
-  sgai retrospective apply <session-id>     Apply improvements from a session
-  sgai list-agents [target_directory]       List available agents
+  sgai [--listen-addr addr]    Start web server (default)
 
 Options:
-  --fresh         Force a fresh start (don't resume existing workflow)
-
-Serve Options:
   --listen-addr   HTTP server listen address (default: 127.0.0.1:8080)
 
 Examples:
-  sgai .
-      Run workflow in current directory
-  sgai --fresh .
-      Start fresh, don't resume existing workflow
-  sgai serve
+  sgai
       Start web UI on localhost:8080
-  sgai serve --listen-addr 0.0.0.0:8080
-      Start web UI accessible externally
-  sgai sessions
-      List all sessions with GOAL summary
-  sgai status
-      Show workflow status for current directory
-  sgai status ./my-project
-      Show workflow status for specific directory
-  sgai retrospective analyze
-      Analyze the most recent session
-  sgai retrospective analyze 2025-12-30-09-33.3db5
-      Analyze specific session
-  sgai retrospective apply 2025-12-30-09-33.3db5
-      Apply improvements from session
-  sgai list-agents
-      List all available agents`)
+  sgai --listen-addr 0.0.0.0:8080
+      Start web UI accessible externally`)
 }
 
 // runWorkflow executes the main workflow loop for a target directory.
 // It handles flow mode workflows, agent iteration, and human interaction.
-func runWorkflow(ctx context.Context, args []string) {
+// mcpURL is the HTTP URL of the MCP server for this workflow.
+// logWriter, when non-nil, receives a copy of the agent output for the web UI log tab.
+func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io.Writer) {
 	flagSet := flag.NewFlagSet("sgai", flag.ExitOnError)
 	freshFlag := flagSet.Bool("fresh", false, "force a fresh start (delete state.json and PROJECT_MANAGEMENT.md)")
 	flagSet.Parse(args) //nolint:errcheck // ExitOnError FlagSet exits on error, never returns non-nil
@@ -179,15 +136,6 @@ func runWorkflow(ctx context.Context, args []string) {
 		log.Fatalln("failed to apply custom MCPs:", err)
 	}
 
-	if err := os.Chdir(dir); err != nil {
-		log.Fatalln("failed to change directory to", dir, err)
-	}
-
-	executablePath, err := os.Executable()
-	if err != nil {
-		log.Fatalln("failed to get executable path:", err)
-	}
-
 	flowDag, err := parseFlow(metadata.Flow, dir)
 	if err != nil {
 		log.Fatalln("failed to parse flow:", err)
@@ -216,11 +164,12 @@ func runWorkflow(ctx context.Context, args []string) {
 	} else {
 		allAgents = append([]string{"coordinator"}, dagAgents...)
 	}
+	workspaceName := filepath.Base(dir)
 	longestNameLen := len("sgai")
 	for _, agent := range allAgents {
 		longestNameLen = max(longestNameLen, len(agent))
 	}
-	paddedsgai := "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
+	paddedsgai := workspaceName + "][" + "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
@@ -291,7 +240,7 @@ func runWorkflow(ctx context.Context, args []string) {
 	defer func() {
 		if retrospectiveDir != "" {
 			if err := copyFinalStateToRetrospective(dir, retrospectiveDir); err != nil {
-				log.Printf("[sgai] warning: failed to copy final state: %v", err)
+				log.Println("[sgai] warning: failed to copy final state:", err)
 			}
 		}
 	}()
@@ -347,7 +296,7 @@ func runWorkflow(ctx context.Context, args []string) {
 			log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 			return
 		}
-		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
 		if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
 			return
 		}
@@ -397,7 +346,7 @@ func runWorkflow(ctx context.Context, args []string) {
 				log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 				return
 			}
-			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, executablePath)
+			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
 			if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
 				return
 			}
@@ -584,7 +533,8 @@ type multiModelConfig struct {
 	retrospectiveDir string
 	longestNameLen   int
 	paddedsgai       string
-	executablePath   string
+	mcpURL           string
+	logWriter        io.Writer
 }
 
 func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
@@ -699,7 +649,8 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 
 		*iterationCounter++
 
-		prefix := fmt.Sprintf("[%s:%04d]", paddedAgentName, *iterationCounter)
+		workspaceName := filepath.Base(cfg.dir)
+		prefix := fmt.Sprintf("[%s][%s:%04d]", workspaceName, paddedAgentName, *iterationCounter)
 
 		if err := state.Save(cfg.statePath, wfState); err != nil {
 			log.Fatalln("failed to save state before running agent:", err)
@@ -778,20 +729,56 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		if wfState.InteractiveAutoLock {
 			interactiveEnv = "auto"
 		}
-		cmd := exec.CommandContext(ctx, "opencode", args...)
+
+		agentIdentity := cfg.agent
+		if modelSpec != "" {
+			model, variant := parseModelAndVariant(modelSpec)
+			agentIdentity = cfg.agent + "|" + model + "|" + variant
+		}
+
+		cmd := exec.Command("opencode", args...)
+		cmd.Dir = cfg.dir
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		cmd.Env = append(os.Environ(),
-			"OPENCODE_CONFIG_DIR=.sgai",
-			"SGAI_MCP_EXECUTABLE="+cfg.executablePath,
+			"OPENCODE_CONFIG_DIR="+filepath.Join(cfg.dir, ".sgai"),
+			"SGAI_MCP_URL="+cfg.mcpURL,
+			"SGAI_AGENT_IDENTITY="+agentIdentity,
 			"SGAI_MCP_INTERACTIVE="+interactiveEnv)
 		cmd.Stdin = strings.NewReader(msg)
 
-		stderrWriter := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-		cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
+		var stderrOut io.Writer = os.Stderr
+		var stdoutOut io.Writer = os.Stdout
+		if cfg.logWriter != nil {
+			stderrOut = io.MultiWriter(os.Stderr, cfg.logWriter)
+			stdoutOut = io.MultiWriter(os.Stdout, cfg.logWriter)
+		}
+		stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut}
+		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, statePath: cfg.statePath, currentAgent: cfg.agent}
 
-		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: os.Stdout, statePath: cfg.statePath, currentAgent: cfg.agent}
+		cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
 		cmd.Stdout = io.MultiWriter(jsonWriter, outputCapture)
 
-		if err := cmd.Run(); err != nil {
+		if errStart := cmd.Start(); errStart != nil {
+			fmt.Fprintln(os.Stderr, "failed to start opencode:", errStart)
+			newState, errLoad := state.Load(cfg.statePath)
+			if errLoad != nil {
+				log.Fatalln("failed to read state.json:", errLoad)
+			}
+			newState.Status = state.StatusAgentDone
+			if errSave := state.Save(cfg.statePath, newState); errSave != nil {
+				log.Fatalln("failed to save state:", errSave)
+			}
+			fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to start failure")
+			return newState
+		}
+
+		processExited := make(chan struct{})
+		go terminateProcessGroupOnCancel(ctx, cmd, processExited)
+
+		errWait := cmd.Wait()
+		close(processExited)
+
+		if errWait != nil {
 			if ctx.Err() != nil {
 				fmt.Println("["+cfg.paddedsgai+"]", "interrupted during agent execution")
 				return wfState
@@ -799,13 +786,13 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			fmt.Fprintln(os.Stderr, "\n=== RAW AGENT OUTPUT (last 1000 lines) ===")
 			outputCapture.dump(os.Stderr)
 			fmt.Fprintln(os.Stderr, "=== END RAW AGENT OUTPUT ===")
-			newState, err := state.Load(cfg.statePath)
-			if err != nil {
-				log.Fatalln("failed to read state.json:", err)
+			newState, errLoad := state.Load(cfg.statePath)
+			if errLoad != nil {
+				log.Fatalln("failed to read state.json:", errLoad)
 			}
 			newState.Status = state.StatusAgentDone
-			if err := state.Save(cfg.statePath, newState); err != nil {
-				log.Fatalln("failed to save state:", err)
+			if errSave := state.Save(cfg.statePath, newState); errSave != nil {
+				log.Fatalln("failed to save state:", errSave)
 			}
 			fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to error")
 			return newState
@@ -842,7 +829,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 
 				if metadata.CompletionGateScript != "" {
 					fmt.Println("["+cfg.paddedsgai+"]", "running completionGateScript:", metadata.CompletionGateScript)
-					output, errScript := runCompletionGateScript(metadata.CompletionGateScript)
+					output, errScript := runCompletionGateScript(cfg.dir, metadata.CompletionGateScript)
 					if errScript != nil {
 						fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
 						newState.Status = state.StatusWorking
@@ -872,7 +859,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				if capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
 					timestamp := time.Now().Format("20060102150405")
 					sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
-					if err := exportSession(capturedSessionID, sessionFile); err != nil {
+					if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
 						log.Fatalln("failed to export session:", err)
 					}
 				}
@@ -887,31 +874,24 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			notifyMsg := fmt.Sprintf("QUESTION - %s", filepath.Base(cfg.dir))
 			notify.Send("sgai", notifyMsg)
 
-			if !newState.InteractiveAutoLock {
-				hasMultiChoice := newState.MultiChoiceQuestion != nil && len(newState.MultiChoiceQuestion.Questions) > 0
-				isTTY := term.IsTerminal(int(os.Stdin.Fd()))
-				switch {
-				case hasMultiChoice && isTTY:
-					fmt.Println("["+cfg.paddedsgai+"]", "multi-choice question requested...")
-					handleMultiChoiceQuestion(cfg.dir, cfg.statePath, newState.MultiChoiceQuestion)
-				case isTTY:
-					fmt.Println("["+cfg.paddedsgai+"]", "human input requested, opening editor...")
-					launchEditorForResponse(cfg.dir, newState.HumanMessage, cfg.statePath)
-				default:
-					fmt.Println("["+cfg.paddedsgai+"]", "waiting for response...")
-				}
-			}
+			fmt.Println("["+cfg.paddedsgai+"]", "waiting for response via web UI...")
 
-			humanResponse = waitForStateTransition(cfg.dir, cfg.statePath)
+			var cancelled bool
+			humanResponse, cancelled = waitForStateTransition(ctx, cfg.dir, cfg.statePath)
+			if cancelled {
+				return wfState
+			}
 			if newState.MultiChoiceQuestion != nil && newState.MultiChoiceQuestion.IsWorkGate && strings.Contains(humanResponse, workGateApprovalText) {
 				loadedState, errLoad := state.Load(cfg.statePath)
 				if errLoad != nil {
 					log.Println("failed to load state for work gate approval:", errLoad)
 				} else {
 					loadedState.WorkGateApproved = true
+					loadedState.InteractiveAutoLock = true
 					if errSave := state.Save(cfg.statePath, loadedState); errSave != nil {
 						log.Fatalln("failed to save work gate approval:", errSave)
 					}
+					newState = loadedState
 				}
 			}
 			wfState = newState
@@ -922,7 +902,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
 				timestamp := time.Now().Format("20060102150405")
 				sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
-				if err := exportSession(capturedSessionID, sessionFile); err != nil {
+				if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
 					log.Fatalln("failed to export session:", err)
 				}
 			}
@@ -952,7 +932,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 	}
 }
 
-func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, executablePath string) state.Workflow {
+func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, mcpURL string, logWriter io.Writer) state.Workflow {
 	cfg := multiModelConfig{
 		dir:              dir,
 		goalPath:         goalPath,
@@ -962,7 +942,8 @@ func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag
 		retrospectiveDir: retrospectiveDir,
 		longestNameLen:   longestNameLen,
 		paddedsgai:       paddedsgai,
-		executablePath:   executablePath,
+		mcpURL:           mcpURL,
+		logWriter:        logWriter,
 	}
 	return runMultiModelAgent(ctx, cfg, wfState, metadata, iterationCounter)
 }
@@ -1317,8 +1298,9 @@ func hasPendingMessages(s *state.Workflow, statePath, paddedsgai string) bool {
 	return false
 }
 
-func runCompletionGateScript(script string) (string, error) {
+func runCompletionGateScript(dir, script string) (string, error) {
 	cmd := exec.Command("sh", "-c", script)
+	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), err
@@ -1566,269 +1548,46 @@ func setupOutputCapture(retrospectiveDir string) error {
 	return nil
 }
 
-func waitForStateTransition(dir, statePath string) string {
+func waitForStateTransition(ctx context.Context, dir, statePath string) (string, bool) {
 	responsePath := filepath.Join(dir, ".sgai", "response.txt")
 	for {
+		if ctx.Err() != nil {
+			return "", true
+		}
 		st, err := state.Load(statePath)
 		if err == nil && st.Status == state.StatusWorking {
-			data, err := os.ReadFile(responsePath)
-			if err != nil {
-				return ""
+			data, errRead := os.ReadFile(responsePath)
+			if errRead != nil {
+				return "", false
 			}
-			if err := os.Remove(responsePath); err != nil {
-				log.Println("cleanup failed:", err)
+			if errRemove := os.Remove(responsePath); errRemove != nil {
+				log.Println("cleanup failed:", errRemove)
 			}
-			return string(data)
+			return string(data), false
 		}
-		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return "", true
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 }
 
-func writeResponseAndTransition(dir, statePath, response string) {
-	responsePath := filepath.Join(dir, ".sgai", "response.txt")
-	if err := os.WriteFile(responsePath, []byte(response), 0644); err != nil {
-		log.Fatalln("failed to write response file:", err)
+const gracefulShutdownTimeout = 5 * time.Second
+
+func terminateProcessGroupOnCancel(ctx context.Context, cmd *exec.Cmd, processExited <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+	case <-processExited:
+		return
 	}
-	st, err := state.Load(statePath)
-	if err != nil {
-		log.Fatalln("failed to load state:", err)
+	pgid := -cmd.Process.Pid
+	_ = syscall.Kill(pgid, syscall.SIGTERM)
+	select {
+	case <-time.After(gracefulShutdownTimeout):
+		_ = syscall.Kill(pgid, syscall.SIGKILL)
+	case <-processExited:
 	}
-	st.Status = state.StatusWorking
-	if err := state.Save(statePath, st); err != nil {
-		log.Fatalln("failed to save state:", err)
-	}
-}
-
-func launchEditorForResponse(dir, humanMessage, statePath string) {
-	response, err := openEditorForResponse(humanMessage)
-	if err != nil {
-		log.Fatalln("failed to get human response:", err)
-	}
-	writeResponseAndTransition(dir, statePath, response)
-}
-
-func handleMultiChoiceQuestion(dir, statePath string, mcq *state.MultiChoiceQuestion) {
-	response, err := collectMultiChoiceResponse(mcq)
-	if err != nil {
-		log.Fatalln("failed to collect multi-choice response:", err)
-	}
-
-	wfState, err := state.Load(statePath)
-	if err != nil {
-		log.Fatalln("failed to load state:", err)
-	}
-	wfState.MultiChoiceQuestion = nil
-	if err := state.Save(statePath, wfState); err != nil {
-		log.Fatalln("failed to clear multi-choice question:", err)
-	}
-
-	writeResponseAndTransition(dir, statePath, response)
-}
-
-func collectMultiChoiceResponse(mcq *state.MultiChoiceQuestion) (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	var allResponses []string
-
-	for qIdx, q := range mcq.Questions {
-		fmt.Println()
-		fmt.Printf("# Question %d of %d\n", qIdx+1, len(mcq.Questions))
-		fmt.Println(q.Question)
-		fmt.Println()
-
-		if q.MultiSelect {
-			fmt.Println("(Select one or more options by entering numbers separated by commas, e.g., 1,3)")
-		} else {
-			fmt.Println("(Select one option by entering its number)")
-		}
-		fmt.Println()
-
-		for i, choice := range q.Choices {
-			fmt.Printf("  [%d] %s\n", i+1, choice)
-		}
-		fmt.Println()
-		fmt.Println("  [O] Other (provide custom input)")
-		fmt.Println()
-
-		var selectedChoices []string
-		for {
-			fmt.Print("Your selection: ")
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				return "", fmt.Errorf("failed to read input: %w", err)
-			}
-			input = strings.TrimSpace(input)
-
-			if input == "" {
-				fmt.Println("Please enter a selection.")
-				continue
-			}
-
-			selectedChoices, err = parseChoiceSelection(input, q.Choices, q.MultiSelect)
-			if err != nil {
-				fmt.Println("Error:", err)
-				continue
-			}
-			break
-		}
-
-		fmt.Println()
-		fmt.Print("Other (optional, press Enter to skip): ")
-		otherInput, err := reader.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("failed to read other input: %w", err)
-		}
-		otherInput = strings.TrimSpace(otherInput)
-
-		if !q.MultiSelect && len(selectedChoices) == 0 && otherInput == "" {
-			return "", fmt.Errorf("must select at least one option or provide custom input")
-		}
-
-		response := formatMultiChoiceResponse(selectedChoices, otherInput)
-		if len(mcq.Questions) > 1 {
-			allResponses = append(allResponses, fmt.Sprintf("Q%d: %s\n%s", qIdx+1, q.Question, response))
-		} else {
-			allResponses = append(allResponses, response)
-		}
-	}
-
-	return strings.Join(allResponses, "\n\n"), nil
-}
-
-func parseChoiceSelection(input string, choices []string, multiSelect bool) ([]string, error) {
-	input = strings.ToUpper(strings.TrimSpace(input))
-
-	if input == "O" {
-		return nil, nil
-	}
-
-	parts := strings.Split(input, ",")
-	var selectedIndices []int
-
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if strings.ToUpper(part) == "O" {
-			continue
-		}
-
-		idx, err := strconv.Atoi(part)
-		if err != nil {
-			return nil, fmt.Errorf("invalid selection '%s': must be a number or 'O'", part)
-		}
-		if idx < 1 || idx > len(choices) {
-			return nil, fmt.Errorf("invalid selection %d: must be between 1 and %d", idx, len(choices))
-		}
-		selectedIndices = append(selectedIndices, idx-1)
-	}
-
-	if !multiSelect && len(selectedIndices) > 1 {
-		return nil, fmt.Errorf("single-select mode: please select only one option")
-	}
-
-	var selected []string
-	for _, idx := range selectedIndices {
-		selected = append(selected, choices[idx])
-	}
-
-	return selected, nil
-}
-
-func formatMultiChoiceResponse(selectedChoices []string, otherInput string) string {
-	var parts []string
-
-	if len(selectedChoices) > 0 {
-		parts = append(parts, "Selected: "+strings.Join(selectedChoices, ", "))
-	}
-
-	if otherInput != "" {
-		parts = append(parts, "Other: "+otherInput)
-	}
-
-	return strings.Join(parts, "\n")
-}
-
-func openEditorForResponse(humanMessage string) (string, error) {
-	editor := os.Getenv("EDITOR")
-
-	if editor == "" {
-		fmt.Println("# Agent Message")
-		fmt.Println()
-		fmt.Println(humanMessage)
-		fmt.Println()
-
-		fd := int(os.Stdin.Fd())
-		oldState, err := term.MakeRaw(fd)
-		if err != nil {
-			fmt.Println("# Your Response (end with Ctrl+D):")
-			fmt.Println()
-			data, err := io.ReadAll(os.Stdin)
-			if err != nil {
-				return "", err
-			}
-			return string(data), nil
-		}
-		defer func() {
-			if err := term.Restore(fd, oldState); err != nil {
-				log.Println("close failed:", err)
-			}
-		}()
-
-		t := term.NewTerminal(os.Stdin, "> ")
-		if _, err := fmt.Fprintln(t, "# Your Response (empty line to finish):"); err != nil {
-			log.Println("write failed:", err)
-		}
-		var lines []string
-		for {
-			line, err := t.ReadLine()
-			if err != nil {
-				break
-			}
-			if line == "" {
-				break
-			}
-			lines = append(lines, line)
-		}
-		return strings.Join(lines, "\n"), nil
-	}
-
-	tmpFile, err := os.CreateTemp("", "sgai-*.md")
-	if err != nil {
-		return "", err
-	}
-	tmpPath := tmpFile.Name()
-	defer func() {
-		if err := os.Remove(tmpPath); err != nil {
-			log.Println("cleanup failed:", err)
-		}
-	}()
-
-	content := "# Agent Message\n\n" + humanMessage + "\n\n# Your Response\n\n"
-	if _, err := tmpFile.WriteString(content); err != nil {
-		if errClose := tmpFile.Close(); errClose != nil {
-			log.Println("close failed:", errClose)
-		}
-		return "", err
-	}
-	if err := tmpFile.Close(); err != nil {
-		log.Println("close failed:", err)
-	}
-
-	editorParts := strings.Fields(editor)
-	cmd := exec.Command(editorParts[0], append(editorParts[1:], tmpPath)...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(tmpPath)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
 
 type prefixWriter struct {
@@ -2339,9 +2098,10 @@ func copyFinalStateToRetrospective(dir, retrospectiveDir string) error {
 	return nil
 }
 
-func exportSession(sessionID, outputPath string) error {
+func exportSession(dir, sessionID, outputPath string) error {
 	cmd := exec.Command("opencode", "export", sessionID)
-	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR=.sgai")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("opencode export failed: %w", err)
@@ -2350,70 +2110,6 @@ func exportSession(sessionID, outputPath string) error {
 		return err
 	}
 	return os.WriteFile(outputPath, output, 0644)
-}
-
-func cmdStatus(args []string) {
-	dir := "."
-	if len(args) > 0 {
-		dir = args[0]
-	}
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	statePath := filepath.Join(absDir, ".sgai", "state.json")
-	wfState, err := state.Load(statePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No workflow state found in", absDir)
-			return
-		}
-		log.Fatalln("failed to load state:", err)
-	}
-
-	printStatusSection(wfState)
-	printModelStatusesSection(wfState)
-	printSequenceSection(wfState)
-	printProjectTodosSection(wfState)
-	printMessagesSection(wfState)
-	printProgressSection(wfState)
-}
-
-func printStatusSection(wfState state.Workflow) {
-	status := wfState.Status
-	if status == "" {
-		status = "-"
-	}
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "-"
-	}
-	task := wfState.Task
-	if task == "" {
-		task = "-"
-	}
-
-	fmt.Printf("Status:        %s\n", status)
-	fmt.Printf("Current Agent: %s\n", currentAgent)
-	if wfState.CurrentModel != "" {
-		fmt.Printf("Current Model: %s\n", wfState.CurrentModel)
-	}
-	fmt.Printf("Task:          %s\n", task)
-}
-
-func printModelStatusesSection(wfState state.Workflow) {
-	if len(wfState.ModelStatuses) == 0 {
-		return
-	}
-
-	fmt.Println()
-	fmt.Println("Model Statuses:")
-	for modelID, status := range wfState.ModelStatuses {
-		symbol := modelStatusSymbol(status)
-		shortID := extractModelShortName(modelID)
-		fmt.Printf("  %s %-35s %s\n", symbol, shortID, status)
-	}
 }
 
 func modelStatusSymbol(status string) string {
@@ -2437,45 +2133,6 @@ func extractModelShortName(modelID string) string {
 	return modelID
 }
 
-func printSequenceSection(wfState state.Workflow) {
-	if len(wfState.AgentSequence) == 0 {
-		return
-	}
-
-	fmt.Println()
-	fmt.Println("Sequence:")
-
-	now := time.Now().UTC()
-	for i, entry := range wfState.AgentSequence {
-		startTime, err := time.Parse(time.RFC3339, entry.StartTime)
-		if err != nil {
-			continue
-		}
-
-		var elapsed time.Duration
-		switch {
-		case entry.IsCurrent:
-			elapsed = now.Sub(startTime)
-		case i+1 < len(wfState.AgentSequence):
-			nextStartTime, err := time.Parse(time.RFC3339, wfState.AgentSequence[i+1].StartTime)
-			if err == nil {
-				elapsed = nextStartTime.Sub(startTime)
-			} else {
-				elapsed = now.Sub(startTime)
-			}
-		default:
-			elapsed = now.Sub(startTime)
-		}
-
-		elapsedStr := formatDuration(elapsed)
-		marker := ""
-		if entry.IsCurrent {
-			marker = " *"
-		}
-		fmt.Printf("  %-20s %s%s\n", entry.Agent, elapsedStr, marker)
-	}
-}
-
 func formatDuration(d time.Duration) string {
 	totalSeconds := int(d.Seconds())
 	minutes := totalSeconds / 60
@@ -2484,182 +2141,6 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm %ds", minutes, seconds)
 	}
 	return fmt.Sprintf("%ds", seconds)
-}
-
-func printProjectTodosSection(wfState state.Workflow) {
-	if len(wfState.ProjectTodos) == 0 {
-		return
-	}
-
-	fmt.Println()
-	fmt.Println("Project TODOs:")
-
-	for _, todo := range wfState.ProjectTodos {
-		if todo.Status == "completed" || todo.Status == "cancelled" {
-			continue
-		}
-		symbol := todoStatusSymbol(todo.Status)
-		fmt.Printf("  %s %s (%s)\n", symbol, todo.Content, todo.Priority)
-	}
-}
-
-func printMessagesSection(wfState state.Workflow) {
-	if len(wfState.Messages) == 0 {
-		return
-	}
-
-	unreadCount := 0
-	for _, msg := range wfState.Messages {
-		if !msg.Read {
-			unreadCount++
-		}
-	}
-
-	fmt.Println()
-	if unreadCount > 0 {
-		fmt.Printf("Messages: %d unread\n", unreadCount)
-	} else {
-		fmt.Println("Messages:")
-	}
-
-	for _, msg := range wfState.Messages {
-		if !msg.Read {
-			subject := extractMessageSubject(msg.Body)
-			fmt.Printf("  %s → %s: %s\n", msg.FromAgent, msg.ToAgent, subject)
-		}
-	}
-}
-
-func extractMessageSubject(body string) string {
-	lines := strings.SplitSeq(body, "\n")
-	for line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			if len(trimmed) > 50 {
-				return trimmed[:47] + "..."
-			}
-			return trimmed
-		}
-	}
-	return ""
-}
-
-func printProgressSection(wfState state.Workflow) {
-	if len(wfState.Progress) == 0 {
-		return
-	}
-
-	fmt.Println()
-	fmt.Println("Progress:")
-
-	maxEntries := 10
-	startIdx := 0
-	if len(wfState.Progress) > maxEntries {
-		startIdx = len(wfState.Progress) - maxEntries
-	}
-
-	for i := len(wfState.Progress) - 1; i >= startIdx; i-- {
-		entry := wfState.Progress[i]
-		timeStr := formatProgressTimestamp(entry.Timestamp)
-		fmt.Printf("  %s %s: %s\n", timeStr, entry.Agent, entry.Description)
-	}
-}
-
-func formatProgressTimestamp(timestamp string) string {
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return timestamp
-	}
-	return t.Local().Format("15:04:05")
-}
-
-func cmdListAgents(args []string) {
-	dir := "."
-	if len(args) > 0 {
-		dir = args[0]
-	}
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	skelAgentsFS, err := fs.Sub(skelFS, "skel/.sgai/agent")
-	if err != nil {
-		log.Fatalln("failed to access skeleton agents:", err)
-	}
-
-	skelAgents := make(map[string]string) // name -> description
-	err = fs.WalkDir(skelAgentsFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".md") {
-			return nil
-		}
-		name := strings.TrimSuffix(path, ".md")
-		content, err := fs.ReadFile(skelAgentsFS, path)
-		if err != nil {
-			return nil
-		}
-		desc := extractFrontmatterDescription(string(content))
-		skelAgents[name] = desc
-		return nil
-	})
-	if err != nil {
-		log.Fatalln("failed to list skeleton agents:", err)
-	}
-
-	dirAgents := make(map[string]string)
-	dirAgentsPath := filepath.Join(absDir, ".sgai", "agent")
-	if _, err := os.Stat(dirAgentsPath); err == nil {
-		entries, err := os.ReadDir(dirAgentsPath)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
-					continue
-				}
-				name := strings.TrimSuffix(entry.Name(), ".md")
-				content, err := os.ReadFile(filepath.Join(dirAgentsPath, entry.Name()))
-				if err != nil {
-					continue
-				}
-				desc := extractFrontmatterDescription(string(content))
-				dirAgents[name] = desc
-			}
-		}
-	}
-
-	fmt.Println("Skeleton agents:")
-	skelNames := make([]string, 0, len(skelAgents))
-	for name := range skelAgents {
-		skelNames = append(skelNames, name)
-	}
-	slices.Sort(skelNames)
-	for _, name := range skelNames {
-		desc := skelAgents[name]
-		if desc != "" {
-			fmt.Printf("  %s: %s\n", name, desc)
-		} else {
-			fmt.Printf("  %s\n", name)
-		}
-	}
-
-	if len(dirAgents) > 0 {
-		fmt.Println("\nDirectory agents (.sgai/agent/):")
-		dirNames := make([]string, 0, len(dirAgents))
-		for name := range dirAgents {
-			dirNames = append(dirNames, name)
-		}
-		slices.Sort(dirNames)
-		for _, name := range dirNames {
-			desc := dirAgents[name]
-			if desc != "" {
-				fmt.Printf("  %s: %s\n", name, desc)
-			} else {
-				fmt.Printf("  %s\n", name)
-			}
-		}
-	}
 }
 
 func applyLayerFolderOverlay(dir string) error {

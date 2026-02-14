@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import { cn } from "@/lib/utils";
 import type { ApiChangesResponse, ApiDiffLine } from "@/types";
 
@@ -73,7 +73,7 @@ export function ChangesTab({ workspaceName }: ChangesTabProps) {
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [isUpdating, startTransition] = useTransition();
 
-  const changesEvent = useSSEEvent("changes:update");
+  const changesEvent = useWorkspaceSSEEvent(workspaceName, "changes:update");
 
   useEffect(() => {
     if (!workspaceName) return;

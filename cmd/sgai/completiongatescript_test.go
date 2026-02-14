@@ -48,7 +48,7 @@ func TestRunCompletionGateScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := runCompletionGateScript(tt.script)
+			output, err := runCompletionGateScript(t.TempDir(), tt.script)
 
 			if tt.expectError && err == nil {
 				t.Error("expected error, got nil")

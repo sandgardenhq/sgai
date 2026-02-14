@@ -222,7 +222,6 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const workspaceUpdateEvent = useSSEEvent("workspace:update");
-  const sessionUpdateEvent = useSSEEvent("session:update");
 
   useEffect(() => {
     let cancelled = false;
@@ -250,10 +249,10 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
   }, [refreshKey]);
 
   useEffect(() => {
-    if (workspaceUpdateEvent !== null || sessionUpdateEvent !== null) {
+    if (workspaceUpdateEvent !== null) {
       setRefreshKey((k) => k + 1);
     }
-  }, [workspaceUpdateEvent, sessionUpdateEvent]);
+  }, [workspaceUpdateEvent]);
 
   useEffect(() => {
     if (selectedName) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -76,6 +77,7 @@ func (b *sseBroker) publish(evt sseEvent) {
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/events/stream", s.handleSSEStream)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/events/stream", s.handleWorkspaceSSEStream)
 	mux.HandleFunc("GET /api/v1/agents", s.handleAPIAgents)
 	mux.HandleFunc("GET /api/v1/skills", s.handleAPISkills)
 	mux.HandleFunc("GET /api/v1/skills/{name...}", s.handleAPISkillDetail)
@@ -154,6 +156,80 @@ func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+}
+
+func (s *Server) handleWorkspaceSSEStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	workspaceName := r.PathValue("name")
+	if workspaceName == "" {
+		http.Error(w, "workspace name is required", http.StatusBadRequest)
+		return
+	}
+
+	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
+	if workspacePath == "" {
+		http.Error(w, "workspace not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	broker := s.workspaceBroker(workspacePath)
+	client := broker.subscribe()
+	defer broker.unsubscribe(client)
+
+	s.sendWorkspaceSSESnapshot(w, flusher, workspacePath)
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-client.done:
+			return
+		case evt := <-client.events:
+			if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
+				return
+			}
+		}
+	}
+}
+
+func (s *Server) sendWorkspaceSSESnapshot(w http.ResponseWriter, flusher http.Flusher, workspacePath string) {
+	snapshot := s.buildWorkspaceSSESnapshot(workspacePath)
+	evt := sseEvent{Type: "snapshot", Data: snapshot}
+	if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
+		log.Println("failed to send workspace snapshot:", errWrite)
+	}
+}
+
+type sseWorkspaceDetailSnapshot struct {
+	Name       string `json:"name"`
+	Running    bool   `json:"running"`
+	NeedsInput bool   `json:"needsInput"`
+	Status     string `json:"status"`
+}
+
+func (s *Server) buildWorkspaceSSESnapshot(workspacePath string) sseWorkspaceDetailSnapshot {
+	running, needsInput := s.getWorkspaceStatus(workspacePath)
+	wfState, _ := state.Load(statePath(workspacePath))
+	status := wfState.Status
+	if status == "" {
+		status = "-"
+	}
+	return sseWorkspaceDetailSnapshot{
+		Name:       filepath.Base(workspacePath),
+		Running:    running,
+		NeedsInput: needsInput,
+		Status:     status,
 	}
 }
 
@@ -1547,7 +1623,7 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "session:update", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -1617,7 +1693,7 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "session:update", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -1655,7 +1731,7 @@ func (s *Server) handleAPIStopSession(w http.ResponseWriter, r *http.Request) {
 		message = "session already stopped"
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "session:update", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -1678,7 +1754,7 @@ func (s *Server) handleAPIResetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "session:update", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -1863,7 +1939,7 @@ func (s *Server) handleAPIComposeSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "compose:update", Data: map[string]string{
+	s.publishToWorkspace(workspacePath, sseEvent{Type: "compose:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 		"action":    "saved",
 	}})
@@ -1975,7 +2051,7 @@ func (s *Server) handleAPIComposeDraft(w http.ResponseWriter, r *http.Request) {
 	cs.wizard = wizardState(req.Wizard)
 	cs.mu.Unlock()
 
-	s.sseBroker.publish(sseEvent{Type: "compose:update", Data: map[string]string{
+	s.publishToWorkspace(workspacePath, sseEvent{Type: "compose:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 		"action":    "draft-saved",
 	}})
@@ -2711,66 +2787,18 @@ func (s *Server) handleAPIRetroAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess = &session{running: true, retroTempDir: tempDir}
+	ctx, cancel := context.WithCancel(context.Background())
+	sess = &session{running: true, retroTempDir: tempDir, cancel: cancel}
 	s.sessions[sessionKey] = sess
 	s.mu.Unlock()
 
-	sgaiPath, errExec := os.Executable()
-	if errExec != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		if errCleanup := os.RemoveAll(tempDir); errCleanup != nil {
-			log.Println("cleanup failed:", errCleanup)
-		}
-		http.Error(w, "failed to find sgai executable", http.StatusInternalServerError)
-		return
-	}
-
-	cmd := exec.Command(sgaiPath, "retrospective", "analyze", "--temp-dir="+tempDir, req.Session)
-	cmd.Dir = workspacePath
-
-	stdout, errStdout := cmd.StdoutPipe()
-	if errStdout != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		if errCleanup := os.RemoveAll(tempDir); errCleanup != nil {
-			log.Println("cleanup failed:", errCleanup)
-		}
-		http.Error(w, "failed to create stdout pipe", http.StatusInternalServerError)
-		return
-	}
-	stderr, errStderr := cmd.StderrPipe()
-	if errStderr != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		if errCleanup := os.RemoveAll(tempDir); errCleanup != nil {
-			log.Println("cleanup failed:", errCleanup)
-		}
-		http.Error(w, "failed to create stderr pipe", http.StatusInternalServerError)
-		return
-	}
-
-	sess.cmd = cmd
-
-	if errStart := cmd.Start(); errStart != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		if errCleanup := os.RemoveAll(tempDir); errCleanup != nil {
-			log.Println("cleanup failed:", errCleanup)
-		}
-		http.Error(w, "failed to start analysis", http.StatusInternalServerError)
-		return
-	}
-
-	go s.captureOutput(stdout, stderr, sessionKey, "[retro] ")
+	logWriter := newSessionLogWriter(sess, workspacePath, s, filepath.Base(workspacePath))
 
 	go func() {
-		if errWait := cmd.Wait(); errWait != nil {
-			log.Println("retrospective analyze exited with error:", errWait)
+		defer cancel()
+		errAnalyze := runRetrospectiveAnalysis(ctx, workspacePath, req.Session, tempDir, logWriter)
+		if errAnalyze != nil {
+			log.Println("retrospective analyze failed:", errAnalyze)
 		}
 		sess.mu.Lock()
 		sess.running = false
@@ -2860,57 +2888,16 @@ func (s *Server) handleAPIRetroApply(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
-	sgaiPath, errExec := os.Executable()
-	if errExec != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		http.Error(w, "failed to find sgai executable", http.StatusInternalServerError)
-		return
-	}
-
-	cmd := exec.Command(sgaiPath, "retrospective", "apply", "--selected", req.Session)
-	cmd.Dir = workspacePath
-	cmd.Stdin = strings.NewReader(selectedContent)
-
-	stdout, errStdout := cmd.StdoutPipe()
-	if errStdout != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		http.Error(w, "failed to create stdout pipe", http.StatusInternalServerError)
-		return
-	}
-
-	stderr, errStderr := cmd.StderrPipe()
-	if errStderr != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		http.Error(w, "failed to create stderr pipe", http.StatusInternalServerError)
-		return
-	}
-
-	sess.cmd = cmd
-
-	if errStart := cmd.Start(); errStart != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		http.Error(w, "failed to start apply", http.StatusInternalServerError)
-		return
-	}
-
-	go s.captureOutput(stdout, stderr, sessionKey, "[retro] ")
+	logWriter := newSessionLogWriter(sess, workspacePath, s, filepath.Base(workspacePath))
 
 	go func() {
-		errApply := cmd.Wait()
+		errApply := runRetrospectiveApply(workspacePath, req.Session, selectedContent, logWriter, logWriter)
 		sess.mu.Lock()
 		sess.running = false
 		sess.mu.Unlock()
 
 		if errApply != nil {
-			log.Println("retrospective apply exited with error:", errApply)
+			log.Println("retrospective apply failed:", errApply)
 			return
 		}
 
@@ -3089,7 +3076,7 @@ func (s *Server) handleAPISteer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "messages:new", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "messages:new", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -3133,7 +3120,7 @@ func (s *Server) handleAPIUpdateDescription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "changes:update", Data: map[string]string{
+	s.publishToWorkspace(workspacePath, sseEvent{Type: "changes:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
@@ -3201,7 +3188,7 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.sseBroker.publish(sseEvent{Type: "session:update", Data: map[string]string{
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 	}})
 
