@@ -49,6 +49,14 @@ Common fields include:
 - `modelStatuses` (object map of model ID to status string)
 - `currentModel` (string, format `agentName:modelSpec`)
 
+### Self-drive after a work gate
+
+The workflow file also stores whether the run has switched into automatic mode after a work gate is approved.
+
+- `interactiveAutoLock` (boolean)
+
+When `interactiveAutoLock` is `true`, the server surfaces that state through its API as `interactiveAuto` in workspace detail/session responses.
+
 ## Messages
 
 A message entry includes:
