@@ -8,4 +8,4 @@
 
 ### Additional Changes
 
-- Updated the macOS menu bar display to be simpler and easier to read.
+- Improved the macOS menu bar display to be simpler and easier to read.
