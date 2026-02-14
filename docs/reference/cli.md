@@ -44,6 +44,8 @@ Options:
 
   Default: `127.0.0.1:8080`
 
+  Note: When the host is a wildcard address (for example, `0.0.0.0:8080` or `[::]:8080`), `sgai` opens the dashboard URL using a loopback host (`127.0.0.1` / `::1`).
+
 ### `sgai sessions`
 
 List all sessions in `.sgai/retrospectives`.
