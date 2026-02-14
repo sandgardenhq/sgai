@@ -32,6 +32,8 @@ sgai [--interactive] [--fresh] <target_directory>
 
 Start the web server for session management.
 
+The web dashboard includes a Log tab that updates automatically as new log output is produced.
+
 ```sh
 sgai serve [--listen-addr addr]
 ```
