@@ -55,7 +55,7 @@ The summary uses this format:
 - Normal: `⏺ <running> / <total>`
 - Warning: `⚠ <running> / <total>`
 
-The menu only shows per-factory entries such as `<factory> (Needs Input)` and `<factory> (Stopped)`.
+The menu can include per-factory entries such as `<factory> (Needs Input)` and `<factory> (Stopped)`.
 
 ### `sgai sessions`
 
