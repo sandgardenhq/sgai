@@ -10,14 +10,9 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 - **Version**: 0.0.0+20260214
 - **Summary**: This release includes the updates captured in the structured release notes payload below.
 
-```json
-{
-  "New Features": [
-    "Live log streaming now updates clients immediately when new log lines are captured so you can watch logs refresh in real time."
-  ]
-}
+#### New Features
 
-```
+- Added live log streaming updates so clients can refresh logs in real time.
 
 ## Topics
 
