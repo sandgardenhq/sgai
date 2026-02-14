@@ -6,11 +6,6 @@
 - **Version**: 0.0.0+20260214
 - **Summary**: This release includes the updates listed below.
 
-```json
-{
-  "Additional Changes": [
-    "The macOS menu bar display is now simpler and easier to read."
-  ]
-}
+### Additional Changes
 
-```
+- Updated the macOS menu bar display to be simpler and easier to read.
