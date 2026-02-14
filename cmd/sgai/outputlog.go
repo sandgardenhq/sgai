@@ -182,6 +182,9 @@ func (s *Server) captureOutput(stdout, stderr io.ReadCloser, sessionKey, prefix 
 				sess.outputLog.add(logLine{prefix: prefix, text: line})
 			}
 			s.mu.Unlock()
+			if sess != nil {
+				s.sseBroker.publish(sseEvent{Type: "log:append", Data: map[string]string{"workspace": sessionKey}})
+			}
 		}
 	}
 
