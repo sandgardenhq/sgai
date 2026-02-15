@@ -164,6 +164,11 @@ sgai                              # Start on localhost:8080
 sgai --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
+## MCP transport
+
+SGAI exposes its Model Context Protocol (MCP) tools over HTTP.
+For details on the HTTP endpoint and agent identity header, see [MCP remote HTTP transport](./docs/reference/mcp-remote-http.md).
+
 ## Frontend Development
 
 The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
