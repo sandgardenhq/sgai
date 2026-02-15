@@ -95,7 +95,7 @@ make build
 ## How It Works
 
 ```
-GOAL.md → sgai serve → Monitor in Browser → Iterate
+GOAL.md → sgai → Monitor in Browser → Iterate
 ```
 
 1. **Define your goals** — Write a `GOAL.md` file describing what you want to build
