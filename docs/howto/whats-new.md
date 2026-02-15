@@ -1,12 +1,10 @@
 # What's new
 
-## 0.0.0+20260215 — Additional changes
+## 0.0.0+20260215 — Updated macOS menu bar and notifications
 
 - **Date**: 2026-02-15
 - **Version**: 0.0.0+20260215
-- **Summary**: This release includes the changes listed below.
-
-### Additional Changes
+- **Summary**: This release includes refined macOS menu bar handling and native notifications.
 
 ### New Features
 
