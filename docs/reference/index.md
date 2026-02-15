@@ -22,13 +22,8 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 - **Date**: 2026-02-15
 - **Version**: 0.0.0+20260215
-- **Summary**: This update addresses the changes listed below.
+- **Summary**: This update addresses notification system removal.
 
-```json
-{
-  "Breaking Changes": [
-    "Native notification support has been removed, so applications will no longer be able to send or receive notifications through this product."
-  ]
-}
+#### Breaking Changes
 
-```
+- Removed native notification support; applications can no longer send or receive notifications through this product.
