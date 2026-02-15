@@ -7,7 +7,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 - **Web dashboard** — Monitor and control agent execution via React SPA with real-time SSE updates, start/stop controls, and human-in-the-loop response interface
 - **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
 - **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
-- **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
+- **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI)
 - **MCP server** — Exposes workflow management tools (state updates, messaging, skills, snippets) to AI agents
 - **Retrospective system** — Analyze completed sessions, extract reusable skills and snippets
 - **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
@@ -87,7 +87,7 @@ make build
 4. **Launch the web dashboard:**
 
    ```sh
-   sgai serve
+   sgai
    ```
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
@@ -160,8 +160,8 @@ not implementation. Focus on outcomes.
 ## Usage
 
 ```sh
-sgai serve                              # Start on localhost:8080
-sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
+sgai                              # Start on localhost:8080
+sgai --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
 ## Frontend Development
