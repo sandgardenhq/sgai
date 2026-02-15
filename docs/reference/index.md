@@ -27,7 +27,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 ```json
 {
   "Breaking Changes": [
-    "Native notification support has been removed, so applications will no longer be able to send or receive notifications through this product. The notifications package has been deleted, and a goals document has been added to document the decision and expected migration away from native notifications."
+    "Native notification support has been removed, so applications will no longer be able to send or receive notifications through this product."
   ]
 }
 
