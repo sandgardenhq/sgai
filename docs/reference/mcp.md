@@ -12,7 +12,7 @@ The server listens on `127.0.0.1` and serves MCP requests under the `/mcp` path.
 
 ## Agent identity header
 
-Each MCP request can include an `X-Sgai-Agent-Identity` header.
+Each MCP request can include an `X-SGAI-Agent-Identity` header.
 
 The header format is:
 
