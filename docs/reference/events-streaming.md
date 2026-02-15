@@ -4,6 +4,12 @@
 
 ## Connect
 
+Connect to the global workspace-update stream:
+
+```text
+GET /api/v1/events/stream
+```
+
 Connect to a specific workspace stream:
 
 ```text
@@ -27,3 +33,9 @@ The snapshot payload contains:
 - `running`
 - `needsInput`
 - `status`
+
+## Workspace update event
+
+The global stream can send a `workspace:update` event.
+
+The event payload includes a `workspace` field with the workspace name.
