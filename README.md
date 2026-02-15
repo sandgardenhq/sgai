@@ -99,7 +99,7 @@ GOAL.md → sgai serve → Monitor in Browser → Iterate
 ```
 
 1. **Define your goals** — Write a `GOAL.md` file describing what you want to build
-2. **Launch the dashboard** — Run `sgai serve` to start the web interface
+2. **Launch the dashboard** — Run `sgai` to start the web interface
 3. **Monitor progress** — Watch agents work in real-time, see diffs, logs, and status updates
 4. **Provide guidance** — When agents need clarification, respond through the web UI
 5. **Iterate** — Review results, update goals, and continue until satisfied
