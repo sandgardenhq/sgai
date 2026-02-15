@@ -12,7 +12,7 @@
 
 ### Breaking Changes
 
-- Removed CLI and terminal-based interaction support.
+- Removed `CLI` and terminal-based interaction support.
 
 ### Additional Changes
 
