@@ -40,3 +40,4 @@ environment: {
 - `sgai mcp` loads state from `<working-dir>/.sgai/state.json`.
 
 
+
