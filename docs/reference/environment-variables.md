@@ -39,7 +39,4 @@ environment: {
 - If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`.
 - `sgai mcp` loads state from `<working-dir>/.sgai/state.json`.
 
-## `SGAI_NTFY`
-
-If `SGAI_NTFY` is set, `sgai` sends remote notifications by posting the message body to that URL.
 
