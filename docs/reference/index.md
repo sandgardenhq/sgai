@@ -22,7 +22,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 - **Date**: 2026-02-15
 - **Version**: 0.0.0+20260215
-- **Summary**: This update addresses notification system removal.
+- **Summary**: This update addresses the removal of the notification system.
 
 #### Breaking Changes
 
