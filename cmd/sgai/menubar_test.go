@@ -129,6 +129,23 @@ func TestCountActive(t *testing.T) {
 			},
 			want: 0,
 		},
+		{
+			name: "pinnedOnly",
+			items: []menuBarItem{
+				{name: "a", pinned: true},
+				{name: "b"},
+			},
+			want: 1,
+		},
+		{
+			name: "pinnedAndRunning",
+			items: []menuBarItem{
+				{name: "a", running: true},
+				{name: "b", pinned: true},
+				{name: "c", pinned: true, running: true},
+			},
+			want: 3,
+		},
 	}
 
 	for _, tc := range cases {
@@ -141,34 +158,65 @@ func TestCountActive(t *testing.T) {
 	}
 }
 
-func TestFilterAttentionItems(t *testing.T) {
-	items := []menuBarItem{
-		{name: "a", running: true},
-		{name: "b", needsInput: true},
-		{name: "c", stopped: true},
-		{name: "d", running: true},
-	}
+func TestFilterVisibleItems(t *testing.T) {
+	t.Run("attentionItems", func(t *testing.T) {
+		items := []menuBarItem{
+			{name: "a", running: true},
+			{name: "b", needsInput: true},
+			{name: "c", stopped: true},
+			{name: "d", running: true},
+		}
+		got := filterVisibleItems(items)
+		if len(got) != 2 {
+			t.Fatalf("filterVisibleItems() returned %d items; want 2", len(got))
+		}
+		if got[0].name != "b" {
+			t.Errorf("filterVisibleItems()[0].name = %q; want %q", got[0].name, "b")
+		}
+		if got[1].name != "c" {
+			t.Errorf("filterVisibleItems()[1].name = %q; want %q", got[1].name, "c")
+		}
+	})
 
-	got := filterAttentionItems(items)
-	if len(got) != 2 {
-		t.Fatalf("filterAttentionItems() returned %d items; want 2", len(got))
-	}
-	if got[0].name != "b" {
-		t.Errorf("filterAttentionItems()[0].name = %q; want %q", got[0].name, "b")
-	}
-	if got[1].name != "c" {
-		t.Errorf("filterAttentionItems()[1].name = %q; want %q", got[1].name, "c")
-	}
-}
+	t.Run("empty", func(t *testing.T) {
+		items := []menuBarItem{
+			{name: "a", running: true},
+		}
+		got := filterVisibleItems(items)
+		if len(got) != 0 {
+			t.Errorf("filterVisibleItems() returned %d items; want 0", len(got))
+		}
+	})
 
-func TestFilterAttentionItemsEmpty(t *testing.T) {
-	items := []menuBarItem{
-		{name: "a", running: true},
-	}
-	got := filterAttentionItems(items)
-	if len(got) != 0 {
-		t.Errorf("filterAttentionItems() returned %d items; want 0", len(got))
-	}
+	t.Run("pinnedIncluded", func(t *testing.T) {
+		items := []menuBarItem{
+			{name: "a", running: true},
+			{name: "b", pinned: true},
+			{name: "c", running: true, pinned: true},
+		}
+		got := filterVisibleItems(items)
+		if len(got) != 2 {
+			t.Fatalf("filterVisibleItems() returned %d items; want 2", len(got))
+		}
+		if got[0].name != "b" {
+			t.Errorf("filterVisibleItems()[0].name = %q; want %q", got[0].name, "b")
+		}
+		if got[1].name != "c" {
+			t.Errorf("filterVisibleItems()[1].name = %q; want %q", got[1].name, "c")
+		}
+	})
+
+	t.Run("pinnedWithAttention", func(t *testing.T) {
+		items := []menuBarItem{
+			{name: "a", needsInput: true},
+			{name: "b", pinned: true},
+			{name: "c", stopped: true},
+		}
+		got := filterVisibleItems(items)
+		if len(got) != 3 {
+			t.Fatalf("filterVisibleItems() returned %d items; want 3", len(got))
+		}
+	})
 }
 
 func TestFormatMenuItemLabel(t *testing.T) {
@@ -186,6 +234,26 @@ func TestFormatMenuItemLabel(t *testing.T) {
 			name: "stopped",
 			item: menuBarItem{name: "my-workspace", stopped: true},
 			want: "\u25A0 my-workspace (Stopped)",
+		},
+		{
+			name: "runningPinned",
+			item: menuBarItem{name: "my-workspace", running: true, pinned: true},
+			want: "\u25B6 my-workspace (Running)",
+		},
+		{
+			name: "idlePinned",
+			item: menuBarItem{name: "my-workspace", pinned: true},
+			want: "\u25CB my-workspace",
+		},
+		{
+			name: "pinnedWithStoppedFlag",
+			item: menuBarItem{name: "my-workspace", pinned: true, stopped: true},
+			want: "\u25CB my-workspace",
+		},
+		{
+			name: "defaultNoFlags",
+			item: menuBarItem{name: "my-workspace"},
+			want: "my-workspace",
 		},
 	}
 
@@ -355,6 +423,40 @@ func TestToMenuBarItem(t *testing.T) {
 		got := toMenuBarItem(w)
 		if got.stopped {
 			t.Error("expected stopped = false (never started)")
+		}
+	})
+
+	t.Run("pinned", func(t *testing.T) {
+		w := workspaceInfo{
+			DirName:    "pinned-ws",
+			Running:    false,
+			NeedsInput: false,
+			InProgress: false,
+			Pinned:     true,
+		}
+		got := toMenuBarItem(w)
+		if !got.pinned {
+			t.Error("expected pinned = true")
+		}
+		if got.stopped {
+			t.Error("expected stopped = false (never started)")
+		}
+	})
+
+	t.Run("pinnedRunning", func(t *testing.T) {
+		w := workspaceInfo{
+			DirName:    "pinned-running-ws",
+			Running:    true,
+			NeedsInput: false,
+			InProgress: true,
+			Pinned:     true,
+		}
+		got := toMenuBarItem(w)
+		if !got.pinned {
+			t.Error("expected pinned = true")
+		}
+		if !got.running {
+			t.Error("expected running = true")
 		}
 	})
 }

@@ -10,6 +10,7 @@ type menuBarItem struct {
 	needsInput bool
 	running    bool
 	stopped    bool
+	pinned     bool
 }
 
 type menuBarState struct {
@@ -32,6 +33,7 @@ func toMenuBarItem(w workspaceInfo) menuBarItem {
 		needsInput: w.NeedsInput,
 		running:    w.Running,
 		stopped:    !w.Running && w.InProgress,
+		pinned:     w.Pinned,
 	}
 }
 
@@ -58,17 +60,17 @@ func countRunning(items []menuBarItem) int {
 func countActive(items []menuBarItem) int {
 	count := 0
 	for _, item := range items {
-		if item.running || item.stopped || item.needsInput {
+		if item.running || item.stopped || item.needsInput || item.pinned {
 			count++
 		}
 	}
 	return count
 }
 
-func filterAttentionItems(items []menuBarItem) []menuBarItem {
+func filterVisibleItems(items []menuBarItem) []menuBarItem {
 	var result []menuBarItem
 	for _, item := range items {
-		if item.needsInput || item.stopped {
+		if item.needsInput || item.stopped || item.pinned {
 			result = append(result, item)
 		}
 	}
@@ -76,10 +78,18 @@ func filterAttentionItems(items []menuBarItem) []menuBarItem {
 }
 
 func formatMenuItemLabel(item menuBarItem) string {
-	if item.needsInput {
+	switch {
+	case item.needsInput:
 		return "\u26A0 " + item.name + " (Needs Input)"
+	case item.running && item.pinned:
+		return "\u25B6 " + item.name + " (Running)"
+	case item.pinned:
+		return "\u25CB " + item.name
+	case item.stopped:
+		return "\u25A0 " + item.name + " (Stopped)"
+	default:
+		return item.name
 	}
-	return "\u25A0 " + item.name + " (Stopped)"
 }
 
 func workspaceItemSubpath(item menuBarItem) string {

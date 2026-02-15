@@ -2,21 +2,23 @@
 
 package notify
 
-import (
-	"os/exec"
-	"strings"
-)
+/*
+#cgo CFLAGS: -x objective-c
+#cgo LDFLAGS: -framework Cocoa -framework UserNotifications
+
+#include <stdlib.h>
+
+extern void SendNativeNotification(const char *title, const char *message);
+*/
+import "C"
+
+import "unsafe"
 
 func sendLocal(title, message string) error {
-	title = escapeAppleScript(title)
-	message = escapeAppleScript(message)
-
-	script := `display notification "` + message + `" with title "` + title + `"`
-	return exec.Command("osascript", "-e", script).Run()
-}
-
-func escapeAppleScript(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
+	cTitle := C.CString(title)
+	defer C.free(unsafe.Pointer(cTitle))
+	cMessage := C.CString(message)
+	defer C.free(unsafe.Pointer(cMessage))
+	C.SendNativeNotification(cTitle, cMessage)
+	return nil
 }

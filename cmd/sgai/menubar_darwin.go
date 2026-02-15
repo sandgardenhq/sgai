@@ -104,7 +104,7 @@ func rebuildMenuFromServer(srv *Server) {
 
 	C.MenuBarAddSeparator()
 
-	for _, item := range filterAttentionItems(items) {
+	for _, item := range filterVisibleItems(items) {
 		label := formatMenuItemLabel(item)
 		itemURL := workspaceURL(baseURL, item.name, workspaceItemSubpath(item))
 		tag := allocTag(menuBarAction{actionURL: itemURL})

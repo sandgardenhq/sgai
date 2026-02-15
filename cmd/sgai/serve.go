@@ -519,8 +519,7 @@ func cmdServe(args []string) {
 		}
 	}()
 
-	_ = startMenuBar
-	<-ctx.Done()
+	startMenuBar(ctx, baseURL, srv)
 	if errClose := httpServer.Close(); errClose != nil {
 		log.Println("http server close:", errClose)
 	}
