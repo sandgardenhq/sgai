@@ -164,6 +164,27 @@ sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
 
+## macOS menu bar
+
+When `sgai serve` runs on macOS, it can expose a menu bar entry that lists workspaces.
+
+### What shows up
+
+The menu can include:
+
+- Workspaces that are **pinned** (so they stay visible)
+- Workspaces that need attention (for example, a workspace that is stopped or needs input)
+
+### Status indicators
+
+The menu uses short, icon-prefixed labels to communicate state:
+
+| Example label | Meaning |
+|---|---|
+| `▶ my-workspace (Running)` | The workspace is running and pinned. |
+| `○ my-workspace` | The workspace is pinned but not running. |
+| `my-workspace` | No special status is shown. |
+
 ## Frontend Development
 
 The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
