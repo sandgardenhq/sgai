@@ -2,6 +2,16 @@
 
 Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents work together to build your software. Monitor progress in real-time, provide guidance when needed, and iterate until your goals are achieved.
 
+## Automated Setup with opencode
+
+The fastest way to install SGAI is with [opencode](https://opencode.ai):
+
+```sh
+opencode run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+```
+
+This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](INSTALLATION.md) for the full step-by-step instructions.
+
 ## Features
 
 - **Web dashboard** — Monitor and control agent execution via React SPA with real-time SSE updates, start/stop controls, and human-in-the-loop response interface
@@ -23,6 +33,8 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 | [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
 | [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
 | [gh](https://cli.github.com/) (GitHub CLI)   | Creates draft PRs from fork merge flow                                    | Optional — merge works without PR creation |
+| [tmux](https://github.com/tmux/tmux)         | Terminal multiplexer — manages detached sessions for agent processes       |                           |
+| [rg](https://github.com/BurntSushi/ripgrep) (ripgrep) | Fast text search — used by completion verification and code search skills |                           |
 
 ### Environment Variables
 
@@ -50,7 +62,7 @@ make build
 1. **Install dependencies via Homebrew:**
 
    ```sh
-   brew install node anomalyco/tap/opencode jj graphviz oven-sh/bun/bun
+   brew install node anomalyco/tap/opencode jj graphviz oven-sh/bun/bun tmux ripgrep
    ```
 
 2. **Log in to your AI provider:**

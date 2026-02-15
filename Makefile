@@ -5,7 +5,7 @@ webapp-build:
 	cd cmd/sgai/webapp && bun install && bun run build.ts
 
 webapp-test:
-	cd cmd/sgai/webapp && bun test
+	cd cmd/sgai/webapp && bun install && bun test
 
 test: webapp-test
 	go test -v ./...
