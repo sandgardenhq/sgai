@@ -1,18 +1,32 @@
 # MCP server
 
-`sgai` provides an MCP server that exposes workflow-management tools over stdio.
+`sgai` provides an MCP (Model Context Protocol) server that exposes workflow-management tools over HTTP.
 
-## Run
+`sgai` starts an MCP server per workspace and passes its URL to agent processes.
 
-```sh
-sgai mcp
+## Connect
+
+The agent process receives the MCP URL in `SGAI_MCP_URL`.
+
+The server listens on `127.0.0.1` and serves MCP requests under the `/mcp` path.
+
+## Agent identity header
+
+Each MCP request can include an `X-Sgai-Agent-Identity` header.
+
+The header format is:
+
+```text
+<name>|<model>|<variant>
 ```
+
+Only `<name>` is required.
+
+If the header is missing (or `<name>` is empty), the server treats the agent name as `coordinator`.
 
 ## Working directory
 
-`sgai mcp` reads the working directory from `SGAI_MCP_WORKING_DIRECTORY`.
-
-If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`.
+The MCP server uses a workspace directory as its working directory.
 
 ## Tools
 
