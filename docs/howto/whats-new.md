@@ -11,5 +11,5 @@
 ### New Features
 
 - Added pinned workspace handling to the macOS menu bar so the correct workspace stays available and easy to access.
-- Updated the macOS menu bar to start as part of the server process so it is available earlier and managed more consistently.
+- Updated the macOS menu bar to start as part of the server process so it is available earlier and more consistently managed.
 - Updated macOS notifications to use the native notification system instead of `osascript` for improved reliability and consistent behavior.
