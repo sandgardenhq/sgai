@@ -16,4 +16,4 @@
 
 ### Additional Changes
 
-- Updated workflow event handling to be scoped per workspace.
+- Updated workflow event handling to be scoped per workspace for improved isolation and traceability.
