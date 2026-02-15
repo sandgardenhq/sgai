@@ -166,11 +166,9 @@ sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 
 ## macOS menu bar
 
-When `sgai serve` runs on macOS, it can expose a menu bar entry that lists workspaces.
-
 ### What shows up
 
-The menu can include:
+Menu items can include:
 
 - Workspaces that are **pinned** (so they stay visible)
 - Workspaces that need attention (for example, a workspace that is stopped or needs input)
