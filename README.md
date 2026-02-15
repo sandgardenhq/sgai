@@ -26,9 +26,6 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ### Environment Variables
 
-| Variable        | Purpose                                                                         |
-|-----------------|---------------------------------------------------------------------------------|
-
 No environment variables are currently documented.
 
 ## Installation
