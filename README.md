@@ -28,7 +28,8 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 | Variable        | Purpose                                                                         |
 |-----------------|---------------------------------------------------------------------------------|
-| `SGAI_NTFY`     | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
+
+No environment variables are currently documented.
 
 ## Installation
 
