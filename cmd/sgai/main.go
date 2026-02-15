@@ -26,7 +26,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sandgardenhq/sgai/pkg/notify"
 	"github.com/sandgardenhq/sgai/pkg/state"
 	"sigs.k8s.io/yaml"
 )
@@ -261,10 +260,6 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 	var iterationCounter int
 	var previousAgent string
 
-	defer func() {
-		notifyMsg := fmt.Sprintf("JOB COMPLETE - %s", filepath.Base(dir))
-		notify.Send("sgai", notifyMsg)
-	}()
 	for {
 		if ctx.Err() != nil {
 			fmt.Println("["+paddedsgai+"]", "interrupted, stopping workflow...")
@@ -870,9 +865,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			if err := state.Save(cfg.statePath, newState); err != nil {
 				log.Fatalln("failed to save state:", err)
 			}
-
-			notifyMsg := fmt.Sprintf("QUESTION - %s", filepath.Base(cfg.dir))
-			notify.Send("sgai", notifyMsg)
 
 			fmt.Println("["+cfg.paddedsgai+"]", "waiting for response via web UI...")
 
