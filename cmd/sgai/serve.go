@@ -420,6 +420,10 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 			sess.running = false
 			sess.mu.Unlock()
 			s.clearEverStartedOnCompletion(workspacePath)
+			s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{
+				Type: "session:update",
+				Data: map[string]string{"workspace": filepath.Base(workspacePath)},
+			})
 		}()
 
 		runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
@@ -446,6 +450,10 @@ func (s *Server) stopSession(workspacePath string) {
 	}
 
 	resetHumanCommunication(workspacePath)
+	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{
+		Type: "session:update",
+		Data: map[string]string{"workspace": filepath.Base(workspacePath)},
+	})
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {

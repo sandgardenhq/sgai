@@ -1,5 +1,33 @@
-@import "tailwindcss";
+---
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "backend-go-developer" -> "stpa-analyst"
+  "go-readability-reviewer" -> "stpa-analyst"
+  "general-purpose" -> "stpa-analyst"
+  "react-developer" -> "react-reviewer"
+  "react-reviewer" -> "stpa-analyst"
+  "project-critic-council"
+  "skill-writer"
+models:
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
+  "react-developer": "anthropic/claude-opus-4-6"
+  "react-reviewer": "anthropic/claude-opus-4-6"
+  "stpa-analyst": "anthropic/claude-opus-4-6"
+  "project-critic-council": ["anthropic/claude-opus-4-6"]
+  "skill-writer": "anthropic/claude-opus-4-6 (max)"
+completionGateScript: make test
+---
 
+- [x] announce `running completionGateScript: make test` in the human task message (update Go backend to set `task` field in workflow state so it appears in the UI status badge)
+- [x] navigate to dashboard on 'Failed to load workspace: workspace not found' (navigate to `/` instead of showing error text)
+- [x] remove the internal scrollbar in events inside Progress tab (remove ScrollArea entirely from EventTimeline, let page scroll naturally)
+- [x] add deployment skill to skel (at `cmd/sgai/skel/.sgai/skills/deployment/SKILL.md`)
+  - [x] And this skill introduces also a new standard: the '.deploy/' directory in which instructions, env files, and scripts are placed and used by the model to deploy the application.
+- [x] apply this theme https://tweakcn.com/editor/theme?theme=twitter (keep @import tailwindcss, add theme CSS after it)
+```
 :root {
   --background: oklch(1.0000 0 0);
   --foreground: oklch(0.1884 0.0128 248.5103);
@@ -160,3 +188,9 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 }
+```
+- [x] in the Progress tab, inside the workflow box, show [agent,models] pairs in a table (add models data to events API response in Go, display as table in WorkflowSection)
+- [x] the menu bar needs few updates
+  - [x] Don't show the alert triangle anymore
+  - [x] at the menu bar itself, show an inbox item whenever one of the workspaces are wiating for human to respond
+  - [x] use the empty circle and full circle (the same ones used for the TODO list) to indicate whether all factories are stopped (empty circle), or at least few of them are running (full circle; factories waiting for human response should count as running)

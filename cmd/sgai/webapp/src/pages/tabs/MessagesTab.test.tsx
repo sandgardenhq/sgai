@@ -82,13 +82,19 @@ describe("MessagesTab", () => {
     expect(screen.getAllByText("backend-developer").length).toBeGreaterThan(0);
   });
 
-  it("shows unread indicator for unread messages", async () => {
+  it("shows unread messages with bold styling", async () => {
     mockFetch.mockResolvedValue(new Response(JSON.stringify(messagesResponse)));
     renderMessagesTab();
 
     await waitFor(() => {
-      expect(screen.getByText("New")).toBeDefined();
+      expect(screen.getAllByText("coordinator").length).toBeGreaterThan(0);
     });
+
+    const summaries = document.querySelectorAll("summary");
+    const unreadSummary = Array.from(summaries).find((s) => s.className.includes("font-bold"));
+    expect(unreadSummary).toBeDefined();
+    const readSummary = Array.from(summaries).find((s) => !s.className.includes("font-bold"));
+    expect(readSummary).toBeDefined();
   });
 
   it("renders empty state when no messages", async () => {

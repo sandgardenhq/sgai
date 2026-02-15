@@ -236,9 +236,18 @@ export function WorkspaceDetail(): JSX.Element | null {
     }
   }, [detail, hasForks, activeTab, navigate, workspaceName]);
 
+  useEffect(() => {
+    if (error && error.message.toLowerCase().includes("workspace not found")) {
+      navigate("/", { replace: true });
+    }
+  }, [error, navigate]);
+
   if (loading && !detail) return <WorkspaceDetailSkeleton />;
 
   if (error) {
+    if (error.message.toLowerCase().includes("workspace not found")) {
+      return null;
+    }
     return (
       <p className="text-sm text-destructive">
         Failed to load workspace: {error.message}
@@ -457,19 +466,20 @@ export function WorkspaceDetail(): JSX.Element | null {
                   <Button
                     type="button"
                     size="sm"
-                    variant={detail.interactiveAuto ? "default" : "outline"}
+                    variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
                     onClick={handleSelfDrive}
                     disabled={isActionDisabled}
-                    aria-pressed={detail.interactiveAuto}
+                    aria-pressed={detail.running && detail.interactiveAuto}
                   >
                     {selfDriveLabel}
                   </Button>
                   <Button
                     type="button"
                     size="sm"
-                    variant={detail.running ? "default" : "outline"}
+                    variant={(detail.running && !detail.interactiveAuto) ? "default" : "outline"}
                     onClick={handleStart}
                     disabled={isActionDisabled}
+                    aria-pressed={detail.running && !detail.interactiveAuto}
                   >
                     Start
                   </Button>

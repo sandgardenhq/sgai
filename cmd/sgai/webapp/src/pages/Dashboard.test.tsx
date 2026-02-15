@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { Dashboard } from "./Dashboard";
 import { resetDefaultSSEStore } from "@/lib/sse-store";
@@ -51,6 +51,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   resetDefaultSSEStore();
   (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
@@ -157,8 +158,16 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("IN PROGRESS").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
     });
+
+    const inProgressSection = document.querySelector(".mb-3.pb-2.border-b");
+    expect(inProgressSection).not.toBeNull();
+
+    const links = inProgressSection!.querySelectorAll("a");
+    const linkNames = Array.from(links).map((a) => a.textContent?.trim());
+    expect(linkNames).toContain("project-alpha");
+    expect(linkNames).toContain("project-alpha-fork1");
   });
 
   it("renders workspace indicators (pinned, running, needs input)", async () => {
@@ -177,6 +186,9 @@ describe("Dashboard", () => {
     const pinnedIndicators = document.querySelectorAll("span");
     const hasPinned = Array.from(pinnedIndicators).some((el) => el.textContent === "📌");
     expect(hasPinned).toBe(true);
+
+    const needsInputIndicators = document.querySelectorAll('[title="Waiting for response"]');
+    expect(needsInputIndicators.length).toBeGreaterThan(0);
   });
 
   it("does not show running indicator for in-progress only workspaces", async () => {
@@ -302,5 +314,35 @@ describe("Dashboard", () => {
       const runningIndicators = document.querySelectorAll('[title="Running"]');
       expect(runningIndicators.length).toBeGreaterThan(0);
     });
+  });
+
+  it("does not show skeleton during SSE-triggered refresh (stale-while-revalidate)", async () => {
+    let resolveSecondFetch: ((value: Response) => void) | null = null;
+    const secondFetchPromise = new Promise<Response>((resolve) => {
+      resolveSecondFetch = resolve;
+    });
+
+    mockFetch
+      .mockResolvedValueOnce(new Response(JSON.stringify(workspacesResponse)))
+      .mockImplementationOnce(() => secondFetchPromise);
+
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(mockEventSources.length).toBeGreaterThan(0);
+    });
+
+    mockEventSources[0].simulateEvent("workspace:update", JSON.stringify({ workspace: "project-alpha" }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    const skeletons = document.querySelectorAll("[data-slot='skeleton']");
+    expect(skeletons.length).toBe(0);
+    expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+
+    resolveSecondFetch!(new Response(JSON.stringify(workspacesResponse)));
   });
 });

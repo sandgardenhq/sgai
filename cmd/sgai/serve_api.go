@@ -1305,6 +1305,11 @@ type apiEventEntry struct {
 	DateDivider     string `json:"dateDivider"`
 }
 
+type apiAgentModelEntry struct {
+	Agent  string   `json:"agent"`
+	Models []string `json:"models"`
+}
+
 type apiEventsResponse struct {
 	Events        []apiEventEntry       `json:"events"`
 	CurrentAgent  string                `json:"currentAgent"`
@@ -1314,6 +1319,7 @@ type apiEventsResponse struct {
 	HumanMessage  string                `json:"humanMessage"`
 	GoalContent   string                `json:"goalContent"`
 	ModelStatuses []apiModelStatusEntry `json:"modelStatuses,omitempty"`
+	AgentModels   []apiAgentModelEntry  `json:"agentModels,omitempty"`
 }
 
 func (s *Server) handleAPIWorkspaceEvents(w http.ResponseWriter, r *http.Request) {
@@ -1345,6 +1351,7 @@ func (s *Server) handleAPIWorkspaceEvents(w http.ResponseWriter, r *http.Request
 		HumanMessage:  wfState.HumanMessage,
 		GoalContent:   goalContent,
 		ModelStatuses: convertModelStatuses(orderedModelStatuses(workspacePath, wfState.ModelStatuses)),
+		AgentModels:   collectAgentModels(workspacePath),
 	})
 }
 
@@ -1618,6 +1625,7 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 	wfState.Status = state.StatusWorking
 	wfState.HumanMessage = ""
 	wfState.MultiChoiceQuestion = nil
+	wfState.Task = ""
 	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
 		http.Error(w, "failed to save state", http.StatusInternalServerError)
 		return
@@ -3463,4 +3471,29 @@ func resolveCurrentModel(workspacePath string, wfState state.Workflow) string {
 		return ""
 	}
 	return models[0]
+}
+
+func collectAgentModels(workspacePath string) []apiAgentModelEntry {
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	goalData, errRead := os.ReadFile(goalPath)
+	if errRead != nil {
+		return nil
+	}
+	metadata, errParse := parseYAMLFrontmatter(goalData)
+	if errParse != nil || len(metadata.Models) == 0 {
+		return nil
+	}
+	agents := slices.Sorted(maps.Keys(metadata.Models))
+	result := make([]apiAgentModelEntry, 0, len(agents))
+	for _, agent := range agents {
+		models := getModelsForAgent(metadata.Models, agent)
+		if len(models) == 0 {
+			continue
+		}
+		result = append(result, apiAgentModelEntry{
+			Agent:  agent,
+			Models: models,
+		})
+	}
+	return result
 }
