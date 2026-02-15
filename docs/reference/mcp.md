@@ -30,7 +30,7 @@ The MCP server uses a workspace directory as its working directory.
 
 ## Tools
 
-### `skills`
+### `find_skills`
 
 - Input: `{ "name": "..." }` (optional)
 - Behavior:
