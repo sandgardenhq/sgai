@@ -7,7 +7,7 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 - **Web dashboard** — Monitor and control agent execution via React SPA with real-time SSE updates, start/stop controls, and human-in-the-loop response interface
 - **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
 - **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
-- **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
+- **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI)
 - **MCP server** — Exposes workflow management tools (state updates, messaging, skills, snippets) to AI agents
 - **Retrospective system** — Analyze completed sessions, extract reusable skills and snippets
 - **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
@@ -87,7 +87,7 @@ make build
 4. **Launch the web dashboard:**
 
    ```sh
-   sgai serve
+   sgai
    ```
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
@@ -95,11 +95,11 @@ make build
 ## How It Works
 
 ```
-GOAL.md → sgai serve → Monitor in Browser → Iterate
+GOAL.md → sgai → Monitor in Browser → Iterate
 ```
 
 1. **Define your goals** — Write a `GOAL.md` file describing what you want to build
-2. **Launch the dashboard** — Run `sgai serve` to start the web interface
+2. **Launch the dashboard** — Run `sgai` to start the web interface
 3. **Monitor progress** — Watch agents work in real-time, see diffs, logs, and status updates
 4. **Provide guidance** — When agents need clarification, respond through the web UI
 5. **Iterate** — Review results, update goals, and continue until satisfied
@@ -160,9 +160,14 @@ not implementation. Focus on outcomes.
 ## Usage
 
 ```sh
-sgai serve                              # Start on localhost:8080
-sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
+sgai                              # Start on localhost:8080
+sgai --listen-addr 0.0.0.0:8080   # Start accessible externally
 ```
+
+## MCP transport
+
+SGAI exposes its Model Context Protocol (MCP) tools over HTTP.
+For details on the HTTP endpoint and agent identity header, see [MCP remote HTTP transport](./docs/reference/mcp-remote-http.md).
 
 ## Frontend Development
 
