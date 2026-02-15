@@ -364,6 +364,11 @@ export interface ApiEventEntry {
   dateDivider: string;
 }
 
+export interface ApiAgentModelEntry {
+  agent: string;
+  models: string[];
+}
+
 export interface ApiEventsResponse {
   events: ApiEventEntry[];
   currentAgent: string;
@@ -373,6 +378,7 @@ export interface ApiEventsResponse {
   humanMessage: string;
   goalContent: string;
   modelStatuses?: ApiModelStatusEntry[];
+  agentModels?: ApiAgentModelEntry[];
 }
 
 export interface ApiForkCommit {

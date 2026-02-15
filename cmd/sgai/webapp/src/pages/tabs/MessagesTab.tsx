@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
+import { cn } from "@/lib/utils";
 import type { ApiMessagesResponse, ApiMessageEntry } from "@/types";
 
 interface MessagesTabProps {
@@ -23,17 +23,23 @@ function MessagesTabSkeleton() {
 }
 
 function MessageItem({ message }: { message: ApiMessageEntry }) {
+  const isUnread = !message.read;
   return (
     <details className="border rounded-lg">
-      <summary className="cursor-pointer px-4 py-3 flex items-center gap-2 text-sm flex-nowrap overflow-hidden">
-        {!message.read && <Badge variant="default" className="text-xs shrink-0">New</Badge>}
+      <summary className={cn(
+        "cursor-pointer px-4 py-3 flex items-center gap-2 text-sm flex-nowrap overflow-hidden",
+        isUnread && "font-bold"
+      )}>
         <span className="whitespace-nowrap shrink-0">{message.fromAgent}</span>
         <span className="whitespace-nowrap shrink-0">{"\u2192"}</span>
         <span className="whitespace-nowrap shrink-0">{message.toAgent}:</span>
         {message.subject && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="truncate text-muted-foreground">{message.subject}</span>
+              <span className={cn(
+                "truncate",
+                isUnread ? "text-foreground" : "text-muted-foreground"
+              )}>{message.subject}</span>
             </TooltipTrigger>
             <TooltipContent className="max-w-sm">{message.subject}</TooltipContent>
           </Tooltip>

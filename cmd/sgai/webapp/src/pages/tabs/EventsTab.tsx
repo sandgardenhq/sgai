@@ -3,13 +3,13 @@ import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiEventsResponse, ApiEventEntry, ApiModelStatusEntry } from "@/types";
+import type { ApiEventsResponse, ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
@@ -44,6 +44,10 @@ function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsR
           className="max-w-full h-auto"
         />
 
+        {eventsData.agentModels && eventsData.agentModels.length > 0 && (
+          <AgentModelsTable entries={eventsData.agentModels} />
+        )}
+
         {eventsData.modelStatuses && eventsData.modelStatuses.length > 0 && (
           <ModelStatusList statuses={eventsData.modelStatuses} />
         )}
@@ -60,6 +64,44 @@ function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsR
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function AgentModelsTable({ entries }: { entries: ApiAgentModelEntry[] }) {
+  return (
+    <div className="text-sm">
+      <strong>Agent Models:</strong>
+      <Table className="mt-1">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-muted-foreground">Agent</TableHead>
+            <TableHead className="text-muted-foreground">Model(s)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entries.map((entry) => (
+            <TableRow key={entry.agent}>
+              <TableCell className="whitespace-nowrap">{entry.agent}</TableCell>
+              <TableCell>
+                {entry.models.map((model) => {
+                  const shortModel = model.split("/").pop() ?? model;
+                  return (
+                    <Tooltip key={model}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block mr-2 cursor-help truncate max-w-[200px]">
+                          {shortModel}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{model}</TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -95,43 +137,41 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
   }
 
   return (
-    <ScrollArea className="max-h-[calc(100vh-24rem)]">
-      <div className="flex flex-col">
-        {events.map((event, index) => {
-          const eventKey = `${event.timestamp}-${event.agent}-${event.description}`;
-          return (
-            <div key={eventKey}>
-              {event.showDateDivider && (
-                <div className="flex items-center gap-3 py-3 ml-[18px]">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-background px-3 py-1 rounded-full border">
-                    {event.dateDivider}
-                  </span>
+    <div className="flex flex-col">
+      {events.map((event, index) => {
+        const eventKey = `${event.timestamp}-${event.agent}-${event.description}`;
+        return (
+          <div key={eventKey}>
+            {event.showDateDivider && (
+              <div className="flex items-center gap-3 py-3 ml-[18px]">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-background px-3 py-1 rounded-full border">
+                  {event.dateDivider}
+                </span>
+              </div>
+            )}
+            <div className="flex gap-3 py-1.5">
+              <div className="flex flex-col items-center w-3 shrink-0 pt-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_rgba(var(--primary),0.2)]" />
+                {index < events.length - 1 && (
+                  <span className="w-0.5 flex-1 min-h-[20px] bg-border mt-1" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 pb-2">
+                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <time className="text-xs text-muted-foreground whitespace-nowrap">
+                    {event.formattedTime}
+                  </time>
+                  <Badge variant="secondary" className="text-[0.65rem] px-2 py-0">
+                    {event.agent}
+                  </Badge>
                 </div>
-              )}
-              <div className="flex gap-3 py-1.5">
-                <div className="flex flex-col items-center w-3 shrink-0 pt-1.5">
-                  <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_rgba(var(--primary),0.2)]" />
-                  {index < events.length - 1 && (
-                    <span className="w-0.5 flex-1 min-h-[20px] bg-border mt-1" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0 pb-2">
-                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <time className="text-xs text-muted-foreground whitespace-nowrap">
-                      {event.formattedTime}
-                    </time>
-                    <Badge variant="secondary" className="text-[0.65rem] px-2 py-0">
-                      {event.agent}
-                    </Badge>
-                  </div>
-                  <span className="text-sm break-words">{event.description}</span>
-                </div>
+                <span className="text-sm break-words">{event.description}</span>
               </div>
             </div>
-          );
-        })}
-      </div>
-    </ScrollArea>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

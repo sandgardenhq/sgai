@@ -14,7 +14,6 @@ models:
   "htmx-picocss-frontend-developer": "anthropic/claude-sonnet-4-5"
   "htmx-picocss-frontend-reviewer": "anthropic/claude-opus-4-6"
   "stpa-analyst": "anthropic/claude-opus-4-6"
-interactive: yes
 ---
 
 One or two paragraphs explaining what you want to do

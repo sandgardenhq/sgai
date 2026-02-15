@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Menu, X } from "lucide-react";
+import { Loader2, Menu, X, Inbox } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSSEEvent } from "@/hooks/useSSE";
 import { cn } from "@/lib/utils";
@@ -39,18 +40,16 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
           <TooltipContent>Pinned</TooltipContent>
         </Tooltip>
       )}
+      {workspace.needsInput && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Inbox className="h-3 w-3 text-primary" aria-label="Waiting for response" title="Waiting for response" />
+          </TooltipTrigger>
+          <TooltipContent>Waiting for response</TooltipContent>
+        </Tooltip>
+      )}
       {isActive && (
         <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
-      )}
-      {workspace.needsInput && (
-        <span
-          className="text-destructive text-xs"
-          role="img"
-          aria-label="Needs input"
-          title="Needs input"
-        >
-          ●
-        </span>
       )}
     </span>
   );
@@ -162,19 +161,8 @@ function InProgressSection({ workspaces, selectedName }: InProgressSectionProps)
 
   if (inProgress.length === 0) return null;
 
-  const hasNeedsInput = inProgress.some((w) => w.needsInput);
-
   return (
     <div className="mb-3 pb-2 border-b">
-      <div className={cn(
-        "text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1",
-        hasNeedsInput ? "text-destructive" : "text-muted-foreground"
-      )}>
-        {hasNeedsInput && (
-          <span className="text-destructive text-xs" role="img" aria-label="Needs input">●</span>
-        )}
-        IN PROGRESS
-      </div>
       {inProgress.map((w) => {
         const isSelected = w.name === selectedName;
         return (
@@ -207,6 +195,72 @@ function InProgressSection({ workspaces, selectedName }: InProgressSectionProps)
   );
 }
 
+function collectAllWorkspaces(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[] {
+  const all: ApiWorkspaceEntry[] = [];
+  for (const w of workspaces) {
+    all.push(w);
+    if (w.forks) {
+      for (const fork of w.forks) {
+        all.push(fork);
+      }
+    }
+  }
+  return all;
+}
+
+interface SidebarHeaderIndicatorsProps {
+  workspaces: ApiWorkspaceEntry[];
+}
+
+function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
+  const allWorkspaces = useMemo(() => collectAllWorkspaces(workspaces), [workspaces]);
+
+  const needsInputCount = useMemo(
+    () => allWorkspaces.filter((w) => w.needsInput).length,
+    [allWorkspaces],
+  );
+
+  const hasAnyRunning = useMemo(
+    () => allWorkspaces.some((w) => w.running || w.needsInput),
+    [allWorkspaces],
+  );
+
+  return (
+    <div className="flex items-center gap-2">
+      {needsInputCount > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="relative inline-flex items-center text-primary cursor-help">
+              <Inbox className="h-4 w-4" />
+              <Badge
+                variant="destructive"
+                className="absolute -top-2 -right-2.5 h-4 min-w-4 px-1 text-[0.6rem] leading-none flex items-center justify-center rounded-full"
+              >
+                {needsInputCount}
+              </Badge>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {needsInputCount === 1
+              ? "1 workspace waiting for response"
+              : `${needsInputCount} workspaces waiting for response`}
+          </TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-sm cursor-help" aria-label={hasAnyRunning ? "Some factories running" : "All factories stopped"}>
+            {hasAnyRunning ? "●" : "○"}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {hasAnyRunning ? "Some factories are running" : "All factories stopped"}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 interface DashboardProps {
   children: ReactNode;
 }
@@ -220,12 +274,15 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const hasLoadedOnce = useRef(false);
 
   const workspaceUpdateEvent = useSSEEvent("workspace:update");
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (!hasLoadedOnce.current) {
+      setLoading(true);
+    }
     setError(null);
 
     api.workspaces
@@ -234,6 +291,7 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
         if (!cancelled) {
           setWorkspaces(response.workspaces ?? []);
           setLoading(false);
+          hasLoadedOnce.current = true;
         }
       })
       .catch((err: unknown) => {
@@ -249,9 +307,11 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
   }, [refreshKey]);
 
   useEffect(() => {
-    if (workspaceUpdateEvent !== null) {
+    if (workspaceUpdateEvent === null) return;
+    const timeoutId = setTimeout(() => {
       setRefreshKey((k) => k + 1);
-    }
+    }, 100);
+    return () => clearTimeout(timeoutId);
   }, [workspaceUpdateEvent]);
 
   useEffect(() => {
@@ -278,6 +338,11 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
             <Menu className="h-4 w-4" />
           </Button>
           <span className="text-sm font-semibold">Workspaces</span>
+          {!loading && !error && (
+            <span className="ml-auto">
+              <SidebarHeaderIndicators workspaces={workspaces} />
+            </span>
+          )}
         </div>
       )}
 
@@ -299,17 +364,25 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
       >
         <div className="flex items-center justify-between px-2 py-2 md:hidden">
           <span className="text-sm font-semibold">Workspaces</span>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Close workspace list"
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {!loading && !error && <SidebarHeaderIndicators workspaces={workspaces} />}
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label="Close workspace list"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <Separator className="md:hidden" />
+        <div className="hidden md:flex items-center justify-between px-3 py-2">
+          <span className="text-sm font-semibold">Workspaces</span>
+          {!loading && !error && <SidebarHeaderIndicators workspaces={workspaces} />}
+        </div>
+        <Separator className="hidden md:block" />
         <ScrollArea className="flex-1 px-1 py-2">
           {loading && <WorkspaceTreeSkeleton />}
 
