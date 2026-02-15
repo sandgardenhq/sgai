@@ -32,6 +32,8 @@ sgai [--interactive] [--fresh] <target_directory>
 
 Start the web server for session management.
 
+On macOS, `sgai serve` also starts the menu bar app. See [macOS menu bar and notifications](./macos-menu-bar.md).
+
 ```sh
 sgai serve [--listen-addr addr]
 ```
