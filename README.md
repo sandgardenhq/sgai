@@ -31,7 +31,7 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 - **Version**: 0.0.0+20260216
 - **Summary**: This release includes refined Dashboard navigation and refreshed global styling.
 
-### Additional Changes
+#### Additional Changes
 
 - Updated the Dashboard to use a shared sidebar and sheet navigation layout, improved mobile navigation, and refreshed global styling.
 
