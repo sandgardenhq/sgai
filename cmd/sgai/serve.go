@@ -160,11 +160,23 @@ type configurableEditor struct {
 }
 
 func (e *configurableEditor) open(path string) error {
-	cmd := exec.Command(e.command, path)
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
+	{
+		cmd := exec.Command(e.command, path)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		err := cmd.Run()
+		if err == nil {
+			return nil
+		}
+	}
+	{
+		cmd := exec.Command("code", path)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		return cmd.Run()
+	}
 }
 
 func resolveEditor(configEditor string) (name, command string, isTerminal bool) {
