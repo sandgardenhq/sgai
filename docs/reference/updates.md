@@ -10,4 +10,4 @@ This page summarizes notable changes by release.
 
 ### New Features
 
-- Updated the `sgai` user experience with Twitter-style theming, improved navigation, richer dashboard views, progress indicators, an agent-to-model mapping display, `completionGateScript` status reporting, and a new deployment skill.
+- Improved the `sgai` user experience with Twitter-style theming, improved navigation, richer dashboard views, progress indicators, an agent-to-model mapping display, `completionGateScript` status reporting, and a new deployment skill.
