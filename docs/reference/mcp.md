@@ -23,6 +23,12 @@ If `SGAI_MCP_WORKING_DIRECTORY` is not set, the default working directory is `.`
   - When `name` is empty, lists available skills.
   - When `name` matches a skill name, returns the skill content.
 
+Example:
+
+```json
+{ "name": "stpa-overview" }
+```
+
 ### `find_snippets`
 
 - Input: `{ "language": "...", "query": "..." }` (both optional)
