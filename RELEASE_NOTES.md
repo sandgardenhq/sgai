@@ -1,10 +1,10 @@
 # Release Notes
 
-## 0.0.0+20260216 — New features and fixes
+## 0.0.0+20260216 — Web-only architecture and new workspace flows
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes new capabilities and fixes across the CLI and supporting packages.
+- **Summary**: This release includes a web-only architecture, expanded workspace management, and improvements across the UI, workflows, and documentation.
 
 ### New Features
 
@@ -22,7 +22,7 @@
 
 ### Breaking Changes
 
-- Removed the CLI/stdio MCP flow in favor of the web UI and per-workspace long-lived HTTP MCP servers, so interactive workflows must connect through the HTTP MCP server.
+- Removed the CLI/stdio MCP flow in favor of the web UI and per-workspace long-lived HTTP MCP servers.
 - Updated `sgai_find_skills` to return only skill names and descriptions, so callers must not rely on full skill payloads in the search response.
 - Removed use of the unsupported `--variant` flag when launching OpenCode, so invocations must use the documented model flag.
 
