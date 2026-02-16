@@ -2,6 +2,16 @@
 
 Execute the following steps in order. Verify each checkpoint before proceeding.
 
+## Automated Setup with opencode
+
+Run this command to have opencode follow this guide end-to-end:
+
+```sh
+opencode run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+```
+
+See [README.md](./README.md) for a short overview of what this automated flow does.
+
 ## Step 1: Check and Install Dependencies
 
 The following tools are required:
@@ -153,13 +163,13 @@ Start `sgai serve` in the TodoApp directory using a method that survives opencod
 
 **Determine the best persistence method for the current platform and start sgai:**
 
-- Try `nohup` first (most portable):
-  ```sh
-  cd ./SGAI/TodoApp && nohup sgai serve > sgai.log 2>&1 &
-  ```
-- If `tmux` is available, prefer it:
+- Use `tmux` if available (preferred):
   ```sh
   tmux new-session -d -s sgai -c ./SGAI/TodoApp 'sgai serve'
+  ```
+- Use `nohup` as a portable fallback:
+  ```sh
+  cd ./SGAI/TodoApp && nohup sgai serve > sgai.log 2>&1 &
   ```
 - If `screen` is available:
   ```sh
