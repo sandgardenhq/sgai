@@ -11,7 +11,7 @@
 ```json
 {
   "Additional Changes": [
-    "Updated the documentation to support automated installation and clarified the overall setup flow. The docs added `opencode`-based automated install instructions, refined the build/test steps, and updated the README with current dependencies and setup requirements."
+    "Updated the documentation to support automated installation and clarified the overall setup flow."
   ]
 }
 
