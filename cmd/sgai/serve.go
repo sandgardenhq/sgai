@@ -438,7 +438,13 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 			})
 		}()
 
-		runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
+		continuousPrompt := readContinuousModePrompt(workspacePath)
+		if continuousPrompt != "" {
+			setContinuousAutoMode(workspacePath)
+			runContinuousWorkflow(ctx, []string{workspacePath}, continuousPrompt, mcpURL, logWriter)
+		} else {
+			runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
+		}
 	}()
 
 	return startSessionResult{sess: sess}

@@ -463,36 +463,64 @@ export function WorkspaceDetail(): JSX.Element | null {
                       Respond
                     </Button>
                   )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
-                    onClick={handleSelfDrive}
-                    disabled={isActionDisabled}
-                    aria-pressed={detail.running && detail.interactiveAuto}
-                  >
-                    {selfDriveLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={(detail.running && !detail.interactiveAuto) ? "default" : "outline"}
-                    onClick={handleStart}
-                    disabled={isActionDisabled}
-                    aria-pressed={detail.running && !detail.interactiveAuto}
-                  >
-                    Start
-                  </Button>
-                  {detail.running && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleStop}
-                      disabled={isStartStopPending}
-                    >
-                      Stop
-                    </Button>
+                  {detail.continuousMode ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
+                        onClick={handleSelfDrive}
+                        disabled={isActionDisabled}
+                        aria-pressed={detail.running && detail.interactiveAuto}
+                      >
+                        Continuous Self-Drive
+                      </Button>
+                      {detail.running && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleStop}
+                          disabled={isStartStopPending}
+                        >
+                          Stop
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
+                        onClick={handleSelfDrive}
+                        disabled={isActionDisabled}
+                        aria-pressed={detail.running && detail.interactiveAuto}
+                      >
+                        {selfDriveLabel}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={(detail.running && !detail.interactiveAuto) ? "default" : "outline"}
+                        onClick={handleStart}
+                        disabled={isActionDisabled}
+                        aria-pressed={detail.running && !detail.interactiveAuto}
+                      >
+                        Start
+                      </Button>
+                      {detail.running && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleStop}
+                          disabled={isStartStopPending}
+                        >
+                          Stop
+                        </Button>
+                      )}
+                    </>
                   )}
                   {showForkAction && (
                     <Button
