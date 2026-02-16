@@ -13,7 +13,7 @@ Always run the code reviewer when one is available.
 Always make sure you use tmux and playwright to test the changes.
 
 For tests:
-use listen address `-listen-addr 127.0.0.1:8181`
+use listen address `-listen-addr 127.0.0.1:0` (observe the port number and use that from this moment on)
 use directory ./verification
 use `make build` to generate the binary
 
