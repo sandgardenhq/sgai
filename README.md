@@ -191,6 +191,11 @@ The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embe
 | [React Router](https://reactrouter.com)       | Client-side routing                     |
 | [Lucide React](https://lucide.dev)            | Icons                                   |
 
+Some shadcn/ui components also rely on a couple of small utility packages:
+
+- `class-variance-authority`
+- `tw-animate-css`
+
 ### Build Commands
 
 ```sh
