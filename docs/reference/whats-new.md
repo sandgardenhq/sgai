@@ -11,7 +11,7 @@ This page summarizes notable project updates.
 ```json
 {
   "Bug Fixes": [
-    "If the configured editor command cannot open a file, the system will now fall back to opening it in Visual Studio Code so you can keep working without manual retries. Specifically, when launching the configured editor returns a failure, the workflow attempts a secondary open using the `code` (VS Code) command as a fallback."
+    "Fixed editor launch failures by falling back to Visual Studio Code (`code`) when the configured editor could not open the file."
   ]
 }
 
