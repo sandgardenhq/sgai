@@ -18,19 +18,19 @@
 - Added a web-only architecture that runs one long-lived HTTP MCP server per workspace and isolates interactive state per workspace.
 - Added a continuous self-drive mode driven by `GOAL.md` `continuousModePrompt` and exposed as a UI control.
 - Added the `stpa-overview` skill and updated STPA startup so workflows are skill-driven rather than agent-wired.
-- Added an “Open In OpenCode” action that launches the OpenCode TUI locally when `opencode` is available on `PATH`.
+- Added an `Open In OpenCode` action that launches the OpenCode TUI locally when `opencode` is available on `PATH`.
 
 ### Breaking Changes
 
-- Removed the CLI/stdio MCP flow in favor of the web UI and per-workspace long-lived HTTP MCP servers.
-- Updated `sgai_find_skills` to return only skill names and descriptions, so callers must not rely on full skill payloads in the search response.
-- Removed use of the unsupported `--variant` flag when launching OpenCode, so invocations must use the documented model flag.
+- Removed the CLI/stdio MCP flow in favor of the web UI and per-workspace long-lived HTTP MCP servers, so migrate by using the web UI and per-workspace HTTP MCP server for interactive workflows.
+- Updated `sgai_find_skills` to return only skill names and descriptions, so migrate by updating callers to fetch full skill details separately.
+- Removed use of the unsupported `--variant` flag when launching OpenCode, so migrate by using the documented model flag.
 
 ### Bug Fixes
 
 - Fixed editor launching to fall back reliably when a preferred editor is missing or fails by detecting editor availability, allowing terminal editors, and falling back to VS Code.
 - Fixed workflow and message rendering crashes by preventing negative padding panics and correcting pending-message agent name resolution.
-- Fixed workflow completion to clear the “ever started” flag so workspaces do not remain in an incorrect started state.
+- Fixed workflow completion to clear the `ever started` flag so workspaces do not remain in an incorrect started state.
 - Fixed HTMX compose responses to use `Hx-Trigger` header casing for compatibility.
 
 ### Deprecations
