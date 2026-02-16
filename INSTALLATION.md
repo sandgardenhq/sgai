@@ -72,10 +72,10 @@ sgai --help
 
 ## Step 3: Create Workspace and Demo Project
 
-Create the following directory structure relative to the current working directory:
+Create the following directory structure relative to the current working directory. The `sgai` directory is the root from which `sgai serve` is started. Each subdirectory (like `TodoApp`) is a workspace that appears in the dashboard.
 
 ```
-./SGAI/
+./sgai/
   TodoApp/
     GOAL.md
     .sgai/
@@ -85,10 +85,10 @@ Create the following directory structure relative to the current working directo
 **Create directories:**
 
 ```sh
-mkdir -p ./SGAI/TodoApp/.sgai
+mkdir -p ./sgai/TodoApp/.sgai
 ```
 
-**Create `./SGAI/TodoApp/GOAL.md`** with this content:
+**Create `./sgai/TodoApp/GOAL.md`** with this content:
 
 ```markdown
 ---
@@ -124,13 +124,13 @@ Build a simple command-line todo application.
 - [ ] Add basic error handling
 ```
 
-**Create `./SGAI/INSTALLATIONS_NOTES.md`** — write a file with these sections:
+**Create `./sgai/INSTALLATIONS_NOTES.md`** — write a file with these sections:
 
 1. A title: "SGAI Installation Notes"
 2. A blockquote constraint: "when INSTALLATIONS_NOTES.md is present, read that file to understand how to start sgai"
-3. A "How to Start SGAI" section explaining to navigate to a project directory containing `GOAL.md` and `.sgai/`, then run `sgai serve`. Include that the dashboard is at http://localhost:8080.
+3. A "How to Start SGAI" section explaining to navigate to the `sgai/` directory (the root that contains workspaces like `TodoApp/`) and run `sgai serve`. Workspaces inside `sgai/` will appear in the dashboard at http://localhost:8080.
 4. A "How to Stop SGAI" section explaining how to find and kill the process (`ps aux | grep 'sgai serve'` then `kill <PID>`).
-5. A "How to Restart SGAI" section with: `cd SGAI/TodoApp && sgai serve`
+5. A "How to Restart SGAI" section with: `cd sgai && sgai serve`
 6. A "Troubleshooting" section noting that if `sgai` is not found, add Go binaries to PATH: `export PATH="$PATH:$(go env GOPATH)/bin"`
 
 ### ✅ Checkpoint
@@ -138,32 +138,32 @@ Build a simple command-line todo application.
 Verify the directory structure:
 
 ```sh
-ls -la ./SGAI/
-ls -la ./SGAI/TodoApp/
-ls -la ./SGAI/TodoApp/.sgai/
-cat ./SGAI/TodoApp/GOAL.md
-cat ./SGAI/INSTALLATIONS_NOTES.md
+ls -la ./sgai/
+ls -la ./sgai/TodoApp/
+ls -la ./sgai/TodoApp/.sgai/
+cat ./sgai/TodoApp/GOAL.md
+cat ./sgai/INSTALLATIONS_NOTES.md
 ```
 
 ---
 
 ## Step 4: Start SGAI
 
-Start `sgai serve` in the TodoApp directory using a method that survives opencode exiting.
+Start `sgai serve` from the `sgai/` directory (not from a workspace subdirectory). This is the root directory that contains workspaces — `sgai serve` discovers them automatically and shows them in the dashboard.
 
 **Determine the best persistence method for the current platform and start sgai:**
 
 - Try `nohup` first (most portable):
   ```sh
-  cd ./SGAI/TodoApp && nohup sgai serve > sgai.log 2>&1 &
+  cd ./sgai && nohup sgai serve > sgai.log 2>&1 &
   ```
 - If `tmux` is available, prefer it:
   ```sh
-  tmux new-session -d -s sgai -c ./SGAI/TodoApp 'sgai serve'
+  tmux new-session -d -s sgai -c ./sgai 'sgai serve'
   ```
 - If `screen` is available:
   ```sh
-  screen -dmS sgai bash -c 'cd ./SGAI/TodoApp && sgai serve'
+  screen -dmS sgai bash -c 'cd ./sgai && sgai serve'
   ```
 
 Use whichever method is available, preferring `tmux` > `nohup` > `screen`.
@@ -180,7 +180,7 @@ ps aux | grep 'sgai serve'
 curl -s http://localhost:8080 > /dev/null && echo "SGAI is running" || echo "SGAI is not responding"
 ```
 
-Update `./SGAI/INSTALLATIONS_NOTES.md` to reflect the actual persistence method used, so future sessions know how to restart sgai.
+Update `./sgai/INSTALLATIONS_NOTES.md` to reflect the actual persistence method used, so future sessions know how to restart sgai.
 
 ---
 
