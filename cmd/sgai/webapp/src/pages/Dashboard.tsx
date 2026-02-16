@@ -6,7 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Menu, X, Inbox } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { Loader2, Inbox } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSSEEvent } from "@/hooks/useSSE";
 import { cn } from "@/lib/utils";
@@ -73,7 +85,7 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
   }, [isSelected, hasForkSelected]);
 
   return (
-    <div className="mb-0.5">
+    <SidebarMenuItem className="mb-0.5">
       <div className="flex items-center gap-0">
         {hasForks ? (
           <button
@@ -87,58 +99,56 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
         ) : (
           <span className="w-5 h-5 inline-block shrink-0 mr-1" />
         )}
-        <Link
-          to={`/workspaces/${encodeURIComponent(workspace.name)}/progress`}
-          className={cn(
-            "flex items-center gap-1 flex-1 min-w-0 px-2 py-1.5 rounded text-sm no-underline transition-colors",
-            isSelected
-              ? "bg-primary/10 border-l-[3px] border-primary pl-[calc(0.5rem-3px)] font-semibold text-primary"
-              : "hover:bg-muted"
-          )}
+        <SidebarMenuButton
+          asChild
+          isActive={isSelected}
+          className="flex-1 min-w-0"
         >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                {workspace.name}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="right">{workspace.name}</TooltipContent>
-          </Tooltip>
-          <WorkspaceIndicators workspace={workspace} />
-        </Link>
+          <Link to={`/workspaces/${encodeURIComponent(workspace.name)}/progress`}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                  {workspace.name}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="right">{workspace.name}</TooltipContent>
+            </Tooltip>
+            <WorkspaceIndicators workspace={workspace} />
+          </Link>
+        </SidebarMenuButton>
       </div>
 
       {hasForks && expanded && (
         <div className="ml-2.5 pl-4 relative before:content-[''] before:absolute before:left-2.5 before:top-0 before:bottom-2 before:w-0.5 before:bg-border before:rounded-sm">
-          {workspace.forks?.map((fork) => {
+          <SidebarMenu>
+            {workspace.forks?.map((fork) => {
             const forkSelected = fork.name === selectedName;
             return (
-              <Link
-                key={fork.name}
-                to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}
-                className={cn(
-                  "flex items-center gap-1 py-1 px-2 rounded text-sm no-underline transition-colors relative",
-                  "before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm",
-                  forkSelected
-                    ? "bg-primary/10 border-l-[3px] border-primary pl-[calc(0.5rem-3px)] font-semibold text-primary"
-                    : "hover:bg-muted"
-                )}
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {fork.name}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{fork.name}</TooltipContent>
-                </Tooltip>
-                <WorkspaceIndicators workspace={fork} />
-              </Link>
+              <SidebarMenuItem key={fork.name}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={forkSelected}
+                  className="relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
+                >
+                  <Link to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {fork.name}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{fork.name}</TooltipContent>
+                    </Tooltip>
+                    <WorkspaceIndicators workspace={fork} />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             );
           })}
+          </SidebarMenu>
         </div>
       )}
-    </div>
+    </SidebarMenuItem>
   );
 }
 
@@ -163,34 +173,40 @@ function InProgressSection({ workspaces, selectedName }: InProgressSectionProps)
 
   return (
     <div className="mb-3 pb-2 border-b">
-      {inProgress.map((w) => {
-        const isSelected = w.name === selectedName;
-        return (
-            <Link
-              key={w.name}
-              to={w.needsInput
-              ? `/workspaces/${encodeURIComponent(w.name)}/respond`
-              : `/workspaces/${encodeURIComponent(w.name)}/progress`
-            }
-            className={cn(
-              "flex items-center gap-1 py-1 px-2 ml-2 rounded text-sm no-underline transition-colors mb-0.5",
-              isSelected
-                ? "bg-primary/10 border-l-[3px] border-primary pl-[calc(0.5rem-3px)] font-semibold text-primary"
-                : "hover:bg-destructive/10"
-            )}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {w.name}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right">{w.name}</TooltipContent>
-            </Tooltip>
-            <WorkspaceIndicators workspace={w} />
-          </Link>
-        );
-      })}
+      <SidebarMenu>
+        {inProgress.map((w) => {
+          const isSelected = w.name === selectedName;
+          return (
+            <SidebarMenuItem key={w.name}>
+              <SidebarMenuButton
+                asChild
+                isActive={isSelected}
+                className={cn(
+                  "ml-2 mb-0.5",
+                  !isSelected && "hover:bg-destructive/10"
+                )}
+              >
+                <Link
+                  to={w.needsInput
+                    ? `/workspaces/${encodeURIComponent(w.name)}/respond`
+                    : `/workspaces/${encodeURIComponent(w.name)}/progress`
+                  }
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {w.name}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{w.name}</TooltipContent>
+                  </Tooltip>
+                  <WorkspaceIndicators workspace={w} />
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
     </div>
   );
 }
@@ -261,19 +277,33 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
   );
 }
 
-interface DashboardProps {
+function MobileHeader({ workspaces, loading, error }: { workspaces: ApiWorkspaceEntry[]; loading: boolean; error: Error | null }) {
+  return (
+    <div className="flex items-center gap-2 pb-3 md:hidden">
+      <SidebarTrigger />
+      <span className="text-sm font-semibold">Workspaces</span>
+      {!loading && !error && (
+        <span className="ml-auto">
+          <SidebarHeaderIndicators workspaces={workspaces} />
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface DashboardContentProps {
   children: ReactNode;
 }
 
-export function Dashboard({ children }: DashboardProps): JSX.Element {
+function DashboardContent({ children }: DashboardContentProps): JSX.Element {
   const { name: selectedName } = useParams<{ name: string }>();
   const navigate = useNavigate();
+  const { setOpenMobile } = useSidebar();
 
   const [workspaces, setWorkspaces] = useState<ApiWorkspaceEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const hasLoadedOnce = useRef(false);
 
   const workspaceUpdateEvent = useSSEEvent("workspace:update");
@@ -316,101 +346,56 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
 
   useEffect(() => {
     if (selectedName) {
-      setIsSidebarOpen(false);
+      setOpenMobile(false);
     }
-  }, [selectedName]);
+  }, [selectedName, setOpenMobile]);
 
   const handleCreateWorkspace = useCallback(() => {
     navigate("/workspaces/new");
   }, [navigate]);
 
   return (
-    <div className="relative flex flex-col md:flex-row gap-0 h-[calc(100vh-4rem)]">
-      {!isSidebarOpen && (
-        <div className="flex items-center gap-2 pb-3 md:hidden">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            aria-label="Open workspace list"
-            onClick={() => setIsSidebarOpen(true)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-semibold">Workspaces</span>
-          {!loading && !error && (
-            <span className="ml-auto">
-              <SidebarHeaderIndicators workspaces={workspaces} />
-            </span>
-          )}
-        </div>
-      )}
-
-      {isSidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close workspace list"
-          className="absolute inset-0 z-10 bg-black/40 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        className={cn(
-          "absolute inset-y-0 left-0 z-20 w-[85vw] max-w-[320px] bg-background border-r flex flex-col transition-transform",
-          "md:static md:z-auto md:w-[280px] md:min-w-[240px] md:max-w-[320px] md:translate-x-0 md:border-b-0",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="flex items-center justify-between px-2 py-2 md:hidden">
-          <span className="text-sm font-semibold">Workspaces</span>
-          <div className="flex items-center gap-2">
+    <>
+      <Sidebar side="left" collapsible="offcanvas">
+        <SidebarHeader className="px-3 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">Workspaces</span>
             {!loading && !error && <SidebarHeaderIndicators workspaces={workspaces} />}
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label="Close workspace list"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        </div>
-        <Separator className="md:hidden" />
-        <div className="hidden md:flex items-center justify-between px-3 py-2">
-          <span className="text-sm font-semibold">Workspaces</span>
-          {!loading && !error && <SidebarHeaderIndicators workspaces={workspaces} />}
-        </div>
-        <Separator className="hidden md:block" />
-        <ScrollArea className="flex-1 px-1 py-2">
-          {loading && <WorkspaceTreeSkeleton />}
-
-          {error && (
-            <p className="text-sm text-destructive p-2">
-              Failed to load workspaces: {error.message}
-            </p>
-          )}
-
-          {!loading && !error && (
-            <>
-              <InProgressSection workspaces={workspaces} selectedName={selectedName} />
-              {workspaces.length > 0 ? (
-                workspaces.map((workspace) => (
-                  <WorkspaceTreeItem
-                    key={workspace.name}
-                    workspace={workspace}
-                    selectedName={selectedName}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground italic p-2">No workspaces found.</p>
-              )}
-            </>
-          )}
-        </ScrollArea>
+        </SidebarHeader>
         <Separator />
-        <div className="p-2">
+        <SidebarContent>
+          <ScrollArea className="flex-1 px-1 py-2">
+            {loading && <WorkspaceTreeSkeleton />}
+
+            {error && (
+              <p className="text-sm text-destructive p-2">
+                Failed to load workspaces: {error.message}
+              </p>
+            )}
+
+            {!loading && !error && (
+              <>
+                <InProgressSection workspaces={workspaces} selectedName={selectedName} />
+                <SidebarMenu>
+                  {workspaces.length > 0 ? (
+                    workspaces.map((workspace) => (
+                      <WorkspaceTreeItem
+                        key={workspace.name}
+                        workspace={workspace}
+                        selectedName={selectedName}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic p-2">No workspaces found.</p>
+                  )}
+                </SidebarMenu>
+              </>
+            )}
+          </ScrollArea>
+        </SidebarContent>
+        <Separator />
+        <SidebarFooter className="p-2">
           <Button
             variant="outline"
             className="w-full"
@@ -418,12 +403,29 @@ export function Dashboard({ children }: DashboardProps): JSX.Element {
           >
             [ + ]
           </Button>
-        </div>
-      </aside>
+        </SidebarFooter>
+      </Sidebar>
 
-      <main className="flex-1 overflow-auto pt-4 md:pt-0 md:pl-4">
-        {children}
-      </main>
-    </div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileHeader workspaces={workspaces} loading={loading} error={error} />
+        <main className="flex-1 overflow-auto pt-4 md:pt-0 md:pl-4">
+          {children}
+        </main>
+      </div>
+    </>
+  );
+}
+
+interface DashboardProps {
+  children: ReactNode;
+}
+
+export function Dashboard({ children }: DashboardProps): JSX.Element {
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-[calc(100vh-4rem)] w-full">
+        <DashboardContent>{children}</DashboardContent>
+      </div>
+    </SidebarProvider>
   );
 }
