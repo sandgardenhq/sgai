@@ -175,6 +175,32 @@ not implementation. Focus on outcomes.
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+| `continuousModePrompt` | When set to a non-empty string, `sgai serve` runs the workspace in continuous mode. The workflow repeats after completion and reacts to new steering messages and `GOAL.md` updates. |
+
+### Continuous mode (always-on)
+
+Use continuous mode when a workspace should keep running and pick up new instructions without requiring manual restarts.
+
+1. Open your workspace `GOAL.md`.
+2. Add `continuousModePrompt` to the YAML frontmatter.
+
+```markdown
+---
+continuousModePrompt: "Review the current state and plan next steps"
+---
+
+# Project Goal
+
+...
+```
+
+3. Start the dashboard as usual:
+
+```sh
+sgai serve
+```
+
+Continuous mode stays active for that workspace as long as `continuousModePrompt` remains set.
 
 ## Usage
 
