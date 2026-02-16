@@ -86,6 +86,7 @@ export interface ApiWorkspaceDetailResponse {
   hasSgai: boolean;
   hasEditedGoal: boolean;
   interactiveAuto: boolean;
+  continuousMode: boolean;
   currentAgent: string;
   currentModel: string;
   task: string;

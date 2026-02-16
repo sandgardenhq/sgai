@@ -72,6 +72,7 @@ const workspaceDetail: ApiWorkspaceDetailResponse = {
   hasSgai: true,
   hasEditedGoal: true,
   interactiveAuto: false,
+  continuousMode: false,
   currentAgent: "react-developer",
   currentModel: "anthropic/claude-opus-4-6",
   task: "Implementing Dashboard component",
@@ -494,6 +495,59 @@ describe("WorkspaceDetail", () => {
     await waitFor(() => {
       expect(screen.getByText("stopped")).toBeDefined();
     });
+  });
+
+  it("renders Continuous Self-Drive button when continuousMode is true and not running", async () => {
+    const continuousDetail = { ...workspaceDetail, running: false, continuousMode: true };
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(continuousDetail)),
+    );
+    renderWorkspaceDetail();
+
+    expect(await screen.findByRole("button", { name: "Continuous Self-Drive" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Self-drive" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
+  it("renders Continuous Self-Drive and Stop buttons when continuousMode is true and running", async () => {
+    const continuousRunning = { ...workspaceDetail, running: true, continuousMode: true };
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(continuousRunning)),
+    );
+    const { container } = renderWorkspaceDetail();
+    const view = within(container);
+
+    expect(await view.findByRole("button", { name: "Continuous Self-Drive" })).toBeDefined();
+    expect(view.getAllByRole("button", { name: "Stop" }).length).toBeGreaterThan(0);
+    expect(view.queryByRole("button", { name: "Self-Drive" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Start" })).toBeNull();
+  });
+
+  it("renders normal buttons when continuousMode is false and not running", async () => {
+    const normalDetail = { ...workspaceDetail, running: false, continuousMode: false };
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(normalDetail)),
+    );
+    renderWorkspaceDetail();
+
+    expect(await screen.findByRole("button", { name: "Self-drive" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Continuous Self-Drive" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
+  it("renders normal buttons when continuousMode is false and running", async () => {
+    const normalRunning = { ...workspaceDetail, running: true, continuousMode: false };
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(normalRunning)),
+    );
+    const { container } = renderWorkspaceDetail();
+    const view = within(container);
+
+    expect(await view.findByRole("button", { name: "Self-Drive" })).toBeDefined();
+    expect(view.getAllByRole("button", { name: "Stop" }).length).toBeGreaterThan(0);
+    expect(view.queryByRole("button", { name: "Continuous Self-Drive" })).toBeNull();
   });
 
   it("shows interrupted banner and reset action when status is working but session is stopped", async () => {

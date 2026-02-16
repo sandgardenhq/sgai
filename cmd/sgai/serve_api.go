@@ -753,6 +753,7 @@ type apiWorkspaceDetailResponse struct {
 	HasSGAI         bool                      `json:"hasSgai"`
 	HasEditedGoal   bool                      `json:"hasEditedGoal"`
 	InteractiveAuto bool                      `json:"interactiveAuto"`
+	ContinuousMode  bool                      `json:"continuousMode"`
 	CurrentAgent    string                    `json:"currentAgent"`
 	CurrentModel    string                    `json:"currentModel"`
 	Task            string                    `json:"task"`
@@ -857,6 +858,7 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 		HasSGAI:         hassgaiDirectory(workspacePath),
 		HasEditedGoal:   hasEditedGoal,
 		InteractiveAuto: interactiveAuto,
+		ContinuousMode:  readContinuousModePrompt(workspacePath) != "",
 		CurrentAgent:    currentAgent,
 		CurrentModel:    resolveCurrentModel(workspacePath, wfState),
 		Task:            task,
