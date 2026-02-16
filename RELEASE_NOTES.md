@@ -1,14 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260216 — Ad-hoc runs from Forks tab
+## 0.0.0+20260216 — Ad hoc runs from Forks tab
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes improvements to ad-hoc run initiation from the `Forks` tab.
+- **Summary**: This release includes improvements for starting ad hoc runs from the `Forks` tab.
 
 ### New Features
 
-- Added an inline run box on the `Forks` tab to start ad-hoc runs with model selection and in-place output, and updated the UI to use the `Models API` with corresponding test coverage.
+- Added an inline run box on the `Forks` tab to start ad hoc runs with model selection and in place output, and updated the UI to use the `Models API` with corresponding test coverage.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
