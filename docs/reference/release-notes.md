@@ -4,16 +4,11 @@
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes a Messages UI rendering update.
 
-```json
-{
-  "New Features": [
-    "Message content in the Messages tab now renders Markdown as rich text, with automated tests validating the generated HTML output."
-  ]
-}
+### New Features
 
-```
+- Added rich-text rendering for message bodies in the **Messages** tab by rendering content as Markdown and validating the generated HTML output with automated tests.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
