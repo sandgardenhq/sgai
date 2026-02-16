@@ -40,6 +40,19 @@ const messagesResponse: ApiMessagesResponse = {
   ],
 };
 
+const markdownMessagesResponse: ApiMessagesResponse = {
+  messages: [
+    {
+      id: 3,
+      fromAgent: "coordinator",
+      toAgent: "backend-developer",
+      body: "## Task\n\nPlease implement the **API** with:\n\n- endpoint `/users`\n- endpoint `/posts`\n\n```go\nfunc main() {}\n```",
+      subject: "API Implementation",
+      read: true,
+    },
+  ],
+};
+
 function renderMessagesTab() {
   return render(
     <MemoryRouter>
@@ -106,5 +119,34 @@ describe("MessagesTab", () => {
 
     const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
     expect(calledUrl).toContain("/api/v1/workspaces/test-project/messages");
+  });
+
+  it("renders markdown content in message body", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(markdownMessagesResponse)));
+    renderMessagesTab();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("coordinator").length).toBeGreaterThan(0);
+    });
+
+    const details = document.querySelector("details");
+    expect(details).not.toBeNull();
+    details!.setAttribute("open", "");
+
+    await waitFor(() => {
+      const heading = document.querySelector("h2");
+      expect(heading).not.toBeNull();
+      expect(heading!.textContent).toBe("Task");
+    });
+
+    const bold = document.querySelector("strong");
+    const strongTexts = Array.from(document.querySelectorAll("strong")).map((el) => el.textContent);
+    expect(strongTexts).toContain("API");
+
+    const listItems = document.querySelectorAll("li");
+    expect(listItems.length).toBe(2);
+
+    const codeBlock = document.querySelector("pre");
+    expect(codeBlock).not.toBeNull();
   });
 });
