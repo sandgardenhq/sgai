@@ -11,7 +11,7 @@
 ```json
 {
   "New Features": [
-    "Converted the STPA analyst agent to support a dedicated STPA overview capability as part of its standard workflow. The agent now loads a new `stpa-overview` skill and runs the complete STPA overview workflow through a dedicated skill definition with associated orchestration configuration."
+    "Converted the `stpa-analyst` agent to support a dedicated `stpa-overview` capability by loading the new `stpa-overview` skill and running the complete STPA overview workflow through a dedicated skill definition and orchestration configuration."
   ]
 }
 
