@@ -11,7 +11,7 @@ This page summarizes recent updates to `sgai`.
 ```json
 {
   "New Features": [
-    "Added a GOAL.md-driven continuous mode workflow so you can run an ongoing loop with clear controls and visibility into what the system is doing. This introduces a backend continuous-loop runner with steering triggers, state observability/telemetry, an API feature flag to enable the mode, and corresponding UI controls plus automated UI/test coverage."
+    "Added a GOAL.md-driven continuous mode workflow so you can run an ongoing loop with clear controls and visibility into what the system is doing."
   ]
 }
 
