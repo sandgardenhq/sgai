@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes additional updates across features and fixes.
+- **Summary**: This release includes improvements to ad-hoc run initiation from the `Forks` tab.
 
 ### New Features
 
