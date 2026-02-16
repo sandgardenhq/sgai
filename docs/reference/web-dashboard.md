@@ -22,6 +22,10 @@ The `sgai serve` command starts a web dashboard for monitoring workspaces, follo
 
 The dashboard shows a list of workspaces.
 
+### Workspace refresh behavior
+
+The workspaces list can refresh while keeping the existing list visible.
+
 ### Workspace row indicators
 
 - **Waiting for response**
@@ -59,6 +63,12 @@ Model values display in truncated form, with a tooltip that reveals the full mod
 ### Events timeline
 
 The events timeline renders directly in the page layout (without an internal scroll container).
+
+## Workflow completion gate
+
+When a workflow uses a completion gate script (for example, a `completionGateScript` value in `GOAL.md`), the dashboard can show a human task message that includes text like:
+
+- `running completionGateScript: …`
 
 ## Messages tab
 
