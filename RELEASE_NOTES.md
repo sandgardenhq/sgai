@@ -1,19 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260216 — Additional updates
+## 0.0.0+20260216 — Ad-hoc runs from Forks tab
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
 - **Summary**: This release includes additional updates across features and fixes.
 
-```json
-{
-  "New Features": [
-    "You can now start an ad-hoc run directly from the Forks tab using an inline run box that includes model selection and displays the output in place. Under the hood, the Forks UI has been updated to use the newer Models API for model picking and the associated test coverage has been updated to match the new UI flow and API usage."
-  ]
-}
+### New Features
 
-```
+- Added an inline run box on the `Forks` tab to start ad-hoc runs with model selection and in-place output, and updated the UI to use the `Models API` with corresponding test coverage.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
