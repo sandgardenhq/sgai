@@ -8,11 +8,4 @@
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Testing guidance was updated so you can run tests without worrying about conflicting with another service already using the same port. The test instructions now recommend binding the listener to an ephemeral (dynamically assigned) port rather than a fixed, preconfigured listen port to avoid collisions in CI and local environments."
-  ]
-}
-
-```
+- Updated testing guidance to recommend binding the test listener to an ephemeral (dynamically assigned) port to avoid port collisions in CI and local environments.
