@@ -23,6 +23,23 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 - **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
 - **Go-native** — Single binary, fast startup, minimal dependencies
 
+## Recent updates
+
+### 0.0.0+20260216 — Release notes update
+
+- **Date**: 2026-02-16
+- **Version**: 0.0.0+20260216
+- **Summary**: This update covers the changes listed below.
+
+```json
+{
+  "Additional Changes": [
+    "The Dashboard now uses a shared Sidebar/Sheet interface with improved mobile navigation and refreshed global styling. Technically, the Dashboard was refactored to adopt the shared Sidebar/Sheet UI system, enabling mobile sheet behavior and updating global styles to align with the new component patterns."
+  ]
+}
+
+```
+
 ## Prerequisites
 
 | Dependency                                   | Purpose                                                                   |                           |
