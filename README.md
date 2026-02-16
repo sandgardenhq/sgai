@@ -25,20 +25,15 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 
 ## Recent updates
 
-### 0.0.0+20260216 — Release notes update
+### 0.0.0+20260216 — Refined Dashboard navigation
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This update covers the changes listed below.
+- **Summary**: This update includes refined Dashboard navigation and refreshed global styling.
 
-```json
-{
-  "Additional Changes": [
-    "Updated the Dashboard to use a shared Sidebar/Sheet interface, improving mobile navigation and refreshing global styling."
-  ]
-}
+#### Additional Changes
 
-```
+- Updated the Dashboard to use a shared `Sidebar`/`Sheet` interface, improving mobile navigation and refreshing global styling.
 
 ## Prerequisites
 
