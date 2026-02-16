@@ -1,18 +1,11 @@
 # Updates
 
-## 0.0.0+20260216 — Additional changes
+## 0.0.0+20260216 — Added `stpa-overview` support
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes updates across multiple areas.
+- **Summary**: This release includes a new `stpa-overview` workflow capability for the `stpa-analyst` agent.
 
-### Additional Changes
+### New Features
 
-```json
-{
-  "New Features": [
-    "Converted the `stpa-analyst` agent to support a dedicated `stpa-overview` capability by loading the new `stpa-overview` skill and running the complete STPA overview workflow through a dedicated skill definition and orchestration configuration."
-  ]
-}
-
-```
+- Added a dedicated `stpa-overview` capability to the `stpa-analyst` agent by loading the `stpa-overview` skill and running the STPA overview workflow through a dedicated skill definition and orchestration configuration.
