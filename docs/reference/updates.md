@@ -8,11 +8,4 @@
 
 ### Additional Changes
 
-```json
-{
-  "Additional Changes": [
-    "Updated the documentation to support automated installation and clarified the overall setup flow."
-  ]
-}
-
-```
+- Updated the documentation to support automated installation and clarified the overall setup flow.
