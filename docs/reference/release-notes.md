@@ -8,7 +8,7 @@
 
 ### New Features
 
-- Added rich-text rendering for message bodies in the **Messages** tab by rendering content as Markdown and validating the generated HTML output with automated tests.
+- Added rich-text rendering for message bodies in the `Messages` tab by rendering content as Markdown and validating the generated HTML output with automated tests.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
