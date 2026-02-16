@@ -43,8 +43,14 @@ sgai serve
 
 ## What to expect in the dashboard
 
-- The workspace detail page shows a **Continuous Self-Drive** button.
+- When the workspace is not running, the workspace detail page shows a **Continuous Self-Drive** button instead of the usual **Self-drive** and **Start** buttons.
 - When the workspace is running, a **Stop** button is available.
+
+## Steering messages
+
+Continuous mode can start a new cycle when an unread message from the human partner arrives.
+
+When that happens, `sgai` adds the message content into `GOAL.md` so the next cycle can follow the updated direction. The message is inserted right after the YAML frontmatter when frontmatter is present. If the file has no frontmatter, the message is inserted at the beginning of the file.
 
 ## Notes
 
