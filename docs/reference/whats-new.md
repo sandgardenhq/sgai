@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes dependency updates for the web dashboard.
 
 ### Additional Changes
 
