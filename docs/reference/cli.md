@@ -22,6 +22,10 @@ sgai [--interactive] [--fresh] <target_directory>
   - `no`
   - `auto` (self-driving)
 
+  Related:
+
+  - Self-drive lock persistence in [`workflow state`](./workflow-state.md#self-drive-lock-interactiveautolock).
+
 - `--fresh`
 
   Force a fresh start (do not resume existing workflow).
