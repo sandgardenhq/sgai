@@ -2,6 +2,8 @@
 
 `sgai` persists workflow state as JSON in `.sgai/state.json` inside the project directory.
 
+This file is read and written by the `sgai` CLI and the `sgai serve` web server.
+
 ## File location
 
 - Path: `.sgai/state.json`
@@ -48,6 +50,13 @@ Common fields include:
 - `cost` (object with `totalCost`, `totalTokens`, and `byAgent`)
 - `modelStatuses` (object map of model ID to status string)
 - `currentModel` (string, format `agentName:modelSpec`)
+
+## Self-drive lock (`interactiveAutoLock`)
+
+`state.json` may include an `interactiveAutoLock` boolean.
+
+- When `interactiveAutoLock` is `true`, self-drive stays enabled across workflow resets that reinitialize the in-memory workflow state.
+- The web server persists changes to this field by saving `.sgai/state.json`.
 
 ## Messages
 
