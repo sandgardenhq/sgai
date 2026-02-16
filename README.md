@@ -92,6 +92,8 @@ make build
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
 
+   For dashboard UI details (workspace indicators, Progress tab layout, and more), see [Web dashboard](./docs/reference/web-dashboard.md).
+
 ## How It Works
 
 ```
@@ -156,6 +158,8 @@ not implementation. Focus on outcomes.
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+
+The dashboard can display agent-to-model assignments from the `models` map in the Progress tab.
 
 ## Usage
 
