@@ -2,6 +2,8 @@
 
 This page shows how the web dashboard structures its navigation sidebar using the shared Sidebar primitives.
 
+The sidebar uses a Sheet-style overlay on small screens. This keeps the mobile sidebar content in a portal-based layer instead of inside the normal page flow.
+
 ## What you build
 
 - A sidebar wrapped in `SidebarProvider` so the open/collapsed state is shared.
@@ -138,4 +140,7 @@ Wrap the part of the React tree that calls `useSidebar()` in `SidebarProvider`.
 
 ### Mobile overlay styles look wrong
 
-The sidebar uses a Sheet-based overlay on mobile viewports. Check the global stylesheet for the sidebar-related CSS custom properties and base layer styles.
+The sidebar uses a Sheet-based overlay on mobile viewports.
+
+1. Check the global stylesheet for the sidebar-related CSS custom properties and base layer styles.
+2. Verify that the sidebar content renders inside the overlay on small screens (the overlay should cover the app content, instead of pushing it aside).
