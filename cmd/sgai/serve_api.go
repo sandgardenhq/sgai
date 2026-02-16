@@ -3182,6 +3182,13 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 	if wfState.InteractiveAutoLock {
 		newAutoMode = true
 	}
+
+	wfState.InteractiveAutoLock = newAutoMode
+	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
+		return
+	}
+
 	result := s.startSession(workspacePath, newAutoMode)
 	if result.startError != nil {
 		http.Error(w, result.startError.Error(), http.StatusInternalServerError)

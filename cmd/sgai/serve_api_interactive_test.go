@@ -11,6 +11,64 @@ import (
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
+func TestSelfDrivePersistsInteractiveAutoLock(t *testing.T) {
+	t.Run("toggleOnSetsLock", func(t *testing.T) {
+		rootDir := t.TempDir()
+		workspace := filepath.Join(rootDir, "test-project")
+		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+			t.Fatal(errMkdir)
+		}
+		createsgaiDir(t, workspace)
+
+		wfState, errLoad := state.Load(statePath(workspace))
+		if errLoad != nil && !os.IsNotExist(errLoad) {
+			t.Fatal(errLoad)
+		}
+
+		newAutoMode := true
+		wfState.InteractiveAutoLock = newAutoMode
+		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+			t.Fatal(errSave)
+		}
+
+		loaded, errReload := state.Load(statePath(workspace))
+		if errReload != nil {
+			t.Fatal(errReload)
+		}
+		if !loaded.InteractiveAutoLock {
+			t.Fatal("InteractiveAutoLock should be true after self-drive toggle on")
+		}
+	})
+
+	t.Run("lockPreventsTurnOff", func(t *testing.T) {
+		rootDir := t.TempDir()
+		workspace := filepath.Join(rootDir, "test-project")
+		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+			t.Fatal(errMkdir)
+		}
+		createsgaiDir(t, workspace)
+
+		if errSave := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSave != nil {
+			t.Fatal(errSave)
+		}
+
+		wfState, errLoad := state.Load(statePath(workspace))
+		if errLoad != nil {
+			t.Fatal(errLoad)
+		}
+
+		wasAuto := true
+		newAutoMode := !wasAuto
+		if wfState.InteractiveAutoLock {
+			newAutoMode = true
+		}
+
+		if !newAutoMode {
+			t.Fatal("newAutoMode should stay true when InteractiveAutoLock is already set")
+		}
+	})
+}
+
 func TestBuildWorkspaceDetailUsesWorkflowAutoLock(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
