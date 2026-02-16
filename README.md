@@ -10,7 +10,7 @@ The fastest way to install SGAI is with [opencode](https://opencode.ai):
 opencode run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
 
-This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](INSTALLATION.md) for the full step-by-step instructions.
+This reads [`INSTALLATION.md`](./INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](./INSTALLATION.md) for the full step-by-step instructions.
 
 ## Features
 
