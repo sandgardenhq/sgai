@@ -6,6 +6,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 - [CLI commands](./cli.md)
 - [Environment variables](./environment-variables.md)
+- [Webapp Forks tab (Ad-hoc Prompt)](./webapp-forks-tab.md)
 - [Project configuration (`sgai.json`)](./project-configuration.md)
 - [Workflow state (`.sgai/state.json`)](./workflow-state.md)
 - [MCP server](./mcp.md)
