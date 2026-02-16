@@ -9,7 +9,7 @@
 ```json
 {
   "New Features": [
-    "Message content in the Messages tab is now displayed using rich text formatting so that Markdown is rendered for easier reading. Specifically, the Messages tab renders message bodies as Markdown and includes automated tests that validate the generated HTML output."
+    "Message content in the Messages tab now renders Markdown as rich text, with automated tests validating the generated HTML output."
   ]
 }
 
