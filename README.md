@@ -4,10 +4,17 @@ Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents wo
 
 ## Automated Setup with opencode
 
-The fastest way to install SGAI is with [opencode](https://opencode.ai):
+The fastest way to install SGAI is with [opencode](https://opencode.ai).
+
+**Before you begin:**
+
+1. **opencode must be up-to-date.** Update it with `opencode update` or reinstall from [opencode.ai/docs/#install](https://opencode.ai/docs/#install).
+2. **You must be authenticated to Claude.** Run `opencode auth login`, select **Anthropic** → **Claude Pro/Max**, and complete the OAuth flow.
+
+Then run:
 
 ```sh
-opencode run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+opencode --model anthropic/claude-opus-4-6 run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
 
 This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](INSTALLATION.md) for the full step-by-step instructions.
