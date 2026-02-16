@@ -8,4 +8,4 @@
 
 ### Additional Changes
 
-- Updated `lucide-react` from `0.563.0` to `0.564.0` in the `cmd/sgai/webapp` dependency set.
+- Updated `lucide-react` from `0.563.0` to `0.564.0` in `cmd/sgai/webapp`.
