@@ -22,6 +22,11 @@ sgai [--interactive] [--fresh] <target_directory>
   - `no`
   - `auto` (self-driving)
 
+  Notes:
+
+  - When `sgai` runs an editor command and the command returns an error, `sgai` retries by launching Visual Studio Code via the `code` command.
+  - The `code` command must be available on `PATH` for this fallback to work.
+
 - `--fresh`
 
   Force a fresh start (do not resume existing workflow).
