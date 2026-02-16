@@ -49,6 +49,12 @@ Common fields include:
 - `modelStatuses` (object map of model ID to status string)
 - `currentModel` (string, format `agentName:modelSpec`)
 
+## Task field
+
+The `task` field is a short, human-readable status string.
+
+The web UI can surface this string in status UI (for example, to announce that a configured `completionGateScript` is running).
+
 ## Messages
 
 A message entry includes:
