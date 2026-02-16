@@ -256,11 +256,12 @@ describe("Dashboard", () => {
     const { container } = renderDashboard();
 
     await waitFor(() => {
-      const layout = container.querySelector("div.flex");
-      expect(layout?.className).toContain("flex-col");
-      const aside = container.querySelector("aside");
-      expect(aside?.className).toContain("w-[85vw]");
-      expect(aside?.className).toContain("md:w-[280px]");
+      const sidebarWrapper = container.querySelector("[data-slot='sidebar-wrapper']");
+      expect(sidebarWrapper?.className).toContain("flex");
+      const sidebar = container.querySelector("[data-sidebar='sidebar']");
+      expect(sidebar).toBeTruthy();
+      const contentArea = container.querySelector("main");
+      expect(contentArea?.className).toContain("overflow-auto");
     });
   });
 
