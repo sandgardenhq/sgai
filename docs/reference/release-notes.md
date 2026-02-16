@@ -1,14 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260216 — Release notes updates
+## 0.0.0+20260216 — Render Markdown in Messages tab
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes a Messages UI rendering update.
+- **Summary**: This release includes improved message rendering in the `Messages` tab.
 
 ### New Features
 
-- Added rich-text rendering for message bodies in the `Messages` tab by rendering content as Markdown and validating the generated HTML output with automated tests.
+- Added rich-text rendering for message bodies in the `Messages` tab by rendering content as `Markdown` and validating the generated `HTML` output with automated tests.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
