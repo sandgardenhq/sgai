@@ -1,12 +1,10 @@
 # What's new
 
-This page summarizes notable project updates.
-
-## 0.0.0+20260216 — Release updates
+## 0.0.0+20260216 — Improved editor launch resilience
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This release includes the changes listed in the sections below.
+- **Summary**: This release includes improved editor launch resilience when the configured editor cannot open a file.
 
 ### Bug Fixes
 
