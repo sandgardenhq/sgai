@@ -29,11 +29,11 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This update includes refined Dashboard navigation and refreshed global styling.
+- **Summary**: This release includes refined Dashboard navigation and refreshed global styling.
 
 #### Additional Changes
 
-- Updated the Dashboard to use a shared `Sidebar`/`Sheet` interface, improving mobile navigation and refreshing global styling.
+- Updated the Dashboard to use a shared sidebar and sheet navigation layout, improving mobile navigation and refreshing global styling.
 
 ## Prerequisites
 
