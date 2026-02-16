@@ -34,7 +34,7 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 ```json
 {
   "Additional Changes": [
-    "The Dashboard now uses a shared Sidebar/Sheet interface with improved mobile navigation and refreshed global styling. Technically, the Dashboard was refactored to adopt the shared Sidebar/Sheet UI system, enabling mobile sheet behavior and updating global styles to align with the new component patterns."
+    "Updated the Dashboard to use a shared Sidebar/Sheet interface, improving mobile navigation and refreshing global styling."
   ]
 }
 
