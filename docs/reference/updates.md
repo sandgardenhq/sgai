@@ -8,13 +8,6 @@ This page summarizes notable changes by release.
 - **Version**: 0.0.0+20260216
 - **Summary**: This update addresses the changes listed below.
 
-### Generated change set (raw)
+### New Features
 
-```json
-{
-  "New Features": [
-    "The sgai user experience was enhanced with a more modern visual style, improved navigation, and clearer progress feedback across key workflows. This update adds Twitter-style theming, richer dashboard views, progress indicators, an agent↔model mapping display, `completionGateScript` status reporting, and a new deployment skill, along with additional navigation and UI polish."
-  ]
-}
-
-```
+- Updated the `sgai` user experience with Twitter-style theming, improved navigation, richer dashboard views, progress indicators, an agent-to-model mapping display, `completionGateScript` status reporting, and a new deployment skill.
