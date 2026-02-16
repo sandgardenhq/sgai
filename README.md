@@ -33,7 +33,7 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 
 #### Additional Changes
 
-- Updated the Dashboard to use a shared sidebar and sheet navigation layout, improving mobile navigation and refreshing global styling.
+- Updated the Dashboard to use a shared sidebar and sheet navigation layout, improved mobile navigation, and refreshed global styling.
 
 ## Prerequisites
 
