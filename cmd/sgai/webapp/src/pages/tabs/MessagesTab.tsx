@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiMessagesResponse, ApiMessageEntry } from "@/types";
@@ -46,9 +47,7 @@ function MessageItem({ message }: { message: ApiMessageEntry }) {
           <div className="text-xs text-muted-foreground">
             <strong>To:</strong> {message.toAgent}
           </div>
-          <div className="prose prose-sm max-w-none mt-2 whitespace-pre-wrap text-sm">
-            {message.body}
-          </div>
+          <MarkdownContent content={message.body} className="mt-2" />
         </div>
       )}
     </details>
