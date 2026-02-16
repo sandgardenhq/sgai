@@ -9,6 +9,7 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 - [Project configuration (`sgai.json`)](./project-configuration.md)
 - [Workflow state (`.sgai/state.json`)](./workflow-state.md)
 - [MCP server](./mcp.md)
+- [Web dashboard sidebar layout](./web-dashboard-sidebar.md)
 
 ## Examples
 
