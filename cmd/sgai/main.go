@@ -245,11 +245,13 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 	}()
 
 	if !resuming {
+		preservedAutoLock := wfState.InteractiveAutoLock
 		wfState = state.Workflow{
-			Status:       state.StatusWorking,
-			Messages:     []state.Message{},
-			GoalChecksum: newChecksum,
-			VisitCounts:  initVisitCounts(allAgents),
+			Status:              state.StatusWorking,
+			Messages:            []state.Message{},
+			GoalChecksum:        newChecksum,
+			VisitCounts:         initVisitCounts(allAgents),
+			InteractiveAutoLock: preservedAutoLock,
 		}
 		if err := state.Save(stateJSONPath, wfState); err != nil {
 			log.Println("failed to initialize state.json:", err)
