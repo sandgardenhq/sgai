@@ -1,4 +1,4 @@
-# Release notes
+# Release Notes
 
 ## 0.0.0+20260216 — Release notes updates
 
