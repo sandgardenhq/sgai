@@ -2,11 +2,11 @@
 
 This page summarizes notable changes by release.
 
-## 0.0.0+20260216 — Pending update summary
+## 0.0.0+20260216 — Improved web dashboard experience
 
 - **Date**: 2026-02-16
 - **Version**: 0.0.0+20260216
-- **Summary**: This update addresses the changes listed below.
+- **Summary**: This release includes a refined `sgai` web dashboard experience and related workflow visibility improvements.
 
 ### New Features
 
