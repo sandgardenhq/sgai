@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router";
 import { ForksTab } from "./ForksTab";
 import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiForksResponse } from "@/types";
+import type { ApiForksResponse, ApiModelsResponse } from "@/types";
 
 class MockEventSource {
   url: string;
@@ -89,6 +89,14 @@ const workspacesResponse = {
   ],
 };
 
+const modelsResponse: ApiModelsResponse = {
+  models: [
+    { id: "anthropic/claude-sonnet-4-20250514", name: "Claude Sonnet" },
+    { id: "anthropic/claude-opus-4-20250514", name: "Claude Opus" },
+  ],
+  defaultModel: "anthropic/claude-sonnet-4-20250514",
+};
+
 function mockForksAndWorkspaces() {
   return mockFetch.mockImplementation((input: string | URL | Request) => {
     const url = String(input);
@@ -97,6 +105,9 @@ function mockForksAndWorkspaces() {
     }
     if (url.endsWith("/api/v1/workspaces")) {
       return Promise.resolve(new Response(JSON.stringify(workspacesResponse)));
+    }
+    if (url.includes("/api/v1/models")) {
+      return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
     }
     return Promise.resolve(new Response("{}"));
   });
@@ -176,6 +187,9 @@ describe("ForksTab", () => {
       if (url.endsWith("/api/v1/workspaces")) {
         return Promise.resolve(new Response(JSON.stringify(workspacesResponse)));
       }
+      if (url.includes("/api/v1/models")) {
+        return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+      }
       return Promise.resolve(new Response("{}"));
     });
     renderForksTab();
@@ -199,11 +213,69 @@ describe("ForksTab", () => {
     renderForksTab();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
     const calledUrls = mockFetch.mock.calls.map((call) => (call[0] as string));
     expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/forks"))).toBe(true);
     expect(calledUrls.some((url) => url.endsWith("/api/v1/workspaces"))).toBe(true);
+    expect(calledUrls.some((url) => url.includes("/api/v1/models"))).toBe(true);
+  });
+
+  it("renders run box with model selector after forks load", async () => {
+    mockForksAndWorkspaces();
+    renderForksTab();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Model")).toBeDefined();
+    });
+
+    expect(screen.getByText("Ad-hoc Prompt")).toBeDefined();
+    expect(screen.getByLabelText("Prompt")).toBeDefined();
+  });
+
+  it("renders run box submit button", async () => {
+    mockForksAndWorkspaces();
+    renderForksTab();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Submit" })).toBeDefined();
+    });
+  });
+
+  it("renders run box below empty forks state", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/forks")) {
+        return Promise.resolve(new Response(JSON.stringify({ forks: [] })));
+      }
+      if (url.endsWith("/api/v1/workspaces")) {
+        return Promise.resolve(new Response(JSON.stringify(workspacesResponse)));
+      }
+      if (url.includes("/api/v1/models")) {
+        return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+    renderForksTab();
+
+    await waitFor(() => {
+      expect(screen.getByText(/No forks yet/)).toBeDefined();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Ad-hoc Prompt")).toBeDefined();
+    });
+  });
+
+  it("populates model selector with available models", async () => {
+    mockForksAndWorkspaces();
+    renderForksTab();
+
+    await waitFor(() => {
+      expect(screen.getByText("Claude Sonnet")).toBeDefined();
+    });
+
+    expect(screen.getByText("Claude Opus")).toBeDefined();
   });
 });
