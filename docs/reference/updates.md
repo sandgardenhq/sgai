@@ -8,4 +8,4 @@
 
 ### Additional Changes
 
-- Updated the documentation to support automated installation and clarified the overall setup flow.
+- Updated the documentation to cover automated installation and clarify the overall setup flow.
