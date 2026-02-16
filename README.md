@@ -8,7 +8,7 @@ The fastest way to install SGAI is with [opencode](https://opencode.ai).
 
 **Before you begin:**
 
-1. **opencode must be up-to-date.** Update it with `opencode update` or reinstall from [opencode.ai/docs/#install](https://opencode.ai/docs/#install).
+1. **opencode must be up to date.** Update it with `opencode update` or reinstall from [opencode.ai/docs/#install](https://opencode.ai/docs/#install).
 2. **You must be authenticated to Claude.** Run `opencode auth login`, select **Anthropic** → **Claude Pro/Max**, and complete the OAuth flow.
 
 Then run:
