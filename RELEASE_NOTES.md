@@ -9,7 +9,7 @@
 ```json
 {
   "New Features": [
-    "The inbox indicator is now a clickable control that takes users directly to the first workspace that needs attention. This update changes the inbox indicator UI to a button that routes to the first needs-input workspace and adds automated test coverage for the navigation behavior."
+    "Updated the inbox indicator to a clickable button that routes users to the first workspace needing attention and added automated tests for the navigation behavior."
   ]
 }
 
