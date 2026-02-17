@@ -48,6 +48,7 @@ beforeEach(() => {
         mockEventSources.push(this);
       }
     } as unknown as typeof EventSource;
+  resetDefaultSSEStore();
 });
 
 afterEach(() => {
