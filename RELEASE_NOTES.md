@@ -6,7 +6,7 @@
 - **Version**: 0.0.0+20260217
 - **Summary**: This release includes updates to inbox navigation behavior.
 
-### New Features
+### Bug Fixes
 
 - Updated the inbox indicator to a clickable button that routes users to the first workspace requiring attention and added automated tests for the navigation behavior.
 
