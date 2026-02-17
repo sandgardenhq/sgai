@@ -1,21 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260217 — Draft release notes
+## 0.0.0+20260217 — Updated dashboard branding
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes the changes listed below.
+- **Summary**: This release includes updates to the dashboard UI to reflect SGAI branding.
 
-### Draft (unformatted)
+### New Features
 
-```json
-{
-  "New Features": [
-    "Updated the dashboard to show the new SGAI branding in the sidebar and mobile header, including new logo assets and static asset serving from `/assets/`."
-  ]
-}
-
-```
+- Updated the dashboard to show the new SGAI branding in the sidebar and mobile header, including new logo assets and static asset serving from `/assets/`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
