@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import sgaiLogo from "@/assets/sgai-logo.svg";
 import {
   Sidebar,
   SidebarContent,
@@ -279,13 +280,15 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
 
 function MobileHeader({ workspaces, loading, error }: { workspaces: ApiWorkspaceEntry[]; loading: boolean; error: Error | null }) {
   return (
-    <div className="flex items-center gap-2 pb-3 md:hidden">
+    <div className="relative flex items-center gap-2 pb-3 md:hidden">
       <SidebarTrigger />
       <span className="text-sm font-semibold">Workspaces</span>
+      <span className="absolute left-1/2 -translate-x-1/2">
+        <img src={sgaiLogo} alt="SGAI" className="h-[28px] w-auto" />
+      </span>
+      <span className="flex-1" />
       {!loading && !error && (
-        <span className="ml-auto">
-          <SidebarHeaderIndicators workspaces={workspaces} />
-        </span>
+        <SidebarHeaderIndicators workspaces={workspaces} />
       )}
     </div>
   );
@@ -358,7 +361,11 @@ function DashboardContent({ children }: DashboardContentProps): JSX.Element {
     <>
       <Sidebar side="left" collapsible="offcanvas">
         <SidebarHeader className="px-3 py-2">
-          <div className="flex items-center justify-between">
+          <div>
+            <img src={sgaiLogo} alt="SGAI" className="h-[28px] w-auto" />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between pt-2">
             <span className="text-sm font-semibold">Workspaces</span>
             {!loading && !error && <SidebarHeaderIndicators workspaces={workspaces} />}
           </div>
