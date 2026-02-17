@@ -1,5 +1,20 @@
 # Release Notes
 
+## 0.0.0+20260217 — Release updates
+
+- **Date**: 2026-02-17
+- **Version**: 0.0.0+20260217
+- **Summary**: This release includes the changes captured in the structured notes below.
+
+```json
+{
+  "Additional Changes": [
+    "The project documentation was updated to better reflect the current recommended way to run the tool and to improve the layout of the README. Specifically, the README usage was changed from `sgai serve` to `sgai`, the Features section was repositioned, and a `GOALS` specification file was added to guide a broader README rewrite."
+  ]
+}
+
+```
+
 ## 0.0.0+20260127 — Improved CI test reliability
 
 - **Date**: 2026-01-27
