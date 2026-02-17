@@ -1,6 +1,33 @@
 # Sandgarden AI Software Factory
 
-Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents work together to build your software. Monitor progress in real-time, provide guidance when needed, and iterate until your goals are achieved.
+sgai is an AI software factory: a local service that orchestrates multiple specialized AI agents from a single goal description.
+Define what you want in `GOAL.md`, start sgai, and use the web dashboard to monitor progress, answer questions, and iterate.
+
+## Key Concepts
+
+| Concept | What it is | Why it matters |
+|---|---|---|
+| The factory | sgai coordinating multiple agents (not a single “chatbot”) | Work gets split into roles (build, review, analysis) and coordinated in a repeatable way |
+| `GOAL.md` | The intent/spec for a project (“what”, not “how”) | Gives agents a durable source of truth to follow and update against |
+| Agents | Specialized roles (developer, reviewer, analyst, etc.) | Improves quality by separating implementation and review responsibilities |
+| Flow | A directed graph describing who reviews whom (`->`) | Makes review and safety/quality checks explicit |
+| Human-in-the-loop | You supervise, clarify, and unblock | Prevents agents from guessing when requirements are ambiguous |
+| Coordinator | The “foreman” agent that reads `GOAL.md` and delegates | Keeps the work moving and assigns tasks to the right roles |
+
+## Installation
+
+```sh
+go install github.com/sandgardenhq/sgai/cmd/sgai@latest
+```
+
+Or from source:
+
+```sh
+git clone https://github.com/sandgardenhq/sgai.git
+cd sgai
+cd cmd/sgai/webapp && bun install && cd ../../..
+make build
+```
 
 ## Automated Setup with opencode
 
@@ -19,39 +46,11 @@ opencode --model anthropic/claude-opus-4-6 run "install SGAI using the instructi
 
 This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](INSTALLATION.md) for the full step-by-step instructions.
 
-## Prerequisites
-
-| Dependency                                   | Purpose                                                                   |                           |
-|----------------------------------------------|---------------------------------------------------------------------------|---------------------------|
-| [Node.js](https://nodejs.org)                | JavaScript runtime — provides `npx` for MCP server auto-installation      |                           |
-| [bun](https://bun.sh)                        | JavaScript runtime and bundler — builds the React frontend                |                           |
-| [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
-| [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
-| [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
-| [gh](https://cli.github.com/) (GitHub CLI)   | Creates draft PRs from fork merge flow                                    | Optional — merge works without PR creation |
-| [tmux](https://github.com/tmux/tmux)         | Terminal multiplexer — manages detached sessions for agent processes       |                           |
-| [rg](https://github.com/BurntSushi/ripgrep) (ripgrep) | Fast text search — used by completion verification and code search skills |                           |
-
 ### Environment Variables
 
 | Variable        | Purpose                                                                         |
 |-----------------|---------------------------------------------------------------------------------|
 | `SGAI_NTFY`     | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
-
-## Installation
-
-```sh
-go install github.com/sandgardenhq/sgai/cmd/sgai@latest
-```
-
-Or from source:
-
-```sh
-git clone https://github.com/sandgardenhq/sgai.git
-cd sgai
-cd cmd/sgai/webapp && bun install && cd ../../..
-make build
-```
 
 ## Quick Start (macOS)
 
@@ -73,14 +72,6 @@ make build
 3. **Create a `GOAL.md` in your project directory:**
 
    ```markdown
-   ---
-   completionGateScript: make test
-   flow: |
-     "general-purpose"
-     "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-   interactive: yes
-   ---
-
    # My Project Goal
 
    Build a REST API with user authentication.
@@ -92,6 +83,8 @@ make build
    - [ ] Add password hashing
    ```
 
+   This minimal `GOAL.md` uses default settings. See [GOAL.md Reference](#goalmd-reference) for advanced options like custom flows and model assignments.
+
 4. **Launch the web dashboard:**
 
    ```sh
@@ -99,6 +92,18 @@ make build
    ```
 
    Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
+
+   Run `sgai` from the parent directory that contains your projects. sgai discovers `GOAL.md` files in subdirectories automatically.
+
+   ```
+   workspace/              ← Run `sgai` from here
+   ├── project-1/
+   │   └── GOAL.md
+   ├── project-2/
+   │   └── GOAL.md
+   └── project-3/
+       └── GOAL.md
+   ```
 
 ## How It Works
 
@@ -130,6 +135,19 @@ The web dashboard shows:
 - **Retrospective system** — Analyze completed sessions, extract reusable skills and snippets
 - **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
 - **Go-native** — Single binary, fast startup, minimal dependencies
+
+## Prerequisites
+
+| Dependency | Purpose | Required? |
+|---|---|---|
+| [Node.js](https://nodejs.org) | JavaScript runtime — provides `npx` for MCP server auto-installation | Required |
+| [bun](https://bun.sh) | JavaScript runtime and bundler — builds the React frontend | Required (build only) |
+| [opencode](https://opencode.ai) | AI inference engine — executes agents, validates models, exports sessions | Required |
+| [jj](https://docs.jj-vcs.dev/) (Jujutsu) | VCS integration in web UI (diffs, logs, workspace forking) | Required |
+| [dot](https://graphviz.org/) (Graphviz) | Renders workflow DAG as proper SVG | Optional — plain-text SVG fallback |
+| [gh](https://cli.github.com/) (GitHub CLI) | Creates draft PRs from fork merge flow | Optional — merge works without PR creation |
+| [tmux](https://github.com/tmux/tmux) | Terminal multiplexer — manages detached sessions for agent processes | Required |
+| [rg](https://github.com/BurntSushi/ripgrep) (ripgrep) | Fast text search — used by completion verification and code search skills | Required |
 
 ## GOAL.md Reference
 
@@ -175,6 +193,52 @@ not implementation. Focus on outcomes.
 | `models`      | Per-agent AI model assignments (supports variant syntax) |
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+
+## Common Flows
+
+Use these as ready-to-copy starting points for the `flow` frontmatter field.
+
+### Go Backend Only
+
+```yaml
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+```
+
+### Go Backend with Safety Analysis
+
+```yaml
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "go-readability-reviewer" -> "stpa-analyst"
+```
+
+### Full-Stack Go + HTMX/PicoCSS
+
+```yaml
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "go-readability-reviewer" -> "stpa-analyst"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
+  "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+```
+
+### Full-Stack Go + React
+
+```yaml
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "go-readability-reviewer" -> "stpa-analyst"
+  "react-developer" -> "react-reviewer"
+  "react-reviewer" -> "stpa-analyst"
+```
+
+### Research / Exploration
+
+```yaml
+flow: |
+  "general-purpose"
+```
 
 ## Usage
 
