@@ -2,6 +2,14 @@
 
 This page lists environment variables that `sgai` reads.
 
+## `OPENCODE_CONFIG_DIR`
+
+When `sgai` starts an ad-hoc OpenCode run, it sets `OPENCODE_CONFIG_DIR` to:
+
+`<project-root>/.sgai`
+
+This makes the ad-hoc run use the same per-project OpenCode configuration as the rest of the workspace.
+
 ## `EDITOR`
 
 If `EDITOR` is set, `sgai` uses it to choose the default for `--interactive`.
