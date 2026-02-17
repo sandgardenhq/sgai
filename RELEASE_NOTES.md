@@ -1,16 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260217 — Additional updates
+## 0.0.0+20260217 — Removed fork merge support
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes additional updates across the CLI and core packages.
+- **Summary**: This release includes removal of `fork merge` support to align with the updated merge policy.
 
-{
-  "Breaking Changes": [
-    "Removed the fork merge capability from the product and eliminated the merge button from the interface to match the updated merge policy. The fork merge API and its supporting logic, tests, and type definitions were removed, and the change was documented in a `GOALS` specification for the merge-button removal."
-  ]
-}
+### Breaking Changes
+
+- Removed `fork merge` support, including the `fork merge` API and merge button in the UI, to align with the updated merge policy.
 
 
 ## 0.0.0+20260127 — Improved CI test reliability
