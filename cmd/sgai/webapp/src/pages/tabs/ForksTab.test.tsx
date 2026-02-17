@@ -28,6 +28,7 @@ beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
+  resetDefaultSSEStore();
 });
 
 afterEach(() => {

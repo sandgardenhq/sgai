@@ -49,6 +49,8 @@ beforeEach(() => {
         mockEventSources.push(this);
       }
     } as unknown as typeof EventSource;
+  resetDefaultSSEStore();
+  resetAllWorkspaceSSEStores();
 });
 
 afterEach(() => {
@@ -122,8 +124,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders workspace header when data loads", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -133,8 +135,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders status badge", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -144,8 +146,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders execution timer", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -158,8 +160,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders status line with agent and model", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -172,8 +174,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("does not render latest progress banner", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -185,8 +187,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders tab navigation", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -197,8 +199,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("highlights active tab based on URL", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail("/workspaces/test-project/progress");
 
@@ -207,8 +209,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders entity browser links (Agents, Skills, Snippets)", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -219,8 +221,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders workspace action buttons", async () => {
     const stoppedDetail = { ...workspaceDetail, running: false };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(stoppedDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(stoppedDetail))),
     );
     renderWorkspaceDetail();
 
@@ -236,8 +238,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("hides fork and compose actions when running", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     const { container } = renderWorkspaceDetail();
     const view = within(container);
@@ -253,8 +255,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("shows open in OpenCode when running", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(workspaceDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
     renderWorkspaceDetail();
 
@@ -269,8 +271,8 @@ describe("WorkspaceDetail", () => {
       running: false,
       forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
     };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(rootWithForks)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(rootWithForks))),
     );
     renderWorkspaceDetail();
 
@@ -301,8 +303,8 @@ describe("WorkspaceDetail", () => {
       running: true,
       forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
     };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(rootRunning)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(rootRunning))),
     );
     renderWorkspaceDetail();
 
@@ -311,8 +313,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders no-workspace state when hasSgai is false", async () => {
     const noWorkspace = { ...workspaceDetail, hasSgai: false, isRoot: false };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(noWorkspace)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(noWorkspace))),
     );
     renderWorkspaceDetail();
 
@@ -499,8 +501,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders Continuous Self-Drive button when continuousMode is true and not running", async () => {
     const continuousDetail = { ...workspaceDetail, running: false, continuousMode: true };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(continuousDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(continuousDetail))),
     );
     renderWorkspaceDetail();
 
@@ -512,8 +514,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders Continuous Self-Drive and Stop buttons when continuousMode is true and running", async () => {
     const continuousRunning = { ...workspaceDetail, running: true, continuousMode: true };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(continuousRunning)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(continuousRunning))),
     );
     const { container } = renderWorkspaceDetail();
     const view = within(container);
@@ -526,8 +528,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders normal buttons when continuousMode is false and not running", async () => {
     const normalDetail = { ...workspaceDetail, running: false, continuousMode: false };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(normalDetail)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(normalDetail))),
     );
     renderWorkspaceDetail();
 
@@ -539,8 +541,8 @@ describe("WorkspaceDetail", () => {
 
   it("renders normal buttons when continuousMode is false and running", async () => {
     const normalRunning = { ...workspaceDetail, running: true, continuousMode: false };
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(normalRunning)),
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(normalRunning))),
     );
     const { container } = renderWorkspaceDetail();
     const view = within(container);
