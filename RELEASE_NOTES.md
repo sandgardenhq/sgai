@@ -8,7 +8,7 @@
 
 ### Additional Changes
 
-- Updated project documentation to reflect running `sgai` (instead of `sgai serve`), reorganize the README, and add a `GOALS` specification file.
+- Updated project documentation to reflect running `sgai` (instead of `sgai serve`), reorganized the README, and added a `GOALS` specification file.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
