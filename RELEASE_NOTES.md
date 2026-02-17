@@ -1,19 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260217 — Additional changes
+## 0.0.0+20260217 — Improved server bind address logging
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes the updates listed in the sections below.
+- **Summary**: This release includes refinements to server startup and logging.
 
-```json
-{
-  "Additional Changes": [
-    "Updated the server startup to create and pass an explicit `net.Listener` so logs report the actual bound address and port, including when the port is assigned dynamically."
-  ]
-}
+### Additional Changes
 
-```
+- Updated server startup to create and pass an explicit `net.Listener` so logs report the actual bound address and port, including when the port is assigned dynamically.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
