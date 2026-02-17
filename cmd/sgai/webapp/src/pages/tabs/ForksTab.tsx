@@ -97,21 +97,6 @@ function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry
     });
   };
 
-  const handleMerge = (event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (isActionPending) return;
-    setActionError(null);
-    startActionTransition(async () => {
-      try {
-        await api.workspaces.merge(rootName, fork.dir);
-        onRefresh();
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Failed to merge fork");
-      }
-    });
-  };
-
   const handleDelete = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -175,16 +160,6 @@ function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry
             disabled={isActionPending}
           >
             Open in sgai
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="min-w-[110px]"
-            onClick={handleMerge}
-            disabled={isActionPending}
-          >
-            Merge
           </Button>
           <Button
             type="button"
