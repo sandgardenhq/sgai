@@ -1,14 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260217 — Additional changes
+## 0.0.0+20260217 — Updated inbox indicator navigation
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes the latest updates across features, fixes, and maintenance.
+- **Summary**: This release includes updates to inbox navigation behavior.
 
 ### New Features
 
-- Updated the inbox indicator to a clickable button that routes users to the first workspace needing attention and added automated tests for the navigation behavior.
+- Updated the inbox indicator to a clickable button that routes users to the first workspace requiring attention and added automated tests for the navigation behavior.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
