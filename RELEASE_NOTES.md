@@ -1,10 +1,10 @@
 # Release Notes
 
-## 0.0.0+20260217 — Release updates
+## 0.0.0+20260217 — Updated documentation guidance
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes documentation updates and a new project planning artifact.
+- **Summary**: This release includes documentation updates and a new `GOALS` specification file.
 
 ### Additional Changes
 
