@@ -1,5 +1,12 @@
 # Release Notes
 
+{
+  "New Features": [
+    "Users can now receive browser notifications when a workspace newly requires approval, including a visible permission prompt to enable notifications. This adds notification wiring for the “workspace needs approval” condition, a browser permission prompt bar, and accompanying automated tests to validate the end-to-end behavior."
+  ]
+}
+
+
 ## 0.0.0+20260127 — Improved CI test reliability
 
 - **Date**: 2026-01-27
