@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes updates to the dashboard UI to reflect SGAI branding.
+- **Summary**: This release includes dashboard updates to reflect SGAI branding.
 
 ### New Features
 
