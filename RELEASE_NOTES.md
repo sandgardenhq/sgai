@@ -6,14 +6,9 @@
 - **Version**: 0.0.0+20260217
 - **Summary**: This release includes the latest updates across features, fixes, and maintenance.
 
-```json
-{
-  "New Features": [
-    "Updated the inbox indicator to a clickable button that routes users to the first workspace needing attention and added automated tests for the navigation behavior."
-  ]
-}
+### New Features
 
-```
+- Updated the inbox indicator to a clickable button that routes users to the first workspace needing attention and added automated tests for the navigation behavior.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
