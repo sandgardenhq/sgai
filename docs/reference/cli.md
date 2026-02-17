@@ -4,7 +4,7 @@ This page describes the `sgai` command-line interface.
 
 ## Ad-hoc OpenCode runs
 
-Some parts of the UI can start an ad-hoc OpenCode run (for example, to run a one-off task outside the main workflow).
+`sgai` can start an ad-hoc OpenCode run for one-off tasks outside the main workflow.
 
 ### Output prefixes
 
