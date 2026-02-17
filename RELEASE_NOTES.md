@@ -8,7 +8,7 @@
 
 ### New Features
 
-- Added browser notifications when a workspace newly required approval, including a visible permission prompt to enable notifications.
+- Added browser notifications when a workspace required approval, including a visible permission prompt to enable notifications.
 
 
 ## 0.0.0+20260127 — Improved CI test reliability
