@@ -11,6 +11,10 @@ Notes:
 - The check applies to workspaces and any nested forks.
 - Notifications use the workspace name as the browser notification `tag`, which allows the browser to de-duplicate notifications for the same workspace.
 
+When a notification fires, the notification title is `Approval Needed` and the notification body follows this format:
+
+`Workspace <workspace-name> needs your input`
+
 ## Enable notifications in the dashboard
 
 1. Open the web dashboard in a browser.
@@ -31,6 +35,11 @@ The dismissal is saved in the browser using `localStorage` under the key `notifi
 - Notifications only fire while the dashboard is open in a browser tab.
 - No Service Worker notifications are used.
 - Browsers without the `window.Notification` API do not show notifications or the permission banner.
+
+## What happens when permission is not granted
+
+- When notification permission is `default`, the dashboard does not fire notifications.
+- When notification permission is `denied`, the dashboard does not fire notifications.
 
 ## Troubleshooting
 
