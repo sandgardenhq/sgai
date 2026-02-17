@@ -511,16 +511,6 @@ export interface ApiForkResponse {
   parent: string;
 }
 
-export interface ApiMergeRequest {
-  forkDir: string;
-  confirm: boolean;
-}
-
-export interface ApiMergeResponse {
-  merged: boolean;
-  message: string;
-}
-
 export interface ApiDeleteForkResponse {
   deleted: boolean;
   message: string;

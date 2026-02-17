@@ -26,7 +26,6 @@ import type {
   ApiComposeDraftResponse,
   ApiComposeSaveResponse,
   ApiForkResponse,
-  ApiMergeResponse,
   ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
@@ -155,11 +154,6 @@ export const api = {
       fetchJSON<ApiForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork`,
         { method: "POST", body: JSON.stringify({ name: forkName }) },
-      ),
-    merge: (name: string, forkDir: string) =>
-      fetchJSON<ApiMergeResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/merge`,
-        { method: "POST", body: JSON.stringify({ forkDir, confirm: true }) },
       ),
     rename: (name: string, newName: string) =>
       fetchJSON<ApiRenameResponse>(

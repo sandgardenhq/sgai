@@ -1683,16 +1683,6 @@ func normalizeForkName(name string) string {
 	return strings.ToLower(joined)
 }
 
-func invokeLLMForAssist(prompt string) (string, error) {
-	cmd := exec.Command("opencode", "run", "--title", "llm-assist")
-	cmd.Stdin = strings.NewReader(prompt)
-	output, errRun := cmd.Output()
-	if errRun != nil {
-		return "", fmt.Errorf("opencode failed: %w", errRun)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 func writeOpenCodeScript(content string) (string, error) {
 	tmpFile, errTmp := os.CreateTemp("", "sgai-opencode-*.sh")
 	if errTmp != nil {
