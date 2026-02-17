@@ -29,6 +29,7 @@ const result = await Bun.build({
   minify: true,
   sourcemap: "linked",
   target: "browser",
+  publicPath: "/assets/",
   plugins: [tailwindPlugin],
   naming: {
     entry: "assets/[name]-[hash].[ext]",
