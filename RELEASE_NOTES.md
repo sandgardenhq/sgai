@@ -8,7 +8,7 @@
 
 ### New Features
 
-- Updated the dashboard to show the new SGAI branding in the sidebar and mobile header, including new logo assets and static asset serving from `/assets/`.
+- Updated the dashboard to reflect SGAI branding in the sidebar and mobile header, including new logo assets and static asset serving from `/assets/`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
