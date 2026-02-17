@@ -11,7 +11,7 @@
 ```json
 {
   "New Features": [
-    "Updated the dashboard to show the new SGAI branding in the sidebar and mobile header. This adds SGAI logo asset files, updates the dashboard sidebar and mobile header to reference them, and configures the web build to serve static assets from the `/assets/` path."
+    "Updated the dashboard to show the new SGAI branding in the sidebar and mobile header, including new logo assets and static asset serving from `/assets/`."
   ]
 }
 
