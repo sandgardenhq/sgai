@@ -1,6 +1,6 @@
 # Web UI
 
-The web UI includes a dashboard with a sidebar header that shows an inbox indicator when one or more workspaces are waiting on a human response.
+The web UI includes a dashboard with a sidebar header. The header shows an inbox indicator when one or more workspaces are waiting on a human response.
 
 ## Open the next workspace that needs input
 
