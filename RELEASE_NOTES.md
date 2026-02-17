@@ -6,16 +6,9 @@
 - **Version**: 0.0.0+20260217
 - **Summary**: This release includes updates across the project.
 
-### Draft notes (source)
+### New Features
 
-```json
-{
-  "New Features": [
-    "Ad-hoc opencode runs now inherit the configured environment and present their output in a consistent, readable format."
-  ]
-}
-
-```
+- Added support for ad-hoc `opencode` runs to inherit the configured environment and present output in a consistent, readable format.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
