@@ -9,7 +9,7 @@
 ```json
 {
   "Additional Changes": [
-    "The project documentation was updated to better reflect the current recommended way to run the tool and to improve the layout of the README. Specifically, the README usage was changed from `sgai serve` to `sgai`, the Features section was repositioned, and a `GOALS` specification file was added to guide a broader README rewrite."
+    "Updated project documentation to reflect running `sgai` (instead of `sgai serve`), reorganize the README, and add a `GOALS` specification file."
   ]
 }
 
