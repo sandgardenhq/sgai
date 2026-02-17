@@ -1,14 +1,14 @@
 # Release Notes
 
-## 0.0.0+20260217 — Project updates
+## 0.0.0+20260217 — Improved ad-hoc opencode runs
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes updates across the project.
+- **Summary**: This release includes improved ad-hoc `opencode` run environment inheritance and output routing.
 
 ### New Features
 
-- Added support for ad-hoc `opencode` runs to inherit the configured environment and present output in a consistent, clear format.
+- Added support for ad-hoc `opencode` runs to inherit configured environment variables and mirror prefixed process output to `sgai` `stdout`/`stderr`.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
