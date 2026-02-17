@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { Dashboard } from "./Dashboard";
 import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -96,6 +96,11 @@ const workspacesResponse: ApiWorkspacesResponse = {
   ],
 };
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location-display">{location.pathname}</div>;
+}
+
 function renderDashboard(initialRoute = "/") {
   return render(
     <MemoryRouter initialEntries={[initialRoute]}>
@@ -106,6 +111,7 @@ function renderDashboard(initialRoute = "/") {
             element={
               <Dashboard>
                 <div data-testid="dashboard-content">Content</div>
+                <LocationDisplay />
               </Dashboard>
             }
           />
@@ -314,6 +320,31 @@ describe("Dashboard", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       const runningIndicators = document.querySelectorAll('[title="Running"]');
       expect(runningIndicators.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("navigates to first needsInput workspace when inbox icon is clicked", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(workspacesResponse)),
+    );
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+    });
+
+    const inboxButtons = screen.getAllByRole("button", {
+      name: /workspace.*waiting.*response/i,
+    });
+    expect(inboxButtons.length).toBeGreaterThan(0);
+
+    fireEvent.click(inboxButtons[0]);
+
+    await waitFor(() => {
+      const locationEl = screen.getByTestId("location-display");
+      expect(locationEl.textContent).toBe(
+        "/workspaces/project-alpha-fork1/respond"
+      );
     });
   });
 
