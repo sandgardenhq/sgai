@@ -42,6 +42,8 @@ Options:
 
   HTTP server listen address.
 
+  To bind to an ephemeral port, use `:0` (for example, `127.0.0.1:0` or `0.0.0.0:0`). When `:0` is used, `sgai` prints the dashboard URL using the actual assigned port.
+
   Default: `127.0.0.1:8080`
 
 ### `sgai sessions`
