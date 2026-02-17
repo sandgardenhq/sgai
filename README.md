@@ -199,6 +199,8 @@ The Dashboard page renders the logo in two places:
 1. **Desktop sidebar header**: a left-aligned logo above the **Workspaces** heading.
 2. **Mobile header bar**: a centered logo between the sidebar trigger and the header indicators.
 
+The build config serves these static assets under `assets/` so the dashboard can reference them at runtime.
+
 If a custom deployment setup serves frontend assets from a non-default base URL, the web build config sets `publicPath` to `/assets/` (see `cmd/sgai/webapp/build.ts`). Make sure the deployed frontend can resolve static assets under that path.
 
 ### Frontend Stack
