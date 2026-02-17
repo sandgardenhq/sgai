@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"maps"
@@ -2705,12 +2706,16 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	st.selectedModel = strings.TrimSpace(req.Model)
 	st.promptText = strings.TrimSpace(req.Prompt)
 
-	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--title", "adhoc ["+st.selectedModel+"]")
+	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--agent", "build", "--title", "adhoc ["+st.selectedModel+"]")
 	cmd.Dir = workspacePath
+	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
-	cmd.Stdout = writer
-	cmd.Stderr = writer
+	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
+	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
+	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
+	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
+	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 
 	if errStart := cmd.Start(); errStart != nil {
 		st.running = false
