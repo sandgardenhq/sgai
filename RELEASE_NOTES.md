@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes refinements to server startup and logging.
+- **Summary**: This release includes improved server startup and logging.
 
 ### Additional Changes
 
