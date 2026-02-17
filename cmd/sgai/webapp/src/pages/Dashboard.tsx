@@ -230,6 +230,7 @@ interface SidebarHeaderIndicatorsProps {
 }
 
 function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
+  const navigate = useNavigate();
   const allWorkspaces = useMemo(() => collectAllWorkspaces(workspaces), [workspaces]);
 
   const needsInputCount = useMemo(
@@ -242,12 +243,26 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
     [allWorkspaces],
   );
 
+  const handleInboxClick = useCallback(() => {
+    const firstNeedsInput = allWorkspaces.find((w) => w.needsInput);
+    if (firstNeedsInput) {
+      navigate(`/workspaces/${encodeURIComponent(firstNeedsInput.name)}/respond`);
+    }
+  }, [allWorkspaces, navigate]);
+
   return (
     <div className="flex items-center gap-2">
       {needsInputCount > 0 && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="relative inline-flex items-center text-primary cursor-help">
+            <button
+              type="button"
+              onClick={handleInboxClick}
+              aria-label={needsInputCount === 1
+                ? "1 workspace waiting for response"
+                : `${needsInputCount} workspaces waiting for response`}
+              className="relative inline-flex items-center text-primary cursor-pointer bg-transparent border-0 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            >
               <Inbox className="h-4 w-4" />
               <Badge
                 variant="destructive"
@@ -255,7 +270,7 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
               >
                 {needsInputCount}
               </Badge>
-            </span>
+            </button>
           </TooltipTrigger>
           <TooltipContent>
             {needsInputCount === 1
