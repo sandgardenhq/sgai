@@ -8,7 +8,7 @@
 
 ### New Features
 
-- Added support for ad-hoc `opencode` runs to inherit the configured environment and present output in a consistent, readable format.
+- Added support for ad-hoc `opencode` runs to inherit the configured environment and present output in a consistent, clear format.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
