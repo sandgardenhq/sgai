@@ -8,7 +8,7 @@ When `sgai` starts an ad-hoc OpenCode run, it sets `OPENCODE_CONFIG_DIR` to:
 
 `<project-root>/.sgai`
 
-This makes the ad-hoc run use the same per-project OpenCode configuration as the rest of the workspace.
+This tells OpenCode to read its configuration from the project's `.sgai` directory.
 
 ## `EDITOR`
 
