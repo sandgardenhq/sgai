@@ -39,7 +39,7 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 | [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
 | [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
 | [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
-| [gh](https://cli.github.com/) (GitHub CLI)   | Creates draft PRs from fork merge flow                                    | Optional — merge works without PR creation |
+| [gh](https://cli.github.com/) (GitHub CLI)   | GitHub integration (when enabled elsewhere)                               | Optional |
 | [tmux](https://github.com/tmux/tmux)         | Terminal multiplexer — manages detached sessions for agent processes       |                           |
 | [rg](https://github.com/BurntSushi/ripgrep) (ripgrep) | Fast text search — used by completion verification and code search skills |                           |
 
