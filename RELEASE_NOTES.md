@@ -4,16 +4,11 @@
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes the changes captured in the structured notes below.
+- **Summary**: This release includes documentation updates and a new project planning artifact.
 
-```json
-{
-  "Additional Changes": [
-    "Updated project documentation to reflect running `sgai` (instead of `sgai serve`), reorganize the README, and add a `GOALS` specification file."
-  ]
-}
+### Additional Changes
 
-```
+- Updated project documentation to reflect running `sgai` (instead of `sgai serve`), reorganize the README, and add a `GOALS` specification file.
 
 ## 0.0.0+20260127 — Improved CI test reliability
 
