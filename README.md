@@ -187,6 +187,20 @@ sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
 
 The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
 
+### Branding assets (SGAI logo)
+
+The dashboard loads the SGAI logo from SVG assets stored in `cmd/sgai/webapp/src/assets/`:
+
+- `sgai-logo.svg` (light theme)
+- `sgai-logo-dark.svg` (dark variant; present for future use)
+
+The Dashboard page renders the logo in two places:
+
+1. **Desktop sidebar header**: a left-aligned logo above the **Workspaces** heading.
+2. **Mobile header bar**: a centered logo between the sidebar trigger and the header indicators.
+
+If a custom deployment setup serves frontend assets from a non-default base URL, the web build config sets `publicPath` to `/assets/` (see `cmd/sgai/webapp/build.ts`). Make sure the deployed frontend can resolve static assets under that path.
+
 ### Frontend Stack
 
 | Technology                                    | Purpose                                 |
