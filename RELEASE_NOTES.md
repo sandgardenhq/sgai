@@ -2,7 +2,7 @@
 
 {
   "New Features": [
-    "Users can now receive browser notifications when a workspace newly requires approval, including a visible permission prompt to enable notifications. This adds notification wiring for the “workspace needs approval” condition, a browser permission prompt bar, and accompanying automated tests to validate the end-to-end behavior."
+    "Users can now receive browser notifications when a workspace newly requires approval, including a visible permission prompt to enable notifications."
   ]
 }
 
