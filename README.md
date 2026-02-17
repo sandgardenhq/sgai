@@ -181,6 +181,7 @@ not implementation. Focus on outcomes.
 ```sh
 sgai serve                              # Start on localhost:8080
 sgai serve --listen-addr 0.0.0.0:8080   # Start accessible externally
+sgai serve --listen-addr 127.0.0.1:0    # Bind to an ephemeral port; printed dashboard URL includes the assigned port
 ```
 
 ## Frontend Development
