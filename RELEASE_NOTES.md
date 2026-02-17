@@ -11,7 +11,7 @@
 ```json
 {
   "New Features": [
-    "Ad-hoc opencode runs now inherit the configured environment and present their output in a consistent, readable format. Specifically, the runner injects the configured env vars into ad-hoc executions and prefixes and mirrors process output to the sgai stdout/stderr streams."
+    "Ad-hoc opencode runs now inherit the configured environment and present their output in a consistent, readable format."
   ]
 }
 
