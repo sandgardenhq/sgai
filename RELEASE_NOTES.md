@@ -4,7 +4,7 @@
 
 - **Date**: 2026-02-17
 - **Version**: 0.0.0+20260217
-- **Summary**: This release includes improved server startup and logging.
+- **Summary**: This release includes improved server startup and bind address logging.
 
 ### Additional Changes
 
