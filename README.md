@@ -41,12 +41,6 @@ This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your p
 ## Installation
 
 ```sh
-go install github.com/sandgardenhq/sgai/cmd/sgai@latest
-```
-
-Or from source:
-
-```sh
 git clone https://github.com/sandgardenhq/sgai.git
 cd sgai
 cd cmd/sgai/webapp && bun install && cd ../../..
