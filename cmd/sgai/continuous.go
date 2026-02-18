@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adhocore/gronx"
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
@@ -21,6 +22,8 @@ const (
 	triggerNone     triggerKind = ""
 	triggerGoal     triggerKind = "goal-changed"
 	triggerSteering triggerKind = "steering-message"
+	triggerAuto     triggerKind = "auto-timer"
+	triggerCron     triggerKind = "cron-schedule"
 )
 
 const (
@@ -64,7 +67,9 @@ func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt 
 			return
 		}
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum)
+		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
+
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, cronExpr)
 		if trigger == triggerNone {
 			return
 		}
@@ -120,8 +125,28 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 	updateContinuousModeProgress(stateJSONPath, "continuous mode prompt failed after all retries, proceeding to watch loop")
 }
 
-func watchForTrigger(ctx context.Context, dir string, stateJSONPath string, lastChecksum string) triggerKind {
+func watchForTrigger(ctx context.Context, dir string, stateJSONPath string, lastChecksum string, autoDuration time.Duration, cronExpr string) triggerKind {
 	goalPath := filepath.Join(dir, "GOAL.md")
+
+	var deadline time.Time
+	var deadlineTrigger triggerKind
+
+	if cronExpr != "" {
+		nextTick, errNext := gronx.NextTick(cronExpr, false)
+		if errNext != nil {
+			log.Println("failed to parse cron expression:", errNext)
+		} else {
+			deadline = nextTick
+			deadlineTrigger = triggerCron
+		}
+	}
+
+	now := time.Now()
+	if autoDuration > 0 && (deadline.IsZero() || now.Add(autoDuration).Before(deadline)) {
+		deadline = now.Add(autoDuration)
+		deadlineTrigger = triggerAuto
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -144,6 +169,10 @@ func watchForTrigger(ctx context.Context, dir string, stateJSONPath string, last
 		found, _ := hasHumanPartnerMessage(wfState.Messages)
 		if found {
 			return triggerSteering
+		}
+
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return deadlineTrigger
 		}
 	}
 }
@@ -274,6 +303,30 @@ func readContinuousModePrompt(workspacePath string) string {
 		return ""
 	}
 	return metadata.ContinuousModePrompt
+}
+
+func readContinuousModeAutoCron(workspacePath string) (time.Duration, string) {
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	data, errRead := os.ReadFile(goalPath)
+	if errRead != nil {
+		return 0, ""
+	}
+	metadata, errParse := parseYAMLFrontmatter(data)
+	if errParse != nil {
+		return 0, ""
+	}
+
+	var autoDuration time.Duration
+	if metadata.ContinuousModeAuto != "" {
+		parsed, errParseDuration := time.ParseDuration(metadata.ContinuousModeAuto)
+		if errParseDuration != nil {
+			log.Println("failed to parse continuousModeAuto duration:", errParseDuration)
+		} else {
+			autoDuration = parsed
+		}
+	}
+
+	return autoDuration, metadata.ContinuousModeCron
 }
 
 func setContinuousAutoMode(workspacePath string) {
