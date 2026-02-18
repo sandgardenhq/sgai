@@ -3,6 +3,7 @@ module github.com/sandgardenhq/sgai
 go 1.25.7
 
 require (
+	github.com/adhocore/gronx v1.19.6
 	github.com/adrg/xdg v0.5.3
 	github.com/google/jsonschema-go v0.4.2
 	github.com/mactaggart/gographviz v0.0.0-20250815040658-9ffd0326c418

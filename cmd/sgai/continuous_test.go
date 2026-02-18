@@ -258,7 +258,7 @@ func TestWatchForTrigger(t *testing.T) {
 			}
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, originalChecksum)
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, originalChecksum, 0, "")
 		if trigger != triggerGoal {
 			t.Errorf("expected trigger %q, got %q", triggerGoal, trigger)
 		}
@@ -308,7 +308,7 @@ func TestWatchForTrigger(t *testing.T) {
 			}
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum)
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, 0, "")
 		if trigger != triggerSteering {
 			t.Errorf("expected trigger %q, got %q", triggerSteering, trigger)
 		}
@@ -347,7 +347,7 @@ func TestWatchForTrigger(t *testing.T) {
 			cancel()
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum)
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, 0, "")
 		if trigger != triggerNone {
 			t.Errorf("expected trigger %q on cancel, got %q", triggerNone, trigger)
 		}
@@ -529,6 +529,207 @@ func TestGoalMetadataContinuousModePromptParsing(t *testing.T) {
 		}
 		if metadata.ContinuousModePrompt != "" {
 			t.Errorf("expected empty prompt, got %q", metadata.ContinuousModePrompt)
+		}
+	})
+}
+
+func TestGoalMetadataAutoCronParsing(t *testing.T) {
+	t.Run("parsesContinuousModeAuto", func(t *testing.T) {
+		content := []byte("---\ncontinuousModeAuto: 1h30m\nflow: |\n  a -> b\n---\n\nGoal.\n")
+		metadata, err := parseYAMLFrontmatter(content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if metadata.ContinuousModeAuto != "1h30m" {
+			t.Errorf("expected auto '1h30m', got %q", metadata.ContinuousModeAuto)
+		}
+	})
+
+	t.Run("parsesContinuousModeCron", func(t *testing.T) {
+		content := []byte("---\ncontinuousModeCron: '0 * * * *'\nflow: |\n  a -> b\n---\n\nGoal.\n")
+		metadata, err := parseYAMLFrontmatter(content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if metadata.ContinuousModeCron != "0 * * * *" {
+			t.Errorf("expected cron '0 * * * *', got %q", metadata.ContinuousModeCron)
+		}
+	})
+
+	t.Run("parsesBothAutoAndCron", func(t *testing.T) {
+		content := []byte("---\ncontinuousModeAuto: 30s\ncontinuousModeCron: '*/5 * * * *'\n---\n\nGoal.\n")
+		metadata, err := parseYAMLFrontmatter(content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if metadata.ContinuousModeAuto != "30s" {
+			t.Errorf("expected auto '30s', got %q", metadata.ContinuousModeAuto)
+		}
+		if metadata.ContinuousModeCron != "*/5 * * * *" {
+			t.Errorf("expected cron '*/5 * * * *', got %q", metadata.ContinuousModeCron)
+		}
+	})
+}
+
+func TestReadContinuousModeAutoCron(t *testing.T) {
+	t.Run("parsesAutoDuration", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		content := "---\ncontinuousModeAuto: 2h\n---\n\nGoal.\n"
+		if err := os.WriteFile(goalPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
+		if autoDuration != 2*time.Hour {
+			t.Errorf("expected 2h duration, got %v", autoDuration)
+		}
+		if cronExpr != "" {
+			t.Errorf("expected empty cron, got %q", cronExpr)
+		}
+	})
+
+	t.Run("parsesCronExpression", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		content := "---\ncontinuousModeCron: '0 0 * * *'\n---\n\nGoal.\n"
+		if err := os.WriteFile(goalPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
+		if autoDuration != 0 {
+			t.Errorf("expected 0 duration, got %v", autoDuration)
+		}
+		if cronExpr != "0 0 * * *" {
+			t.Errorf("expected cron expression, got %q", cronExpr)
+		}
+	})
+
+	t.Run("parsesBothAutoAndCron", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		content := "---\ncontinuousModeAuto: 5m\ncontinuousModeCron: '*/10 * * * *'\n---\n\nGoal.\n"
+		if err := os.WriteFile(goalPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
+		if autoDuration != 5*time.Minute {
+			t.Errorf("expected 5m duration, got %v", autoDuration)
+		}
+		if cronExpr != "*/10 * * * *" {
+			t.Errorf("expected cron expression, got %q", cronExpr)
+		}
+	})
+
+	t.Run("invalidDurationReturnsZero", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		content := "---\ncontinuousModeAuto: invalid\n---\n\nGoal.\n"
+		if err := os.WriteFile(goalPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		autoDuration, _ := readContinuousModeAutoCron(dir)
+		if autoDuration != 0 {
+			t.Errorf("expected 0 duration for invalid input, got %v", autoDuration)
+		}
+	})
+
+	t.Run("missingFileReturnsZero", func(t *testing.T) {
+		dir := t.TempDir()
+
+		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
+		if autoDuration != 0 {
+			t.Errorf("expected 0 duration for missing file, got %v", autoDuration)
+		}
+		if cronExpr != "" {
+			t.Errorf("expected empty cron for missing file, got %q", cronExpr)
+		}
+	})
+}
+
+func TestWatchForTriggerAutoDuration(t *testing.T) {
+	t.Run("triggersAfterAutoDuration", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		sgaiDir := filepath.Join(dir, ".sgai")
+		if err := os.MkdirAll(sgaiDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		goalContent := "---\nflow: |\n  a -> b\n---\n\nGoal content.\n"
+		if err := os.WriteFile(goalPath, []byte(goalContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		checksum, err := computeGoalChecksum(goalPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stateJSONPath := filepath.Join(sgaiDir, "state.json")
+		wfState := state.Workflow{
+			Status:   state.StatusComplete,
+			Messages: []state.Message{},
+		}
+		if err := state.Save(stateJSONPath, wfState); err != nil {
+			t.Fatal(err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		t.Cleanup(cancel)
+
+		autoDuration := 100 * time.Millisecond
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, "")
+		if trigger != triggerAuto {
+			t.Errorf("expected trigger %q, got %q", triggerAuto, trigger)
+		}
+	})
+
+	t.Run("goalChangeOverridesAutoDuration", func(t *testing.T) {
+		dir := t.TempDir()
+		goalPath := filepath.Join(dir, "GOAL.md")
+		sgaiDir := filepath.Join(dir, ".sgai")
+		if err := os.MkdirAll(sgaiDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		originalContent := "---\nflow: |\n  a -> b\n---\n\nOriginal goal.\n"
+		if err := os.WriteFile(goalPath, []byte(originalContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		checksum, err := computeGoalChecksum(goalPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stateJSONPath := filepath.Join(sgaiDir, "state.json")
+		wfState := state.Workflow{
+			Status:   state.StatusComplete,
+			Messages: []state.Message{},
+		}
+		if err := state.Save(stateJSONPath, wfState); err != nil {
+			t.Fatal(err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		t.Cleanup(cancel)
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			modifiedContent := "---\nflow: |\n  a -> b\n---\n\nModified goal content.\n"
+			if err := os.WriteFile(goalPath, []byte(modifiedContent), 0644); err != nil {
+				t.Error(err)
+			}
+		}()
+
+		autoDuration := 1 * time.Second
+		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, "")
+		if trigger != triggerGoal {
+			t.Errorf("expected trigger %q, got %q", triggerGoal, trigger)
 		}
 	})
 }
