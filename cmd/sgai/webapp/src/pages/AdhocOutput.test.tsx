@@ -108,7 +108,7 @@ describe("AdhocOutput", () => {
     await act(async () => { fireEvent.click(button); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
-    expect(screen.getByText("Running...")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /stop/i })).toBeTruthy();
   });
 
   test("shows error on failure", async () => {

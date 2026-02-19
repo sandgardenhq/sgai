@@ -72,16 +72,16 @@ describe("RunTab", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDefined();
   });
 
-  it("places model selector and submit button on the same row", async () => {
+  it("places model selector and prompt textarea side-by-side in a grid layout", async () => {
     mockFetch.mockResolvedValue(new Response(JSON.stringify(modelsResponse)));
     renderRunTab();
 
     const modelSelect = await screen.findByRole("combobox", { name: "Model" });
-    const submitButton = screen.getByRole("button", { name: "Submit" });
+    const promptTextarea = screen.getByRole("textbox", { name: "Prompt" });
 
-    const row = modelSelect.parentElement;
-    expect(row).toBeTruthy();
-    expect(row?.contains(submitButton)).toBe(true);
+    const grid = modelSelect.closest(".grid-cols-\\[200px_1fr\\]");
+    expect(grid).toBeTruthy();
+    expect(grid?.contains(promptTextarea)).toBe(true);
   });
 
   it("selects the default model when provided", async () => {

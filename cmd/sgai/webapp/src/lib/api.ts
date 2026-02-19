@@ -174,6 +174,11 @@ export const api = {
       fetchJSON<ApiAdhocResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/adhoc`,
       ),
+    adhocStop: (name: string) =>
+      fetchJSON<ApiAdhocResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/adhoc`,
+        { method: "DELETE" },
+      ),
     retroAnalyze: (name: string, session: string) =>
       fetchJSON<ApiRetroActionResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/retrospective/analyze`,

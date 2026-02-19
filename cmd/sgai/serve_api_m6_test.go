@@ -927,6 +927,129 @@ func TestHandleAPIAdhocStatus(t *testing.T) {
 	})
 }
 
+func TestHandleAPIAdhocStop(t *testing.T) {
+	t.Run("stopsRunningAdhoc", func(t *testing.T) {
+		_, workspace, srv := setupM6TestWorkspace(t)
+
+		st := srv.getAdhocState(workspace)
+		st.mu.Lock()
+		st.running = true
+		st.output.WriteString("partial output")
+		st.mu.Unlock()
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
+		}
+
+		var result apiAdhocResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if result.Running {
+			t.Error("running should be false after stop")
+		}
+		if !strings.Contains(result.Output, "partial output") {
+			t.Errorf("output = %q; want containing 'partial output'", result.Output)
+		}
+		if !strings.Contains(result.Output, "[stopped by user]") {
+			t.Errorf("output = %q; want containing '[stopped by user]'", result.Output)
+		}
+		if result.Message != "ad-hoc stopped" {
+			t.Errorf("message = %q; want %q", result.Message, "ad-hoc stopped")
+		}
+
+		st.mu.Lock()
+		running := st.running
+		st.mu.Unlock()
+		if running {
+			t.Error("adhoc state running should be false after stop")
+		}
+	})
+
+	t.Run("stopNonRunningAdhoc", func(t *testing.T) {
+		_, _, srv := setupM6TestWorkspace(t)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
+		}
+
+		var result apiAdhocResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if result.Running {
+			t.Error("running should be false")
+		}
+		if result.Message != "ad-hoc stopped" {
+			t.Errorf("message = %q; want %q", result.Message, "ad-hoc stopped")
+		}
+	})
+
+	t.Run("workspaceNotFound", func(t *testing.T) {
+		_, _, srv := setupM6TestWorkspace(t)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/nonexistent/adhoc", nil)
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusNotFound {
+			t.Fatalf("status = %d; want %d", resp.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("idempotentStop", func(t *testing.T) {
+		_, workspace, srv := setupM6TestWorkspace(t)
+
+		st := srv.getAdhocState(workspace)
+		st.mu.Lock()
+		st.running = true
+		st.output.WriteString("output")
+		st.mu.Unlock()
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		for range 3 {
+			req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
+			resp := httptest.NewRecorder()
+			mux.ServeHTTP(resp, req)
+
+			if resp.Code != http.StatusOK {
+				t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
+			}
+		}
+
+		st.mu.Lock()
+		output := st.output.String()
+		running := st.running
+		st.mu.Unlock()
+
+		if running {
+			t.Error("running should be false")
+		}
+		if strings.Count(output, "[stopped by user]") != 1 {
+			t.Errorf("output should contain exactly one '[stopped by user]', got: %q", output)
+		}
+	})
+}
+
 func TestHandleAPIOpenEditorGoal(t *testing.T) {
 	t.Run("opensGoalFile", func(t *testing.T) {
 		_, workspace, srv := setupM6TestWorkspace(t)

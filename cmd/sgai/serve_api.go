@@ -107,6 +107,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStatus)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhoc)
+	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/analyze", s.handleAPIRetroAnalyze)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/apply", s.handleAPIRetroApply)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/delete", s.handleAPIRetroDelete)
@@ -2426,6 +2427,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 
 	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--agent", "build", "--title", "adhoc ["+st.selectedModel+"]")
 	cmd.Dir = workspacePath
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
@@ -2464,6 +2466,31 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, apiAdhocResponse{
 		Running: true,
 		Message: "ad-hoc prompt started",
+	})
+}
+
+func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	st := s.getAdhocState(workspacePath)
+	st.stop()
+
+	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
+		"workspace": filepath.Base(workspacePath),
+		"action":    "adhoc-stopped",
+	}})
+
+	st.mu.Lock()
+	output := st.output.String()
+	st.mu.Unlock()
+
+	writeJSON(w, apiAdhocResponse{
+		Running: false,
+		Output:  output,
+		Message: "ad-hoc stopped",
 	})
 }
 
