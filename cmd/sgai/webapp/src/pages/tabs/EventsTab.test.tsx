@@ -88,7 +88,6 @@ describe("EventsTab", () => {
 
     expect(screen.getByText("Implementing API endpoints")).toBeDefined();
     expect(screen.getByText("Feb 8, 2026")).toBeDefined();
-    expect(screen.getByText("Work Flow")).toBeDefined();
   });
 
   it("renders GOAL.md section when goal content is provided", async () => {

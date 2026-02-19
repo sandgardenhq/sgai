@@ -34,19 +34,22 @@ function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsR
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Work Flow</CardTitle>
-      </CardHeader>
       <CardContent className="space-y-3">
-        <img
-          src={svgUrl}
-          alt="Workflow graph"
-          className="max-w-full h-auto"
-        />
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 min-w-0">
+            <img
+              src={svgUrl}
+              alt="Workflow graph"
+              className="max-w-full h-auto"
+            />
+          </div>
 
-        {eventsData.agentModels && eventsData.agentModels.length > 0 && (
-          <AgentModelsTable entries={eventsData.agentModels} />
-        )}
+          {eventsData.agentModels && eventsData.agentModels.length > 0 && (
+            <div className="lg:w-80 xl:w-96 shrink-0">
+              <AgentModelsTable entries={eventsData.agentModels} />
+            </div>
+          )}
+        </div>
 
         {eventsData.modelStatuses && eventsData.modelStatuses.length > 0 && (
           <ModelStatusList statuses={eventsData.modelStatuses} />
@@ -70,8 +73,7 @@ function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsR
 function AgentModelsTable({ entries }: { entries: ApiAgentModelEntry[] }) {
   return (
     <div className="text-sm">
-      <strong>Agent Models:</strong>
-      <Table className="mt-1">
+      <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="text-muted-foreground">Agent</TableHead>
@@ -83,19 +85,23 @@ function AgentModelsTable({ entries }: { entries: ApiAgentModelEntry[] }) {
             <TableRow key={entry.agent}>
               <TableCell className="whitespace-nowrap">{entry.agent}</TableCell>
               <TableCell>
-                {entry.models.map((model) => {
-                  const shortModel = model.split("/").pop() ?? model;
-                  return (
-                    <Tooltip key={model}>
-                      <TooltipTrigger asChild>
-                        <span className="inline-block mr-2 cursor-help truncate max-w-[200px]">
-                          {shortModel}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{model}</TooltipContent>
-                    </Tooltip>
-                  );
-                })}
+                <ul className="list-disc list-inside space-y-0.5">
+                  {entry.models.map((model) => {
+                    const shortModel = model.split("/").pop() ?? model;
+                    return (
+                      <li key={model}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">
+                              {shortModel}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{model}</TooltipContent>
+                        </Tooltip>
+                      </li>
+                    );
+                  })}
+                </ul>
               </TableCell>
             </TableRow>
           ))}
