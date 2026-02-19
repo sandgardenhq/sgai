@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
@@ -18,6 +19,8 @@ type workspaceStateSnapshot struct {
 	progressLen  int
 	todosHash    string
 	messagesHash string
+	goalModTime  time.Time
+	goalHash     string
 }
 
 func (s *Server) startStateWatcher() {
@@ -64,6 +67,7 @@ func (s *Server) pollWorkspaceStates(snapshots map[string]workspaceStateSnapshot
 func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]workspaceStateSnapshot, activeWorkspaces map[string]bool) {
 	activeWorkspaces[dir] = true
 	stPath := statePath(dir)
+	goalPath := filepath.Join(dir, "GOAL.md")
 
 	info, errStat := os.Stat(stPath)
 	if errStat != nil {
@@ -71,9 +75,20 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 		return
 	}
 
+	goalInfo, errGoalStat := os.Stat(goalPath)
+	if errGoalStat != nil {
+		goalInfo = nil
+	}
+
 	prev, hasPrev := snapshots[dir]
 	if hasPrev && info.ModTime().Equal(prev.modTime) {
-		return
+		goalChanged := false
+		if goalInfo != nil {
+			goalChanged = !goalInfo.ModTime().Equal(prev.goalModTime)
+		}
+		if !goalChanged {
+			return
+		}
 	}
 
 	wfState, errLoad := state.Load(stPath)
@@ -81,7 +96,7 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 		return
 	}
 
-	current := buildStateSnapshot(info.ModTime(), wfState)
+	current := buildStateSnapshot(info.ModTime(), wfState, goalInfo)
 	snapshots[dir] = current
 
 	if !hasPrev {
@@ -91,8 +106,8 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 	s.emitStateChangeEvents(name, dir, prev, current)
 }
 
-func buildStateSnapshot(modTime time.Time, wfState state.Workflow) workspaceStateSnapshot {
-	return workspaceStateSnapshot{
+func buildStateSnapshot(modTime time.Time, wfState state.Workflow, goalInfo os.FileInfo) workspaceStateSnapshot {
+	snapshot := workspaceStateSnapshot{
 		modTime:      modTime,
 		status:       wfState.Status,
 		needsInput:   wfState.NeedsHumanInput(),
@@ -100,6 +115,11 @@ func buildStateSnapshot(modTime time.Time, wfState state.Workflow) workspaceStat
 		todosHash:    hashTodos(wfState.ProjectTodos, wfState.Todos),
 		messagesHash: hashMessages(wfState.Messages),
 	}
+	if goalInfo != nil {
+		snapshot.goalModTime = goalInfo.ModTime()
+		snapshot.goalHash = hashGoalFile(goalInfo)
+	}
+	return snapshot
 }
 
 func (s *Server) emitStateChangeEvents(workspaceName, workspacePath string, prev, current workspaceStateSnapshot) {
@@ -123,6 +143,11 @@ func (s *Server) emitStateChangeEvents(workspaceName, workspacePath string, prev
 
 	if prev.messagesHash != current.messagesHash {
 		s.publishToWorkspace(workspacePath, sseEvent{Type: "messages:new", Data: data})
+		publishedToWorkspace = true
+	}
+
+	if prev.goalHash != current.goalHash {
+		s.publishToWorkspace(workspacePath, sseEvent{Type: "goal:update", Data: data})
 		publishedToWorkspace = true
 	}
 
@@ -151,5 +176,15 @@ func hashMessages(messages []state.Message) string {
 		return ""
 	}
 	h.Write(data)
+	return fmt.Sprintf("%x", h.Sum(nil))[:16]
+}
+
+func hashGoalFile(goalInfo os.FileInfo) string {
+	if goalInfo == nil {
+		return ""
+	}
+	h := sha256.New()
+	_, _ = fmt.Fprint(h, goalInfo.ModTime().String())
+	_, _ = fmt.Fprintf(h, "%d", goalInfo.Size())
 	return fmt.Sprintf("%x", h.Sum(nil))[:16]
 }
