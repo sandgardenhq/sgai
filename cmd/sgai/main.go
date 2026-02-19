@@ -1028,6 +1028,9 @@ type GoalMetadata struct {
 	Flow                 string         `json:"flow,omitempty" yaml:"flow,omitempty"`
 	Models               map[string]any `json:"models,omitempty" yaml:"models,omitempty"`
 	CompletionGateScript string         `json:"completionGateScript,omitempty" yaml:"completionGateScript,omitempty"`
+	ContinuousModePrompt string         `json:"continuousModePrompt,omitempty" yaml:"continuousModePrompt,omitempty"`
+	ContinuousModeAuto   string         `json:"continuousModeAuto,omitempty" yaml:"continuousModeAuto,omitempty"`
+	ContinuousModeCron   string         `json:"continuousModeCron,omitempty" yaml:"continuousModeCron,omitempty"`
 }
 
 type agentMetadata struct {

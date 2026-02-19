@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"maps"
@@ -101,7 +102,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/reset", s.handleAPIResetSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/merge", s.handleAPIMergeWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
@@ -753,6 +753,7 @@ type apiWorkspaceDetailResponse struct {
 	HasSGAI         bool                      `json:"hasSgai"`
 	HasEditedGoal   bool                      `json:"hasEditedGoal"`
 	InteractiveAuto bool                      `json:"interactiveAuto"`
+	ContinuousMode  bool                      `json:"continuousMode"`
 	CurrentAgent    string                    `json:"currentAgent"`
 	CurrentModel    string                    `json:"currentModel"`
 	Task            string                    `json:"task"`
@@ -857,6 +858,7 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 		HasSGAI:         hassgaiDirectory(workspacePath),
 		HasEditedGoal:   hasEditedGoal,
 		InteractiveAuto: interactiveAuto,
+		ContinuousMode:  readContinuousModePrompt(workspacePath) != "",
 		CurrentAgent:    currentAgent,
 		CurrentModel:    resolveCurrentModel(workspacePath, wfState),
 		Task:            task,
@@ -2146,287 +2148,6 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-type apiMergeRequest struct {
-	ForkDir string `json:"forkDir"`
-	Confirm bool   `json:"confirm"`
-}
-
-type apiMergeResponse struct {
-	Merged  bool   `json:"merged"`
-	Message string `json:"message"`
-}
-
-func (s *Server) handleAPIMergeWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	if classifyWorkspace(workspacePath) != workspaceRoot {
-		http.Error(w, "workspace is not a root", http.StatusBadRequest)
-		return
-	}
-
-	var req apiMergeRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if !req.Confirm {
-		http.Error(w, "confirmation required to merge and delete fork", http.StatusBadRequest)
-		return
-	}
-
-	forkDir, errValidate := s.validateDirectory(req.ForkDir)
-	if errValidate != nil {
-		http.Error(w, "invalid fork directory", http.StatusBadRequest)
-		return
-	}
-
-	if classifyWorkspace(forkDir) != workspaceFork {
-		http.Error(w, "fork workspace not found", http.StatusBadRequest)
-		return
-	}
-
-	if getRootWorkspacePath(forkDir) != workspacePath {
-		http.Error(w, "fork does not belong to root", http.StatusBadRequest)
-		return
-	}
-
-	diffCmd := exec.Command("jj", "diff", "--stat")
-	diffCmd.Dir = forkDir
-	diffOutput, errDiff := diffCmd.CombinedOutput()
-	if errDiff != nil {
-		http.Error(w, "failed to collect diff summary", http.StatusInternalServerError)
-		return
-	}
-	if strings.TrimSpace(string(diffOutput)) != "" {
-		http.Error(w, "fork has uncommitted changes", http.StatusConflict)
-		return
-	}
-
-	logCmd := exec.Command("jj", "log", "-r", "::@", "--no-graph")
-	logCmd.Dir = forkDir
-	logOutput, errLog := logCmd.CombinedOutput()
-	if errLog != nil {
-		http.Error(w, "failed to collect commit history", http.StatusInternalServerError)
-		return
-	}
-
-	goalContent := ""
-	if data, errRead := os.ReadFile(filepath.Join(forkDir, "GOAL.md")); errRead == nil {
-		goalContent = string(data)
-	}
-
-	forkName := filepath.Base(forkDir)
-	branchName := normalizeForkName(forkName)
-	if branchName == "" {
-		branchName = "fork-merge"
-	}
-	prompt := strings.Join([]string{
-		"Return a short branch name based on the fork work.",
-		"Use only letters, numbers, dashes, and underscores.",
-		"Fork name: " + forkName,
-		"Commit history:\n" + string(logOutput),
-		"Diff summary:\n" + string(diffOutput),
-		"GOAL:\n" + goalContent,
-	}, "\n")
-	if result, errPrompt := invokeLLMForAssist(prompt); errPrompt == nil {
-		normalized := normalizeForkName(result)
-		if validateWorkspaceName(normalized) == "" && normalized != "" {
-			branchName = normalized
-		}
-	}
-
-	baseBookmark := "main"
-	for _, candidate := range []string{"main", "trunk"} {
-		baseCmd := exec.Command("jj", "log", "-r", candidate, "--no-graph", "-T", "change_id")
-		baseCmd.Dir = workspacePath
-		if errBase := baseCmd.Run(); errBase == nil {
-			baseBookmark = candidate
-			break
-		}
-	}
-
-	forkRevset := fmt.Sprintf("ancestors(@) ~ ancestors(%s@)", baseBookmark)
-	rebaseCmd := exec.Command("jj", "rebase", "-s", forkRevset, "-d", baseBookmark)
-	rebaseCmd.Dir = forkDir
-	rebaseOutput, errRebase := rebaseCmd.CombinedOutput()
-	if errRebase != nil {
-		if !strings.Contains(strings.ToLower(string(rebaseOutput)), "conflict") {
-			http.Error(w, "failed to rebase fork", http.StatusInternalServerError)
-			return
-		}
-		listCmd := exec.Command("jj", "resolve", "--list")
-		listCmd.Dir = forkDir
-		listOutput, errList := listCmd.CombinedOutput()
-		if errList != nil {
-			http.Error(w, "failed to list conflicts", http.StatusInternalServerError)
-			return
-		}
-		conflictFiles := strings.Fields(string(listOutput))
-		if len(conflictFiles) == 0 {
-			http.Error(w, "failed to detect conflicts", http.StatusInternalServerError)
-			return
-		}
-		for _, file := range conflictFiles {
-			targetPath := file
-			if !filepath.IsAbs(targetPath) {
-				targetPath = filepath.Join(forkDir, targetPath)
-			}
-			content, errRead := os.ReadFile(targetPath)
-			if errRead != nil {
-				http.Error(w, "failed to read conflict file", http.StatusInternalServerError)
-				return
-			}
-			prompt := strings.Join([]string{
-				"Resolve the merge conflicts in the following file.",
-				"Return only the resolved file content.",
-				"File: " + file,
-				"Content:\n" + string(content),
-			}, "\n")
-			resolved, errResolve := invokeLLMForAssist(prompt)
-			if errResolve != nil || strings.TrimSpace(resolved) == "" {
-				http.Error(w, "failed to resolve conflicts", http.StatusInternalServerError)
-				return
-			}
-			if errWrite := os.WriteFile(targetPath, []byte(resolved), 0644); errWrite != nil {
-				http.Error(w, "failed to write resolved file", http.StatusInternalServerError)
-				return
-			}
-		}
-		resolveCmd := exec.Command("jj", "resolve", "--accept=working")
-		resolveCmd.Dir = forkDir
-		if _, errResolve := resolveCmd.CombinedOutput(); errResolve != nil {
-			http.Error(w, "failed to record conflict resolution", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	squashFrom := fmt.Sprintf("(%s) ~ @", forkRevset)
-	squashCandidatesCmd := exec.Command("jj", "log", "-r", squashFrom, "--no-graph", "-T", "change_id ++ \"\\n\"")
-	squashCandidatesCmd.Dir = forkDir
-	squashCandidatesOutput, errCandidates := squashCandidatesCmd.CombinedOutput()
-	if errCandidates != nil {
-		http.Error(w, "failed to identify squash candidates", http.StatusInternalServerError)
-		return
-	}
-	if strings.TrimSpace(string(squashCandidatesOutput)) != "" {
-		squashCmd := exec.Command("jj", "squash", "--from", squashFrom, "--into", "@")
-		squashCmd.Dir = forkDir
-		if _, errSquash := squashCmd.CombinedOutput(); errSquash != nil {
-			http.Error(w, "failed to squash fork changes", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	commitMessage := ""
-	defaultDescCmd := exec.Command("jj", "log", "-r", "::@", "--no-graph", "-T", "description.first_line() ++ \"\\n\"")
-	defaultDescCmd.Dir = forkDir
-	defaultDescOutput, errDefaultDesc := defaultDescCmd.CombinedOutput()
-	if errDefaultDesc == nil {
-		var parts []string
-		for line := range strings.SplitSeq(string(defaultDescOutput), "\n") {
-			trimmed := strings.TrimSpace(line)
-			if trimmed != "" {
-				parts = append(parts, trimmed)
-			}
-		}
-		if len(parts) > 0 {
-			commitMessage = strings.Join(parts, "; ")
-		}
-	}
-	if commitMessage == "" {
-		commitMessage = "merge fork work"
-	}
-	commitPrompt := strings.Join([]string{
-		"Write a concise commit message summarizing the fork work.",
-		"Commit history:\n" + string(logOutput),
-		"Diff summary:\n" + string(diffOutput),
-		"GOAL:\n" + goalContent,
-	}, "\n")
-	if result, errPrompt := invokeLLMForAssist(commitPrompt); errPrompt == nil && strings.TrimSpace(result) != "" {
-		commitMessage = strings.TrimSpace(result)
-	}
-
-	descCmd := exec.Command("jj", "desc", "-m", commitMessage)
-	descCmd.Dir = forkDir
-	if _, errDesc := descCmd.CombinedOutput(); errDesc != nil {
-		http.Error(w, "failed to update commit message", http.StatusInternalServerError)
-		return
-	}
-
-	bookmarkCmd := exec.Command("jj", "bookmark", "create", branchName, "-r", "@")
-	bookmarkCmd.Dir = forkDir
-	if _, errBookmark := bookmarkCmd.CombinedOutput(); errBookmark != nil {
-		http.Error(w, "failed to create bookmark", http.StatusInternalServerError)
-		return
-	}
-
-	pushCmd := exec.Command("jj", "git", "push", "--bookmark", branchName)
-	pushCmd.Dir = forkDir
-	if _, errPush := pushCmd.CombinedOutput(); errPush != nil {
-		http.Error(w, "failed to push bookmark", http.StatusInternalServerError)
-		return
-	}
-
-	if _, errGH := exec.LookPath("gh"); errGH == nil {
-		prTitle := commitMessage
-		prBody := ""
-		prPrompt := strings.Join([]string{
-			"Write a GitHub pull request title and body.",
-			"Return the title on a line starting with TITLE: and the body after BODY:.",
-			"Commit history:\n" + string(logOutput),
-			"Diff summary:\n" + string(diffOutput),
-			"GOAL:\n" + goalContent,
-		}, "\n")
-		if result, errPrompt := invokeLLMForAssist(prPrompt); errPrompt == nil {
-			lines := strings.Split(result, "\n")
-			for i, line := range lines {
-				if after, found := strings.CutPrefix(line, "TITLE:"); found {
-					prTitle = strings.TrimSpace(after)
-				}
-				if strings.HasPrefix(line, "BODY:") {
-					prBody = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
-					break
-				}
-			}
-		}
-		if prTitle == "" {
-			prTitle = commitMessage
-		}
-		prCmd := exec.Command("gh", "pr", "create", "--draft", "--head", branchName, "--title", prTitle, "--body", prBody)
-		prCmd.Dir = forkDir
-		if _, errPR := prCmd.CombinedOutput(); errPR != nil {
-			http.Error(w, "failed to create pull request", http.StatusInternalServerError)
-			return
-		}
-	}
-
-	forgetCmd := exec.Command("jj", "workspace", "forget", filepath.Base(forkDir))
-	forgetCmd.Dir = workspacePath
-	if _, errForget := forgetCmd.CombinedOutput(); errForget != nil {
-		http.Error(w, "failed to forget fork workspace", http.StatusInternalServerError)
-		return
-	}
-	if errRemove := os.RemoveAll(forkDir); errRemove != nil {
-		http.Error(w, "failed to remove fork directory", http.StatusInternalServerError)
-		return
-	}
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "merged",
-		"fork":      forkName,
-	}})
-
-	writeJSON(w, apiMergeResponse{
-		Merged:  true,
-		Message: "fork merged successfully",
-	})
-}
-
 type apiDeleteForkRequest struct {
 	ForkDir string `json:"forkDir"`
 	Confirm bool   `json:"confirm"`
@@ -2703,12 +2424,16 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	st.selectedModel = strings.TrimSpace(req.Model)
 	st.promptText = strings.TrimSpace(req.Prompt)
 
-	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--title", "adhoc ["+st.selectedModel+"]")
+	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--agent", "build", "--title", "adhoc ["+st.selectedModel+"]")
 	cmd.Dir = workspacePath
+	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
-	cmd.Stdout = writer
-	cmd.Stderr = writer
+	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
+	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
+	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
+	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
+	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 
 	if errStart := cmd.Start(); errStart != nil {
 		st.running = false

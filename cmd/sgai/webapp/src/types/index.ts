@@ -86,6 +86,7 @@ export interface ApiWorkspaceDetailResponse {
   hasSgai: boolean;
   hasEditedGoal: boolean;
   interactiveAuto: boolean;
+  continuousMode: boolean;
   currentAgent: string;
   currentModel: string;
   task: string;
@@ -508,16 +509,6 @@ export interface ApiForkResponse {
   name: string;
   dir: string;
   parent: string;
-}
-
-export interface ApiMergeRequest {
-  forkDir: string;
-  confirm: boolean;
-}
-
-export interface ApiMergeResponse {
-  merged: boolean;
-  message: string;
 }
 
 export interface ApiDeleteForkResponse {

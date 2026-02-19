@@ -160,11 +160,23 @@ type configurableEditor struct {
 }
 
 func (e *configurableEditor) open(path string) error {
-	cmd := exec.Command(e.command, path)
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
+	{
+		cmd := exec.Command(e.command, path)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		err := cmd.Run()
+		if err == nil {
+			return nil
+		}
+	}
+	{
+		cmd := exec.Command("code", path)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		return cmd.Run()
+	}
 }
 
 func resolveEditor(configEditor string) (name, command string, isTerminal bool) {
@@ -426,7 +438,13 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 			})
 		}()
 
-		runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
+		continuousPrompt := readContinuousModePrompt(workspacePath)
+		if continuousPrompt != "" {
+			setContinuousAutoMode(workspacePath)
+			runContinuousWorkflow(ctx, []string{workspacePath}, continuousPrompt, mcpURL, logWriter)
+		} else {
+			runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
+		}
 	}()
 
 	return startSessionResult{sess: sess}
@@ -502,6 +520,11 @@ func cmdServe(args []string) {
 		}
 	}
 
+	listener, errListen := net.Listen("tcp", *listenAddr)
+	if errListen != nil {
+		log.Fatalln("failed to listen:", errListen)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -516,14 +539,14 @@ func cmdServe(args []string) {
 	srv.registerAPIRoutes(mux)
 	handler := srv.spaMiddleware(mux)
 
-	httpServer := &http.Server{Addr: *listenAddr, Handler: handler}
+	httpServer := &http.Server{Handler: handler}
 
-	baseURL := dashboardBaseURL(*listenAddr)
+	baseURL := dashboardBaseURL(listener.Addr().String())
 	log.Println("sgai serve listening on", baseURL)
 
 	go func() {
-		if errListen := httpServer.ListenAndServe(); errListen != nil && !errors.Is(errListen, http.ErrServerClosed) {
-			log.Fatalln("server error:", errListen)
+		if errServe := httpServer.Serve(listener); errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
+			log.Fatalln("server error:", errServe)
 		}
 	}()
 
@@ -1663,16 +1686,6 @@ func normalizeForkName(name string) string {
 	parts := strings.Fields(normalized)
 	joined := strings.Join(parts, "-")
 	return strings.ToLower(joined)
-}
-
-func invokeLLMForAssist(prompt string) (string, error) {
-	cmd := exec.Command("opencode", "run", "--title", "llm-assist")
-	cmd.Stdin = strings.NewReader(prompt)
-	output, errRun := cmd.Output()
-	if errRun != nil {
-		return "", fmt.Errorf("opencode failed: %w", errRun)
-	}
-	return strings.TrimSpace(string(output)), nil
 }
 
 func writeOpenCodeScript(content string) (string, error) {
