@@ -745,7 +745,7 @@ function NoWorkspaceState({ name, dir }: { name: string; dir: string }) {
       <div className="text-center py-8 text-muted-foreground italic">
         <p>No workspace configured for this directory.</p>
         <Link
-          to={`/workspaces/${encodeURIComponent(name)}/init`}
+          to={`/workspaces/${encodeURIComponent(name)}/goal/edit`}
           className="inline-block mt-4 px-4 py-2 text-sm rounded border hover:bg-muted transition-colors no-underline"
         >
           Edit GOAL
