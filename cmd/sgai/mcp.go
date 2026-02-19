@@ -532,7 +532,7 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 	}
 
 	if len(args.Questions) == 0 {
-		return "Error: At least one question is required", nil
+		return `Error: At least one question is required. You must provide questions in this format: {"questions": [{"question": "Your question text?", "choices": ["Choice 1", "Choice 2"], "multiSelect": false}]}`, nil
 	}
 
 	for i, q := range args.Questions {

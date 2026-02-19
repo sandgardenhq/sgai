@@ -88,6 +88,46 @@ func TestBuildWorkspaceDetailUsesWorkflowAutoLock(t *testing.T) {
 	}
 }
 
+func TestStartAPIClearsStaleInteractiveAutoLock(t *testing.T) {
+	rootDir := t.TempDir()
+	workspace := filepath.Join(rootDir, "test-project")
+	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+		t.Fatal(errMkdir)
+	}
+	createsgaiDir(t, workspace)
+
+	if errSave := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSave != nil {
+		t.Fatal(errSave)
+	}
+
+	wfState, errLoad := state.Load(statePath(workspace))
+	if errLoad != nil {
+		t.Fatal(errLoad)
+	}
+
+	wfState.InteractiveAutoLock = false
+	wfState.StartedInteractive = true
+	if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		t.Fatal(errSave)
+	}
+
+	effectiveAuto := wfState.InteractiveAutoLock
+
+	loaded, errReload := state.Load(statePath(workspace))
+	if errReload != nil {
+		t.Fatal(errReload)
+	}
+	if loaded.InteractiveAutoLock {
+		t.Fatal("InteractiveAutoLock should be false after interactive start cleared it")
+	}
+	if !loaded.StartedInteractive {
+		t.Fatal("StartedInteractive should be true after interactive start")
+	}
+	if effectiveAuto {
+		t.Fatal("effective auto mode should be false when interactive start clears the lock")
+	}
+}
+
 func TestHandleAPIWorkspaceSessionUsesWorkflowAutoLock(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")

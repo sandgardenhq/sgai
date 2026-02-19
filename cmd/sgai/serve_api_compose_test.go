@@ -11,16 +11,8 @@ import (
 	"testing"
 )
 
-func resetComposerSessions(t *testing.T) {
-	t.Helper()
-	composerSessionsMu.Lock()
-	composerSessions = make(map[string]*composerSession)
-	composerSessionsMu.Unlock()
-}
-
 func setupComposeTestWorkspace(t *testing.T) (string, *Server) {
 	t.Helper()
-	resetComposerSessions(t)
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-workspace")
 	if err := os.MkdirAll(filepath.Join(workspace, ".sgai", "agent"), 0755); err != nil {
@@ -38,7 +30,6 @@ func TestHandleAPIComposeState(t *testing.T) {
 	workspaceName := filepath.Base(workspace)
 
 	t.Run("returnsDefaultState", func(t *testing.T) {
-		resetComposerSessions(t)
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
@@ -64,7 +55,6 @@ func TestHandleAPIComposeState(t *testing.T) {
 	})
 
 	t.Run("returnsExistingGoalState", func(t *testing.T) {
-		resetComposerSessions(t)
 		goalContent := `---
 flow: |
   "backend-go-developer" -> "go-readability-reviewer"
@@ -84,8 +74,9 @@ Build a REST API
 			t.Fatal(err)
 		}
 
+		freshSrv := NewServer(filepath.Dir(workspace))
 		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		freshSrv.registerAPIRoutes(mux)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
@@ -170,9 +161,8 @@ func TestHandleAPIComposePreview(t *testing.T) {
 	workspaceName := filepath.Base(workspace)
 
 	t.Run("generatesPreview", func(t *testing.T) {
-		resetComposerSessions(t)
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		cs.state.Description = "A test project"
 		cs.state.Tasks = "- Task 1\n- Task 2"
@@ -206,9 +196,8 @@ func TestHandleAPIComposePreview(t *testing.T) {
 	})
 
 	t.Run("returnsFlowError", func(t *testing.T) {
-		resetComposerSessions(t)
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		cs.state.Flow = `invalid DOT {{{{ syntax >>>>`
 		cs.mu.Unlock()
@@ -240,9 +229,8 @@ func TestHandleAPIComposeSave(t *testing.T) {
 	workspaceName := filepath.Base(workspace)
 
 	t.Run("savesGoalMd", func(t *testing.T) {
-		resetComposerSessions(t)
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		cs.state.Description = "Saved project"
 		cs.state.Tasks = "- Saved task"
@@ -283,14 +271,13 @@ func TestHandleAPIComposeSave(t *testing.T) {
 	})
 
 	t.Run("etagConflict", func(t *testing.T) {
-		resetComposerSessions(t)
 
 		goalPath := filepath.Join(workspace, "GOAL.md")
 		if err := os.WriteFile(goalPath, []byte("original content"), 0644); err != nil {
 			t.Fatal(err)
 		}
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		cs.state.Description = "New content"
 		cs.mu.Unlock()
@@ -309,7 +296,6 @@ func TestHandleAPIComposeSave(t *testing.T) {
 	})
 
 	t.Run("etagMatchAllowsSave", func(t *testing.T) {
-		resetComposerSessions(t)
 
 		goalPath := filepath.Join(workspace, "GOAL.md")
 		originalContent := []byte("original content for etag test")
@@ -319,7 +305,7 @@ func TestHandleAPIComposeSave(t *testing.T) {
 
 		currentEtag := computeEtag(originalContent)
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		cs.state.Description = "Updated with valid etag"
 		cs.mu.Unlock()
@@ -343,7 +329,6 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 	workspaceName := filepath.Base(workspace)
 
 	t.Run("savesDraftToSession", func(t *testing.T) {
-		resetComposerSessions(t)
 
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
@@ -380,7 +365,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 			t.Error("saved should be true")
 		}
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		desc := cs.state.Description
 		step := cs.wizard.CurrentStep
@@ -399,7 +384,6 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 	})
 
 	t.Run("idempotent", func(t *testing.T) {
-		resetComposerSessions(t)
 
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
@@ -429,7 +413,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 			}
 		}
 
-		cs := getComposerSession(workspace)
+		cs := srv.getComposerSession(workspace)
 		cs.mu.Lock()
 		desc := cs.state.Description
 		cs.mu.Unlock()
@@ -482,8 +466,6 @@ func TestComputeEtag(t *testing.T) {
 func TestHandleAPIComposeSaveConcurrentDrafts(t *testing.T) {
 	workspace, srv := setupComposeTestWorkspace(t)
 	workspaceName := filepath.Base(workspace)
-
-	resetComposerSessions(t)
 
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)

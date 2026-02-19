@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -95,7 +93,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/changes", s.handleAPIWorkspaceChanges)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/events", s.handleAPIWorkspaceEvents)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/forks", s.handleAPIWorkspaceForks)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/retrospectives", s.handleAPIWorkspaceRetrospectives)
+
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/pending-question", s.handleAPIPendingQuestion)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/respond", s.handleAPIRespond)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/start", s.handleAPIStartSession)
@@ -108,9 +106,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStatus)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhoc)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/analyze", s.handleAPIRetroAnalyze)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/apply", s.handleAPIRetroApply)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/retrospective/delete", s.handleAPIRetroDelete)
+
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/workflow.svg", s.handleAPIWorkflowSVG)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/commits", s.handleAPIWorkspaceCommits)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
@@ -1438,62 +1434,6 @@ func convertJJCommitsForAPI(commits []jjCommit) []apiForkCommit {
 	return result
 }
 
-type apiRetroSession struct {
-	Name            string `json:"name"`
-	HasImprovements bool   `json:"hasImprovements"`
-	GoalSummary     string `json:"goalSummary"`
-}
-
-type apiRetroDetail struct {
-	SessionName     string `json:"sessionName"`
-	GoalSummary     string `json:"goalSummary"`
-	GoalContent     string `json:"goalContent"`
-	Improvements    string `json:"improvements"`
-	ImprovementsRaw string `json:"improvementsRaw"`
-	HasImprovements bool   `json:"hasImprovements"`
-	IsAnalyzing     bool   `json:"isAnalyzing"`
-	IsApplying      bool   `json:"isApplying"`
-}
-
-type apiRetrospectivesResponse struct {
-	Sessions        []apiRetroSession `json:"sessions"`
-	SelectedSession string            `json:"selectedSession"`
-	Details         *apiRetroDetail   `json:"details,omitempty"`
-}
-
-func (s *Server) handleAPIWorkspaceRetrospectives(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	sessions := convertRetroSessionsForAPI(s.listRetrospectiveSessionsForProject(workspacePath))
-
-	sessionParam := r.URL.Query().Get("session")
-	if sessionParam == "" && len(sessions) > 0 {
-		sessionParam = sessions[0].Name
-	}
-
-	var detail *apiRetroDetail
-	if sessionParam != "" {
-		detail = s.buildRetroDetailForAPI(workspacePath, sessionParam)
-	}
-
-	writeJSON(w, apiRetrospectivesResponse{
-		Sessions:        sessions,
-		SelectedSession: sessionParam,
-		Details:         detail,
-	})
-}
-
-func convertRetroSessionsForAPI(sessions []retroSessionData) []apiRetroSession {
-	result := make([]apiRetroSession, 0, len(sessions))
-	for _, s := range sessions {
-		result = append(result, apiRetroSession(s))
-	}
-	return result
-}
-
 func generateQuestionID(wfState state.Workflow) string {
 	if !wfState.NeedsHumanInput() {
 		return ""
@@ -1685,6 +1625,16 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
 		return
 	}
+
+	if !req.Auto {
+		wfState.InteractiveAutoLock = false
+		wfState.StartedInteractive = true
+		if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+			http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	req.Auto = wfState.InteractiveAutoLock || req.Auto
 
 	result := s.startSession(workspacePath, req.Auto)
@@ -1777,68 +1727,6 @@ func (s *Server) handleAPIResetSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) buildRetroDetailForAPI(dir, sessionName string) *apiRetroDetail {
-	retrospectivesDir := filepath.Join(dir, ".sgai", "retrospectives")
-	sessionDir := filepath.Join(retrospectivesDir, sessionName)
-
-	goalPath := filepath.Join(sessionDir, "GOAL.md")
-	improvementsPath := filepath.Join(sessionDir, "IMPROVEMENTS.md")
-
-	goalSummary := stripMarkdownHeading(extractGoalSummary(goalPath))
-
-	var goalContent string
-	if data, errRead := os.ReadFile(goalPath); errRead == nil {
-		normalized := normalizeEscapedNewlines(data)
-		stripped := stripFrontmatter(string(normalized))
-		if rendered, errRender := renderMarkdown([]byte(stripped)); errRender == nil {
-			goalContent = rendered
-		}
-	}
-
-	var improvementsContent string
-	var improvementsRaw string
-	hasImprovements := false
-	if data, errRead := os.ReadFile(improvementsPath); errRead == nil {
-		hasImprovements = true
-		stripped := stripFrontmatter(string(data))
-		improvementsRaw = stripped
-		if rendered, errRender := renderMarkdown([]byte(stripped)); errRender == nil {
-			improvementsContent = rendered
-		}
-	}
-
-	sessionKey := "retro-analyze-" + dir + "-" + sessionName
-	applyKey := "retro-apply-" + dir + "-" + sessionName
-
-	s.mu.Lock()
-	analyzeSession := s.sessions[sessionKey]
-	applySession := s.sessions[applyKey]
-	s.mu.Unlock()
-
-	var isAnalyzing, isApplying bool
-	if analyzeSession != nil {
-		analyzeSession.mu.Lock()
-		isAnalyzing = analyzeSession.running
-		analyzeSession.mu.Unlock()
-	}
-	if applySession != nil {
-		applySession.mu.Lock()
-		isApplying = applySession.running
-		applySession.mu.Unlock()
-	}
-
-	return &apiRetroDetail{
-		SessionName:     sessionName,
-		GoalSummary:     goalSummary,
-		GoalContent:     goalContent,
-		Improvements:    improvementsContent,
-		ImprovementsRaw: improvementsRaw,
-		HasImprovements: hasImprovements,
-		IsAnalyzing:     isAnalyzing,
-		IsApplying:      isApplying,
-	}
-}
-
 type apiComposeStateResponse struct {
 	Workspace      string             `json:"workspace"`
 	State          composerState      `json:"state"`
@@ -1869,7 +1757,7 @@ func (s *Server) handleAPIComposeState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cs := getComposerSession(workspacePath)
+	cs := s.getComposerSession(workspacePath)
 	cs.mu.Lock()
 	currentState := cs.state
 	wizard := syncWizardState(cs.wizard, currentState)
@@ -1938,7 +1826,7 @@ func (s *Server) handleAPIComposeSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cs := getComposerSession(workspacePath)
+	cs := s.getComposerSession(workspacePath)
 	cs.mu.Lock()
 	currentState := cs.state
 	cs.mu.Unlock()
@@ -2005,7 +1893,7 @@ func (s *Server) handleAPIComposePreview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	cs := getComposerSession(workspacePath)
+	cs := s.getComposerSession(workspacePath)
 	cs.mu.Lock()
 	currentState := cs.state
 	cs.mu.Unlock()
@@ -2056,7 +1944,7 @@ func (s *Server) handleAPIComposeDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cs := getComposerSession(workspacePath)
+	cs := s.getComposerSession(workspacePath)
 	cs.mu.Lock()
 	cs.state = req.State
 	cs.wizard = wizardState(req.Wizard)
@@ -2494,228 +2382,6 @@ func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type apiRetroAnalyzeRequest struct {
-	Session string `json:"session"`
-}
-
-type apiRetroActionResponse struct {
-	Running bool   `json:"running"`
-	Session string `json:"session"`
-	Message string `json:"message"`
-}
-
-func (s *Server) handleAPIRetroAnalyze(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiRetroAnalyzeRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Session == "" {
-		http.Error(w, "session is required", http.StatusBadRequest)
-		return
-	}
-
-	sessionKey := "retro-analyze-" + workspacePath + "-" + req.Session
-
-	s.mu.Lock()
-	sess := s.sessions[sessionKey]
-	if sess != nil {
-		sess.mu.Lock()
-		running := sess.running
-		sess.mu.Unlock()
-		if running {
-			s.mu.Unlock()
-			writeJSON(w, apiRetroActionResponse{
-				Running: true,
-				Session: req.Session,
-				Message: "analysis already running",
-			})
-			return
-		}
-	}
-
-	tempDir, errTemp := os.MkdirTemp("", "sgai-retro-analyze-*")
-	if errTemp != nil {
-		s.mu.Unlock()
-		http.Error(w, "failed to create temp directory", http.StatusInternalServerError)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	sess = &session{running: true, retroTempDir: tempDir, cancel: cancel}
-	s.sessions[sessionKey] = sess
-	s.mu.Unlock()
-
-	logWriter := newSessionLogWriter(sess, workspacePath, s, filepath.Base(workspacePath))
-
-	go func() {
-		defer cancel()
-		errAnalyze := runRetrospectiveAnalysis(ctx, workspacePath, req.Session, tempDir, logWriter)
-		if errAnalyze != nil {
-			log.Println("retrospective analyze failed:", errAnalyze)
-		}
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-	}()
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "retro-analyze-started",
-		"session":   req.Session,
-	}})
-
-	writeJSON(w, apiRetroActionResponse{
-		Running: true,
-		Session: req.Session,
-		Message: "analysis started",
-	})
-}
-
-type apiRetroApplyRequest struct {
-	Session             string            `json:"session"`
-	SelectedSuggestions []string          `json:"selectedSuggestions"`
-	Notes               map[string]string `json:"notes,omitempty"`
-}
-
-func (s *Server) handleAPIRetroApply(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiRetroApplyRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Session == "" {
-		http.Error(w, "session is required", http.StatusBadRequest)
-		return
-	}
-
-	sessionKey := "retro-apply-" + workspacePath + "-" + req.Session
-
-	s.mu.Lock()
-	sess := s.sessions[sessionKey]
-	if sess != nil {
-		sess.mu.Lock()
-		running := sess.running
-		sess.mu.Unlock()
-		if running {
-			s.mu.Unlock()
-			writeJSON(w, apiRetroActionResponse{
-				Running: true,
-				Session: req.Session,
-				Message: "apply already running",
-			})
-			return
-		}
-	}
-
-	sess = &session{running: true}
-	s.sessions[sessionKey] = sess
-	s.mu.Unlock()
-
-	retrospectivesDir := filepath.Join(workspacePath, ".sgai", "retrospectives")
-	sessionDir := filepath.Join(retrospectivesDir, req.Session)
-	improvementsPath := filepath.Join(sessionDir, "IMPROVEMENTS.md")
-
-	content, errRead := os.ReadFile(improvementsPath)
-	if errRead != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		http.Error(w, "IMPROVEMENTS.md not found", http.StatusNotFound)
-		return
-	}
-
-	suggestions := parseImprovementSuggestions(string(content))
-	selectedContent := buildSelectedImprovementsContent(
-		filterSelectedSuggestions(suggestions, req.SelectedSuggestions),
-		func(idx int) string {
-			if req.Notes == nil {
-				return ""
-			}
-			return strings.TrimSpace(req.Notes[strconv.Itoa(idx)])
-		},
-	)
-
-	logWriter := newSessionLogWriter(sess, workspacePath, s, filepath.Base(workspacePath))
-
-	go func() {
-		errApply := runRetrospectiveApply(workspacePath, req.Session, selectedContent, logWriter, logWriter)
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-
-		if errApply != nil {
-			log.Println("retrospective apply failed:", errApply)
-			return
-		}
-
-		if errDelete := deleteRetrospectiveSession(workspacePath, req.Session); errDelete != nil {
-			log.Println("failed to auto-delete retrospective session:", req.Session, errDelete)
-		}
-	}()
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "retro-apply-started",
-		"session":   req.Session,
-	}})
-
-	writeJSON(w, apiRetroActionResponse{
-		Running: true,
-		Session: req.Session,
-		Message: "apply started",
-	})
-}
-
-func (s *Server) handleAPIRetroDelete(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiRetroAnalyzeRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Session == "" {
-		http.Error(w, "session is required", http.StatusBadRequest)
-		return
-	}
-
-	if errDelete := deleteRetrospectiveSession(workspacePath, req.Session); errDelete != nil {
-		if errors.Is(errDelete, os.ErrNotExist) {
-			http.Error(w, "session not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to delete session", http.StatusInternalServerError)
-		return
-	}
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "retro-session-deleted",
-		"session":   req.Session,
-	}})
-
-	writeJSON(w, struct {
-		OK bool `json:"ok"`
-	}{OK: true})
-}
-
 func (s *Server) handleAPIWorkflowSVG(w http.ResponseWriter, r *http.Request) {
 	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
 	if !ok {
@@ -2944,6 +2610,7 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wfState.InteractiveAutoLock = newAutoMode
+	wfState.StartedInteractive = false
 	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
 		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
 		return

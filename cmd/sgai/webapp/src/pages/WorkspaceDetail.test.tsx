@@ -281,7 +281,8 @@ describe("WorkspaceDetail", () => {
     });
 
     expect(screen.getByRole("button", { name: "Fork" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Open in Editor" })).toBeDefined();
+    const openEditorButtons = screen.getAllByRole("button", { name: "Open in Editor" });
+    expect(openEditorButtons.length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("button", { name: "Respond" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Self-drive" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
@@ -403,6 +404,34 @@ describe("WorkspaceDetail", () => {
     });
   });
 
+  it("sends auto=false when Start is clicked even if interactiveAuto is true", async () => {
+    const stoppedAutoDetail = { ...workspaceDetail, running: false, interactiveAuto: true };
+    mockFetch.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes("/api/v1/workspaces/test-project/start")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: true, message: "Session started" })));
+      }
+      if (url.includes("/api/v1/workspaces/test-project")) {
+        return Promise.resolve(new Response(JSON.stringify(stoppedAutoDetail)));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    renderWorkspaceDetail();
+
+    const startButton = await screen.findByRole("button", { name: "Start" });
+    fireEvent.click(startButton);
+
+    await waitFor(() => {
+      const startCall = mockFetch.mock.calls.find(
+        (call) => String(call[0]).includes("/start"),
+      );
+      expect(startCall).toBeDefined();
+      const body = JSON.parse(String((startCall![1] as RequestInit).body));
+      expect(body.auto).toBe(false);
+    });
+  });
+
   it("hides respond button when there is no pending question", async () => {
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
@@ -437,9 +466,15 @@ describe("WorkspaceDetail", () => {
       running: false,
       forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
     };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(rootWithForks))),
-    );
+    mockFetch.mockImplementation((url: string | URL | Request) => {
+      if (typeof url === "string" && url.includes("/api/v1/models")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          models: [{ id: "test-model", name: "Test Model" }],
+          defaultModel: "test-model",
+        })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(rootWithForks)));
+    });
 
     const { container } = renderWorkspaceDetail();
     await waitFor(() => {
@@ -448,8 +483,8 @@ describe("WorkspaceDetail", () => {
 
     const header = container.querySelector("header");
     const headerScope = header ? within(header) : null;
-    expect(headerScope?.queryByText("45m 30s")).toBeNull();
-    expect(headerScope?.queryByText("stopped")).toBeNull();
+    expect(headerScope?.queryByText("45m 30s") ?? null).toBeNull();
+    expect(headerScope?.queryByText("stopped") ?? null).toBeNull();
   });
 
   it("polls for workspace detail while running", async () => {

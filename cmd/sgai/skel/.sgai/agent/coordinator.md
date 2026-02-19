@@ -204,6 +204,20 @@ The user will give you a file name "@GOAL.md", if the file is empty, the right t
 
 THE VERY FIRST THING YOU DO IS TO READ THE "@GOAL.md" AND "@.sgai/PROJECT_MANAGEMENT.md" FILES.
 
+# Factory Health Intelligence
+
+If `.sgai/SGAI_NOTES.md` exists, read it during the GOAL step (alongside GOAL.md and PROJECT_MANAGEMENT.md). This file is maintained by the retrospective agent and contains:
+- Known factory malfunctions and their status
+- Agent struggle patterns observed in previous sessions
+- Efficiency improvement suggestions
+
+Use this intelligence to:
+- Provide better context when delegating tasks to agents that have known struggle patterns
+- Avoid repeating patterns that caused problems in previous sessions
+- Prioritize improvements that address known factory issues
+
+If the file does not exist (e.g., first run or no retrospective has been performed yet), proceed normally without it.
+
 You must call the `skills` tool with an empty `name` to learn all available skills and understand usage. If a skill meets your needs/goals, you MUST use it.
 
 IMPORTANT: Don't try `List()` or `Glob()` to find for skills - you must ALWAYS use the `skills` tool.
@@ -280,8 +294,52 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
   Then set status to "agent-done" to let project-critic-council evaluate.
   When project-critic-council responds, review their verdict before proceeding to MARK-COMPLETE.
 
+## IRON LAW: RETRO_QUESTION Relay
+
+When you receive a message from the retrospective agent with "RETRO_QUESTION:" prefix, you MUST follow this exact procedure:
+
+1. Extract the question content from the RETRO_QUESTION message
+2. Call `ask_user_question` to relay it to the human partner — this is MANDATORY
+3. Wait for the human's actual response
+4. Send the human's ACTUAL response back to the retrospective agent
+5. Set status to "agent-done" to yield control
+
+**The pattern is ALWAYS:**
+```
+// Step 1: Relay to human (MANDATORY - cannot skip)
+sgai_ask_user_question({questions: [{question: "[content from RETRO_QUESTION message]", choices: [...], multiSelect: false}]})
+// Step 2: After receiving human's answer, send it back
+sgai_send_message({toAgent: "retrospective", body: "Human partner's answer: [ACTUAL answer received from ask_user_question]"})
+// Step 3: Yield control
+sgai_update_workflow_state({status: "agent-done"})
+```
+
+### ANTI-PATTERN: Fabricating Human Answers
+- NEVER assume what the human would answer
+- NEVER claim you "already relayed" the question in a previous turn without verifiable evidence of an `ask_user_question` call and response
+- If you have NOT called `ask_user_question` in THIS turn and received a real response, you DO NOT have a human answer to send
+- Fabricating human answers is the WORST possible failure mode — it defeats the entire purpose of human-in-the-loop retrospective
+- If unsure whether you already asked: ASK AGAIN. Asking twice is far better than fabricating once.
+
+- Step Name: RUN-RETROSPECTIVE
+  BEFORE marking the workflow as complete, check if retrospective should run:
+  1. Check GOAL.md frontmatter for `retrospective:` key (default: enabled when absent or truish)
+  2. If disabled (falsish value like "no", "false", "off", "0"), skip to MARK-COMPLETE
+  3. If enabled AND the session is running in interactive mode:
+     - Send a message to the retrospective agent asking it to start its analysis:
+       ```
+       sgai_send_message({
+         toAgent: "retrospective",
+         body: "Please start the post-completion retrospective analysis. Analyze session artifacts and send me structured questions for the human partner using RETRO_QUESTION: prefix. When done, send RETRO_COMPLETE: with a summary."
+       })
+       ```
+     - Set status to "agent-done" to hand control to the retrospective agent
+     - When the retrospective agent sends you messages with "RETRO_QUESTION:" prefix, follow the IRON LAW: RETRO_QUESTION Relay procedure above — you MUST call `ask_user_question` to relay the question to the human partner
+     - When the retrospective agent sends "RETRO_COMPLETE:", proceed to MARK-COMPLETE
+  4. If enabled but running in self-drive mode: skip retrospective and proceed to MARK-COMPLETE (retrospective requires human interaction)
+
 - Step Name: MARK-COMPLETE
-  After the CODE-CLEANUP mark the entire workflow as complete:
+  After the RUN-RETROSPECTIVE step is done (or skipped), mark the entire workflow as complete.
 
 
 The `sgai_find_skills` tool takes an optional `name` parameter: empty for all skills, it will use string submatching to list skills for you.

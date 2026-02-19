@@ -19,3 +19,13 @@ lint:
 
 install: build
 	cp sgai $(HOME)/bin/sgai
+
+deploy: build
+	mv -v ./bin/sgai ../sgai/bin/sgai-base
+	killall -9 sgai-base
+
+absorb-sgai:
+	@find sgai/ -type f | while read f; do \
+		mkdir -p "$$(dirname "cmd/sgai/skel/.sgai/$${f#sgai/}")" || true; \
+		mv -v "$$f" "cmd/sgai/skel/.sgai/$${f#sgai/}"; \
+	done

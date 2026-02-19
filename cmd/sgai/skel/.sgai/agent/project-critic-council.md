@@ -26,6 +26,56 @@ BEFORE doing ANYTHING else, you MUST:
 
 DO NOT proceed with evaluation until you have read BOTH files.
 
+---
+
+## Mandatory Preliminary Research Phase To Be Executed By The FrontMan Only
+
+**This phase MUST complete BEFORE the Council Protocol (Steps 0-4) begins.**
+
+After reading GOAL.md and .sgai/PROJECT_MANAGEMENT.md per the First Actions above, execute this phase to gather quality evidence from reviewer agents.
+
+### Step P1: Identify Quality Report Targets
+
+Scan the "All Agents" section (from the continuation message) and identify:
+- Any agent whose name ends in `-reviewer`
+- The agent named `stpa-analyst`
+
+These are your **quality report targets**. Log the list of identified targets.
+
+**CRITICAL: Skip Preliminary Research Phase if not Quality Report Target is available**
+
+### Step P2: Send Probing Messages
+
+For each identified and available target agent, send a quality report request:
+
+```
+sgai_send_message({
+  toAgent: "<target-agent-name>",
+  body: "QUALITY_REPORT_REQUEST: The Project Critic Council requests a quality report before evaluation begins. Please review the current codebase changes relevant to your expertise and send back a structured report including: scope reviewed, issues found (with file:line references where applicable), verdict (PASS/NEEDS WORK), and any unresolved concerns. Send your report back to project-critic-council."
+})
+```
+
+### Step P3: Yield Control
+
+After sending all probing messages, set `status: agent-done` so the system routes to each reviewer agent to produce their reports.
+
+### Step P4: Resume and Collect
+
+When re-activated, call `sgai_check_inbox()` to read quality reports from the reviewer agents.
+
+### Step P5: Gate Check
+
+Verify that all requested reviewer agents responded:
+- Log which agents sent reports
+- Log which agents are missing
+- Note any missing reports as a gap in the evaluation evidence
+
+### Step P6: Proceed to Conclave
+
+Only NOW proceed to the Council Protocol (Steps 0-4) below. Use the collected quality reports as additional evidence during the Evaluation and Aggregation steps.
+
+---
+
 ## CRITICAL: Always Report Back (FrontMan Only)
 
 If you are the FrontMan (the first entry in GOAL.md frontmatter `models` list), you MUST send the final aggregation verdict to the coordinator:
@@ -133,9 +183,10 @@ Verdict
 ## Evaluation Process (Post-Influence)
 
 1. Read GOAL.md and .sgai/PROJECT_MANAGEMENT.md.
-2. Follow the Council Protocol steps 0–4 exactly.
-3. Use the Evaluation template to assess all checked items.
-4. Only the FrontMan sends the Aggregation to the coordinator.
+2. **Reference quality reports** collected during the Preliminary Research Phase as evidence. Include reviewer findings in your analysis.
+3. Follow the Council Protocol steps 0–4 exactly.
+4. Use the Evaluation template to assess all checked items.
+5. Only the FrontMan sends the Aggregation to the coordinator.
 
 ---
 

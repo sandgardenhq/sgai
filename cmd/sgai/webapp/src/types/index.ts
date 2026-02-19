@@ -402,28 +402,7 @@ export interface ApiForksResponse {
   forks: ApiForkEntry[];
 }
 
-export interface ApiRetroSession {
-  name: string;
-  hasImprovements: boolean;
-  goalSummary: string;
-}
 
-export interface ApiRetroDetail {
-  sessionName: string;
-  goalSummary: string;
-  goalContent: string;
-  improvements: string;
-  improvementsRaw: string;
-  hasImprovements: boolean;
-  isAnalyzing: boolean;
-  isApplying: boolean;
-}
-
-export interface ApiRetrospectivesResponse {
-  sessions: ApiRetroSession[];
-  selectedSession: string;
-  details?: ApiRetroDetail;
-}
 
 export interface ApiComposerAgentConf {
   name: string;
@@ -586,21 +565,7 @@ export interface ApiAdhocResponse {
   message: string;
 }
 
-export interface ApiRetroAnalyzeRequest {
-  session: string;
-}
 
-export interface ApiRetroApplyRequest {
-  session: string;
-  selectedSuggestions: string[];
-  notes?: Record<string, string>;
-}
-
-export interface ApiRetroActionResponse {
-  running: boolean;
-  session: string;
-  message: string;
-}
 
 export type SSEEventType =
   | "workspace:update"
