@@ -1,96 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { ArrowLeft, Loader2, Play } from "lucide-react";
+import { ArrowLeft, Play, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api, ApiError } from "@/lib/api";
+import { useAdhocRunner } from "@/hooks/useAdhocRunner";
 
 export function AdhocOutput(): JSX.Element {
   const { name: workspaceName = "" } = useParams<{ name: string }>();
   const [searchParams] = useSearchParams();
-  const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");
-  const [output, setOutput] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const outputRef = useRef<HTMLPreElement>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoRunRef = useRef(false);
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [output]);
-
-  const runAdhoc = useCallback(
-    async (promptValue: string, modelValue: string) => {
-      const trimmedPrompt = promptValue.trim();
-      const trimmedModel = modelValue.trim();
-      if (!workspaceName || isRunning || !trimmedPrompt || !trimmedModel) return;
-
-      stopPolling();
-      setIsRunning(true);
-      setError(null);
-      setOutput("");
-
-      try {
-        const result = await api.workspaces.adhoc(workspaceName, trimmedPrompt, trimmedModel);
-        if (result.output) {
-          setOutput(result.output);
-        }
-        if (!result.running) {
-          setIsRunning(false);
-          return;
-        }
-
-        pollTimerRef.current = setInterval(async () => {
-          try {
-            const poll = await api.workspaces.adhocStatus(workspaceName);
-            if (poll.output) {
-              setOutput(poll.output);
-            }
-            if (!poll.running) {
-              stopPolling();
-              setIsRunning(false);
-            }
-          } catch {
-            stopPolling();
-            setIsRunning(false);
-          }
-        }, 2000);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError("Failed to execute ad-hoc prompt");
-        }
-        setIsRunning(false);
-      }
-    },
-    [workspaceName, isRunning, stopPolling],
-  );
+  const {
+    prompt,
+    setPrompt,
+    output,
+    isRunning,
+    error,
+    outputRef,
+    run,
+    stop,
+    handleKeyDown,
+    reset,
+  } = useAdhocRunner({ workspaceName });
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      runAdhoc(prompt, model);
+      run(prompt, model);
     },
-    [runAdhoc, prompt, model],
+    [run, prompt, model],
   );
 
   useEffect(() => {
@@ -102,8 +44,8 @@ export function AdhocOutput(): JSX.Element {
     autoRunRef.current = true;
     setPrompt(promptParam);
     setModel(modelParam);
-    runAdhoc(promptParam, modelParam);
-  }, [searchParams, runAdhoc]);
+    run(promptParam, modelParam);
+  }, [searchParams, setPrompt, run]);
 
   return (
     <div className="max-w-3xl mx-auto py-8">
@@ -127,47 +69,56 @@ export function AdhocOutput(): JSX.Element {
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-4 mb-6">
-        <div className="space-y-2">
-          <Label htmlFor="adhoc-model">Model</Label>
-          <Input
-            id="adhoc-model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="e.g., anthropic/claude-opus-4-6"
-            disabled={isRunning}
-          />
+        <div className="grid grid-cols-[200px_1fr] gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="adhoc-model">Model</Label>
+            <Input
+              id="adhoc-model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="e.g., anthropic/claude-opus-4-6"
+              disabled={isRunning}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="adhoc-prompt">Prompt</Label>
+            <Textarea
+              id="adhoc-prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, model)}
+              placeholder="Enter your prompt..."
+              rows={6}
+              className="resize-y"
+              disabled={isRunning}
+            />
+            <p className="text-xs text-muted-foreground">
+              Press Shift+Enter to submit
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="adhoc-prompt">Prompt</Label>
-          <Textarea
-            id="adhoc-prompt"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Enter your prompt..."
-            rows={6}
-            className="resize-y"
-            disabled={isRunning}
-          />
-        </div>
-
-        <Button
-          type="submit"
-          disabled={isRunning || !prompt.trim() || !model.trim()}
-          className="w-full"
-        >
+        <div className="flex gap-2">
           {isRunning ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Running...
-            </>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={stop}
+            >
+              <Square className="mr-2 h-4 w-4" />
+              Stop
+            </Button>
           ) : (
-            <>
+            <Button
+              type="submit"
+              disabled={!prompt.trim() || !model.trim()}
+            >
               <Play className="mr-2 h-4 w-4" />
               Execute Prompt
-            </>
+            </Button>
           )}
-        </Button>
+        </div>
       </form>
 
       {output ? (

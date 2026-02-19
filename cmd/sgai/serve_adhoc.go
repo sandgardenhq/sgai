@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"regexp"
 	"sync"
+	"syscall"
+	"time"
 )
 
 var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b[^[\]].?`)
@@ -38,6 +40,41 @@ func (w *lockedWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	stripped := ansiEscapePattern.ReplaceAll(p, nil)
-	w.buf.Write(stripped)
+	_, _ = w.buf.Write(stripped)
 	return len(p), nil
+}
+
+func (st *adhocPromptState) stop() {
+	st.mu.Lock()
+	if !st.running {
+		st.mu.Unlock()
+		return
+	}
+	cmd := st.cmd
+	st.mu.Unlock()
+
+	if cmd != nil && cmd.Process != nil {
+		pgid := -cmd.Process.Pid
+		_ = syscall.Kill(pgid, syscall.SIGTERM)
+
+		done := make(chan struct{})
+		go func() {
+			// Wait for process completion; error is ignored as we're just ensuring cleanup
+			_ = cmd.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(gracefulShutdownTimeout):
+			_ = syscall.Kill(pgid, syscall.SIGKILL)
+			<-done
+		}
+	}
+
+	st.mu.Lock()
+	st.running = false
+	st.cmd = nil
+	st.output.WriteString("\n[stopped by user]\n")
+	st.mu.Unlock()
 }
