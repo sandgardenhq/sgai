@@ -10,22 +10,23 @@ import (
 	"github.com/mactaggart/gographviz"
 )
 
-const flowContinueMessageCoordinator = `
-<UserInstructions>
+const flowSectionPreamble = `<UserInstructions>
 YOU MUST LOAD THE SKILL "set-work-state" - CALL skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
 REMEMBER: file references like @FILENAME.md mean you must read the file $currentWorkingDirectory/FILENAME.md in the workspace.
 
-RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;
+RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;`
 
-if you want to tell me something, use ask_user_question to present structured questions;
+const flowSectionHumanCommDirect = `if you want to tell me something, use ask_user_question to present structured questions;`
 
-You can send messages to other agents using sgai_send_message() (make sure you call sgai_check_outbox() to see if you haven't sent the message you want to send, avoid duplicated messages) and read messages using sgai_check_inbox(). You can also read messages from other agents and send messages to other agents by writing them into @PROJECT_MANAGEMENT.md
+const flowSectionHumanCommNonCoordinator = `if you want to tell me something, make sure you must call sgai_update_workflow_state (set blocked and a blocked message);`
 
-You can use peek_message_bus() to monitor ALL inter-agent communication (both pending and read messages) in reverse chronological order.
+const flowSectionMessaging = `You can send messages to other agents using sgai_send_message() (make sure you call sgai_check_outbox() to see if you haven't sent the message you want to send, avoid duplicated messages) and read messages using sgai_check_inbox(). You can also read messages from other agents and send messages to other agents by writing them into @PROJECT_MANAGEMENT.md`
 
-Critically, you must strictly do the work that you are an expert in, and leave other work to other agents.
+const flowSectionPeekMessageBus = `You can use peek_message_bus() to monitor ALL inter-agent communication (both pending and read messages) in reverse chronological order.`
 
-## Message-Driven Navigation
+const flowSectionWorkFocus = `Critically, you must strictly do the work that you are an expert in, and leave other work to other agents.`
+
+const flowSectionNavigation = `## Message-Driven Navigation
 Navigation between agents is driven by inter-agent messages:
 - Send a message to an agent using sgai_send_message() to route work to them
 - When you set status "agent-done", the system checks for pending messages and routes to the agent with the oldest unread message
@@ -44,10 +45,13 @@ Successors (can pass work to): %SUCCESSORS%
 
 </UserInstructions>.
 
-ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.
-IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).
+ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.`
 
-# PRODUCTIVE WORK GUIDELINES
+const flowSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`
+
+const flowSectionPostSkillsNonCoordinator = `IMPORTANT: If you need human clarification, send a message to coordinator: sgai_send_message({toAgent: "coordinator", body: "QUESTION: <your question>"}). The coordinator will handle human communication.`
+
+const flowSectionGuidelines = `# PRODUCTIVE WORK GUIDELINES
 BEFORE calling sgai_update_workflow_state, ask yourself:
 1. Have I actually done productive work this turn? (read files, wrote code, ran commands, analyzed results)
 2. If I only called sgai_update_workflow_state with status "working", I'm wasting a turn - DO SOMETHING PRODUCTIVE FIRST.
@@ -69,80 +73,69 @@ When you set status: "agent-done":
 4. Do NOT call sgai_update_workflow_state multiple times with the same status
 
 ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
-GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
+GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP`
 
-IMPORTANT: You are the SOLE owner of GOAL.md checkboxes. When delegated work is confirmed complete, you MUST mark the corresponding checkbox by changing '- [ ]' to '- [x]'. Use skills({"name":"project-completion-verification"}) to check status and mark items. Look for 'GOAL COMPLETE:' messages from agents as triggers.
-IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
+const flowSectionTailCoordinator = `IMPORTANT: You are the SOLE owner of GOAL.md checkboxes. When delegated work is confirmed complete, you MUST mark the corresponding checkbox by changing '- [ ]' to '- [x]'. Use skills({"name":"project-completion-verification"}) to check status and mark items. Look for 'GOAL COMPLETE:' messages from agents as triggers.`
+
+const flowSectionTailNonCoordinator = `IMPORTANT: When you complete a task listed in GOAL.md, you MUST notify the coordinator: sgai_send_message({toAgent: "coordinator", body: "GOAL COMPLETE: [exact checkbox text from GOAL.md]"}). Do NOT attempt to edit GOAL.md yourself - only the coordinator can mark checkboxes.`
+
+const flowSectionCommonTail = `IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
 IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
 IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
-IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()
-`
+IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()`
 
-const flowContinueMessageNonCoordinator = `
-<UserInstructions>
-YOU MUST LOAD THE SKILL "set-work-state" - CALL skills({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
-REMEMBER: file references like @FILENAME.md mean you must read the file $currentWorkingDirectory/FILENAME.md in the workspace.
+func composeFlowTemplate(currentAgent string) string {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(flowSectionPreamble)
+	sb.WriteString("\n\n")
 
-RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to achieve @GOAL.md;
+	switch currentAgent {
+	case "coordinator":
+		sb.WriteString(flowSectionHumanCommDirect)
+	default:
+		sb.WriteString(flowSectionHumanCommNonCoordinator)
+	}
+	sb.WriteString("\n\n")
 
-if you want to tell me something, make sure you must call sgai_update_workflow_state (set blocked and a blocked message);
+	sb.WriteString(flowSectionMessaging)
+	sb.WriteString("\n\n")
 
-You can send messages to other agents using sgai_send_message() (make sure you call sgai_check_outbox() to see if you haven't sent the message you want to send, avoid duplicated messages) and read messages using sgai_check_inbox(). You can also read messages from other agents and send messages to other agents by writing them into @PROJECT_MANAGEMENT.md
+	if currentAgent == "coordinator" {
+		sb.WriteString(flowSectionPeekMessageBus)
+		sb.WriteString("\n\n")
+	}
 
-Critically, you must strictly do the work that you are an expert in, and leave other work to other agents.
+	sb.WriteString(flowSectionWorkFocus)
+	sb.WriteString("\n\n")
+	sb.WriteString(flowSectionNavigation)
+	sb.WriteString("\n")
 
-## Message-Driven Navigation
-Navigation between agents is driven by inter-agent messages:
-- Send a message to an agent using sgai_send_message() to route work to them
-- When you set status "agent-done", the system checks for pending messages and routes to the agent with the oldest unread message
-- When no messages are pending, control returns to coordinator
+	switch currentAgent {
+	case "coordinator":
+		sb.WriteString(flowSectionPostSkillsCoordinator)
+	default:
+		sb.WriteString(flowSectionPostSkillsNonCoordinator)
+	}
+	sb.WriteString("\n\n")
 
-## Your Position in the Workflow
-Current agent: %CURRENT_AGENT%
-Predecessors (can receive work from): %PREDECESSORS%
-Successors (can pass work to): %SUCCESSORS%
+	sb.WriteString(flowSectionGuidelines)
+	sb.WriteString("\n\n")
 
-## Visit Counts
-%VISIT_COUNTS%
+	switch currentAgent {
+	case "coordinator":
+		sb.WriteString(flowSectionTailCoordinator)
+		sb.WriteString("\n")
+	default:
+		sb.WriteString(flowSectionTailNonCoordinator)
+		sb.WriteString("\n")
+	}
 
-## All Agents
-%AGENTS_LIST%
+	sb.WriteString(flowSectionCommonTail)
+	sb.WriteString("\n")
 
-</UserInstructions>.
-
-ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.
-IMPORTANT: If you need human clarification, send a message to coordinator: sgai_send_message({toAgent: "coordinator", body: "QUESTION: <your question>"}). The coordinator will handle human communication.
-
-# PRODUCTIVE WORK GUIDELINES
-BEFORE calling sgai_update_workflow_state, ask yourself:
-1. Have I actually done productive work this turn? (read files, wrote code, ran commands, analyzed results)
-2. If I only called sgai_update_workflow_state with status "working", I'm wasting a turn - DO SOMETHING PRODUCTIVE FIRST.
-3. Status "working" should be used ONLY after doing substantial work that needs continuation.
-4. If my work is complete, use status "agent-done" so the system can move forward.
-
-ANTI-PATTERN: Repeatedly calling sgai_update_workflow_state({status:"working"}) without doing real work creates infinite loops.
-GOOD PATTERN: Read files -> Write code -> Run tests -> THEN sgai_update_workflow_state with appropriate status.
-
-# COMPLETION GATE
-CRITICALLY IMPORTANT: IF YOUR LAST MESSAGE IS NOT A TOOL CALL, THE HUMAN PARTNER WILL NOT SEE IT.
-DID YOU DO PRODUCTIVE WORK before updating state? If not, go do something useful first.
-
-# CRITICAL: WHAT HAPPENS AFTER "agent-done"
-When you set status: "agent-done":
-1. The system checks for pending messages and routes to the agent with the oldest unread message
-2. If no messages are pending, control returns to coordinator
-3. You should STOP making tool calls - your turn is over
-4. Do NOT call sgai_update_workflow_state multiple times with the same status
-
-ANTI-PATTERN: Setting "agent-done" then continuing to make calls (the system handles the transition!)
-GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-done"}) once -> STOP
-
-IMPORTANT: When you complete a task listed in GOAL.md, you MUST notify the coordinator: sgai_send_message({toAgent: "coordinator", body: "GOAL COMPLETE: [exact checkbox text from GOAL.md]"}). Do NOT attempt to edit GOAL.md yourself - only the coordinator can mark checkboxes.
-IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
-IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
-IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
-IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()
-`
+	return sb.String()
+}
 
 type dagNode struct {
 	Name         string
@@ -269,6 +262,19 @@ func (d *dag) injectProjectCriticCouncilEdge() {
 	}
 	if !slices.Contains(pccNode.Predecessors, "coordinator") {
 		pccNode.Predecessors = append(pccNode.Predecessors, "coordinator")
+	}
+	slices.Sort(coordNode.Successors)
+}
+
+func (d *dag) injectRetrospectiveEdge() {
+	coordNode := d.ensureNode("coordinator")
+	retroNode := d.ensureNode("retrospective")
+
+	if !slices.Contains(coordNode.Successors, "retrospective") {
+		coordNode.Successors = append(coordNode.Successors, "retrospective")
+	}
+	if !slices.Contains(retroNode.Predecessors, "coordinator") {
+		retroNode.Predecessors = append(retroNode.Predecessors, "coordinator")
 	}
 	slices.Sort(coordNode.Successors)
 }
@@ -441,12 +447,7 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 	}
 	agentsListStr := strings.Join(agentLines, "\n")
 
-	var msg string
-	if currentAgent == "coordinator" {
-		msg = flowContinueMessageCoordinator
-	} else {
-		msg = flowContinueMessageNonCoordinator
-	}
+	msg := composeFlowTemplate(currentAgent)
 
 	msg = strings.ReplaceAll(msg, "%CURRENT_AGENT%", currentAgent)
 	msg = strings.ReplaceAll(msg, "%PREDECESSORS%", predecessorsStr)

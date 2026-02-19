@@ -140,7 +140,12 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		log.Fatalln("failed to parse flow:", err)
 	}
 
+	if retrospectiveEnabled(metadata) {
+		flowDag.injectRetrospectiveEdge()
+	}
+
 	ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+	ensureImplicitRetrospectiveModel(flowDag, &metadata)
 
 	if err := validateModels(metadata.Models); err != nil {
 		log.Fatalln(err)
@@ -175,21 +180,10 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 
 	resuming := canResumeWorkflow(wfState, *freshFlag, newChecksum)
 
-	disableRetrospective := projectConfig != nil && projectConfig.DisableRetrospective
-
 	var retrospectiveDir string
 	var retrospectiveDirRel string
 
 	switch {
-	case disableRetrospective:
-		if !resuming {
-			if err := os.Remove(stateJSONPath); err != nil && !os.IsNotExist(err) {
-				log.Fatalln("failed to truncate state.json on startup:", err)
-			}
-			if err := os.Remove(pmPath); err != nil && !os.IsNotExist(err) {
-				log.Fatalln("failed to truncate PROJECT_MANAGEMENT.md on startup:", err)
-			}
-		}
 	case resuming:
 		fmt.Println("["+paddedsgai+"]", "resuming existing workflow...")
 		retrospectiveDirRel = extractRetrospectiveDirFromProjectManagement(pmPath)
@@ -246,12 +240,14 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 
 	if !resuming {
 		preservedAutoLock := wfState.InteractiveAutoLock
+		preservedStartedInteractive := wfState.StartedInteractive
 		wfState = state.Workflow{
 			Status:              state.StatusWorking,
 			Messages:            []state.Message{},
 			GoalChecksum:        newChecksum,
 			VisitCounts:         initVisitCounts(allAgents),
 			InteractiveAutoLock: preservedAutoLock,
+			StartedInteractive:  preservedStartedInteractive,
 		}
 		if err := state.Save(stateJSONPath, wfState); err != nil {
 			log.Println("failed to initialize state.json:", err)
@@ -293,6 +289,7 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 			return
 		}
+		unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
 		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
 		if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
 			return
@@ -343,6 +340,7 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 				log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 				return
 			}
+			unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
 			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
 			if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
 				return
@@ -389,6 +387,20 @@ func applyWorkGateApproval(wfState *state.Workflow, stateJSONPath, paddedsgai st
 	}
 	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto mode")
 	return false
+}
+
+func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent, stateJSONPath, paddedsgai string) {
+	if currentAgent != "retrospective" {
+		return
+	}
+	if !wfState.StartedInteractive {
+		return
+	}
+	wfState.InteractiveAutoLock = false
+	if err := state.Save(stateJSONPath, *wfState); err != nil {
+		log.Fatalln("failed to save state:", err)
+	}
+	fmt.Println("["+paddedsgai+"]", "re-enabling interactive mode for retrospective")
 }
 
 func ensureImplicitProjectCriticCouncilModel(flowDag *dag, metadata *GoalMetadata) {
@@ -1031,6 +1043,7 @@ type GoalMetadata struct {
 	ContinuousModePrompt string         `json:"continuousModePrompt,omitempty" yaml:"continuousModePrompt,omitempty"`
 	ContinuousModeAuto   string         `json:"continuousModeAuto,omitempty" yaml:"continuousModeAuto,omitempty"`
 	ContinuousModeCron   string         `json:"continuousModeCron,omitempty" yaml:"continuousModeCron,omitempty"`
+	Retrospective        string         `json:"retrospective,omitempty" yaml:"retrospective,omitempty"`
 }
 
 type agentMetadata struct {
@@ -2215,4 +2228,54 @@ func isExistingDirectory(path string) bool {
 
 func isProtectedFile(subfolder, relPath string) bool {
 	return subfolder == "agent" && relPath == "coordinator.md"
+}
+
+func isTruish(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "yes", "true", "1", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func isFalsish(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "no", "false", "0", "off":
+		return true
+	default:
+		return false
+	}
+}
+
+func retrospectiveEnabled(metadata GoalMetadata) bool {
+	if metadata.Retrospective == "" {
+		return true
+	}
+	if isTruish(metadata.Retrospective) {
+		return true
+	}
+	if isFalsish(metadata.Retrospective) {
+		return false
+	}
+	return true
+}
+
+func ensureImplicitRetrospectiveModel(flowDag *dag, metadata *GoalMetadata) {
+	if metadata.Models == nil {
+		metadata.Models = make(map[string]any)
+	}
+	_, existsInDag := flowDag.Nodes["retrospective"]
+	if !existsInDag {
+		return
+	}
+	_, existsInModels := metadata.Models["retrospective"]
+	if existsInModels {
+		return
+	}
+	coordinatorModel, hasCoordinator := metadata.Models["coordinator"]
+	if !hasCoordinator {
+		return
+	}
+	metadata.Models["retrospective"] = coordinatorModel
 }

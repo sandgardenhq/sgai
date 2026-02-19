@@ -21,7 +21,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -122,7 +121,6 @@ type session struct {
 	running         bool
 	interactiveAuto bool
 	outputLog       *circularLogBuffer
-	retroTempDir    string
 	mcpCloseOnce    sync.Once
 	mcpCloseFn      func()
 }
@@ -234,6 +232,9 @@ type Server struct {
 	workspaceBrokers map[string]*sseBroker
 
 	adhocStates map[string]*adhocPromptState
+
+	composerSessionsMu sync.Mutex
+	composerSessions   map[string]*composerSession
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -267,6 +268,7 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		adhocStates:      make(map[string]*adhocPromptState),
 		sseBroker:        newSSEBroker(),
 		workspaceBrokers: make(map[string]*sseBroker),
+		composerSessions: make(map[string]*composerSession),
 		rootDir:          absRootDir,
 		editorAvailable:  editorAvail,
 		isTerminalEditor: editor.isTerminal,
@@ -520,7 +522,7 @@ func cmdServe(args []string) {
 		}
 	}
 
-	listener, errListen := net.Listen("tcp", *listenAddr)
+	listener, errListen := net.Listen("tcp4", *listenAddr)
 	if errListen != nil {
 		log.Fatalln("failed to listen:", errListen)
 	}
@@ -640,6 +642,10 @@ func getWorkflowSVG(dir string, currentAgent string) string {
 		return ""
 	}
 
+	if retrospectiveEnabled(metadata) {
+		d.injectRetrospectiveEdge()
+	}
+
 	dotContent := d.toDOT()
 
 	if currentAgent != "" {
@@ -694,171 +700,6 @@ func formatProgressForDisplay(entries []state.ProgressEntry) []eventsProgressDis
 	}
 
 	return result
-}
-
-type improvementSuggestion struct {
-	Index       int
-	Name        string
-	Section     string
-	Content     string
-	FullContent string
-}
-
-func parseImprovementSuggestions(content string) []improvementSuggestion {
-	stripped := stripFrontmatter(content)
-	lines := linesWithTrailingEmpty(stripped)
-
-	var suggestions []improvementSuggestion
-	var currentSection string
-	var currentSuggestion *improvementSuggestion
-	var contentLines []string
-
-	skipSections := map[string]bool{"Instructions": true, "Summary": true}
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "## ") {
-			if currentSuggestion != nil {
-				currentSuggestion.Content = strings.TrimSpace(strings.Join(contentLines, "\n"))
-				currentSuggestion.FullContent = buildSuggestionFullContent(currentSuggestion.Name, contentLines)
-				suggestions = append(suggestions, *currentSuggestion)
-				currentSuggestion = nil
-				contentLines = nil
-			}
-
-			sectionTitle := strings.TrimSpace(strings.TrimPrefix(line, "## "))
-			if skipSections[sectionTitle] {
-				currentSection = ""
-			} else {
-				currentSection = sectionTitle
-			}
-			continue
-		}
-
-		if strings.HasPrefix(line, "### ") && currentSection != "" {
-			if currentSuggestion != nil {
-				currentSuggestion.Content = strings.TrimSpace(strings.Join(contentLines, "\n"))
-				currentSuggestion.FullContent = buildSuggestionFullContent(currentSuggestion.Name, contentLines)
-				suggestions = append(suggestions, *currentSuggestion)
-			}
-
-			suggestionName := strings.TrimSpace(strings.TrimPrefix(line, "### "))
-			currentSuggestion = &improvementSuggestion{
-				Index:   len(suggestions),
-				Name:    suggestionName,
-				Section: currentSection,
-			}
-			contentLines = nil
-			continue
-		}
-
-		if line == "---" && currentSuggestion != nil {
-			currentSuggestion.Content = strings.TrimSpace(strings.Join(contentLines, "\n"))
-			currentSuggestion.FullContent = buildSuggestionFullContent(currentSuggestion.Name, contentLines)
-			suggestions = append(suggestions, *currentSuggestion)
-			currentSuggestion = nil
-			contentLines = nil
-			continue
-		}
-
-		if currentSuggestion != nil {
-			contentLines = append(contentLines, line)
-		}
-	}
-
-	if currentSuggestion != nil {
-		currentSuggestion.Content = strings.TrimSpace(strings.Join(contentLines, "\n"))
-		currentSuggestion.FullContent = buildSuggestionFullContent(currentSuggestion.Name, contentLines)
-		suggestions = append(suggestions, *currentSuggestion)
-	}
-
-	return suggestions
-}
-
-func buildSuggestionFullContent(name string, contentLines []string) string {
-	var b strings.Builder
-	b.WriteString("### ")
-	b.WriteString(name)
-	b.WriteString("\n")
-	for _, line := range contentLines {
-		b.WriteString(line)
-		b.WriteString("\n")
-	}
-	return b.String()
-}
-
-type noteGetter func(suggestionIndex int) string
-
-func filterSelectedSuggestions(suggestions []improvementSuggestion, selectedIndices []string) []improvementSuggestion {
-	selectedMap := make(map[int]bool)
-	for _, idxStr := range selectedIndices {
-		if idx, err := strconv.Atoi(idxStr); err == nil {
-			selectedMap[idx] = true
-		}
-	}
-
-	var selected []improvementSuggestion
-	for _, suggestion := range suggestions {
-		if selectedMap[suggestion.Index] {
-			selected = append(selected, suggestion)
-		}
-	}
-	return selected
-}
-
-func buildSelectedImprovementsContent(suggestions []improvementSuggestion, getNotes noteGetter) string {
-	var b strings.Builder
-	b.WriteString("# Selected Improvements\n\n")
-	currentSection := ""
-	for _, suggestion := range suggestions {
-		if suggestion.Section != currentSection {
-			b.WriteString("## ")
-			b.WriteString(suggestion.Section)
-			b.WriteString("\n\n")
-			currentSection = suggestion.Section
-		}
-		content := strings.Replace(suggestion.FullContent, "- [ ] APPROVE", "- [x] APPROVE", 1)
-		b.WriteString(content)
-		note := getNotes(suggestion.Index)
-		if note != "" {
-			b.WriteString("\n**User Notes:** ")
-			b.WriteString(note)
-			b.WriteString("\n")
-		}
-		b.WriteString("\n---\n\n")
-	}
-	return b.String()
-}
-
-func (s *Server) listRetrospectiveSessionsForProject(projectDir string) []retroSessionData {
-	retrospectivesDir := filepath.Join(projectDir, ".sgai", "retrospectives")
-	entries, err := os.ReadDir(retrospectivesDir)
-	if err != nil {
-		return nil
-	}
-
-	var sessions []retroSessionData
-	for _, entry := range entries {
-		if entry.IsDir() && retrospectiveDirPatternRE.MatchString(entry.Name()) {
-			sessionDir := filepath.Join(retrospectivesDir, entry.Name())
-			improvementsPath := filepath.Join(sessionDir, "IMPROVEMENTS.md")
-			goalPath := filepath.Join(sessionDir, "GOAL.md")
-
-			_, hasImprovements := os.Stat(improvementsPath)
-			goalSummary := stripMarkdownHeading(extractGoalSummary(goalPath))
-
-			sessions = append(sessions, retroSessionData{
-				Name:            entry.Name(),
-				HasImprovements: hasImprovements == nil,
-				GoalSummary:     goalSummary,
-			})
-		}
-	}
-
-	slices.SortFunc(sessions, func(a, b retroSessionData) int {
-		return strings.Compare(b.Name, a.Name)
-	})
-
-	return sessions
 }
 
 func renderMarkdown(content []byte) (string, error) {
@@ -1559,24 +1400,6 @@ func modelsForAgentFromGoal(dir, agent string) []string {
 	return getModelsForAgent(metadata.Models, agent)
 }
 
-type retroSessionData struct {
-	Name            string
-	HasImprovements bool
-	GoalSummary     string
-}
-
-// stripMarkdownHeading removes leading markdown heading characters from a string.
-func stripMarkdownHeading(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "#") {
-		for len(s) > 0 && s[0] == '#' {
-			s = s[1:]
-		}
-		s = strings.TrimSpace(s)
-	}
-	return s
-}
-
 func initializeWorkspace(workspacePath string) error {
 	if err := unpackSkeleton(workspacePath); err != nil {
 		return fmt.Errorf("unpacking skeleton: %w", err)
@@ -1711,18 +1534,6 @@ func writeOpenCodeScript(content string) (string, error) {
 	}
 
 	return tmpFile.Name(), nil
-}
-
-// deleteRetrospectiveSession removes the retrospective session directory.
-func deleteRetrospectiveSession(workspacePath, sessionID string) error {
-	retrospectivesDir := filepath.Join(workspacePath, ".sgai", "retrospectives")
-	sessionDir := filepath.Join(retrospectivesDir, sessionID)
-
-	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
-		return fmt.Errorf("session %s: %w", sessionID, os.ErrNotExist)
-	}
-
-	return os.RemoveAll(sessionDir)
 }
 
 type snippetData struct {

@@ -23,10 +23,6 @@ type menuBarAction struct {
 	actionURL string
 }
 
-var globalMenuBar = &menuBarState{
-	tags: make(map[int]menuBarAction),
-}
-
 func toMenuBarItem(w workspaceInfo) menuBarItem {
 	return menuBarItem{
 		name:       w.DirName,
@@ -108,11 +104,11 @@ func workspaceURL(baseURL, name, subpath string) string {
 	return u.String()
 }
 
-func allocTag(action menuBarAction) int {
-	globalMenuBar.mu.Lock()
-	defer globalMenuBar.mu.Unlock()
-	globalMenuBar.nextTag++
-	tag := globalMenuBar.nextTag
-	globalMenuBar.tags[tag] = action
+func allocTag(state *menuBarState, action menuBarAction) int {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.nextTag++
+	tag := state.nextTag
+	state.tags[tag] = action
 	return tag
 }

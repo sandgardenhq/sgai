@@ -349,15 +349,12 @@ func TestWorkspaceItemSubpath(t *testing.T) {
 }
 
 func TestAllocTag(t *testing.T) {
-	saved := globalMenuBar
-	t.Cleanup(func() { globalMenuBar = saved })
-
-	globalMenuBar = &menuBarState{
+	state := &menuBarState{
 		tags: make(map[int]menuBarAction),
 	}
 
-	tag1 := allocTag(menuBarAction{actionURL: "http://example.com"})
-	tag2 := allocTag(menuBarAction{actionURL: "http://other.com"})
+	tag1 := allocTag(state, menuBarAction{actionURL: "http://example.com"})
+	tag2 := allocTag(state, menuBarAction{actionURL: "http://other.com"})
 
 	if tag1 == tag2 {
 		t.Errorf("allocTag returned duplicate tags: %d", tag1)
@@ -366,9 +363,9 @@ func TestAllocTag(t *testing.T) {
 		t.Errorf("allocTag returned non-positive tag: %d", tag1)
 	}
 
-	globalMenuBar.mu.Lock()
-	action, ok := globalMenuBar.tags[tag1]
-	globalMenuBar.mu.Unlock()
+	state.mu.Lock()
+	action, ok := state.tags[tag1]
+	state.mu.Unlock()
 	if !ok {
 		t.Errorf("allocTag did not store action for tag %d", tag1)
 	}

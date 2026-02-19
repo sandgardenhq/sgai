@@ -30,6 +30,25 @@ A new skill file at `sgai/skills/<skill-name>/SKILL.md` that has been tested and
 
 **IMPORTANT:** Skills must be created in `sgai/skills/` (the overlay directory), NOT in the local `.sgai/skills/` directory.
 
+## Overlay Directory Understanding
+
+The `sgai/` directory is an **overlay** — files placed there wholly replace their skeleton defaults.
+
+- `.sgai/` = live runtime directory (skeleton + overlay merged at startup)
+- `sgai/` = per-project overlay directory (your changes go here)
+- Overlay files are NOT merged — they REPLACE the entire skeleton file
+
+**When MODIFYING an existing skill:**
+1. READ the current version from `.sgai/skills/<name>/SKILL.md` (the live runtime directory)
+2. Copy the ENTIRE file content
+3. Make your modifications to the copy
+4. Write the COMPLETE modified file to `sgai/skills/<name>/SKILL.md`
+
+**When CREATING a new skill:**
+1. Write the entire new file directly to `sgai/skills/<name>/SKILL.md`
+
+**CRITICAL:** Partial edits are NOT possible via the overlay. Every file in `sgai/` must be a complete, self-contained version of the file it overrides.
+
 ## CRITICAL: Testing Requirement
 
 **You MUST use the `testing-skills-with-subagents` skill before marking your work complete.**
@@ -161,7 +180,7 @@ The skill is ready when:
 - Name: lowercase, hyphenated (e.g., `async-debugging`)
 - Group related skills in subdirectories
 
-**IMPORTANT:** All skills must be written to `sgai/skills/` (the overlay directory) for distribution.
+**IMPORTANT:** All skills must be written to `sgai/skills/` (the overlay directory) for distribution. When modifying an existing skill, you MUST first READ the current version from `.sgai/skills/` (the live runtime directory), then write the COMPLETE modified file to `sgai/skills/`.
 
 ## Quality Checklist
 

@@ -262,7 +262,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
     if (!models || selectedModel) return;
 
     const fallbackModel = models.defaultModel;
-    if (fallbackModel && models.models.some((model) => model.id === fallbackModel)) {
+    if (fallbackModel && models?.models?.some((model) => model.id === fallbackModel)) {
       setSelectedModel(fallbackModel);
     }
   }, [models, selectedModel]);
@@ -389,7 +389,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
               <SelectOption value="" disabled>
                 Select a model
               </SelectOption>
-              {models.models.map((model) => (
+              {models?.models?.map((model) => (
                 <SelectOption key={model.id} value={model.id}>
                   {model.name}
                 </SelectOption>

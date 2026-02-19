@@ -204,17 +204,6 @@ not implementation. Focus on outcomes.
 | `openai-sdk-verifier-py` | Validates Python OpenAI Agents SDK applications. |
 | `openai-sdk-verifier-ts` | Validates TypeScript OpenAI Agents SDK applications. |
 
-### Retrospective Agents
-
-| Agent | Description |
-|-------|-------------|
-| `retrospective-session-analyzer` | Analyzes sessions for SGAI improvement opportunities. |
-| `retrospective-code-analyzer` | Extracts reusable code snippets from sessions. |
-| `retrospective-refiner` | Deduplicates and formats improvement suggestions. |
-| `retrospective-applier` | Applies approved suggestions via delegation. |
-| `skill-writer` | Creates validated skill files from suggestions. |
-| `snippet-writer` | Creates code snippet files from suggestions. |
-
 ### Utility Agents
 
 | Agent | Description |
