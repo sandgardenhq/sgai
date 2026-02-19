@@ -36,7 +36,7 @@ Use this skill when:
 
 ### Phase 3: Save Snippet
 - Generate the filename: kebab-case-name.extension
-- Create the .sgai/snippets/{language}/ directory if missing
+- Create the `sgai/snippets/{language}/` directory if missing (use the overlay directory, not `.sgai/`)
 - Write the frontmatter and code in the correct format
 - Confirm successful addition
 

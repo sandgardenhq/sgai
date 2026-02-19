@@ -9,7 +9,7 @@ description: TDD for process documentation - test with subagents before writing,
 
 **Writing skills IS Test-Driven Development applied to process documentation.**
 
-**Skills are written to `.sgai/skills/` (cloned to local repository).** You edit skills in your local branch of this repository.
+**Skills are written to `sgai/skills/` (the overlay directory).** Files in `sgai/` wholly replace their skeleton defaults from `cmd/sgai/skel/.sgai/`. When modifying an existing skill, READ the current version from `.sgai/skills/` (the live runtime directory) first, then write the COMPLETE modified file to `sgai/skills/`.
 
 You write test cases (pressure scenarios with subagents), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
@@ -68,7 +68,7 @@ API docs, syntax guides, tool documentation (office docs)
 
 ## Directory Structure
 
-**All skills are in the skills repository at `.sgai/skills/`:**
+**All skills are in the skills repository at `.sgai/skills/` (READ location — the live runtime directory). WRITES go to `sgai/skills/` (the overlay directory):**
 
 ```
 .sgai/skills/

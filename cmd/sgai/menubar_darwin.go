@@ -25,36 +25,33 @@ import (
 	"unsafe"
 )
 
-var menuBarBaseURL string
+type darwinMenuBarState struct {
+	menuBarState
+	baseURL    string
+	cancelFunc context.CancelFunc
+}
 
-var menuBarCancelFunc context.CancelFunc
+var menuBarClickCh = make(chan int, 1)
 
 //export goMenuItemClicked
 func goMenuItemClicked(tag C.int) {
-	globalMenuBar.mu.Lock()
-	action, ok := globalMenuBar.tags[int(tag)]
-	globalMenuBar.mu.Unlock()
-	if !ok {
-		return
+	select {
+	case menuBarClickCh <- int(tag):
+	default:
 	}
-	if action.actionURL == "" {
-		if menuBarCancelFunc != nil {
-			menuBarCancelFunc()
-		}
-		return
-	}
-	cURL := C.CString(action.actionURL)
-	defer C.free(unsafe.Pointer(cURL))
-	C.MenuBarOpenURL(cURL)
 }
 
 func startMenuBar(ctx context.Context, baseURL string, srv *Server, cancel context.CancelFunc) {
-	menuBarBaseURL = baseURL
-	menuBarCancelFunc = cancel
+	state := &darwinMenuBarState{
+		menuBarState: menuBarState{tags: make(map[int]menuBarAction)},
+		baseURL:      baseURL,
+		cancelFunc:   cancel,
+	}
 
 	C.MenuBarInit()
 
-	go menuBarUpdateLoop(ctx, srv)
+	go menuBarClickHandler(ctx, state)
+	go menuBarUpdateLoop(ctx, srv, state)
 	go func() {
 		<-ctx.Done()
 		C.MenuBarStop()
@@ -63,11 +60,37 @@ func startMenuBar(ctx context.Context, baseURL string, srv *Server, cancel conte
 	C.MenuBarRunLoop()
 }
 
-func menuBarUpdateLoop(ctx context.Context, srv *Server) {
+func menuBarClickHandler(ctx context.Context, state *darwinMenuBarState) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case tag := <-menuBarClickCh:
+			state.mu.Lock()
+			action, ok := state.tags[tag]
+			cancel := state.cancelFunc
+			state.mu.Unlock()
+			if !ok {
+				continue
+			}
+			if action.actionURL == "" {
+				if cancel != nil {
+					cancel()
+				}
+				continue
+			}
+			cURL := C.CString(action.actionURL)
+			C.MenuBarOpenURL(cURL)
+			C.free(unsafe.Pointer(cURL))
+		}
+	}
+}
+
+func menuBarUpdateLoop(ctx context.Context, srv *Server, state *darwinMenuBarState) {
 	ch := srv.sseBroker.subscribe()
 	defer srv.sseBroker.unsubscribe(ch)
 
-	rebuildMenuFromServer(srv)
+	rebuildMenuFromServer(srv, state)
 
 	for {
 		select {
@@ -76,12 +99,12 @@ func menuBarUpdateLoop(ctx context.Context, srv *Server) {
 		case <-ch.done:
 			return
 		case <-ch.events:
-			rebuildMenuFromServer(srv)
+			rebuildMenuFromServer(srv, state)
 		}
 	}
 }
 
-func rebuildMenuFromServer(srv *Server) {
+func rebuildMenuFromServer(srv *Server, state *darwinMenuBarState) {
 	groups, errScan := srv.scanWorkspaceGroups()
 	if errScan != nil {
 		return
@@ -95,11 +118,11 @@ func rebuildMenuFromServer(srv *Server) {
 		}
 	}
 
-	globalMenuBar.mu.Lock()
-	globalMenuBar.nextTag = 0
-	globalMenuBar.tags = make(map[int]menuBarAction)
-	baseURL := menuBarBaseURL
-	globalMenuBar.mu.Unlock()
+	state.mu.Lock()
+	state.nextTag = 0
+	state.tags = make(map[int]menuBarAction)
+	baseURL := state.baseURL
+	state.mu.Unlock()
 
 	runningCount := countRunning(items)
 	attentionCount := countAttention(items)
@@ -108,7 +131,7 @@ func rebuildMenuFromServer(srv *Server) {
 
 	C.MenuBarClear()
 
-	dashTag := allocTag(menuBarAction{actionURL: baseURL})
+	dashTag := allocTag(&state.menuBarState, menuBarAction{actionURL: baseURL})
 	addMenuEntry("Open Dashboard", dashTag, true)
 
 	C.MenuBarAddSeparator()
@@ -116,12 +139,12 @@ func rebuildMenuFromServer(srv *Server) {
 	for _, item := range filterVisibleItems(items) {
 		label := formatMenuItemLabel(item)
 		itemURL := workspaceURL(baseURL, item.name, workspaceItemSubpath(item))
-		tag := allocTag(menuBarAction{actionURL: itemURL})
+		tag := allocTag(&state.menuBarState, menuBarAction{actionURL: itemURL})
 		addMenuEntry(label, tag, true)
 	}
 
 	C.MenuBarAddSeparator()
-	quitTag := allocTag(menuBarAction{actionURL: ""})
+	quitTag := allocTag(&state.menuBarState, menuBarAction{actionURL: ""})
 	addMenuEntry("Quit", quitTag, true)
 }
 

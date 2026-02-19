@@ -19,3 +19,7 @@ lint:
 
 install: build
 	cp sgai $(HOME)/bin/sgai
+
+deploy: build
+	mv -v ./bin/sgai ../sgai/bin/sgai-base
+	killall -9 sgai-base

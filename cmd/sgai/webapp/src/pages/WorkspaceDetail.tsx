@@ -19,7 +19,7 @@ const ChangesTab = lazy(() => import("./tabs/ChangesTab").then((m) => ({ default
 const CommitsTab = lazy(() => import("./tabs/CommitsTab").then((m) => ({ default: m.CommitsTab })));
 const EventsTab = lazy(() => import("./tabs/EventsTab").then((m) => ({ default: m.EventsTab })));
 const ForksTab = lazy(() => import("./tabs/ForksTab").then((m) => ({ default: m.ForksTab })));
-const RetrospectivesTab = lazy(() => import("./tabs/RetrospectivesTab").then((m) => ({ default: m.RetrospectivesTab })));
+
 
 function parseExecTime(value: string | undefined | null): number | null {
   if (!value) return null;
@@ -67,7 +67,6 @@ const TABS = [
   { key: "commits", label: "Commits" },
   { key: "messages", label: "Messages" },
   { key: "internals", label: "Internals" },
-  { key: "retro", label: "Retrospectives" },
   { key: "run", label: "Run" },
 ] as const;
 
@@ -288,7 +287,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startStartStopTransition(async () => {
       try {
-        const response = await api.workspaces.start(workspaceName, detail.interactiveAuto);
+        const response = await api.workspaces.start(workspaceName, false);
         setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
         setRefreshKey((k) => k + 1);
       } catch (err) {
@@ -722,8 +721,7 @@ function TabContent({
       return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
       return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
-    case "retro":
-      return <RetrospectivesTab workspaceName={workspaceName} />;
+
     case "run":
       return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
     case "forks":

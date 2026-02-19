@@ -138,6 +138,7 @@ type Workflow struct {
 
 	WorkGateApproved    bool `json:"workGateApproved,omitempty"`
 	InteractiveAutoLock bool `json:"interactiveAutoLock,omitempty"`
+	StartedInteractive  bool `json:"startedInteractive,omitempty"`
 
 	// ModelStatuses tracks per-model status in multi-model agents.
 	// Key is model ID (agent:modelSpec), value is "model-working", "model-done", or "model-error".

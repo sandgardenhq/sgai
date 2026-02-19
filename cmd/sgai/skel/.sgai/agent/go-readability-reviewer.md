@@ -379,6 +379,42 @@ Refer to: https://go-proverbs.github.io/
 - Documentation is for users.
 - Don't panic.
 
+### 19. Global State
+
+**CRITICAL: Global vars and mutable global state are severe violations**
+
+- [ ] No package-level `var` declarations holding mutable state
+- [ ] No global singletons (global `*struct` pointers, global maps, global slices)
+- [ ] No global `sync.Mutex`, `sync.Once`, or similar synchronization tied to global state
+- [ ] State is passed through function parameters or struct methods, not accessed via globals
+- [ ] Tests do not depend on global state (create local instances instead)
+
+**Narrow exceptions (must be justified):**
+- CGo `//export` callback bridge: ONE global pointer is acceptable when a C callback cannot receive custom parameters
+- `init()` for package registration patterns (e.g., `database/sql` drivers) — but prefer explicit initialization
+- Constants (`const`) are fine — they are immutable
+
+**Common violations to flag:**
+```go
+// BAD - mutable global state
+var globalState = &AppState{...}
+var appConfig string
+var cancelFunc context.CancelFunc
+
+func doWork() {
+    globalState.mu.Lock() // accessing global
+    ...
+}
+
+// GOOD - pass state through parameters
+type appState struct { ... }
+
+func doWork(state *appState) {
+    state.mu.Lock() // explicit dependency
+    ...
+}
+```
+
 ---
 
 ## Output Format

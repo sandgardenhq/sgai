@@ -18,7 +18,7 @@ import type {
   ApiChangesResponse,
   ApiEventsResponse,
   ApiForksResponse,
-  ApiRetrospectivesResponse,
+
   ApiComposeStateResponse,
   ApiComposeTemplatesResponse,
   ApiComposePreviewResponse,
@@ -29,7 +29,7 @@ import type {
   ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
-  ApiRetroActionResponse,
+
   ApiModelsResponse,
   ApiCommitsResponse,
   ApiSteerResponse,
@@ -142,10 +142,7 @@ export const api = {
       fetchJSON<ApiSessionResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/session`,
       ),
-    retrospectives: (name: string, session?: string) =>
-      fetchJSON<ApiRetrospectivesResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/retrospectives${session ? `?session=${encodeURIComponent(session)}` : ""}`,
-      ),
+
     commits: (name: string) =>
       fetchJSON<ApiCommitsResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/commits`,
@@ -179,21 +176,7 @@ export const api = {
         `/api/v1/workspaces/${encodeURIComponent(name)}/adhoc`,
         { method: "DELETE" },
       ),
-    retroAnalyze: (name: string, session: string) =>
-      fetchJSON<ApiRetroActionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/retrospective/analyze`,
-        { method: "POST", body: JSON.stringify({ session }) },
-      ),
-    retroApply: (name: string, session: string, selectedSuggestions: string[], notes?: Record<string, string>) =>
-      fetchJSON<ApiRetroActionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/retrospective/apply`,
-        { method: "POST", body: JSON.stringify({ session, selectedSuggestions, notes }) },
-      ),
-    retroDelete: (name: string, session: string) =>
-      fetchJSON<ApiRetroActionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/retrospective/delete`,
-        { method: "POST", body: JSON.stringify({ session }) },
-      ),
+
     steer: (name: string, message: string) =>
       fetchJSON<ApiSteerResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/steer`,
