@@ -301,6 +301,16 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
 			}
+			result := handleCompletionGate(ctx, dir, stateJSONPath, wfState, paddedsgai)
+			if result.continueWorking {
+				wfState.Status = state.StatusWorking
+				wfState.CurrentAgent = "coordinator"
+				if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
+					log.Println("failed to save state after continue:", errSave)
+					return
+				}
+				continue
+			}
 			fmt.Println("["+paddedsgai+"]", "complete:", wfState.Task)
 			return
 		}
@@ -352,6 +362,16 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 					currentAgent = wfState.CurrentAgent
 					continue
+				}
+				result := handleCompletionGate(ctx, dir, stateJSONPath, wfState, paddedsgai)
+				if result.continueWorking {
+					wfState.Status = state.StatusWorking
+					wfState.CurrentAgent = "coordinator"
+					if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
+						log.Println("failed to save state after continue:", errSave)
+						return
+					}
+					break
 				}
 				fmt.Println("["+paddedsgai+"]", "complete:", wfState.Task)
 				return
