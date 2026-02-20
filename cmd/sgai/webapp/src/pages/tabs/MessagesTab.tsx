@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
@@ -120,12 +119,10 @@ export function MessagesTab({ workspaceName }: MessagesTabProps) {
   }
 
   return (
-    <ScrollArea className="max-h-[calc(100vh-16rem)]">
-      <div className="space-y-2">
-        {messages.map((msg) => (
-          <MessageItem key={msg.id} message={msg} />
-        ))}
-      </div>
-    </ScrollArea>
+    <div className="space-y-2">
+      {messages.map((msg) => (
+        <MessageItem key={msg.id} message={msg} />
+      ))}
+    </div>
   );
 }
