@@ -27,12 +27,20 @@ import (
 
 var menuBarBaseURL string
 
+var menuBarCancelFunc context.CancelFunc
+
 //export goMenuItemClicked
 func goMenuItemClicked(tag C.int) {
 	globalMenuBar.mu.Lock()
 	action, ok := globalMenuBar.tags[int(tag)]
 	globalMenuBar.mu.Unlock()
-	if !ok || action.actionURL == "" {
+	if !ok {
+		return
+	}
+	if action.actionURL == "" {
+		if menuBarCancelFunc != nil {
+			menuBarCancelFunc()
+		}
 		return
 	}
 	cURL := C.CString(action.actionURL)
@@ -40,8 +48,9 @@ func goMenuItemClicked(tag C.int) {
 	C.MenuBarOpenURL(cURL)
 }
 
-func startMenuBar(ctx context.Context, baseURL string, srv *Server) {
+func startMenuBar(ctx context.Context, baseURL string, srv *Server, cancel context.CancelFunc) {
 	menuBarBaseURL = baseURL
+	menuBarCancelFunc = cancel
 
 	C.MenuBarInit()
 
@@ -111,6 +120,9 @@ func rebuildMenuFromServer(srv *Server) {
 		addMenuEntry(label, tag, true)
 	}
 
+	C.MenuBarAddSeparator()
+	quitTag := allocTag(menuBarAction{actionURL: ""})
+	addMenuEntry("Quit", quitTag, true)
 }
 
 func setMenuTitle(runningCount, totalActive, attentionCount int) {

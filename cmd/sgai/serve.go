@@ -550,7 +550,7 @@ func cmdServe(args []string) {
 		}
 	}()
 
-	startMenuBar(ctx, baseURL, srv)
+	startMenuBar(ctx, baseURL, srv, stop)
 	if errClose := httpServer.Close(); errClose != nil {
 		log.Println("http server close:", errClose)
 	}
