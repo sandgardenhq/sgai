@@ -749,8 +749,8 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			stderrOut = io.MultiWriter(os.Stderr, cfg.logWriter)
 			stdoutOut = io.MultiWriter(os.Stdout, cfg.logWriter)
 		}
-		stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut}
-		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, statePath: cfg.statePath, currentAgent: cfg.agent}
+		stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
+		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, statePath: cfg.statePath, currentAgent: cfg.agent, startTime: time.Now()}
 
 		cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
 		cmd.Stdout = io.MultiWriter(jsonWriter, outputCapture)
@@ -1591,16 +1591,27 @@ func terminateProcessGroupOnCancel(ctx context.Context, cmd *exec.Cmd, processEx
 	}
 }
 
+func formatElapsed(start time.Time) string {
+	elapsed := time.Since(start)
+	hours := int(elapsed.Hours())
+	mins := int(elapsed.Minutes()) % 60
+	secs := int(elapsed.Seconds()) % 60
+	millis := elapsed.Milliseconds() % 1000
+	return fmt.Sprintf("[%02d:%02d:%02d.%03d]", hours, mins, secs, millis)
+}
+
 type prefixWriter struct {
-	prefix string
-	w      io.Writer
+	prefix    string
+	w         io.Writer
+	startTime time.Time
 }
 
 func (p *prefixWriter) Write(data []byte) (int, error) {
 	lines := linesWithTrailingEmpty(string(data))
 	for i, line := range lines {
 		if i < len(lines)-1 || line != "" {
-			if _, err := p.w.Write([]byte(p.prefix + line + "\n")); err != nil {
+			timestamp := formatElapsed(p.startTime)
+			if _, err := p.w.Write([]byte(timestamp + p.prefix + line + "\n")); err != nil {
 				return 0, err
 			}
 		}
@@ -1653,6 +1664,11 @@ type jsonPrettyWriter struct {
 	statePath    string
 	currentAgent string
 	stepCounter  int
+	startTime    time.Time
+}
+
+func (j *jsonPrettyWriter) tsPrefix() string {
+	return formatElapsed(j.startTime) + j.prefix
 }
 
 func (j *jsonPrettyWriter) Write(data []byte) (int, error) {
@@ -1702,15 +1718,15 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 			toolCall := formatToolCall(part.Tool, part.State.Input)
 			switch part.State.Status {
 			case "pending":
-				if _, err := fmt.Fprintln(j.w, j.prefix+toolCall); err != nil {
+				if _, err := fmt.Fprintln(j.w, j.tsPrefix()+toolCall); err != nil {
 					log.Println("write failed:", err)
 				}
 			case "running":
-				if _, err := fmt.Fprintln(j.w, j.prefix+toolCall+" ..."); err != nil {
+				if _, err := fmt.Fprintln(j.w, j.tsPrefix()+toolCall+" ..."); err != nil {
 					log.Println("write failed:", err)
 				}
 			case "completed":
-				if _, err := fmt.Fprintln(j.w, j.prefix+toolCall); err != nil {
+				if _, err := fmt.Fprintln(j.w, j.tsPrefix()+toolCall); err != nil {
 					log.Println("write failed:", err)
 				}
 				if part.State.Output != "" {
@@ -1718,14 +1734,14 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 						j.formatTodoOutput(part.State.Output)
 					} else {
 						for line := range strings.SplitSeq(part.State.Output, "\n") {
-							if _, err := fmt.Fprintln(j.w, j.prefix+"  → "+line); err != nil {
+							if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"  → "+line); err != nil {
 								log.Println("write failed:", err)
 							}
 						}
 					}
 				}
 			case "error":
-				if _, err := fmt.Fprintln(j.w, j.prefix+toolCall+" ERROR:", part.State.Error); err != nil {
+				if _, err := fmt.Fprintln(j.w, j.tsPrefix()+toolCall+" ERROR:", part.State.Error); err != nil {
 					log.Println("write failed:", err)
 				}
 			}
@@ -1742,14 +1758,14 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 	case "reasoning":
 		j.flushText()
 		if part.Text != "" {
-			if _, err := fmt.Fprintln(j.w, j.prefix+"[thinking] ..."); err != nil {
+			if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"[thinking] ..."); err != nil {
 				log.Println("write failed:", err)
 			}
 		}
 
 	default:
 		if event.Type != "" {
-			if _, err := fmt.Fprintln(j.w, j.prefix+"["+event.Type+"]"); err != nil {
+			if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"["+event.Type+"]"); err != nil {
 				log.Println("write failed:", err)
 			}
 		}
@@ -1760,7 +1776,7 @@ func (j *jsonPrettyWriter) flushText() {
 	if j.currentText.Len() > 0 {
 		text := j.currentText.String()
 		for line := range strings.SplitSeq(text, "\n") {
-			if _, err := fmt.Fprintln(j.w, j.prefix+line); err != nil {
+			if _, err := fmt.Fprintln(j.w, j.tsPrefix()+line); err != nil {
 				log.Println("write failed:", err)
 			}
 		}
@@ -1845,7 +1861,7 @@ func (j *jsonPrettyWriter) formatTodoOutput(output string) {
 	var todos []todo
 	if err := json.Unmarshal([]byte(jsonOutput), &todos); err != nil {
 		for line := range strings.SplitSeq(output, "\n") {
-			if _, err := fmt.Fprintln(j.w, j.prefix+"  → "+line); err != nil {
+			if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"  → "+line); err != nil {
 				log.Println("write failed:", err)
 			}
 		}
@@ -1854,7 +1870,7 @@ func (j *jsonPrettyWriter) formatTodoOutput(output string) {
 
 	for _, t := range todos {
 		symbol := todoStatusSymbol(t.Status)
-		if _, err := fmt.Fprintf(j.w, "%s  → %s %s (%s)\n", j.prefix, symbol, t.Content, t.Priority); err != nil {
+		if _, err := fmt.Fprintf(j.w, "%s  → %s %s (%s)\n", j.tsPrefix(), symbol, t.Content, t.Priority); err != nil {
 			log.Println("write failed:", err)
 		}
 	}
