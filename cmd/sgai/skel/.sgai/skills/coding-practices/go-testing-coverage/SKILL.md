@@ -478,6 +478,31 @@ func TestHandler(t *testing.T) {
 - https://pkg.go.dev/slices
 - https://pkg.go.dev/testing/slogtest
 
+## Test Code Quality
+
+### Avoiding Dead Code in Tests
+
+Dead code in tests causes unnecessary review cycles. Before marking tests complete:
+
+- **No unused variables**: Remove any variable declared but never used
+- **No discarded values**: Never assign to `_` unless explicitly ignoring an error
+- **No unnecessary imports**: Remove unused imports (especially `sync/atomic` when not needed)
+- **Meaningful assertions**: Replace trivially-passing assertions with checks that verify actual behavior
+
+Example of bad code (from session):
+```go
+triggerCount := &atomic.Int32{} // unused
+originalRun := d.run             // captured and discarded
+```
+
+Example of good code:
+```go
+// Verify the debounce timer is still pending after 100ms
+if !d.timer.Stop() {
+    <-d.timer.C // drain channel to avoid leak
+}
+```
+
 ## Common Mistakes
 
 - **Testing implementation** - Test behavior, not internals

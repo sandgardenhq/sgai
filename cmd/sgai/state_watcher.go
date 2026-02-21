@@ -13,14 +13,15 @@ import (
 )
 
 type workspaceStateSnapshot struct {
-	modTime      time.Time
-	status       string
-	needsInput   bool
-	progressLen  int
-	todosHash    string
-	messagesHash string
-	goalModTime  time.Time
-	goalHash     string
+	modTime             time.Time
+	status              string
+	needsInput          bool
+	progressLen         int
+	todosHash           string
+	messagesHash        string
+	goalModTime         time.Time
+	goalHash            string
+	summaryGenTriggered bool
 }
 
 func (s *Server) startStateWatcher() {
@@ -97,13 +98,26 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 	}
 
 	current := buildStateSnapshot(info.ModTime(), wfState, goalInfo)
-	snapshots[dir] = current
 
 	if !hasPrev {
+		if s.summaryGen != nil && wfState.Summary == "" && !wfState.SummaryManual {
+			current.summaryGenTriggered = true
+			s.summaryGen.trigger(dir)
+		}
+		snapshots[dir] = current
 		return
 	}
 
 	s.emitStateChangeEvents(name, dir, prev, current)
+
+	if s.summaryGen != nil && wfState.Summary == "" && !wfState.SummaryManual && !prev.summaryGenTriggered {
+		current.summaryGenTriggered = true
+		s.summaryGen.trigger(dir)
+	} else if prev.summaryGenTriggered {
+		current.summaryGenTriggered = true
+	}
+
+	snapshots[dir] = current
 }
 
 func buildStateSnapshot(modTime time.Time, wfState state.Workflow, goalInfo os.FileInfo) workspaceStateSnapshot {
@@ -149,6 +163,9 @@ func (s *Server) emitStateChangeEvents(workspaceName, workspacePath string, prev
 	if prev.goalHash != current.goalHash {
 		s.publishToWorkspace(workspacePath, sseEvent{Type: "goal:update", Data: data})
 		publishedToWorkspace = true
+		if s.summaryGen != nil {
+			s.summaryGen.trigger(workspacePath)
+		}
 	}
 
 	if publishedToWorkspace {

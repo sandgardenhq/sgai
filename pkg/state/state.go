@@ -154,6 +154,15 @@ type Workflow struct {
 	// CurrentModel tracks the currently executing model in multi-model agents.
 	// Format is "agentName:modelSpec".
 	CurrentModel string `json:"currentModel,omitempty"`
+
+	// Summary is a single-sentence summary of the project goal.
+	// Generated automatically when GOAL.md is saved or workspace starts,
+	// unless SummaryManual is true (indicating user has manually edited it).
+	Summary string `json:"summary,omitempty"`
+
+	// SummaryManual indicates whether the summary was manually edited by user.
+	// When true, automatic summary generation is skipped.
+	SummaryManual bool `json:"summaryManual,omitempty"`
 }
 
 // ToolsAllowed reports whether the current interaction mode permits

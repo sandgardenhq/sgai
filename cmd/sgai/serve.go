@@ -234,6 +234,8 @@ type Server struct {
 
 	composerSessionsMu sync.Mutex
 	composerSessions   map[string]*composerSession
+
+	summaryGen *summaryGenerator
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -531,6 +533,7 @@ func cmdServe(args []string) {
 
 	srv := NewServer(rootDir)
 	srv.shutdownCtx = ctx
+	srv.summaryGen = newSummaryGenerator(ctx, srv)
 	if err := srv.loadPinnedProjects(); err != nil {
 		log.Println("warning: failed to load pinned projects:", err)
 	}
@@ -552,6 +555,7 @@ func cmdServe(args []string) {
 	}()
 
 	startMenuBar(ctx, baseURL, srv, stop)
+	srv.summaryGen.stop()
 	if errClose := httpServer.Close(); errClose != nil {
 		log.Println("http server close:", errClose)
 	}

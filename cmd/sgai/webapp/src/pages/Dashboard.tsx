@@ -92,7 +92,7 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
           <button
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
-            className="w-5 h-5 inline-flex items-center justify-center rounded text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors"
+            className="w-5 h-5 inline-flex items-center justify-center rounded text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors self-start mt-1"
             aria-label="Toggle forks"
           >
             {expanded ? "−" : "+"}
@@ -106,14 +106,26 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
           className="flex-1 min-w-0"
         >
           <Link to={`/workspaces/${encodeURIComponent(workspace.name)}/progress`}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {workspace.name}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="right">{workspace.name}</TooltipContent>
-            </Tooltip>
+            <span className="flex-1 min-w-0 flex flex-col">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                    {workspace.name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">{workspace.name}</TooltipContent>
+              </Tooltip>
+              {workspace.summary && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[0.65rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap leading-tight">
+                      {workspace.summary}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">{workspace.summary}</TooltipContent>
+                </Tooltip>
+              )}
+            </span>
             <WorkspaceIndicators workspace={workspace} />
           </Link>
         </SidebarMenuButton>
@@ -132,14 +144,26 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
                   className="relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
                 >
                   <Link to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                          {fork.name}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{fork.name}</TooltipContent>
-                    </Tooltip>
+                    <span className="flex-1 min-w-0 flex flex-col">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                            {fork.name}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{fork.name}</TooltipContent>
+                      </Tooltip>
+                      {fork.summary && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-[0.65rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap leading-tight">
+                              {fork.summary}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">{fork.summary}</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </span>
                     <WorkspaceIndicators workspace={fork} />
                   </Link>
                 </SidebarMenuButton>
@@ -193,14 +217,26 @@ function InProgressSection({ workspaces, selectedName }: InProgressSectionProps)
                     : `/workspaces/${encodeURIComponent(w.name)}/progress`
                   }
                 >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {w.name}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{w.name}</TooltipContent>
-                  </Tooltip>
+                  <span className="flex-1 min-w-0 flex flex-col">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                          {w.name}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{w.name}</TooltipContent>
+                    </Tooltip>
+                    {w.summary && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-[0.65rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap leading-tight">
+                            {w.summary}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">{w.summary}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </span>
                   <WorkspaceIndicators workspace={w} />
                 </Link>
               </SidebarMenuButton>
