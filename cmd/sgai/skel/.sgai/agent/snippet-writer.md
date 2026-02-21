@@ -30,6 +30,25 @@ A new snippet file at `sgai/snippets/<language>/<name>.<ext>` that is ready to u
 
 **IMPORTANT:** Snippets must be created in `sgai/snippets/` (the overlay directory), NOT in the local `.sgai/snippets/` directory.
 
+## Overlay Directory Understanding
+
+The `sgai/` directory is an **overlay** — files placed there wholly replace their skeleton defaults.
+
+- `.sgai/` = live runtime directory (skeleton + overlay merged at startup)
+- `sgai/` = per-project overlay directory (your changes go here)
+- Overlay files are NOT merged — they REPLACE the entire skeleton file
+
+**When MODIFYING an existing snippet:**
+1. READ the current version from `.sgai/snippets/<language>/<name>.<ext>` (the live runtime directory)
+2. Copy the ENTIRE file content
+3. Make your modifications to the copy
+4. Write the COMPLETE modified file to `sgai/snippets/<language>/<name>.<ext>`
+
+**When CREATING a new snippet:**
+1. Write the entire new file directly to `sgai/snippets/<language>/<name>.<ext>`
+
+**CRITICAL:** Partial edits are NOT possible via the overlay. Every file in `sgai/` must be a complete, self-contained version of the file it overrides.
+
 ## Snippet Creation Process
 
 ### Step 1: Understand the Suggestion
@@ -91,7 +110,7 @@ Ensure the snippet:
   - Bash: `.sh`
   - etc.
 
-**IMPORTANT:** All snippets must be written to `sgai/snippets/` (the overlay directory) for distribution.
+**IMPORTANT:** All snippets must be written to `sgai/snippets/` (the overlay directory) for distribution. When modifying an existing snippet, you MUST first READ the current version from `.sgai/snippets/` (the live runtime directory), then write the COMPLETE modified file to `sgai/snippets/`.
 
 ## Header Comment Format by Language
 

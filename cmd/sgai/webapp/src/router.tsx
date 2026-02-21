@@ -70,12 +70,6 @@ const EditGoal = lazy(() =>
 const AdhocOutput = lazy(() =>
   import("./pages/AdhocOutput").then((m) => ({ default: m.AdhocOutput })),
 );
-const RetroAnalyze = lazy(() =>
-  import("./pages/RetroAnalyze").then((m) => ({ default: m.RetroAnalyze })),
-);
-const RetroApply = lazy(() =>
-  import("./pages/RetroApply").then((m) => ({ default: m.RetroApply })),
-);
 
 function PageSkeleton() {
   return (
@@ -179,18 +173,7 @@ export const router = createBrowserRouter([
         path: "workspaces/:name/adhoc",
         element: withSuspense(AdhocOutput),
       },
-      {
-        path: "workspaces/:name/retrospective/analyze",
-        element: withSuspense(RetroAnalyze),
-      },
-      {
-        path: "workspaces/:name/retro/:session/analyze",
-        element: withSuspense(RetroAnalyze),
-      },
-      {
-        path: "workspaces/:name/retrospective/apply",
-        element: withSuspense(RetroApply),
-      },
+
       {
         path: "workspaces/:name/*",
         element: withDashboardSuspense(DashboardWithWorkspace),

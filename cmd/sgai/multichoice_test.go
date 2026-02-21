@@ -117,8 +117,11 @@ func TestAskUserQuestion(t *testing.T) {
 
 		result, _ := askUserQuestion(workDir, args)
 
-		if result != "Error: At least one question is required" {
+		if !strings.Contains(result, "Error: At least one question is required") {
 			t.Errorf("expected error message, got: %q", result)
+		}
+		if !strings.Contains(result, `"questions"`) {
+			t.Errorf("expected error message to include JSON example, got: %q", result)
 		}
 	})
 
@@ -232,8 +235,11 @@ func TestAskUserQuestionStress(t *testing.T) {
 
 		result, _ := askUserQuestion(workDir, args)
 
-		if result != "Error: At least one question is required" {
+		if !strings.Contains(result, "Error: At least one question is required") {
 			t.Errorf("expected error message, got: %q", result)
+		}
+		if !strings.Contains(result, `"questions"`) {
+			t.Errorf("expected error message to include JSON example, got: %q", result)
 		}
 	})
 

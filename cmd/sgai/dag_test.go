@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -463,4 +464,254 @@ func TestInjectProjectCriticCouncilEdgeSuccessorsSorted(t *testing.T) {
 	if !slices.IsSorted(coordNode.Successors) {
 		t.Errorf("coordinator.Successors should be sorted, got: %v", coordNode.Successors)
 	}
+}
+
+func TestInjectRetrospectiveEdgeCreatesNodeAndEdge(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> planner
+		planner -> coder
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	dag.injectRetrospectiveEdge()
+
+	retroNode, exists := dag.Nodes["retrospective"]
+	if !exists {
+		t.Fatal("expected retrospective node to exist")
+	}
+
+	coordNode := dag.Nodes["coordinator"]
+	if !slices.Contains(coordNode.Successors, "retrospective") {
+		t.Errorf("coordinator should have retrospective as successor, got: %v", coordNode.Successors)
+	}
+
+	if !slices.Contains(retroNode.Predecessors, "coordinator") {
+		t.Errorf("retrospective should have coordinator as predecessor, got: %v", retroNode.Predecessors)
+	}
+}
+
+func TestInjectRetrospectiveEdgeIdempotent(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> "retrospective"
+		coordinator -> planner
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	dag.injectRetrospectiveEdge()
+
+	coordNode := dag.Nodes["coordinator"]
+
+	retroCount := 0
+	for _, s := range coordNode.Successors {
+		if s == "retrospective" {
+			retroCount++
+		}
+	}
+	if retroCount != 1 {
+		t.Errorf("expected exactly 1 retrospective in coordinator.Successors, got %d", retroCount)
+	}
+}
+
+func TestInjectRetrospectiveEdgeSuccessorsSorted(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> zebra
+		coordinator -> alpha
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	dag.injectRetrospectiveEdge()
+
+	coordNode := dag.Nodes["coordinator"]
+	if !slices.IsSorted(coordNode.Successors) {
+		t.Errorf("coordinator.Successors should be sorted after retrospective injection, got: %v", coordNode.Successors)
+	}
+}
+
+func TestRetrospectiveAppearsInAllAgents(t *testing.T) {
+	dotContent := `digraph workflow {
+		planner -> coder
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	dag.injectRetrospectiveEdge()
+
+	agents := dag.allAgents()
+	if !slices.Contains(agents, "retrospective") {
+		t.Errorf("allAgents() should contain retrospective, got: %v", agents)
+	}
+}
+
+func TestParseFlowDoesNotInjectRetrospective(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> planner
+		planner -> coder
+	}`
+
+	dag, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	if _, exists := dag.Nodes["retrospective"]; exists {
+		t.Error("parseFlow should not inject retrospective node; injection is now conditional")
+	}
+}
+
+func TestComposeFlowTemplateCoordinatorContent(t *testing.T) {
+	msg := composeFlowTemplate("coordinator")
+
+	requiredPhrases := []string{
+		"ask_user_question to present structured questions",
+		"peek_message_bus()",
+		"YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question",
+		"SOLE owner of GOAL.md checkboxes",
+		flowSectionPreamble,
+		flowSectionMessaging,
+		flowSectionWorkFocus,
+		flowSectionNavigation,
+		flowSectionGuidelines,
+		flowSectionCommonTail,
+	}
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(msg, phrase) {
+			t.Errorf("coordinator template missing required phrase: %q", truncateForTest(phrase))
+		}
+	}
+
+	absentPhrases := []string{
+		"send a message to coordinator: sgai_send_message",
+		"notify the coordinator",
+		"GOAL COMPLETE: [exact checkbox text",
+	}
+	for _, phrase := range absentPhrases {
+		if strings.Contains(msg, phrase) {
+			t.Errorf("coordinator template should not contain: %q", phrase)
+		}
+	}
+}
+
+func TestComposeFlowTemplateNonCoordinatorContent(t *testing.T) {
+	msg := composeFlowTemplate("backend-go-developer")
+
+	requiredPhrases := []string{
+		"sgai_update_workflow_state (set blocked",
+		"send a message to coordinator",
+		"notify the coordinator",
+		"GOAL COMPLETE: [exact checkbox text",
+		flowSectionPreamble,
+		flowSectionMessaging,
+		flowSectionWorkFocus,
+		flowSectionNavigation,
+		flowSectionGuidelines,
+		flowSectionCommonTail,
+	}
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(msg, phrase) {
+			t.Errorf("non-coordinator template missing required phrase: %q", truncateForTest(phrase))
+		}
+	}
+
+	absentPhrases := []string{
+		"peek_message_bus()",
+		"SOLE owner of GOAL.md",
+		"YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question",
+	}
+	for _, phrase := range absentPhrases {
+		if strings.Contains(msg, phrase) {
+			t.Errorf("non-coordinator template should not contain: %q", phrase)
+		}
+	}
+}
+
+func TestComposeFlowTemplateRetrospectiveContent(t *testing.T) {
+	msg := composeFlowTemplate("retrospective")
+
+	requiredPhrases := []string{
+		"sgai_update_workflow_state (set blocked",
+		"send a message to coordinator",
+		"notify the coordinator",
+		"GOAL COMPLETE: [exact checkbox text",
+		`"QUESTION: <your question>"`,
+		"The coordinator will handle human communication",
+		flowSectionPreamble,
+		flowSectionMessaging,
+		flowSectionWorkFocus,
+		flowSectionNavigation,
+		flowSectionGuidelines,
+		flowSectionCommonTail,
+	}
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(msg, phrase) {
+			t.Errorf("retrospective template missing required phrase: %q", truncateForTest(phrase))
+		}
+	}
+
+	absentPhrases := []string{
+		"peek_message_bus()",
+		"SOLE owner of GOAL.md",
+		"YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question",
+		"RETRO_QUESTION:",
+		"RETRO_COMPLETE:",
+		"THROUGH the coordinator",
+	}
+	for _, phrase := range absentPhrases {
+		if strings.Contains(msg, phrase) {
+			t.Errorf("retrospective template should not contain: %q", phrase)
+		}
+	}
+
+	nonCoordMsg := composeFlowTemplate("backend-go-developer")
+	if msg != nonCoordMsg {
+		t.Error("retrospective template should be identical to standard non-coordinator template")
+	}
+}
+
+func TestComposeFlowTemplateSharedSections(t *testing.T) {
+	coordMsg := composeFlowTemplate("coordinator")
+	nonCoordMsg := composeFlowTemplate("backend-go-developer")
+	retroMsg := composeFlowTemplate("retrospective")
+
+	sharedSections := []string{
+		flowSectionPreamble,
+		flowSectionMessaging,
+		flowSectionWorkFocus,
+		flowSectionNavigation,
+		flowSectionGuidelines,
+		flowSectionCommonTail,
+	}
+
+	for _, section := range sharedSections {
+		if !strings.Contains(coordMsg, section) {
+			t.Errorf("coordinator missing shared section: %q", truncateForTest(section))
+		}
+		if !strings.Contains(nonCoordMsg, section) {
+			t.Errorf("non-coordinator missing shared section: %q", truncateForTest(section))
+		}
+		if !strings.Contains(retroMsg, section) {
+			t.Errorf("retrospective missing shared section: %q", truncateForTest(section))
+		}
+	}
+}
+
+func truncateForTest(s string) string {
+	if len(s) > 80 {
+		return s[:80] + "..."
+	}
+	return s
 }

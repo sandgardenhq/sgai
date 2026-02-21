@@ -13,10 +13,9 @@ const configFileName = "sgai.json"
 // projectConfig represents the sgai.json configuration file.
 // The configuration file must be located at the project root, as a sibling to the .sgai directory.
 type projectConfig struct {
-	DefaultModel         string                     `json:"defaultModel,omitempty"`
-	DisableRetrospective bool                       `json:"disable_retrospective,omitempty"`
-	MCP                  map[string]json.RawMessage `json:"mcp,omitempty"`
-	Editor               string                     `json:"editor,omitempty"`
+	DefaultModel string                     `json:"defaultModel,omitempty"`
+	MCP          map[string]json.RawMessage `json:"mcp,omitempty"`
+	Editor       string                     `json:"editor,omitempty"`
 }
 
 func loadProjectConfig(dir string) (*projectConfig, error) {

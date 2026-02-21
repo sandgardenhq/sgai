@@ -29,23 +29,18 @@ type composerSession struct {
 	wizard wizardState
 }
 
-var (
-	composerSessionsMu sync.Mutex
-	composerSessions   = make(map[string]*composerSession)
-)
+func (srv *Server) getComposerSession(workspacePath string) *composerSession {
+	srv.composerSessionsMu.Lock()
+	defer srv.composerSessionsMu.Unlock()
 
-func getComposerSession(workspacePath string) *composerSession {
-	composerSessionsMu.Lock()
-	defer composerSessionsMu.Unlock()
-
-	if existing, ok := composerSessions[workspacePath]; ok {
+	if existing, ok := srv.composerSessions[workspacePath]; ok {
 		return existing
 	}
 
 	cs := &composerSession{}
 	cs.state = loadComposerStateFromDisk(workspacePath)
 	cs.wizard = defaultWizardState()
-	composerSessions[workspacePath] = cs
+	srv.composerSessions[workspacePath] = cs
 	return cs
 }
 
