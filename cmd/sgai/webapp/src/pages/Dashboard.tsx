@@ -295,7 +295,7 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
 
 function MobileHeader({ workspaces, loading, error }: { workspaces: ApiWorkspaceEntry[]; loading: boolean; error: Error | null }) {
   return (
-    <div className="flex items-center gap-2 pb-3 md:hidden">
+    <div className="relative flex items-center gap-2 pb-3 md:hidden">
       <SidebarTrigger />
       <span className="text-sm font-semibold">Workspaces</span>
       <span className="flex-1 flex justify-center">
@@ -376,7 +376,7 @@ function DashboardContent({ children }: DashboardContentProps): JSX.Element {
       <Sidebar side="left" collapsible="offcanvas">
         <SidebarHeader className="px-3 py-2">
           <div>
-            <img src={sgaiLogo} alt="SGAI" className="h-[35px] w-auto" />
+            <img src={sgaiLogo} alt="SGAI" className="h-[28px] w-auto" />
           </div>
           <Separator />
           <div className="flex items-center justify-between pt-2">
