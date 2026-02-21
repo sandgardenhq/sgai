@@ -103,6 +103,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
+	mux.HandleFunc("PUT /api/v1/workspaces/{name}/summary", s.handleAPIUpdateSummary)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStatus)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhoc)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
@@ -687,6 +688,7 @@ type apiWorkspaceEntry struct {
 	IsRoot     bool                `json:"isRoot"`
 	Status     string              `json:"status"`
 	HasSGAI    bool                `json:"hasSgai"`
+	Summary    string              `json:"summary,omitempty"`
 	Forks      []apiWorkspaceEntry `json:"forks,omitempty"`
 }
 
@@ -733,6 +735,7 @@ func convertWorkspaceInfo(w workspaceInfo) apiWorkspaceEntry {
 		IsRoot:     w.IsRoot,
 		Status:     statusText,
 		HasSGAI:    w.HasWorkspace,
+		Summary:    wfState.Summary,
 	}
 }
 
@@ -764,6 +767,8 @@ type apiWorkspaceDetailResponse struct {
 	LatestProgress  string                    `json:"latestProgress"`
 	AgentSequence   []apiAgentSequenceEntry   `json:"agentSequence"`
 	Cost            state.SessionCost         `json:"cost"`
+	Summary         string                    `json:"summary,omitempty"`
+	SummaryManual   bool                      `json:"summaryManual,omitempty"`
 	Forks           []apiWorkspaceForkSummary `json:"forks,omitempty"`
 }
 
@@ -778,6 +783,7 @@ type apiWorkspaceForkSummary struct {
 	Dir         string `json:"dir"`
 	Running     bool   `json:"running"`
 	CommitAhead int    `json:"commitAhead"`
+	Summary     string `json:"summary,omitempty"`
 }
 
 func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request) {
@@ -868,6 +874,8 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
+		Summary:         wfState.Summary,
+		SummaryManual:   wfState.SummaryManual,
 	}
 
 	if kind == workspaceRoot {
@@ -923,11 +931,13 @@ func (s *Server) collectForkSummaries(rootDir string) []apiWorkspaceForkSummary 
 		bookmark := resolveBaseBookmark(rootDir)
 		summaries := make([]apiWorkspaceForkSummary, 0, len(grp.Forks))
 		for _, fork := range grp.Forks {
+			forkState, _ := state.Load(statePath(fork.Directory))
 			summaries = append(summaries, apiWorkspaceForkSummary{
 				Name:        fork.DirName,
 				Dir:         fork.Directory,
 				Running:     fork.Running,
 				CommitAhead: countForkCommitsAhead(bookmark, fork.Directory),
+				Summary:     forkState.Summary,
 			})
 		}
 		return summaries
@@ -2242,6 +2252,55 @@ func (s *Server) handleAPIUpdateGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, apiUpdateGoalResponse{
 		Updated:   true,
 		Workspace: filepath.Base(workspacePath),
+	})
+}
+
+type apiUpdateSummaryRequest struct {
+	Summary string `json:"summary"`
+}
+
+type apiUpdateSummaryResponse struct {
+	Updated   bool   `json:"updated"`
+	Summary   string `json:"summary"`
+	Workspace string `json:"workspace"`
+}
+
+func (s *Server) handleAPIUpdateSummary(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	var req apiUpdateSummaryRequest
+	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	wfState, errLoad := state.Load(statePath(workspacePath))
+	if errLoad != nil {
+		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
+		return
+	}
+
+	wfState.Summary = strings.TrimSpace(req.Summary)
+	wfState.SummaryManual = true
+
+	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
+		return
+	}
+
+	workspaceName := filepath.Base(workspacePath)
+	s.publishGlobalAndWorkspace(workspaceName, workspacePath, sseEvent{
+		Type: "session:update",
+		Data: map[string]string{"workspace": workspaceName},
+	})
+
+	writeJSON(w, apiUpdateSummaryResponse{
+		Updated:   true,
+		Summary:   wfState.Summary,
+		Workspace: workspaceName,
 	})
 }
 

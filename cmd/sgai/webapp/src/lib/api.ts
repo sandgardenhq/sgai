@@ -39,6 +39,7 @@ import type {
   ApiOpenEditorResponse,
   ApiOpenOpencodeResponse,
   ApiDeleteForkResponse,
+  ApiUpdateSummaryResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -221,6 +222,11 @@ export const api = {
       fetchJSON<ApiDeleteForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/delete-fork`,
         { method: "POST", body: JSON.stringify({ forkDir, confirm: true }) },
+      ),
+    updateSummary: (name: string, summary: string) =>
+      fetchJSON<ApiUpdateSummaryResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/summary`,
+        { method: "PUT", body: JSON.stringify({ summary }) },
       ),
   },
 

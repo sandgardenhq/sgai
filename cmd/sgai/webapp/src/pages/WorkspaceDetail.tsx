@@ -1,7 +1,8 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -106,6 +107,132 @@ function TabNav({ workspaceName, activeTab, isRoot, hasForks }: TabNavProps) {
         ))}
       </ul>
     </nav>
+  );
+}
+
+interface InlineSummaryEditorProps {
+  workspaceName: string;
+  summary: string | undefined;
+  onSaved: (newSummary: string) => void;
+}
+
+function InlineSummaryEditor({ workspaceName, summary, onSaved }: InlineSummaryEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(summary ?? "");
+  const [isSaving, startSaveTransition] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(summary ?? "");
+    }
+  }, [summary, editing]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const handleStartEdit = useCallback(() => {
+    setDraft(summary ?? "");
+    setSaveError(null);
+    setEditing(true);
+  }, [summary]);
+
+  const handleCancel = useCallback(() => {
+    setEditing(false);
+    setDraft(summary ?? "");
+    setSaveError(null);
+  }, [summary]);
+
+  const handleSave = useCallback(() => {
+    const trimmed = draft.trim();
+    setSaveError(null);
+    startSaveTransition(async () => {
+      try {
+        await api.workspaces.updateSummary(workspaceName, trimmed);
+        onSaved(trimmed);
+        setEditing(false);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Failed to save summary");
+      }
+    });
+  }, [draft, workspaceName, onSaved]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleCancel();
+      }
+    },
+    [handleSave, handleCancel],
+  );
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 mt-1 max-w-lg">
+        <Input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter a summary..."
+          disabled={isSaving}
+          className="h-7 text-sm"
+          aria-label="Edit workspace summary"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="h-7 px-2 text-xs shrink-0"
+          aria-label="Save summary"
+        >
+          {isSaving ? "…" : "✓"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={isSaving}
+          className="h-7 px-2 text-xs shrink-0"
+          aria-label="Cancel editing"
+        >
+          ✕
+        </Button>
+        {saveError && (
+          <span className="text-xs text-destructive shrink-0" role="alert">{saveError}</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={handleStartEdit}
+          className="mt-1 text-sm text-muted-foreground truncate max-w-md cursor-pointer bg-transparent border-0 p-0 text-left hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          aria-label="Click to edit summary"
+        >
+          {summary ? summary : <span className="italic">No summary yet</span>}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        {summary ? summary : "Click to add a summary"}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -241,6 +368,10 @@ export function WorkspaceDetail(): JSX.Element | null {
     }
   }, [error, navigate]);
 
+  const handleSummarySaved = useCallback((newSummary: string) => {
+    setDetail((prev) => prev ? { ...prev, summary: newSummary, summaryManual: true } : prev);
+  }, []);
+
   if (loading && !detail) return <WorkspaceDetailSkeleton />;
 
   if (error) {
@@ -364,24 +495,31 @@ export function WorkspaceDetail(): JSX.Element | null {
   return (
     <div className="sticky-header-wrapper">
       <div className="sticky top-0 z-10 bg-background">
-        <header className="flex flex-wrap items-center gap-3 mb-3 pb-3 border-b">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h3 className="m-0 text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis flex-shrink min-w-0 max-w-fit">
-                {detail.isFork ? (
-                  <Link
-                    to={`/workspaces/${encodeURIComponent(detail.name)}/rename`}
-                    className="no-underline text-inherit"
-                  >
-                    {detail.name} ✏️
-                  </Link>
-                ) : (
-                  detail.name
-                )}
-              </h3>
-            </TooltipTrigger>
-            <TooltipContent>{detail.dir}</TooltipContent>
-          </Tooltip>
+        <header className="flex flex-wrap items-start gap-3 mb-3 pb-3 border-b">
+          <div className="flex-shrink min-w-0 max-w-fit">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h3 className="m-0 text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                  {detail.isFork ? (
+                    <Link
+                      to={`/workspaces/${encodeURIComponent(detail.name)}/rename`}
+                      className="no-underline text-inherit"
+                    >
+                      {detail.name} ✏️
+                    </Link>
+                  ) : (
+                    detail.name
+                  )}
+                </h3>
+              </TooltipTrigger>
+              <TooltipContent>{detail.dir}</TooltipContent>
+            </Tooltip>
+            <InlineSummaryEditor
+              workspaceName={workspaceName}
+              summary={detail.summary}
+              onSaved={handleSummarySaved}
+            />
+          </div>
 
           {!isForkedRoot && (
             <div className="flex items-center gap-2 shrink-0">

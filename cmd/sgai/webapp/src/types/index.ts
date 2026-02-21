@@ -44,6 +44,7 @@ export interface ApiWorkspaceEntry {
   isRoot: boolean;
   status: string;
   hasSgai: boolean;
+  summary?: string;
   forks?: ApiWorkspaceEntry[];
 }
 
@@ -62,6 +63,7 @@ export interface ApiWorkspaceForkSummary {
   dir: string;
   running: boolean;
   commitAhead: number;
+  summary?: string;
 }
 
 export interface SessionCost {
@@ -100,6 +102,8 @@ export interface ApiWorkspaceDetailResponse {
   latestProgress: string;
   agentSequence: ApiAgentSequenceEntry[];
   cost: SessionCost;
+  summary?: string;
+  summaryManual?: boolean;
   forks?: ApiWorkspaceForkSummary[];
 }
 
@@ -395,6 +399,7 @@ export interface ApiForkEntry {
   dir: string;
   running: boolean;
   commitAhead: number;
+  summary?: string;
   commits: ApiForkCommit[];
 }
 
@@ -503,6 +508,11 @@ export interface ApiRenameResponse {
   name: string;
   oldName: string;
   dir: string;
+}
+
+export interface ApiUpdateSummaryResponse {
+  updated: boolean;
+  workspace: string;
 }
 
 export interface ApiUpdateGoalRequest {

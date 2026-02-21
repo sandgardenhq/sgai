@@ -119,16 +119,28 @@ function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry
   return (
     <div className="border rounded-lg overflow-hidden">
       <div className="flex items-center gap-4 p-4 bg-muted/20">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="font-medium text-sm truncate max-w-[200px] cursor-help">
-              {fork.name}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{fork.name}</TooltipContent>
-        </Tooltip>
+        <div className="flex flex-col min-w-0 max-w-[300px]">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="font-medium text-sm truncate cursor-help">
+                {fork.name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{fork.name}</TooltipContent>
+          </Tooltip>
+          {fork.summary && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs text-muted-foreground truncate cursor-help">
+                  {fork.summary}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">{fork.summary}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
 
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground shrink-0">
           {fork.commitAhead} commits ahead
         </span>
 
