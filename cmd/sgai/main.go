@@ -62,6 +62,9 @@ func main() {
 	case "serve":
 		cmdServe(os.Args[2:])
 		return
+	case "slack-bot":
+		cmdSlackBot(os.Args[2:])
+		return
 	default:
 		cmdServe(os.Args[1:])
 		return
@@ -73,15 +76,27 @@ func printUsage() {
 
 Usage:
   sgai [--listen-addr addr]    Start web server (default)
+  sgai slack-bot [options]     Start Slack bot integration
 
 Options:
   --listen-addr   HTTP server listen address (default: 127.0.0.1:8080)
+
+Slack Bot Options:
+  --root-dir      Root directory for workspaces (defaults to CWD)
+  --listen-addr   Internal HTTP server listen address (default: 127.0.0.1:8080)
+
+Slack Bot Environment Variables:
+  SLACK_BOT_TOKEN      Bot User OAuth Token (xoxb-...)
+  SLACK_APP_TOKEN      App-Level Token for Socket Mode (xapp-...)
+  SLACK_ALLOWED_USERS  Comma-separated Slack user IDs (allowlist)
 
 Examples:
   sgai
       Start web UI on localhost:8080
   sgai --listen-addr 0.0.0.0:8080
-      Start web UI accessible externally`)
+      Start web UI accessible externally
+  sgai slack-bot --root-dir /path/to/workspaces
+      Start Slack bot integration`)
 }
 
 // runWorkflow executes the main workflow loop for a target directory.
