@@ -29,6 +29,7 @@ beforeEach(() => {
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
   resetDefaultSSEStore();
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -109,6 +110,9 @@ function mockForksAndWorkspaces() {
     }
     if (url.includes("/api/v1/models")) {
       return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+    }
+    if (url.includes("/adhoc")) {
+      return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
     }
     return Promise.resolve(new Response("{}"));
   });
@@ -191,6 +195,9 @@ describe("ForksTab", () => {
       if (url.includes("/api/v1/models")) {
         return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
       }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+      }
       return Promise.resolve(new Response("{}"));
     });
     renderForksTab();
@@ -214,13 +221,11 @@ describe("ForksTab", () => {
     renderForksTab();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      const calledUrls = mockFetch.mock.calls.map((call) => (call[0] as string));
+      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/forks"))).toBe(true);
+      expect(calledUrls.some((url) => url.endsWith("/api/v1/workspaces"))).toBe(true);
+      expect(calledUrls.some((url) => url.includes("/api/v1/models"))).toBe(true);
     });
-
-    const calledUrls = mockFetch.mock.calls.map((call) => (call[0] as string));
-    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/forks"))).toBe(true);
-    expect(calledUrls.some((url) => url.endsWith("/api/v1/workspaces"))).toBe(true);
-    expect(calledUrls.some((url) => url.includes("/api/v1/models"))).toBe(true);
   });
 
   it("renders run box with model selector after forks load", async () => {
@@ -255,6 +260,9 @@ describe("ForksTab", () => {
       }
       if (url.includes("/api/v1/models")) {
         return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
       }
       return Promise.resolve(new Response("{}"));
     });
