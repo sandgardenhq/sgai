@@ -286,7 +286,7 @@ func resetWorkflowForNextCycle(stateJSONPath string) {
 		return
 	}
 	wfState.Status = state.StatusWorking
-	wfState.InteractiveAutoLock = true
+	wfState.InteractionMode = state.ModeSelfDrive
 	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
 		log.Println("failed to reset workflow for next cycle:", errSave)
 	}
@@ -335,7 +335,7 @@ func setContinuousAutoMode(workspacePath string) {
 	if errLoad != nil {
 		return
 	}
-	wfState.InteractiveAutoLock = true
+	wfState.InteractionMode = state.ModeSelfDrive
 	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
 		log.Println("failed to set continuous auto mode:", errSave)
 	}

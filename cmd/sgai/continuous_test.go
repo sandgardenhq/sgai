@@ -484,8 +484,7 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 
 	stateJSONPath := filepath.Join(sgaiDir, "state.json")
 	wfState := state.Workflow{
-		Status:              state.StatusComplete,
-		InteractiveAutoLock: false,
+		Status: state.StatusComplete,
 	}
 	if err := state.Save(stateJSONPath, wfState); err != nil {
 		t.Fatal(err)
@@ -501,8 +500,8 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	if loaded.Status != state.StatusWorking {
 		t.Errorf("expected status 'working', got %q", loaded.Status)
 	}
-	if !loaded.InteractiveAutoLock {
-		t.Error("expected interactiveAutoLock to be true")
+	if loaded.InteractionMode != state.ModeSelfDrive {
+		t.Errorf("expected interactionMode %q, got %q", state.ModeSelfDrive, loaded.InteractionMode)
 	}
 }
 

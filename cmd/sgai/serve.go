@@ -115,14 +115,13 @@ func stripFrontmatter(content string) string {
 }
 
 type session struct {
-	mu              sync.Mutex
-	cmd             *exec.Cmd
-	cancel          context.CancelFunc
-	running         bool
-	interactiveAuto bool
-	outputLog       *circularLogBuffer
-	mcpCloseOnce    sync.Once
-	mcpCloseFn      func()
+	mu           sync.Mutex
+	cmd          *exec.Cmd
+	cancel       context.CancelFunc
+	running      bool
+	outputLog    *circularLogBuffer
+	mcpCloseOnce sync.Once
+	mcpCloseFn   func()
 }
 
 type editorOpener interface {
@@ -394,7 +393,7 @@ type startSessionResult struct {
 	startError     error
 }
 
-func (s *Server) startSession(workspacePath string, autoMode bool) startSessionResult {
+func (s *Server) startSession(workspacePath string) startSessionResult {
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
 	if sess != nil && sess.running {
@@ -402,7 +401,7 @@ func (s *Server) startSession(workspacePath string, autoMode bool) startSessionR
 		return startSessionResult{alreadyRunning: true, sess: sess}
 	}
 
-	sess = &session{running: true, interactiveAuto: autoMode, outputLog: newCircularLogBuffer()}
+	sess = &session{running: true, outputLog: newCircularLogBuffer()}
 	s.sessions[workspacePath] = sess
 	s.everStartedDirs[workspacePath] = true
 	s.mu.Unlock()

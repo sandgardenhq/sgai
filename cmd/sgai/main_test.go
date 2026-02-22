@@ -185,20 +185,34 @@ No frontmatter here.
 	})
 }
 
-func TestApplyWorkGateApproval(t *testing.T) {
-	t.Run("locksAutoModeAfterApproval", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		statePath := filepath.Join(tmpDir, "state.json")
-		wf := state.Workflow{WorkGateApproved: true}
+func TestWorkGateTransitionsToBuildingMode(t *testing.T) {
+	t.Run("brainstormingTransitionsToBuilding", func(t *testing.T) {
+		wf := state.Workflow{InteractionMode: state.ModeBrainstorming}
 
-		if shouldContinue := applyWorkGateApproval(&wf, statePath, "sgai"); shouldContinue {
-			t.Fatal("applyWorkGateApproval should not request loop continue on successful save")
+		if wf.InteractionMode == state.ModeBrainstorming {
+			wf.InteractionMode = state.ModeBuilding
 		}
-		if !wf.InteractiveAutoLock {
-			t.Fatal("interactive auto lock should be enabled")
+
+		if wf.InteractionMode != state.ModeBuilding {
+			t.Fatalf("InteractionMode should be %q, got %q", state.ModeBuilding, wf.InteractionMode)
 		}
-		if wf.WorkGateApproved {
-			t.Fatal("work gate approved flag should be cleared")
+		if !wf.IsAutoMode() {
+			t.Fatal("building mode should be auto mode")
+		}
+		if wf.ToolsAllowed() {
+			t.Fatal("building mode should not allow tools")
+		}
+	})
+
+	t.Run("selfDriveDoesNotTransition", func(t *testing.T) {
+		wf := state.Workflow{InteractionMode: state.ModeSelfDrive}
+
+		if wf.InteractionMode == state.ModeBrainstorming {
+			wf.InteractionMode = state.ModeBuilding
+		}
+
+		if wf.InteractionMode != state.ModeSelfDrive {
+			t.Fatalf("InteractionMode should remain %q, got %q", state.ModeSelfDrive, wf.InteractionMode)
 		}
 	})
 }
@@ -730,14 +744,13 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 	})
 }
 
-func TestStartedInteractivePreservedOnInit(t *testing.T) {
+func TestInteractionModePreservedOnInit(t *testing.T) {
 	t.Run("preservedWhenNotResuming", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		original := state.Workflow{
-			StartedInteractive:  true,
-			InteractiveAutoLock: true,
+			InteractionMode: state.ModeBuilding,
 		}
 		if errSave := state.Save(stPath, original); errSave != nil {
 			t.Fatal(errSave)
@@ -748,33 +761,27 @@ func TestStartedInteractivePreservedOnInit(t *testing.T) {
 			t.Fatal(errLoad)
 		}
 
-		preservedAutoLock := loaded.InteractiveAutoLock
-		preservedStartedInteractive := loaded.StartedInteractive
+		preservedMode := loaded.InteractionMode
 
 		newState := state.Workflow{
-			Status:              state.StatusWorking,
-			InteractiveAutoLock: preservedAutoLock,
-			StartedInteractive:  preservedStartedInteractive,
+			Status:          state.StatusWorking,
+			InteractionMode: preservedMode,
 		}
 
-		if !newState.StartedInteractive {
-			t.Error("StartedInteractive should be preserved during reinitialization")
-		}
-		if !newState.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should be preserved during reinitialization")
+		if newState.InteractionMode != state.ModeBuilding {
+			t.Errorf("InteractionMode should be preserved during reinitialization, got %q", newState.InteractionMode)
 		}
 	})
 }
 
 func TestUnlockInteractiveForRetrospective(t *testing.T) {
-	t.Run("interactiveModeUnlocksForRetrospective", func(t *testing.T) {
+	t.Run("buildingTransitionsToRetrospective", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		wf := state.Workflow{
-			StartedInteractive:  true,
-			InteractiveAutoLock: true,
-			Status:              state.StatusWorking,
+			InteractionMode: state.ModeBuilding,
+			Status:          state.StatusWorking,
 		}
 		if errSave := state.Save(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
@@ -782,27 +789,26 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 
 		unlockInteractiveForRetrospective(&wf, "retrospective", stPath, "test")
 
-		if wf.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should be false after retrospective unlock")
+		if wf.InteractionMode != state.ModeRetrospective {
+			t.Errorf("InteractionMode should be %q after retrospective unlock, got %q", state.ModeRetrospective, wf.InteractionMode)
 		}
 
 		loaded, errLoad := state.Load(stPath)
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
-		if loaded.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should be false on disk after retrospective unlock")
+		if loaded.InteractionMode != state.ModeRetrospective {
+			t.Errorf("InteractionMode should be %q on disk after retrospective unlock, got %q", state.ModeRetrospective, loaded.InteractionMode)
 		}
 	})
 
-	t.Run("selfDriveModeStaysLocked", func(t *testing.T) {
+	t.Run("selfDriveStaysSelfDrive", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		wf := state.Workflow{
-			StartedInteractive:  false,
-			InteractiveAutoLock: true,
-			Status:              state.StatusWorking,
+			InteractionMode: state.ModeSelfDrive,
+			Status:          state.StatusWorking,
 		}
 		if errSave := state.Save(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
@@ -810,19 +816,18 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 
 		unlockInteractiveForRetrospective(&wf, "retrospective", stPath, "test")
 
-		if !wf.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should stay true in self-drive mode")
+		if wf.InteractionMode != state.ModeSelfDrive {
+			t.Errorf("InteractionMode should stay %q in self-drive mode, got %q", state.ModeSelfDrive, wf.InteractionMode)
 		}
 	})
 
-	t.Run("nonRetrospectiveAgentStaysLocked", func(t *testing.T) {
+	t.Run("nonRetrospectiveAgentNoTransition", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		wf := state.Workflow{
-			StartedInteractive:  true,
-			InteractiveAutoLock: true,
-			Status:              state.StatusWorking,
+			InteractionMode: state.ModeBuilding,
+			Status:          state.StatusWorking,
 		}
 		if errSave := state.Save(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
@@ -830,21 +835,20 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 
 		unlockInteractiveForRetrospective(&wf, "coordinator", stPath, "test")
 
-		if !wf.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should stay true for non-retrospective agents")
+		if wf.InteractionMode != state.ModeBuilding {
+			t.Errorf("InteractionMode should stay %q for non-retrospective agents, got %q", state.ModeBuilding, wf.InteractionMode)
 		}
 	})
 }
 
-func TestStartedInteractiveRoundTrip(t *testing.T) {
+func TestInteractionModeRoundTrip(t *testing.T) {
 	t.Run("savedAndLoadedCorrectly", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		wf := state.Workflow{
-			StartedInteractive:  true,
-			InteractiveAutoLock: true,
-			Status:              state.StatusWorking,
+			InteractionMode: state.ModeBuilding,
+			Status:          state.StatusWorking,
 		}
 		if errSave := state.Save(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
@@ -854,21 +858,18 @@ func TestStartedInteractiveRoundTrip(t *testing.T) {
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
-		if !loaded.StartedInteractive {
-			t.Error("StartedInteractive should be true after round-trip")
-		}
-		if !loaded.InteractiveAutoLock {
-			t.Error("InteractiveAutoLock should be true after round-trip")
+		if loaded.InteractionMode != state.ModeBuilding {
+			t.Errorf("InteractionMode should be %q after round-trip, got %q", state.ModeBuilding, loaded.InteractionMode)
 		}
 	})
 
-	t.Run("falseOmittedFromJSON", func(t *testing.T) {
+	t.Run("emptyOmittedFromJSON", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
 		wf := state.Workflow{
-			StartedInteractive: false,
-			Status:             state.StatusWorking,
+			InteractionMode: "",
+			Status:          state.StatusWorking,
 		}
 		if errSave := state.Save(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
@@ -878,8 +879,8 @@ func TestStartedInteractiveRoundTrip(t *testing.T) {
 		if errRead != nil {
 			t.Fatal(errRead)
 		}
-		if strings.Contains(string(data), "startedInteractive") {
-			t.Error("startedInteractive should be omitted when false (omitempty)")
+		if strings.Contains(string(data), "interactionMode") {
+			t.Error("interactionMode should be omitted when empty (omitempty)")
 		}
 	})
 }

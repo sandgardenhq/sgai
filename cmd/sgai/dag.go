@@ -47,6 +47,19 @@ Successors (can pass work to): %SUCCESSORS%
 
 ABSOLUTELY CRITICAL: always USE SKILLS WHEN ONE SKILL IS AVAILABLE, DIG THE SKILL CONTENT TO BE SURE IT IS APPLICABLE. Use skills({"name":"skill-name"}) to get the skill content, or use skills({"name":"keywords"}) to find skills by tags.`
 
+const flowSectionSelfDriveMode = `# SELF-DRIVE MODE ACTIVE
+You are running in Self-Drive mode. This means:
+- NO human interaction is allowed at any point
+- The ask_user_question and ask_user_work_gate tools DO NOT EXIST
+- Skip the BRAINSTORMING step entirely - go directly to work
+- Skip the WORK-GATE step entirely - it is implicitly approved
+- If your instructions say to brainstorm or ask for approval, SKIP those steps completely
+`
+
+const flowSectionSelfDriveModeCoordinator = `- Your master plan starts at reading GOAL.md, then immediately delegate work to specialized agents
+- Proceed directly: read GOAL.md → create PROJECT_MANAGEMENT.md → delegate to agents → verify → complete
+`
+
 const flowSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`
 
 const flowSectionPostSkillsNonCoordinator = `IMPORTANT: If you need human clarification, send a message to coordinator: sgai_send_message({toAgent: "coordinator", body: "QUESTION: <your question>"}). The coordinator will handle human communication.`
@@ -462,7 +475,12 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 		msg += snippetNudge
 	}
 
-	if !selfDrive {
+	if selfDrive {
+		msg += "\n\n" + flowSectionSelfDriveMode
+		if currentAgent == "coordinator" {
+			msg += flowSectionSelfDriveModeCoordinator
+		}
+	} else {
 		msg += "\n\nCRITICAL: think hard and ASK ME QUESTIONS BEFORE BUILDING\n"
 	}
 

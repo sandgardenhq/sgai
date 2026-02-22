@@ -16,6 +16,14 @@ const (
 	StatusWaitingForHuman = "waiting-for-human"
 )
 
+// InteractionMode constants define the possible interaction modes of a sgai session.
+const (
+	ModeSelfDrive     = "self-drive"
+	ModeBrainstorming = "brainstorming"
+	ModeBuilding      = "building"
+	ModeRetrospective = "retrospective"
+)
+
 // IsHumanPending reports whether the given status indicates the workflow
 // is waiting for a human response.
 func IsHumanPending(status string) bool {
@@ -136,9 +144,7 @@ type Workflow struct {
 
 	Cost SessionCost `json:"cost"`
 
-	WorkGateApproved    bool `json:"workGateApproved,omitempty"`
-	InteractiveAutoLock bool `json:"interactiveAutoLock,omitempty"`
-	StartedInteractive  bool `json:"startedInteractive,omitempty"`
+	InteractionMode string `json:"interactionMode,omitempty"`
 
 	// ModelStatuses tracks per-model status in multi-model agents.
 	// Key is model ID (agent:modelSpec), value is "model-working", "model-done", or "model-error".
@@ -148,6 +154,18 @@ type Workflow struct {
 	// CurrentModel tracks the currently executing model in multi-model agents.
 	// Format is "agentName:modelSpec".
 	CurrentModel string `json:"currentModel,omitempty"`
+}
+
+// ToolsAllowed reports whether the current interaction mode permits
+// human-interaction tools (ask_user_question, ask_user_work_gate).
+func (w Workflow) ToolsAllowed() bool {
+	return w.InteractionMode == ModeBrainstorming || w.InteractionMode == ModeRetrospective
+}
+
+// IsAutoMode reports whether the current interaction mode runs without
+// human interaction (self-drive or building).
+func (w Workflow) IsAutoMode() bool {
+	return w.InteractionMode == ModeSelfDrive || w.InteractionMode == ModeBuilding
 }
 
 // Message represents an inter-agent message in the workflow system.

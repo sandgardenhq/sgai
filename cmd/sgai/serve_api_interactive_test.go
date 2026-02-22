@@ -11,8 +11,8 @@ import (
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
-func TestSelfDrivePersistsInteractiveAutoLock(t *testing.T) {
-	t.Run("toggleOnSetsLock", func(t *testing.T) {
+func TestSelfDriveSetsInteractionMode(t *testing.T) {
+	t.Run("selfDriveSetsMode", func(t *testing.T) {
 		rootDir := t.TempDir()
 		workspace := filepath.Join(rootDir, "test-project")
 		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -25,8 +25,7 @@ func TestSelfDrivePersistsInteractiveAutoLock(t *testing.T) {
 			t.Fatal(errLoad)
 		}
 
-		newAutoMode := true
-		wfState.InteractiveAutoLock = newAutoMode
+		wfState.InteractionMode = state.ModeSelfDrive
 		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
@@ -35,12 +34,12 @@ func TestSelfDrivePersistsInteractiveAutoLock(t *testing.T) {
 		if errReload != nil {
 			t.Fatal(errReload)
 		}
-		if !loaded.InteractiveAutoLock {
-			t.Fatal("InteractiveAutoLock should be true after self-drive toggle on")
+		if loaded.InteractionMode != state.ModeSelfDrive {
+			t.Fatalf("InteractionMode should be %q after self-drive, got %q", state.ModeSelfDrive, loaded.InteractionMode)
 		}
 	})
 
-	t.Run("lockPreventsTurnOff", func(t *testing.T) {
+	t.Run("selfDriveSticky", func(t *testing.T) {
 		rootDir := t.TempDir()
 		workspace := filepath.Join(rootDir, "test-project")
 		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -48,28 +47,25 @@ func TestSelfDrivePersistsInteractiveAutoLock(t *testing.T) {
 		}
 		createsgaiDir(t, workspace)
 
-		if errSave := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSave != nil {
+		if errSave := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSave != nil {
 			t.Fatal(errSave)
 		}
 
-		wfState, errLoad := state.Load(statePath(workspace))
+		loaded, errLoad := state.Load(statePath(workspace))
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
 
-		wasAuto := true
-		newAutoMode := !wasAuto
-		if wfState.InteractiveAutoLock {
-			newAutoMode = true
+		if !loaded.IsAutoMode() {
+			t.Fatal("self-drive mode should be auto mode")
 		}
-
-		if !newAutoMode {
-			t.Fatal("newAutoMode should stay true when InteractiveAutoLock is already set")
+		if loaded.ToolsAllowed() {
+			t.Fatal("self-drive mode should not allow tools")
 		}
 	})
 }
 
-func TestBuildWorkspaceDetailUsesWorkflowAutoLock(t *testing.T) {
+func TestBuildWorkspaceDetailUsesInteractionMode(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -77,18 +73,18 @@ func TestBuildWorkspaceDetailUsesWorkflowAutoLock(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSaveState != nil {
+	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
 		t.Fatal(errSaveState)
 	}
 
 	srv := NewServer(rootDir)
 	detail := srv.buildWorkspaceDetail(workspace)
 	if !detail.InteractiveAuto {
-		t.Fatal("workspace detail should report interactive auto when workflow lock is enabled")
+		t.Fatal("workspace detail should report interactive auto when mode is self-drive")
 	}
 }
 
-func TestStartAPIClearsStaleInteractiveAutoLock(t *testing.T) {
+func TestStartAPISetsModeBrainstorming(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -96,7 +92,7 @@ func TestStartAPIClearsStaleInteractiveAutoLock(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSave := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSave != nil {
+	if errSave := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSave != nil {
 		t.Fatal(errSave)
 	}
 
@@ -105,30 +101,27 @@ func TestStartAPIClearsStaleInteractiveAutoLock(t *testing.T) {
 		t.Fatal(errLoad)
 	}
 
-	wfState.InteractiveAutoLock = false
-	wfState.StartedInteractive = true
+	wfState.InteractionMode = state.ModeBrainstorming
 	if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
 		t.Fatal(errSave)
 	}
-
-	effectiveAuto := wfState.InteractiveAutoLock
 
 	loaded, errReload := state.Load(statePath(workspace))
 	if errReload != nil {
 		t.Fatal(errReload)
 	}
-	if loaded.InteractiveAutoLock {
-		t.Fatal("InteractiveAutoLock should be false after interactive start cleared it")
+	if loaded.InteractionMode != state.ModeBrainstorming {
+		t.Fatalf("InteractionMode should be %q after interactive start, got %q", state.ModeBrainstorming, loaded.InteractionMode)
 	}
-	if !loaded.StartedInteractive {
-		t.Fatal("StartedInteractive should be true after interactive start")
+	if loaded.IsAutoMode() {
+		t.Fatal("brainstorming mode should not be auto mode")
 	}
-	if effectiveAuto {
-		t.Fatal("effective auto mode should be false when interactive start clears the lock")
+	if !loaded.ToolsAllowed() {
+		t.Fatal("brainstorming mode should allow tools")
 	}
 }
 
-func TestHandleAPIWorkspaceSessionUsesWorkflowAutoLock(t *testing.T) {
+func TestHandleAPIWorkspaceSessionUsesInteractionMode(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -136,7 +129,7 @@ func TestHandleAPIWorkspaceSessionUsesWorkflowAutoLock(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractiveAutoLock: true}); errSaveState != nil {
+	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
 		t.Fatal(errSaveState)
 	}
 
@@ -155,6 +148,6 @@ func TestHandleAPIWorkspaceSessionUsesWorkflowAutoLock(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", errDecode)
 	}
 	if !got.InteractiveAuto {
-		t.Fatal("session response should report interactive auto when workflow lock is enabled")
+		t.Fatal("session response should report interactive auto when mode is self-drive")
 	}
 }
