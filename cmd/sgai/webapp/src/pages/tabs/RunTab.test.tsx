@@ -3,6 +3,7 @@ import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router";
 import { RunTab } from "./RunTab";
 import { resetDefaultSSEStore } from "@/lib/sse-store";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiModelsResponse } from "@/types";
 
 class MockEventSource {
@@ -24,6 +25,7 @@ beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -44,10 +46,38 @@ const modelsResponseWithDefault: ApiModelsResponse = {
   defaultModel: "anthropic/claude-opus-4-6",
 };
 
+function mockModelsAndStatus() {
+  return mockFetch.mockImplementation((input: string | URL | Request) => {
+    const url = input.toString();
+    if (url.includes("/api/v1/models")) {
+      return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+    }
+    if (url.includes("/api/v1/workspaces/test-project/adhoc")) {
+      return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+    }
+    return Promise.resolve(new Response("{}"));
+  });
+}
+
+function mockModelsWithDefaultAndStatus() {
+  return mockFetch.mockImplementation((input: string | URL | Request) => {
+    const url = input.toString();
+    if (url.includes("/api/v1/models")) {
+      return Promise.resolve(new Response(JSON.stringify(modelsResponseWithDefault)));
+    }
+    if (url.includes("/api/v1/workspaces/test-project/adhoc")) {
+      return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+    }
+    return Promise.resolve(new Response("{}"));
+  });
+}
+
 function renderRunTab() {
   return render(
     <MemoryRouter>
-      <RunTab workspaceName="test-project" />
+      <TooltipProvider>
+        <RunTab workspaceName="test-project" />
+      </TooltipProvider>
     </MemoryRouter>,
   );
 }
@@ -61,7 +91,7 @@ describe("RunTab", () => {
   });
 
   it("renders ad-hoc form when models load", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(modelsResponse)));
+    mockModelsAndStatus();
     renderRunTab();
 
     await waitFor(() => {
@@ -72,22 +102,20 @@ describe("RunTab", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDefined();
   });
 
-  it("places model selector and prompt textarea side-by-side in a grid layout", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(modelsResponse)));
+  it("places model selector and prompt textarea in a vertical layout", async () => {
+    mockModelsAndStatus();
     renderRunTab();
 
     const modelSelect = await screen.findByRole("combobox", { name: "Model" });
     const promptTextarea = screen.getByRole("textbox", { name: "Prompt" });
 
-    const grid = modelSelect.closest(".grid-cols-\\[200px_1fr\\]");
-    expect(grid).toBeTruthy();
-    expect(grid?.contains(promptTextarea)).toBe(true);
+    const verticalContainer = modelSelect.closest(".flex.flex-col");
+    expect(verticalContainer).toBeTruthy();
+    expect(verticalContainer?.contains(promptTextarea)).toBe(true);
   });
 
   it("selects the default model when provided", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(modelsResponseWithDefault)),
-    );
+    mockModelsWithDefaultAndStatus();
     renderRunTab();
 
     const modelSelect = await screen.findByRole("combobox", { name: "Model" });
@@ -108,15 +136,13 @@ describe("RunTab", () => {
   });
 
   it("calls models API on mount", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(modelsResponse)));
+    mockModelsAndStatus();
     renderRunTab();
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const calledUrls = mockFetch.mock.calls.map((call) => (call[0] as string));
+      expect(calledUrls.some((url) => url.includes("/api/v1/models?workspace=test-project"))).toBe(true);
     });
-
-    const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain("/api/v1/models?workspace=test-project");
   });
 
   it("runs adhoc prompt and renders output inline", async () => {
@@ -152,5 +178,58 @@ describe("RunTab", () => {
       (call[0] as string).includes("/api/v1/workspaces/test-project/adhoc"),
     );
     expect(adhocCalls.length).toBeGreaterThan(0);
+  });
+
+  it("persists prompt to localStorage on change", async () => {
+    mockModelsAndStatus();
+    renderRunTab();
+
+    const promptInput = await screen.findByRole("textbox", { name: "Prompt" });
+    fireEvent.change(promptInput, { target: { value: "my saved prompt" } });
+
+    await waitFor(() => {
+      const stored = window.localStorage.getItem("adhoc-prompt-test-project");
+      expect(stored).toBe(JSON.stringify("my saved prompt"));
+    });
+  });
+
+  it("restores prompt from localStorage on mount", async () => {
+    window.localStorage.setItem("adhoc-prompt-test-project", JSON.stringify("restored prompt"));
+    mockModelsAndStatus();
+    renderRunTab();
+
+    const promptInput = await screen.findByRole("textbox", { name: "Prompt" });
+    expect((promptInput as HTMLTextAreaElement).value).toBe("restored prompt");
+  });
+
+  it("saves prompt to history after running", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/api/v1/models")) {
+        return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+      }
+      if (url.includes("/api/v1/workspaces/test-project/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ output: "done", running: false })));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+    renderRunTab();
+
+    const modelSelect = await screen.findByRole("combobox", { name: "Model" });
+    fireEvent.change(modelSelect, { target: { value: "anthropic/claude-opus-4-6" } });
+
+    const promptInput = screen.getByRole("textbox", { name: "Prompt" });
+    fireEvent.change(promptInput, { target: { value: "history test prompt" } });
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    await waitFor(() => {
+      expect(submitButton.hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      const history = JSON.parse(window.localStorage.getItem("adhoc-history-test-project") ?? "[]");
+      expect(history).toContain("history test prompt");
+    });
   });
 });

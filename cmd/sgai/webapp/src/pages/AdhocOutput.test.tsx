@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach, spyOn } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach, spyOn } from "bun:test";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { AdhocOutput } from "./AdhocOutput";
@@ -20,29 +20,48 @@ function renderPage(workspace = "test-ws", entry?: string) {
 describe("AdhocOutput", () => {
   let fetchSpy: ReturnType<typeof spyOn>;
 
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   afterEach(() => { cleanup(); fetchSpy?.mockRestore(); });
 
   test("renders page heading", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage();
     expect(screen.getByText("Ad-hoc Prompt")).toBeTruthy();
   });
 
   test("renders workspace name in description", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage("my-project");
     expect(screen.getByText("my-project")).toBeTruthy();
   });
 
   test("renders model input", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage();
     expect(screen.getByLabelText("Model")).toBeTruthy();
   });
 
   test("renders prompt textarea", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage();
     expect(screen.getByLabelText("Prompt")).toBeTruthy();
   });
 
   test("renders back link", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage("test-ws");
     expect(screen.getByText("Back to test-ws")).toBeTruthy();
   });
@@ -66,12 +85,18 @@ describe("AdhocOutput", () => {
   });
 
   test("disables execute button when fields are empty", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage();
     const button = screen.getByText("Execute Prompt").closest("button");
     expect(button?.disabled).toBe(true);
   });
 
   test("enables button when both fields have values", async () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
     renderPage();
     const modelInput = screen.getByLabelText("Model");
     const promptInput = screen.getByLabelText("Prompt");
@@ -86,15 +111,29 @@ describe("AdhocOutput", () => {
   });
 
   test("shows running state during execution (R-18)", async () => {
-    fetchSpy = spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-      Promise.resolve(
-        new Response(JSON.stringify({ running: true, output: "", message: "ad-hoc prompt started" }), {
+    let callCount = 0;
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
+      callCount++;
+      // First call is the adhocStatus GET on mount — return not running
+      // Subsequent POST call is the actual run
+      if (init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ running: true, output: "", message: "ad-hoc prompt started" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ running: false, output: "", message: "" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
-      ),
-    );
+      );
+    });
     renderPage();
+
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
     const modelInput = screen.getByLabelText("Model");
     const promptInput = screen.getByLabelText("Prompt");
@@ -130,5 +169,19 @@ describe("AdhocOutput", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
     expect(screen.getByText("prompt and model are required")).toBeTruthy();
+  });
+
+  test("uses vertical layout for model and prompt", () => {
+    fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    );
+    renderPage();
+
+    const modelInput = screen.getByLabelText("Model");
+    const promptInput = screen.getByLabelText("Prompt");
+
+    const verticalContainer = modelInput.closest(".flex.flex-col");
+    expect(verticalContainer).toBeTruthy();
+    expect(verticalContainer?.contains(promptInput)).toBe(true);
   });
 });

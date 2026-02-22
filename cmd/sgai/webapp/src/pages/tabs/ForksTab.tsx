@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useTransition, type MouseEvent } from "react";
+import { useState, useEffect, useRef, useTransition, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { api, ApiError } from "@/lib/api";
+import { PromptHistory } from "@/components/PromptHistory";
+import { api } from "@/lib/api";
 import { useSSEEvent } from "@/hooks/useSSE";
-import type { ApiForksResponse, ApiForkEntry, ApiForkCommit, ApiModelsResponse } from "@/types";
+import { useAdhocRun } from "@/hooks/useAdhocRun";
+import type { ApiForksResponse, ApiForkEntry, ApiForkCommit } from "@/types";
 
 interface ForksTabProps {
   workspaceName: string;
@@ -196,155 +198,25 @@ function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry
 }
 
 function InlineRunBox({ workspaceName }: { workspaceName: string }) {
-  const [models, setModels] = useState<ApiModelsResponse | null>(null);
-  const [modelsError, setModelsError] = useState<Error | null>(null);
-  const [modelsLoading, setModelsLoading] = useState(true);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [output, setOutput] = useState("");
-  const [runError, setRunError] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const outputRef = useRef<HTMLPreElement>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [output]);
-
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setModels(null);
-    setSelectedModel("");
-    setPrompt("");
-    setOutput("");
-    setRunError(null);
-    setIsRunning(false);
-    stopPolling();
-    setModelsLoading(true);
-    setModelsError(null);
-
-    api.models
-      .list(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setModels(response);
-          setModelsLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setModelsError(err instanceof Error ? err : new Error(String(err)));
-          setModelsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, stopPolling]);
-
-  useEffect(() => {
-    if (!models || selectedModel) return;
-
-    const fallbackModel = models.defaultModel;
-    if (fallbackModel && models?.models?.some((model) => model.id === fallbackModel)) {
-      setSelectedModel(fallbackModel);
-    }
-  }, [models, selectedModel]);
-
-  const runAdhoc = useCallback(
-    async (promptValue: string, modelValue: string) => {
-      const trimmedPrompt = promptValue.trim();
-      const trimmedModel = modelValue.trim();
-      if (!workspaceName || isRunning || !trimmedPrompt || !trimmedModel) return;
-
-      stopPolling();
-      setIsRunning(true);
-      setRunError(null);
-      setOutput("");
-
-      try {
-        const result = await api.workspaces.adhoc(workspaceName, trimmedPrompt, trimmedModel);
-        if (result.output) {
-          setOutput(result.output);
-        }
-        if (!result.running) {
-          setIsRunning(false);
-          return;
-        }
-
-        pollTimerRef.current = setInterval(async () => {
-          try {
-            const poll = await api.workspaces.adhocStatus(workspaceName);
-            if (poll.output) {
-              setOutput(poll.output);
-            }
-            if (!poll.running) {
-              stopPolling();
-              setIsRunning(false);
-            }
-          } catch {
-            stopPolling();
-            setIsRunning(false);
-          }
-        }, 2000);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setRunError(err.message);
-        } else {
-          setRunError("Failed to execute ad-hoc prompt");
-        }
-        setIsRunning(false);
-      }
-    },
-    [workspaceName, isRunning, stopPolling],
-  );
-
-  const handleStop = useCallback(async () => {
-    if (!workspaceName || !isRunning) return;
-
-    try {
-      await api.workspaces.adhocStop(workspaceName);
-      stopPolling();
-      setIsRunning(false);
-      setOutput((prev) => (prev ? prev + "\n\nStopped." : "Stopped."));
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setRunError(err.message);
-      } else {
-        setRunError("Failed to stop ad-hoc prompt");
-      }
-    }
-  }, [workspaceName, isRunning, stopPolling]);
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmedPrompt = prompt.trim();
-    if (!workspaceName || !selectedModel || !trimmedPrompt) return;
-    runAdhoc(trimmedPrompt, selectedModel);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
+  const {
+    models,
+    modelsLoading,
+    modelsError,
+    selectedModel,
+    setSelectedModel,
+    prompt,
+    setPrompt,
+    output,
+    isRunning,
+    runError,
+    handleSubmit,
+    handleKeyDown,
+    stopRun,
+    outputRef,
+    promptHistory,
+    selectFromHistory,
+    clearHistory,
+  } = useAdhocRun({ workspaceName });
 
   if (modelsLoading && !models) {
     return (
@@ -376,7 +248,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-[200px_1fr] gap-4">
+        <div className="flex flex-col gap-4">
           <div className="space-y-2">
             <Label htmlFor="forks-adhoc-model">Model</Label>
             <Select
@@ -398,7 +270,15 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="forks-adhoc-prompt">Prompt</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="forks-adhoc-prompt">Prompt</Label>
+              <PromptHistory
+                history={promptHistory}
+                onSelect={selectFromHistory}
+                onClear={clearHistory}
+                disabled={isRunning}
+              />
+            </div>
             <Textarea
               id="forks-adhoc-prompt"
               value={prompt}
@@ -417,7 +297,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
             <Button
               type="button"
               variant="destructive"
-              onClick={handleStop}
+              onClick={stopRun}
             >
               <Square className="mr-2 h-4 w-4" />
               Stop
