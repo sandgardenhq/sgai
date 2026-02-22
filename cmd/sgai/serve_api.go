@@ -800,7 +800,7 @@ func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request
 func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailResponse {
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.InteractiveAutoLock
+	interactiveAuto := wfState.IsAutoMode()
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -808,7 +808,6 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 	if sess != nil {
 		sess.mu.Lock()
 		running = sess.running
-		interactiveAuto = interactiveAuto || sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -1041,7 +1040,7 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.InteractiveAutoLock
+	interactiveAuto := wfState.IsAutoMode()
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -1049,7 +1048,6 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 	if sess != nil {
 		sess.mu.Lock()
 		running = sess.running
-		interactiveAuto = interactiveAuto || sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -1626,18 +1624,17 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !req.Auto {
-		wfState.InteractiveAutoLock = false
-		wfState.StartedInteractive = true
-		if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
-			http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
-			return
-		}
+	if req.Auto {
+		wfState.InteractionMode = state.ModeSelfDrive
+	} else {
+		wfState.InteractionMode = state.ModeBrainstorming
+	}
+	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
+		return
 	}
 
-	req.Auto = wfState.InteractiveAutoLock || req.Auto
-
-	result := s.startSession(workspacePath, req.Auto)
+	result := s.startSession(workspacePath)
 
 	if result.alreadyRunning {
 		writeJSON(w, apiSessionActionResponse{
@@ -2577,11 +2574,10 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 	sess := s.sessions[workspacePath]
 	s.mu.Unlock()
 
-	var wasRunning, wasAuto bool
+	var wasRunning bool
 	if sess != nil {
 		sess.mu.Lock()
 		wasRunning = sess.running
-		wasAuto = sess.interactiveAuto
 		sess.mu.Unlock()
 	}
 
@@ -2604,19 +2600,13 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	newAutoMode := !wasAuto
-	if wfState.InteractiveAutoLock {
-		newAutoMode = true
-	}
-
-	wfState.InteractiveAutoLock = newAutoMode
-	wfState.StartedInteractive = false
+	wfState.InteractionMode = state.ModeSelfDrive
 	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
 		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
 		return
 	}
 
-	result := s.startSession(workspacePath, newAutoMode)
+	result := s.startSession(workspacePath)
 	if result.startError != nil {
 		http.Error(w, result.startError.Error(), http.StatusInternalServerError)
 		return
@@ -2628,8 +2618,8 @@ func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, apiSelfDriveResponse{
 		Running:  true,
-		AutoMode: newAutoMode,
-		Message:  "self-drive mode toggled",
+		AutoMode: true,
+		Message:  "self-drive mode activated",
 	})
 }
 
@@ -2752,13 +2742,7 @@ func (s *Server) handleAPIOpenInOpenCode(w http.ResponseWriter, r *http.Request)
 	}
 
 	interactive := "yes"
-	autoMode := wfState.InteractiveAutoLock
-	if sess != nil {
-		sess.mu.Lock()
-		autoMode = autoMode || sess.interactiveAuto
-		sess.mu.Unlock()
-	}
-	if autoMode {
+	if wfState.IsAutoMode() {
 		interactive = "auto"
 	}
 

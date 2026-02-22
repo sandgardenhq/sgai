@@ -709,6 +709,76 @@ func TestComposeFlowTemplateSharedSections(t *testing.T) {
 	}
 }
 
+func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
+	dotContent := `digraph workflow {
+		coordinator -> planner
+		planner -> coder
+	}`
+
+	d, err := parseFlow(dotContent, "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	visits := map[string]int{"coordinator": 1, "planner": 0, "coder": 0, "project-critic-council": 0}
+	dir := t.TempDir()
+
+	t.Run("selfDriveIncludesSelfDriveInstructions", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, true)
+		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("self-drive message should contain SELF-DRIVE MODE ACTIVE")
+		}
+		if !strings.Contains(msg, "ask_user_question and ask_user_work_gate tools DO NOT EXIST") {
+			t.Error("self-drive message should state tools do not exist")
+		}
+		if !strings.Contains(msg, "Skip the BRAINSTORMING step entirely") {
+			t.Error("self-drive message should instruct to skip brainstorming")
+		}
+		if !strings.Contains(msg, "Skip the WORK-GATE step entirely") {
+			t.Error("self-drive message should instruct to skip work-gate")
+		}
+		if strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("self-drive message should not contain interactive prompt")
+		}
+	})
+
+	t.Run("interactiveModeIncludesAskQuestions", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, false)
+		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("interactive message should contain ASK ME QUESTIONS prompt")
+		}
+		if strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("interactive message should not contain self-drive instructions")
+		}
+	})
+
+	t.Run("selfDriveNonCoordinator", func(t *testing.T) {
+		msg := buildFlowMessage(d, "planner", visits, dir, true)
+		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("self-drive message for non-coordinator should contain SELF-DRIVE MODE ACTIVE")
+		}
+		if strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("self-drive message for non-coordinator should not contain interactive prompt")
+		}
+		if strings.Contains(msg, "delegate work to specialized agents") {
+			t.Error("self-drive message for non-coordinator should not contain coordinator delegation instructions")
+		}
+		if strings.Contains(msg, "create PROJECT_MANAGEMENT.md") {
+			t.Error("self-drive message for non-coordinator should not contain coordinator delegation flow")
+		}
+	})
+
+	t.Run("selfDriveCoordinatorIncludesDelegation", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, true)
+		if !strings.Contains(msg, "delegate work to specialized agents") {
+			t.Error("self-drive coordinator message should contain delegation instructions")
+		}
+		if !strings.Contains(msg, "create PROJECT_MANAGEMENT.md") {
+			t.Error("self-drive coordinator message should contain delegation flow")
+		}
+	})
+}
+
 func truncateForTest(s string) string {
 	if len(s) > 80 {
 		return s[:80] + "..."

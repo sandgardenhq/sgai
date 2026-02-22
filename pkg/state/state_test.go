@@ -305,6 +305,130 @@ func TestNeedsHumanInput(t *testing.T) {
 	})
 }
 
+func TestInteractionMode(t *testing.T) {
+	t.Run("toolsAllowed", func(t *testing.T) {
+		cases := []struct {
+			name string
+			mode string
+			want bool
+		}{
+			{"selfDrive", ModeSelfDrive, false},
+			{"brainstorming", ModeBrainstorming, true},
+			{"building", ModeBuilding, false},
+			{"retrospective", ModeRetrospective, true},
+			{"empty", "", false},
+			{"unknown", "unknown-mode", false},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := Workflow{InteractionMode: tc.mode}
+				if got := w.ToolsAllowed(); got != tc.want {
+					t.Errorf("ToolsAllowed() = %v; want %v", got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("isAutoMode", func(t *testing.T) {
+		cases := []struct {
+			name string
+			mode string
+			want bool
+		}{
+			{"selfDrive", ModeSelfDrive, true},
+			{"brainstorming", ModeBrainstorming, false},
+			{"building", ModeBuilding, true},
+			{"retrospective", ModeRetrospective, false},
+			{"empty", "", false},
+			{"unknown", "unknown-mode", false},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := Workflow{InteractionMode: tc.mode}
+				if got := w.IsAutoMode(); got != tc.want {
+					t.Errorf("IsAutoMode() = %v; want %v", got, tc.want)
+				}
+			})
+		}
+	})
+
+	t.Run("modeTransitions", func(t *testing.T) {
+		t.Run("brainstormingToBuilding", func(t *testing.T) {
+			w := Workflow{InteractionMode: ModeBrainstorming}
+			if w.IsAutoMode() {
+				t.Error("brainstorming should not be auto mode")
+			}
+			w.InteractionMode = ModeBuilding
+			if !w.IsAutoMode() {
+				t.Error("building should be auto mode")
+			}
+			if w.ToolsAllowed() {
+				t.Error("building should not allow tools")
+			}
+		})
+
+		t.Run("buildingToRetrospective", func(t *testing.T) {
+			w := Workflow{InteractionMode: ModeBuilding}
+			if w.ToolsAllowed() {
+				t.Error("building should not allow tools")
+			}
+			w.InteractionMode = ModeRetrospective
+			if !w.ToolsAllowed() {
+				t.Error("retrospective should allow tools")
+			}
+			if w.IsAutoMode() {
+				t.Error("retrospective should not be auto mode")
+			}
+		})
+
+		t.Run("selfDriveNeverAllowsTools", func(t *testing.T) {
+			w := Workflow{InteractionMode: ModeSelfDrive}
+			if w.ToolsAllowed() {
+				t.Error("self-drive should never allow tools")
+			}
+			if !w.IsAutoMode() {
+				t.Error("self-drive should always be auto mode")
+			}
+		})
+	})
+
+	t.Run("roundTrip", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		stPath := filepath.Join(tmpDir, "state.json")
+
+		for _, mode := range []string{ModeSelfDrive, ModeBrainstorming, ModeBuilding, ModeRetrospective, ""} {
+			t.Run(mode, func(t *testing.T) {
+				wf := Workflow{InteractionMode: mode, Status: StatusWorking}
+				if errSave := Save(stPath, wf); errSave != nil {
+					t.Fatal(errSave)
+				}
+				loaded, errLoad := Load(stPath)
+				if errLoad != nil {
+					t.Fatal(errLoad)
+				}
+				if loaded.InteractionMode != mode {
+					t.Errorf("InteractionMode = %q after round-trip; want %q", loaded.InteractionMode, mode)
+				}
+			})
+		}
+	})
+
+	t.Run("emptyModeOmittedFromJSON", func(t *testing.T) {
+		wf := Workflow{Status: StatusWorking}
+		data, errMarshal := json.Marshal(wf)
+		if errMarshal != nil {
+			t.Fatal(errMarshal)
+		}
+		var raw map[string]json.RawMessage
+		if errUnmarshal := json.Unmarshal(data, &raw); errUnmarshal != nil {
+			t.Fatal(errUnmarshal)
+		}
+		if _, exists := raw["interactionMode"]; exists {
+			t.Error("interactionMode should be omitted from JSON when empty")
+		}
+	})
+}
+
 func TestSave_ExistingDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	sgaiDir := filepath.Join(tmpDir, ".sgai")

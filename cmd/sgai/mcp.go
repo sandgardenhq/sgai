@@ -389,7 +389,7 @@ func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, workingDir
 		log.Println("failed to load workflow state for interactive check:", errLoad)
 	}
 
-	if !wfState.InteractiveAutoLock {
+	if wfState.ToolsAllowed() {
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "ask_user_question",
 			Description: "Present one or more multiple-choice questions to the human partner. Each question has its own choices and multi-select setting. Use this for gathering structured input from the human. Example: {\"questions\": [{\"question\": \"Which database?\", \"choices\": [\"PostgreSQL\", \"MySQL\"], \"multiSelect\": false}]}",
@@ -531,6 +531,10 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		}
 	}
 
+	if currentState.IsAutoMode() {
+		return "Error: Questions are not allowed in auto mode (self-drive or building). The session is running without human interaction.", nil
+	}
+
 	if len(args.Questions) == 0 {
 		return `Error: At least one question is required. You must provide questions in this format: {"questions": [{"question": "Your question text?", "choices": ["Choice 1", "Choice 2"], "multiSelect": false}]}`, nil
 	}
@@ -583,6 +587,10 @@ func askUserWorkGate(workingDir, summary string) (string, error) {
 			Status:   state.StatusWorking,
 			Progress: []state.ProgressEntry{},
 		}
+	}
+
+	if currentState.IsAutoMode() {
+		return "Error: Work gate is not allowed in auto mode (self-drive or building). The session is running without human interaction.", nil
 	}
 
 	questionText := summary + "\n\n---\n\nIs the definition complete? May I begin implementation?"

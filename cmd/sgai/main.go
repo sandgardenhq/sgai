@@ -239,15 +239,13 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 	}()
 
 	if !resuming {
-		preservedAutoLock := wfState.InteractiveAutoLock
-		preservedStartedInteractive := wfState.StartedInteractive
+		preservedMode := wfState.InteractionMode
 		wfState = state.Workflow{
-			Status:              state.StatusWorking,
-			Messages:            []state.Message{},
-			GoalChecksum:        newChecksum,
-			VisitCounts:         initVisitCounts(allAgents),
-			InteractiveAutoLock: preservedAutoLock,
-			StartedInteractive:  preservedStartedInteractive,
+			Status:          state.StatusWorking,
+			Messages:        []state.Message{},
+			GoalChecksum:    newChecksum,
+			VisitCounts:     initVisitCounts(allAgents),
+			InteractionMode: preservedMode,
 		}
 		if err := state.Save(stateJSONPath, wfState); err != nil {
 			log.Println("failed to initialize state.json:", err)
@@ -291,9 +289,6 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		}
 		unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
 		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
-		if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
-			return
-		}
 		if wfState.Status == state.StatusComplete {
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
@@ -342,9 +337,6 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			}
 			unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
 			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
-			if applyWorkGateApproval(&wfState, stateJSONPath, paddedsgai) {
-				return
-			}
 
 			if wfState.Status == state.StatusComplete {
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
@@ -375,32 +367,18 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 	}
 }
 
-func applyWorkGateApproval(wfState *state.Workflow, stateJSONPath, paddedsgai string) bool {
-	if !wfState.WorkGateApproved {
-		return false
-	}
-	wfState.InteractiveAutoLock = true
-	wfState.WorkGateApproved = false
-	if err := state.Save(stateJSONPath, *wfState); err != nil {
-		log.Println("failed to save state:", err)
-		return true
-	}
-	fmt.Println("["+paddedsgai+"]", "work gate approved, switching to auto mode")
-	return false
-}
-
 func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent, stateJSONPath, paddedsgai string) {
 	if currentAgent != "retrospective" {
 		return
 	}
-	if !wfState.StartedInteractive {
+	if wfState.InteractionMode != state.ModeBuilding {
 		return
 	}
-	wfState.InteractiveAutoLock = false
+	wfState.InteractionMode = state.ModeRetrospective
 	if err := state.Save(stateJSONPath, *wfState); err != nil {
 		log.Fatalln("failed to save state:", err)
 	}
-	fmt.Println("["+paddedsgai+"]", "re-enabling interactive mode for retrospective")
+	fmt.Println("["+paddedsgai+"]", "transitioning to retrospective mode")
 }
 
 func ensureImplicitProjectCriticCouncilModel(flowDag *dag, metadata *GoalMetadata) {
@@ -697,7 +675,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			msg = humanResponse
 			humanResponse = ""
 		} else {
-			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractiveAutoLock)
+			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.IsAutoMode())
 
 			multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
 			if multiModelSection != "" {
@@ -735,7 +713,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		}
 
 		interactiveEnv := "yes"
-		if wfState.InteractiveAutoLock {
+		if wfState.IsAutoMode() {
 			interactiveEnv = "auto"
 		}
 
@@ -896,8 +874,9 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 				if errLoad != nil {
 					log.Println("failed to load state for work gate approval:", errLoad)
 				} else {
-					loadedState.WorkGateApproved = true
-					loadedState.InteractiveAutoLock = true
+					if loadedState.InteractionMode == state.ModeBrainstorming {
+						loadedState.InteractionMode = state.ModeBuilding
+					}
 					if errSave := state.Save(cfg.statePath, loadedState); errSave != nil {
 						log.Fatalln("failed to save work gate approval:", errSave)
 					}
