@@ -8,15 +8,48 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Square } from "lucide-react";
 import { api } from "@/lib/api";
 import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiSessionResponse, ApiAgentCost, ApiStepCost, ApiTodosResponse, ApiTodoEntry } from "@/types";
+import { useAdhocRun } from "@/hooks/useAdhocRun";
+import type { ApiSessionResponse, ApiAgentCost, ApiStepCost, ApiTodosResponse, ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
   workspaceName: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
+  actions?: ApiActionEntry[];
+}
+
+interface ActionBarProps {
+  actions: ApiActionEntry[];
+  isRunning: boolean;
+  onActionClick: (action: ApiActionEntry) => void;
+}
+
+function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps) {
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto" role="toolbar" aria-label="Action buttons">
+      {actions.map((action) => (
+        <Tooltip key={`${action.name}-${action.model}`}>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isRunning}
+              onClick={() => onActionClick(action)}
+            >
+              {action.name}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{action.model}</TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
+  );
 }
 
 function SessionTabSkeleton() {
@@ -196,7 +229,7 @@ function TasksSection({ todos }: { todos: ApiTodosResponse }) {
   );
 }
 
-export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: SessionTabProps) {
+export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }: SessionTabProps) {
   const [session, setSession] = useState<ApiSessionResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,6 +244,18 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const [isSteering, startSteerTransition] = useTransition();
   const [pmOpenError, setPmOpenError] = useState<string | null>(null);
   const [isPmOpenPending, startPmOpenTransition] = useTransition();
+  const [actionOutputOpen, setActionOutputOpen] = useState(false);
+
+  const hasActions = Boolean(actions && actions.length > 0);
+
+  const {
+    output: actionOutput,
+    isRunning: isActionRunning,
+    runError: actionRunError,
+    startRun: startActionRun,
+    stopRun: stopActionRun,
+    outputRef: actionOutputRef,
+  } = useAdhocRun({ workspaceName, skipModelsFetch: true });
 
   const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
   const todosEvent = useWorkspaceSSEEvent(workspaceName, "todos:update");
@@ -328,8 +373,55 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
     });
   };
 
+  const handleActionClick = (action: ApiActionEntry) => {
+    setActionOutputOpen(true);
+    startActionRun(action.prompt, action.model);
+  };
+
   return (
     <div className="space-y-4">
+      {hasActions && (
+        <div className="space-y-3">
+          <ActionBar
+            actions={actions!}
+            isRunning={isActionRunning}
+            onActionClick={handleActionClick}
+          />
+          {actionRunError ? (
+            <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
+          ) : null}
+          {(isActionRunning || actionOutput) ? (
+            <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                <ChevronRight
+                  className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
+                  aria-hidden="true"
+                />
+                Output
+                {isActionRunning && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={(e) => { e.preventDefault(); stopActionRun(); }}
+                    className="ml-auto"
+                  >
+                    <Square className="mr-1 h-3 w-3" />
+                    Stop
+                  </Button>
+                )}
+              </summary>
+              <pre
+                ref={actionOutputRef}
+                className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
+              >
+                {actionOutput || (isActionRunning ? "Running..." : "")}
+              </pre>
+            </details>
+          ) : null}
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Steer Next Turn</CardTitle>

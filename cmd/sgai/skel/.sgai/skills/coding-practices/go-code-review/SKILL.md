@@ -344,12 +344,33 @@ func (s *Service) IsExpired() bool {
 - [ ] Range over functions for custom iteration patterns
 - [ ] Iterators return early when yield returns false
 
-**References:**
-- https://pkg.go.dev/slices
-- https://pkg.go.dev/maps
-- https://pkg.go.dev/iter
-- https://go.dev/doc/tutorial/generics
-- https://go.dev/blog/testing-time
+### WaitGroup.Go (Go 1.24+)
+
+- [ ] Uses `sync.WaitGroup.Go` for fire-and-forget goroutines
+- [ ] `wg.Go(fn)` is equivalent to `go func() { wg.Wait(); fn() }()` but simpler
+- [ ] Preferred over `go func() { defer wg.Done(); fn() }()` for simpler error handling
+
+```go
+// GOOD - Go 1.24+ WaitGroup.Go pattern
+var wg sync.WaitGroup
+for _, task := range tasks {
+    wg.Go(func() {
+        process(task)  // err handled inside
+    })
+}
+wg.Wait()
+
+// ACCEPTABLE - traditional pattern still works
+var wg sync.WaitGroup
+for _, task := range tasks {
+    wg.Add(1)
+    go func(t Task) {
+        defer wg.Done()
+        process(t)
+    }(task)
+}
+wg.Wait()
+```
 
 ## Quick Checklist
 
@@ -384,3 +405,12 @@ For fast reviews, check these critical items:
 
 ### Verdict: [PASS/NEEDS WORK]
 ```
+
+## Go References for Idomatic Code
+
+- https://pkg.go.dev/sync#WaitGroup.Go
+- https://pkg.go.dev/slices
+- https://pkg.go.dev/maps
+- https://pkg.go.dev/iter
+- https://go.dev/doc/tutorial/generics
+- https://go.dev/blog/testing-time

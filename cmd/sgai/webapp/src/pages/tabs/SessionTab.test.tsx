@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SessionTab } from "./SessionTab";
 import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiSessionResponse, ApiTodosResponse } from "@/types";
+import type { ApiSessionResponse, ApiTodosResponse, ApiActionEntry } from "@/types";
 
 class MockEventSource {
   url: string;
@@ -79,7 +79,12 @@ const todosResponse: ApiTodosResponse = {
   currentAgent: "backend-developer",
 };
 
-function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: boolean }) {
+const testActions: ApiActionEntry[] = [
+  { name: "Create PR", model: "anthropic/claude-opus-4-6 (max)", prompt: "using GH make a PR" },
+  { name: "Run Tests", model: "anthropic/claude-opus-4-6", prompt: "run all tests" },
+];
+
+function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: boolean; actions?: ApiActionEntry[] }) {
   return render(
     <MemoryRouter>
       <TooltipProvider>
@@ -253,5 +258,97 @@ describe("SessionTab", () => {
     } finally {
       console.error = originalError;
     }
+  });
+
+  it("renders action buttons when actions are provided", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab({ actions: testActions });
+
+    await waitFor(() => {
+      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
+    });
+
+    expect(screen.getByRole("button", { name: "Create PR" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Run Tests" })).toBeDefined();
+  });
+
+  it("does not render action bar when actions is empty", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab({ actions: [] });
+
+    await waitFor(() => {
+      expect(screen.getByText("Steer Next Turn")).toBeDefined();
+    });
+
+    expect(screen.queryByRole("toolbar", { name: "Action buttons" })).toBeNull();
+  });
+
+  it("does not render action bar when actions is undefined", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab();
+
+    await waitFor(() => {
+      expect(screen.getByText("Steer Next Turn")).toBeDefined();
+    });
+
+    expect(screen.queryByRole("toolbar", { name: "Action buttons" })).toBeNull();
+  });
+
+  it("triggers adhoc run when action button is clicked", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc/stop")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "Stopped." })));
+      }
+      if (url.includes("/adhoc") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ running: true, output: "Running action..." })));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab({ actions: testActions });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Create PR" })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create PR" }));
+
+    await waitFor(() => {
+      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+      expect(calledUrls.some((url) => url.includes("/adhoc"))).toBe(true);
+    });
   });
 });

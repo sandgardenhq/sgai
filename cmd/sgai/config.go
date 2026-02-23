@@ -10,12 +10,34 @@ import (
 
 const configFileName = "sgai.json"
 
+func defaultActionConfigs() []actionConfig {
+	return []actionConfig{
+		{
+			Name:   "Create PR",
+			Model:  "anthropic/claude-opus-4-6 (max)",
+			Prompt: "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
+		},
+		{
+			Name:   "Upstream Sync",
+			Model:  "anthropic/claude-opus-4-6 (max)",
+			Prompt: "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
+		},
+	}
+}
+
+type actionConfig struct {
+	Name   string `json:"name"`
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+}
+
 // projectConfig represents the sgai.json configuration file.
 // The configuration file must be located at the project root, as a sibling to the .sgai directory.
 type projectConfig struct {
 	DefaultModel string                     `json:"defaultModel,omitempty"`
 	MCP          map[string]json.RawMessage `json:"mcp,omitempty"`
 	Editor       string                     `json:"editor,omitempty"`
+	Actions      []actionConfig             `json:"actions,omitempty"`
 }
 
 func loadProjectConfig(dir string) (*projectConfig, error) {

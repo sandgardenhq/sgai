@@ -739,6 +739,12 @@ func convertWorkspaceInfo(w workspaceInfo) apiWorkspaceEntry {
 	}
 }
 
+type apiActionEntry struct {
+	Name   string `json:"name"`
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+}
+
 type apiWorkspaceDetailResponse struct {
 	Name            string                    `json:"name"`
 	Dir             string                    `json:"dir"`
@@ -770,6 +776,7 @@ type apiWorkspaceDetailResponse struct {
 	Summary         string                    `json:"summary,omitempty"`
 	SummaryManual   bool                      `json:"summaryManual,omitempty"`
 	Forks           []apiWorkspaceForkSummary `json:"forks,omitempty"`
+	Actions         []apiActionEntry          `json:"actions,omitempty"`
 }
 
 type apiAgentSequenceEntry struct {
@@ -882,7 +889,25 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 		detail.Forks = s.collectForkSummaries(workspacePath)
 	}
 
+	detail.Actions = loadActionsForAPI(workspacePath)
+
 	return detail
+}
+
+func loadActionsForAPI(workspacePath string) []apiActionEntry {
+	config, errLoad := loadProjectConfig(workspacePath)
+	if errLoad != nil || config == nil || len(config.Actions) == 0 {
+		return convertActionsForAPI(defaultActionConfigs())
+	}
+	return convertActionsForAPI(config.Actions)
+}
+
+func convertActionsForAPI(configs []actionConfig) []apiActionEntry {
+	actions := make([]apiActionEntry, 0, len(configs))
+	for _, a := range configs {
+		actions = append(actions, apiActionEntry(a))
+	}
+	return actions
 }
 
 func readGoalAndPMForAPI(dir string) (goalContent, rawGoalContent, fullGoalContent, pmContent string, hasProjectMgmt bool) {
@@ -2369,7 +2394,8 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	st.selectedModel = strings.TrimSpace(req.Model)
 	st.promptText = strings.TrimSpace(req.Prompt)
 
-	cmd := exec.Command("opencode", "run", "-m", st.selectedModel, "--agent", "build", "--title", "adhoc ["+st.selectedModel+"]")
+	args := buildAdhocArgs(st.selectedModel)
+	cmd := exec.Command("opencode", args...)
 	cmd.Dir = workspacePath
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
@@ -2380,6 +2406,12 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr, startTime: time.Now()}
 	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
+	commandLine := "$ opencode " + strings.Join(args, " ")
+	promptLine := "prompt: " + st.promptText
+	_, _ = fmt.Fprintln(stderrPW, commandLine)
+	_, _ = fmt.Fprintln(stderrPW, promptLine)
+	st.output.WriteString(commandLine + "\n")
+	st.output.WriteString(promptLine + "\n")
 
 	if errStart := cmd.Start(); errStart != nil {
 		st.running = false
@@ -2411,6 +2443,15 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 		Running: true,
 		Message: "ad-hoc prompt started",
 	})
+}
+
+func buildAdhocArgs(modelSpec string) []string {
+	baseModel, variant := parseModelAndVariant(modelSpec)
+	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]"}
+	if variant != "" {
+		args = append(args, "--variant", variant)
+	}
+	return args
 }
 
 func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
