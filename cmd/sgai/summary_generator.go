@@ -134,7 +134,7 @@ func generateSummaryViaOpenCode(ctx context.Context, workspacePath, goalBody str
 	}
 	args = append(args, "--agent", "build", "--title", "summary")
 
-	prompt := "Read this GOAL.md and produce a single English sentence summarizing the project goal. Output ONLY the summary sentence, nothing else.\n\n" + goalBody
+	prompt := "Read this GOAL.md and produce a single English sentence summarizing the project goal. Output ONLY the shortest summary sentence you can, nothing else.\n\n" + goalBody
 
 	cmd := exec.CommandContext(ctx, "opencode", args...)
 	cmd.Dir = workspacePath
