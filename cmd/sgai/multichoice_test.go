@@ -11,8 +11,9 @@ import (
 func TestAskUserQuestion(t *testing.T) {
 	t.Run("singleQuestionSetsStateCorrectly", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{
-			Status:       state.StatusWorking,
-			CurrentAgent: "coordinator",
+			Status:          state.StatusWorking,
+			CurrentAgent:    "coordinator",
+			InteractionMode: state.ModeBrainstorming,
 		})
 
 		args := askUserQuestionArgs{
@@ -67,7 +68,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("multipleQuestionsSetsStateCorrectly", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -109,7 +110,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("emptyQuestionsReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{},
@@ -126,7 +127,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("questionWithEmptyChoicesReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -148,7 +149,7 @@ func TestAskUserQuestion(t *testing.T) {
 
 func TestAskUserQuestionStress(t *testing.T) {
 	t.Run("batchOfTenQuestions", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		questions := make([]questionItem, 10)
 		for i := range questions {
@@ -181,8 +182,9 @@ func TestAskUserQuestionStress(t *testing.T) {
 
 	t.Run("preservesExistingProgress", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{
-			Status:       state.StatusWorking,
-			CurrentAgent: "coordinator",
+			Status:          state.StatusWorking,
+			CurrentAgent:    "coordinator",
+			InteractionMode: state.ModeBrainstorming,
 			Progress: []state.ProgressEntry{
 				{Timestamp: "t1", Agent: "coordinator", Description: "previous work"},
 				{Timestamp: "t2", Agent: "coordinator", Description: "more work"},
@@ -208,7 +210,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 	})
 
 	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusAgentDone})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusAgentDone, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -229,7 +231,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 	})
 
 	t.Run("nilQuestionsReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{Questions: nil}
 
@@ -244,7 +246,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 	})
 
 	t.Run("questionWithNilChoicesReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -263,8 +265,9 @@ func TestAskUserQuestionStress(t *testing.T) {
 func TestAskUserWorkGateStress(t *testing.T) {
 	t.Run("setsIsWorkGateTrue", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{
-			Status:       state.StatusWorking,
-			CurrentAgent: "coordinator",
+			Status:          state.StatusWorking,
+			CurrentAgent:    "coordinator",
+			InteractionMode: state.ModeBrainstorming,
 		})
 
 		_, err := askUserWorkGate(workDir, "test summary")
@@ -280,7 +283,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
@@ -296,8 +299,9 @@ func TestAskUserWorkGateStress(t *testing.T) {
 
 	t.Run("preservesExistingMessages", func(t *testing.T) {
 		workDir := setupStateDir(t, state.Workflow{
-			Status:       state.StatusWorking,
-			CurrentAgent: "coordinator",
+			Status:          state.StatusWorking,
+			CurrentAgent:    "coordinator",
+			InteractionMode: state.ModeBrainstorming,
 			Messages: []state.Message{
 				{ID: 1, FromAgent: "coordinator", ToAgent: "developer", Body: "do stuff"},
 				{ID: 2, FromAgent: "developer", ToAgent: "coordinator", Body: "done"},
@@ -317,7 +321,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("setsHumanMessage", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
@@ -332,7 +336,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("hasTwoChoices", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		_, err := askUserWorkGate(workDir, "test summary")
 		if err != nil {
@@ -351,7 +355,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("emptySummaryReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		result, err := askUserWorkGate(workDir, "")
 		if err != nil {
@@ -364,7 +368,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("whitespaceSummaryReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		result, err := askUserWorkGate(workDir, "   \t\n  ")
 		if err != nil {
@@ -377,7 +381,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("summaryAppearsInQuestionText", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking})
+		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		summary := "## What Will Be Built\n- Feature X\n\n## Key Decisions\n- Use approach A"
 

@@ -675,7 +675,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			msg = humanResponse
 			humanResponse = ""
 		} else {
-			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.IsAutoMode())
+			msg = buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
 
 			multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
 			if multiModelSection != "" {
@@ -713,7 +713,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		}
 
 		interactiveEnv := "yes"
-		if wfState.IsAutoMode() {
+		if wfState.InteractionMode == state.ModeSelfDrive {
 			interactiveEnv = "auto"
 		}
 

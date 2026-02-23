@@ -56,8 +56,8 @@ func TestSelfDriveSetsInteractionMode(t *testing.T) {
 			t.Fatal(errLoad)
 		}
 
-		if !loaded.IsAutoMode() {
-			t.Fatal("self-drive mode should be auto mode")
+		if loaded.InteractionMode != state.ModeSelfDrive {
+			t.Fatal("self-drive mode should have InteractionMode == ModeSelfDrive")
 		}
 		if loaded.ToolsAllowed() {
 			t.Fatal("self-drive mode should not allow tools")
@@ -113,8 +113,8 @@ func TestStartAPISetsModeBrainstorming(t *testing.T) {
 	if loaded.InteractionMode != state.ModeBrainstorming {
 		t.Fatalf("InteractionMode should be %q after interactive start, got %q", state.ModeBrainstorming, loaded.InteractionMode)
 	}
-	if loaded.IsAutoMode() {
-		t.Fatal("brainstorming mode should not be auto mode")
+	if loaded.InteractionMode == state.ModeSelfDrive {
+		t.Fatal("brainstorming mode should not be self-drive")
 	}
 	if !loaded.ToolsAllowed() {
 		t.Fatal("brainstorming mode should allow tools")

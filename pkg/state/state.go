@@ -171,12 +171,6 @@ func (w Workflow) ToolsAllowed() bool {
 	return w.InteractionMode == ModeBrainstorming || w.InteractionMode == ModeRetrospective
 }
 
-// IsAutoMode reports whether the current interaction mode runs without
-// human interaction (self-drive or building).
-func (w Workflow) IsAutoMode() bool {
-	return w.InteractionMode == ModeSelfDrive || w.InteractionMode == ModeBuilding
-}
-
 // Message represents an inter-agent message in the workflow system.
 type Message struct {
 	ID        int    `json:"id"`

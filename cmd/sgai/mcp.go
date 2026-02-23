@@ -531,8 +531,8 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		}
 	}
 
-	if currentState.IsAutoMode() {
-		return "Error: Questions are not allowed in auto mode (self-drive or building). The session is running without human interaction.", nil
+	if !currentState.ToolsAllowed() {
+		return "Error: Questions are not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
 	if len(args.Questions) == 0 {
@@ -589,8 +589,8 @@ func askUserWorkGate(workingDir, summary string) (string, error) {
 		}
 	}
 
-	if currentState.IsAutoMode() {
-		return "Error: Work gate is not allowed in auto mode (self-drive or building). The session is running without human interaction.", nil
+	if !currentState.ToolsAllowed() {
+		return "Error: Work gate is not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
 	questionText := summary + "\n\n---\n\nIs the definition complete? May I begin implementation?"

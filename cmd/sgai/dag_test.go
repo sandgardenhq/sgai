@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 func TestParseFlowInline(t *testing.T) {
@@ -724,7 +726,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	dir := t.TempDir()
 
 	t.Run("selfDriveIncludesSelfDriveInstructions", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, true)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive)
 		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
 			t.Error("self-drive message should contain SELF-DRIVE MODE ACTIVE")
 		}
@@ -743,7 +745,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("interactiveModeIncludesAskQuestions", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, false)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBrainstorming)
 		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
 			t.Error("interactive message should contain ASK ME QUESTIONS prompt")
 		}
@@ -753,7 +755,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("selfDriveNonCoordinator", func(t *testing.T) {
-		msg := buildFlowMessage(d, "planner", visits, dir, true)
+		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeSelfDrive)
 		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
 			t.Error("self-drive message for non-coordinator should contain SELF-DRIVE MODE ACTIVE")
 		}
@@ -769,12 +771,61 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("selfDriveCoordinatorIncludesDelegation", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, true)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive)
 		if !strings.Contains(msg, "delegate work to specialized agents") {
 			t.Error("self-drive coordinator message should contain delegation instructions")
 		}
 		if !strings.Contains(msg, "create PROJECT_MANAGEMENT.md") {
 			t.Error("self-drive coordinator message should contain delegation flow")
+		}
+	})
+
+	t.Run("buildingModeIncludesBuildingInstructions", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding)
+		if !strings.Contains(msg, "BUILDING MODE ACTIVE") {
+			t.Error("building mode message should contain BUILDING MODE ACTIVE")
+		}
+		if strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("building mode message should not contain SELF-DRIVE MODE ACTIVE")
+		}
+		if strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("building mode message should not contain interactive prompt")
+		}
+		if !strings.Contains(msg, "retrospective phase is STILL ACTIVE") {
+			t.Error("building mode message should mention retrospective is still active")
+		}
+	})
+
+	t.Run("buildingModeCoordinatorIncludesRetrospective", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding)
+		if !strings.Contains(msg, "run retrospective") {
+			t.Error("building mode coordinator message should mention running retrospective")
+		}
+		if !strings.Contains(msg, "send a message to the retrospective agent") {
+			t.Error("building mode coordinator message should instruct to message retrospective agent")
+		}
+	})
+
+	t.Run("buildingModeNonCoordinator", func(t *testing.T) {
+		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeBuilding)
+		if !strings.Contains(msg, "BUILDING MODE ACTIVE") {
+			t.Error("building mode for non-coordinator should contain BUILDING MODE ACTIVE")
+		}
+		if strings.Contains(msg, "send a message to the retrospective agent") {
+			t.Error("building mode for non-coordinator should not contain coordinator retrospective instructions")
+		}
+	})
+
+	t.Run("emptyModeDefaultsToInteractive", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, "")
+		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("empty mode message should contain interactive prompt")
+		}
+		if strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("empty mode message should not contain self-drive instructions")
+		}
+		if strings.Contains(msg, "BUILDING MODE ACTIVE") {
+			t.Error("empty mode message should not contain building instructions")
 		}
 	})
 }

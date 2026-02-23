@@ -196,8 +196,8 @@ func TestWorkGateTransitionsToBuildingMode(t *testing.T) {
 		if wf.InteractionMode != state.ModeBuilding {
 			t.Fatalf("InteractionMode should be %q, got %q", state.ModeBuilding, wf.InteractionMode)
 		}
-		if !wf.IsAutoMode() {
-			t.Fatal("building mode should be auto mode")
+		if wf.InteractionMode == state.ModeSelfDrive {
+			t.Fatal("building mode should not be self-drive")
 		}
 		if wf.ToolsAllowed() {
 			t.Fatal("building mode should not allow tools")

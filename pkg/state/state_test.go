@@ -329,24 +329,28 @@ func TestInteractionMode(t *testing.T) {
 		}
 	})
 
-	t.Run("isAutoMode", func(t *testing.T) {
+	t.Run("explicitModeChecks", func(t *testing.T) {
 		cases := []struct {
-			name string
-			mode string
-			want bool
+			name        string
+			mode        string
+			isSelfDrive bool
+			isBuilding  bool
 		}{
-			{"selfDrive", ModeSelfDrive, true},
-			{"brainstorming", ModeBrainstorming, false},
-			{"building", ModeBuilding, true},
-			{"retrospective", ModeRetrospective, false},
-			{"empty", "", false},
-			{"unknown", "unknown-mode", false},
+			{"selfDrive", ModeSelfDrive, true, false},
+			{"brainstorming", ModeBrainstorming, false, false},
+			{"building", ModeBuilding, false, true},
+			{"retrospective", ModeRetrospective, false, false},
+			{"empty", "", false, false},
+			{"unknown", "unknown-mode", false, false},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				w := Workflow{InteractionMode: tc.mode}
-				if got := w.IsAutoMode(); got != tc.want {
-					t.Errorf("IsAutoMode() = %v; want %v", got, tc.want)
+				if got := (w.InteractionMode == ModeSelfDrive); got != tc.isSelfDrive {
+					t.Errorf("(mode == ModeSelfDrive) = %v; want %v", got, tc.isSelfDrive)
+				}
+				if got := (w.InteractionMode == ModeBuilding); got != tc.isBuilding {
+					t.Errorf("(mode == ModeBuilding) = %v; want %v", got, tc.isBuilding)
 				}
 			})
 		}
@@ -355,12 +359,12 @@ func TestInteractionMode(t *testing.T) {
 	t.Run("modeTransitions", func(t *testing.T) {
 		t.Run("brainstormingToBuilding", func(t *testing.T) {
 			w := Workflow{InteractionMode: ModeBrainstorming}
-			if w.IsAutoMode() {
-				t.Error("brainstorming should not be auto mode")
+			if w.InteractionMode == ModeSelfDrive {
+				t.Error("brainstorming should not be self-drive")
 			}
 			w.InteractionMode = ModeBuilding
-			if !w.IsAutoMode() {
-				t.Error("building should be auto mode")
+			if w.InteractionMode != ModeBuilding {
+				t.Error("mode should be building")
 			}
 			if w.ToolsAllowed() {
 				t.Error("building should not allow tools")
@@ -376,8 +380,8 @@ func TestInteractionMode(t *testing.T) {
 			if !w.ToolsAllowed() {
 				t.Error("retrospective should allow tools")
 			}
-			if w.IsAutoMode() {
-				t.Error("retrospective should not be auto mode")
+			if w.InteractionMode == ModeSelfDrive {
+				t.Error("retrospective should not be self-drive")
 			}
 		})
 
@@ -386,8 +390,8 @@ func TestInteractionMode(t *testing.T) {
 			if w.ToolsAllowed() {
 				t.Error("self-drive should never allow tools")
 			}
-			if !w.IsAutoMode() {
-				t.Error("self-drive should always be auto mode")
+			if w.InteractionMode != ModeSelfDrive {
+				t.Error("self-drive mode should be self-drive")
 			}
 		})
 	})
