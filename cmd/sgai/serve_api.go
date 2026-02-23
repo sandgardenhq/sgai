@@ -806,7 +806,7 @@ func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request
 func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailResponse {
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.IsAutoMode()
+	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -1050,7 +1050,7 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.IsAutoMode()
+	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -2801,7 +2801,7 @@ func (s *Server) handleAPIOpenInOpenCode(w http.ResponseWriter, r *http.Request)
 	}
 
 	interactive := "yes"
-	if wfState.IsAutoMode() {
+	if wfState.InteractionMode == state.ModeSelfDrive {
 		interactive = "auto"
 	}
 

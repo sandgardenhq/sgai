@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mactaggart/gographviz"
+	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 const flowSectionPreamble = `<UserInstructions>
@@ -58,6 +59,20 @@ You are running in Self-Drive mode. This means:
 
 const flowSectionSelfDriveModeCoordinator = `- Your master plan starts at reading GOAL.md, then immediately delegate work to specialized agents
 - Proceed directly: read GOAL.md → create PROJECT_MANAGEMENT.md → delegate to agents → verify → complete
+`
+
+const flowSectionBuildingMode = `# BUILDING MODE ACTIVE
+You are running in Building mode. The brainstorming and work-gate phases are complete.
+- The human partner has approved the definition — proceed directly to work
+- Skip the BRAINSTORMING step entirely - it is already done
+- Skip the WORK-GATE step entirely - it is already approved
+- Do NOT use ask_user_question or ask_user_work_gate during the building phase
+- The retrospective phase is STILL ACTIVE — you must run it when all work is complete
+- During the retrospective, the system will re-enable human interaction tools automatically
+`
+
+const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify → run retrospective → complete
+- When delegated work is done, send a message to the retrospective agent to start analysis
 `
 
 const flowSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`
@@ -420,7 +435,7 @@ func buildMultiModelSection(currentModel string, models map[string]any, currentA
 	return sb.String()
 }
 
-func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, selfDrive bool) string {
+func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string) string {
 	predecessors := d.getPredecessors(currentAgent)
 	predecessorsStr := strings.Join(predecessors, ", ")
 	if predecessorsStr == "" {
@@ -475,12 +490,18 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 		msg += snippetNudge
 	}
 
-	if selfDrive {
+	switch interactionMode {
+	case state.ModeSelfDrive:
 		msg += "\n\n" + flowSectionSelfDriveMode
 		if currentAgent == "coordinator" {
 			msg += flowSectionSelfDriveModeCoordinator
 		}
-	} else {
+	case state.ModeBuilding:
+		msg += "\n\n" + flowSectionBuildingMode
+		if currentAgent == "coordinator" {
+			msg += flowSectionBuildingModeCoordinator
+		}
+	default:
 		msg += "\n\nCRITICAL: think hard and ASK ME QUESTIONS BEFORE BUILDING\n"
 	}
 
