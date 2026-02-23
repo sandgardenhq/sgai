@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
 import { useSSEEvent, useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiWorkspaceDetailResponse } from "@/types";
+import type { ApiWorkspaceDetailResponse, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
@@ -815,6 +815,7 @@ export function WorkspaceDetail(): JSX.Element | null {
               goalContent={detail.goalContent}
               pmContent={detail.pmContent}
               hasProjectMgmt={detail.hasProjectMgmt}
+              actions={detail.actions}
             />
           </Suspense>
         </div>
@@ -838,6 +839,7 @@ function TabContent({
   goalContent,
   pmContent,
   hasProjectMgmt,
+  actions,
 }: {
   activeTab: string;
   workspaceName: string;
@@ -845,6 +847,7 @@ function TabContent({
   goalContent?: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
+  actions?: ApiActionEntry[];
 }) {
   switch (activeTab) {
     case "progress":
@@ -858,7 +861,7 @@ function TabContent({
     case "messages":
       return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
-      return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
+      return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} actions={actions} />;
 
     case "run":
       return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;

@@ -344,3 +344,164 @@ func readOpencodeConfig(t *testing.T, dir string) opencodeConfig {
 	}
 	return oc
 }
+
+func TestLoadProjectConfigWithActions(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, configFileName)
+
+	content := `{
+		"actions": [
+			{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "using GH make a prompt"},
+			{"name": "Run Tests", "model": "openai/gpt-4", "prompt": "run the test suite"}
+		]
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectConfig(dir)
+	switch {
+	case err != nil:
+		t.Fatalf("loadProjectConfig() error = %v; want nil", err)
+	case config == nil:
+		t.Fatal("loadProjectConfig() = nil; want non-nil config")
+	case len(config.Actions) != 2:
+		t.Fatalf("len(config.Actions) = %d; want 2", len(config.Actions))
+	}
+
+	if config.Actions[0].Name != "Create PR" {
+		t.Errorf("Actions[0].Name = %q; want %q", config.Actions[0].Name, "Create PR")
+	}
+	if config.Actions[0].Model != "anthropic/claude-opus-4-6 (max)" {
+		t.Errorf("Actions[0].Model = %q; want %q", config.Actions[0].Model, "anthropic/claude-opus-4-6 (max)")
+	}
+	if config.Actions[0].Prompt != "using GH make a prompt" {
+		t.Errorf("Actions[0].Prompt = %q; want %q", config.Actions[0].Prompt, "using GH make a prompt")
+	}
+
+	if config.Actions[1].Name != "Run Tests" {
+		t.Errorf("Actions[1].Name = %q; want %q", config.Actions[1].Name, "Run Tests")
+	}
+}
+
+func TestLoadProjectConfigNoActions(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, configFileName)
+
+	content := `{"defaultModel": "anthropic/claude-opus-4-6"}`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectConfig(dir)
+	switch {
+	case err != nil:
+		t.Fatalf("loadProjectConfig() error = %v; want nil", err)
+	case config == nil:
+		t.Fatal("loadProjectConfig() = nil; want non-nil config")
+	case len(config.Actions) != 0:
+		t.Errorf("len(config.Actions) = %d; want 0", len(config.Actions))
+	}
+}
+
+func TestLoadProjectConfigEmptyActions(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, configFileName)
+
+	content := `{"actions": []}`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := loadProjectConfig(dir)
+	switch {
+	case err != nil:
+		t.Fatalf("loadProjectConfig() error = %v; want nil", err)
+	case config == nil:
+		t.Fatal("loadProjectConfig() = nil; want non-nil config")
+	case len(config.Actions) != 0:
+		t.Errorf("len(config.Actions) = %d; want 0", len(config.Actions))
+	}
+}
+
+func TestLoadActionsForAPI(t *testing.T) {
+	t.Run("customActionsFullReplace", func(t *testing.T) {
+		dir := t.TempDir()
+		configPath := filepath.Join(dir, configFileName)
+		content := `{
+			"actions": [
+				{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "create a PR"},
+				{"name": "Deploy", "model": "openai/gpt-4", "prompt": "deploy to prod"}
+			]
+		}`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		actions := loadActionsForAPI(dir)
+		if len(actions) != 2 {
+			t.Fatalf("len(actions) = %d; want 2", len(actions))
+		}
+		if actions[0].Name != "Create PR" {
+			t.Errorf("actions[0].Name = %q; want %q", actions[0].Name, "Create PR")
+		}
+		if actions[0].Model != "anthropic/claude-opus-4-6 (max)" {
+			t.Errorf("actions[0].Model = %q; want %q", actions[0].Model, "anthropic/claude-opus-4-6 (max)")
+		}
+		if actions[0].Prompt != "create a PR" {
+			t.Errorf("actions[0].Prompt = %q; want %q", actions[0].Prompt, "create a PR")
+		}
+		if actions[1].Name != "Deploy" {
+			t.Errorf("actions[1].Name = %q; want %q", actions[1].Name, "Deploy")
+		}
+	})
+
+	t.Run("noConfigFileReturnsDefaults", func(t *testing.T) {
+		dir := t.TempDir()
+		actions := loadActionsForAPI(dir)
+		assertDefaultActions(t, actions)
+	})
+
+	t.Run("emptyActionsReturnsDefaults", func(t *testing.T) {
+		dir := t.TempDir()
+		configPath := filepath.Join(dir, configFileName)
+		content := `{"actions": []}`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		actions := loadActionsForAPI(dir)
+		assertDefaultActions(t, actions)
+	})
+
+	t.Run("configWithoutActionsReturnsDefaults", func(t *testing.T) {
+		dir := t.TempDir()
+		configPath := filepath.Join(dir, configFileName)
+		content := `{"defaultModel": "anthropic/claude-opus-4-6"}`
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		actions := loadActionsForAPI(dir)
+		assertDefaultActions(t, actions)
+	})
+}
+
+func assertDefaultActions(t *testing.T, actions []apiActionEntry) {
+	t.Helper()
+	defaults := defaultActionConfigs()
+	if len(actions) != len(defaults) {
+		t.Fatalf("len(actions) = %d; want %d defaults", len(actions), len(defaults))
+	}
+	for i, want := range defaults {
+		if actions[i].Name != want.Name {
+			t.Errorf("actions[%d].Name = %q; want %q", i, actions[i].Name, want.Name)
+		}
+		if actions[i].Model != want.Model {
+			t.Errorf("actions[%d].Model = %q; want %q", i, actions[i].Model, want.Model)
+		}
+		if actions[i].Prompt != want.Prompt {
+			t.Errorf("actions[%d].Prompt = %q; want %q", i, actions[i].Prompt, want.Prompt)
+		}
+	}
+}

@@ -236,6 +236,8 @@ type Server struct {
 	composerSessions   map[string]*composerSession
 
 	summaryGen *summaryGenerator
+
+	workspaceScanFlight singleflight[string, []workspaceGroup]
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -1268,6 +1270,10 @@ func (s *Server) togglePin(dir string) error {
 }
 
 func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
+	return s.workspaceScanFlight.do("scan", s.doScanWorkspaceGroups)
+}
+
+func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
 	projects, err := scanForProjects(s.rootDir)
 	if err != nil {
 		return nil, err

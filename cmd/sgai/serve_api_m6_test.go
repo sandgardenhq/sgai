@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func setupM6TestWorkspace(t *testing.T) (string, string, *Server) {
@@ -552,6 +554,91 @@ func TestHandleAPIAdhoc(t *testing.T) {
 
 		if resp.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d; want %d", resp.Code, http.StatusBadRequest)
+		}
+	})
+}
+
+func installFakeOpencode(t *testing.T) {
+	t.Helper()
+	fakeBinDir := t.TempDir()
+	fakeOpencode := filepath.Join(fakeBinDir, "opencode")
+	script := "#!/bin/sh\nexit 0\n"
+	if err := os.WriteFile(fakeOpencode, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to create fake opencode: %v", err)
+	}
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestHandleAPIAdhocLogsCommandAndPrompt(t *testing.T) {
+	t.Run("outputContainsCommandAndPrompt", func(t *testing.T) {
+		installFakeOpencode(t)
+		_, workspace, srv := setupM6TestWorkspace(t)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"prompt":"create a new feature","model":"anthropic/claude-opus-4-6 (max)"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+
+		st := srv.getAdhocState(workspace)
+
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			st.mu.Lock()
+			running := st.running
+			st.mu.Unlock()
+			if !running {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		st.mu.Lock()
+		running := st.running
+		output := st.output.String()
+		st.mu.Unlock()
+		if running {
+			t.Fatal("adhoc command did not finish within deadline")
+		}
+
+		if !strings.Contains(output, "$ opencode run -m anthropic/claude-opus-4-6") {
+			t.Errorf("output should contain CLI command, got: %q", output)
+		}
+		if !strings.Contains(output, "prompt: create a new feature") {
+			t.Errorf("output should contain prompt text, got: %q", output)
+		}
+	})
+}
+
+func TestBuildAdhocArgs(t *testing.T) {
+	t.Run("modelWithoutVariant", func(t *testing.T) {
+		args := buildAdhocArgs("anthropic/claude-opus-4-6")
+		want := []string{"run", "-m", "anthropic/claude-opus-4-6", "--agent", "build", "--title", "adhoc [anthropic/claude-opus-4-6]"}
+		if !slices.Equal(args, want) {
+			t.Errorf("buildAdhocArgs(%q) = %v; want %v", "anthropic/claude-opus-4-6", args, want)
+		}
+	})
+
+	t.Run("modelWithVariant", func(t *testing.T) {
+		args := buildAdhocArgs("anthropic/claude-opus-4-6 (max)")
+		want := []string{"run", "-m", "anthropic/claude-opus-4-6", "--agent", "build", "--title", "adhoc [anthropic/claude-opus-4-6 (max)]", "--variant", "max"}
+		if !slices.Equal(args, want) {
+			t.Errorf("buildAdhocArgs(%q) = %v; want %v", "anthropic/claude-opus-4-6 (max)", args, want)
+		}
+	})
+
+	t.Run("modelWithMultiWordVariant", func(t *testing.T) {
+		args := buildAdhocArgs("openai/gpt-4o (high quality)")
+		want := []string{"run", "-m", "openai/gpt-4o", "--agent", "build", "--title", "adhoc [openai/gpt-4o (high quality)]", "--variant", "high quality"}
+		if !slices.Equal(args, want) {
+			t.Errorf("buildAdhocArgs(%q) = %v; want %v", "openai/gpt-4o (high quality)", args, want)
 		}
 	})
 }

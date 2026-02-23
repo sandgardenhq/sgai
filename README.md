@@ -170,6 +170,45 @@ not implementation. Focus on outcomes.
 | `completionGateScript`   | Shell command that determines workflow completion        |
 | `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
 
+### Action Bar
+
+The Internals tab includes an **action bar** — a row of buttons that execute prompts with specified models. Each button triggers an ad-hoc agent run.
+
+**Default actions:** Three built-in actions are available out of the box:
+
+| Action          | Description                                          |
+|-----------------|------------------------------------------------------|
+| Create PR       | Archives GOAL.md, creates a draft PR via `gh`        |
+| Upstream Sync   | Fetches all remotes, rebases against `main@origin`   |
+
+**Custom actions via `sgai.json`:** Define an `actions` array to configure your own buttons:
+
+```json
+{
+  "actions": [
+    {
+      "name": "My Action",
+      "model": "anthropic/claude-opus-4-6 (max)",
+      "prompt": "do something useful"
+    }
+  ]
+}
+```
+
+Each action has three fields:
+
+| Field    | Description                                                     |
+|----------|-----------------------------------------------------------------|
+| `name`   | Button label shown in the action bar                            |
+| `model`  | Model to use (supports variant syntax, see below)               |
+| `prompt` | The prompt sent to the model when the button is clicked         |
+
+**Override behavior:** If you define **any** actions in `sgai.json`, **all** defaults are replaced. To keep the defaults alongside your own, re-define them in `sgai.json`.
+
+**Model variant syntax:** The `model` field supports the same variant syntax as the `models` frontmatter attribute. For example, `"anthropic/claude-opus-4-6 (max)"` resolves to model `claude-opus-4-6` with variant `max`.
+
+See [`sgai.example.json`](sgai.example.json) for a complete example.
+
 ## Usage
 
 ```sh

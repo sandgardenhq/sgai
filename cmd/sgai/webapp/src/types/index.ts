@@ -74,6 +74,12 @@ export interface SessionCost {
   cacheReadInputTokens: number;
 }
 
+export interface ApiActionEntry {
+  name: string;
+  model: string;
+  prompt: string;
+}
+
 export interface ApiWorkspaceDetailResponse {
   name: string;
   dir: string;
@@ -105,6 +111,7 @@ export interface ApiWorkspaceDetailResponse {
   summary?: string;
   summaryManual?: boolean;
   forks?: ApiWorkspaceForkSummary[];
+  actions?: ApiActionEntry[];
 }
 
 export interface ApiCreateWorkspaceRequest {

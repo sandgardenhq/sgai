@@ -1,17 +1,4 @@
 {
-  "mcp": {
-    "memory": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
-      "environment": {
-        "MEMORY_FILE_PATH": "{env:PWD}/.sgai/memory.jsonl"
-      }
-    }
-  },
   "actions": [
     {
       "name": "Create PR",
