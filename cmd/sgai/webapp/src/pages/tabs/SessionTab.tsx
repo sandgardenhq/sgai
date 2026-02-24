@@ -45,7 +45,7 @@ function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps) {
               {action.name}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{action.model}</TooltipContent>
+          <TooltipContent>{action.description || action.model}</TooltipContent>
         </Tooltip>
       ))}
     </div>

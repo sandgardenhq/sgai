@@ -13,22 +13,25 @@ const configFileName = "sgai.json"
 func defaultActionConfigs() []actionConfig {
 	return []actionConfig{
 		{
-			Name:   "Create PR",
-			Model:  "anthropic/claude-opus-4-6 (max)",
-			Prompt: "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
+			Name:        "Create PR",
+			Model:       "anthropic/claude-opus-4-6 (max)",
+			Prompt:      "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
+			Description: "Create a draft pull request from current changes",
 		},
 		{
-			Name:   "Upstream Sync",
-			Model:  "anthropic/claude-opus-4-6 (max)",
-			Prompt: "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
+			Name:        "Upstream Sync",
+			Model:       "anthropic/claude-opus-4-6 (max)",
+			Prompt:      "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
+			Description: "Fetch and rebase against upstream main branch",
 		},
 	}
 }
 
 type actionConfig struct {
-	Name   string `json:"name"`
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
+	Name        string `json:"name"`
+	Model       string `json:"model"`
+	Prompt      string `json:"prompt"`
+	Description string `json:"description,omitempty"`
 }
 
 // projectConfig represents the sgai.json configuration file.
