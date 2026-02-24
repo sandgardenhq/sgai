@@ -22,6 +22,7 @@ const (
 	ModeBrainstorming = "brainstorming"
 	ModeBuilding      = "building"
 	ModeRetrospective = "retrospective"
+	ModeContinuous    = "continuous"
 )
 
 // IsHumanPending reports whether the given status indicates the workflow

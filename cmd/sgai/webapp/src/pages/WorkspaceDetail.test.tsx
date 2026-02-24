@@ -432,6 +432,34 @@ describe("WorkspaceDetail", () => {
     });
   });
 
+  it("sends auto=true when Self-Drive is clicked", async () => {
+    const stoppedDetail = { ...workspaceDetail, running: false };
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/v1/workspaces/test-project/start")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: true, message: "Session started" })));
+      }
+      if (url.includes("/api/v1/workspaces/test-project")) {
+        return Promise.resolve(new Response(JSON.stringify(stoppedDetail)));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    renderWorkspaceDetail();
+
+    const selfDriveButton = await screen.findByRole("button", { name: "Self-drive" });
+    fireEvent.click(selfDriveButton);
+
+    await waitFor(() => {
+      const startCall = mockFetch.mock.calls.find(
+        (call) => String(call[0]).includes("/start"),
+      );
+      expect(startCall).toBeDefined();
+      const body = JSON.parse(String((startCall![1] as RequestInit).body));
+      expect(body.auto).toBe(true);
+    });
+  });
+
   it("hides respond button when there is no pending question", async () => {
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify(workspaceDetail))),

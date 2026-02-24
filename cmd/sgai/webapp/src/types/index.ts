@@ -550,12 +550,6 @@ export interface ApiSteerResponse {
   message: string;
 }
 
-export interface ApiSelfDriveResponse {
-  running: boolean;
-  autoMode: boolean;
-  message: string;
-}
-
 export interface ApiTogglePinResponse {
   pinned: boolean;
   message: string;

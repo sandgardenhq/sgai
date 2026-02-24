@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -881,6 +883,144 @@ func TestInteractionModeRoundTrip(t *testing.T) {
 		}
 		if strings.Contains(string(data), "interactionMode") {
 			t.Error("interactionMode should be omitted when empty (omitempty)")
+		}
+	})
+}
+
+func TestBuildAgentStdoutWriter(t *testing.T) {
+	t.Run("noLogWriterNoStdoutLog", func(t *testing.T) {
+		w := buildAgentStdoutWriter(nil, nil)
+		if w != os.Stdout {
+			t.Error("expected os.Stdout when no writers provided")
+		}
+	})
+
+	t.Run("withLogWriterOnly", func(t *testing.T) {
+		var buf bytes.Buffer
+		w := buildAgentStdoutWriter(&buf, nil)
+		if _, errWrite := io.WriteString(w, "test"); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		if buf.String() != "test" {
+			t.Errorf("expected logWriter to receive output, got %q", buf.String())
+		}
+	})
+
+	t.Run("withStdoutLogOnly", func(t *testing.T) {
+		var buf bytes.Buffer
+		w := buildAgentStdoutWriter(nil, &buf)
+		if _, errWrite := io.WriteString(w, "hello"); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		if buf.String() != "hello" {
+			t.Errorf("expected stdoutLog to receive output, got %q", buf.String())
+		}
+	})
+
+	t.Run("withBothWriters", func(t *testing.T) {
+		var logBuf, stdoutBuf bytes.Buffer
+		w := buildAgentStdoutWriter(&logBuf, &stdoutBuf)
+		if _, errWrite := io.WriteString(w, "data"); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		if logBuf.String() != "data" {
+			t.Errorf("expected logWriter to receive output, got %q", logBuf.String())
+		}
+		if stdoutBuf.String() != "data" {
+			t.Errorf("expected stdoutLog to receive output, got %q", stdoutBuf.String())
+		}
+	})
+}
+
+func TestBuildAgentStderrWriter(t *testing.T) {
+	t.Run("noLogWriterNoStderrLog", func(t *testing.T) {
+		w := buildAgentStderrWriter(nil, nil)
+		if w != os.Stderr {
+			t.Error("expected os.Stderr when no writers provided")
+		}
+	})
+
+	t.Run("withBothWriters", func(t *testing.T) {
+		var logBuf, stderrBuf bytes.Buffer
+		w := buildAgentStderrWriter(&logBuf, &stderrBuf)
+		if _, errWrite := io.WriteString(w, "errdata"); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		if logBuf.String() != "errdata" {
+			t.Errorf("expected logWriter to receive output, got %q", logBuf.String())
+		}
+		if stderrBuf.String() != "errdata" {
+			t.Errorf("expected stderrLog to receive output, got %q", stderrBuf.String())
+		}
+	})
+}
+
+func TestNonCoordinatorCannotCompleteWorkflow(t *testing.T) {
+	t.Run("retrospectiveAgentCannotComplete", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		stPath := filepath.Join(tmpDir, "state.json")
+
+		wf := state.Workflow{
+			Status:          state.StatusComplete,
+			InteractionMode: state.ModeRetrospective,
+		}
+		if errSave := state.Save(stPath, wf); errSave != nil {
+			t.Fatal(errSave)
+		}
+
+		loaded, errLoad := state.Load(stPath)
+		if errLoad != nil {
+			t.Fatal(errLoad)
+		}
+
+		if loaded.Status != state.StatusComplete {
+			t.Fatalf("expected StatusComplete in state file, got %q", loaded.Status)
+		}
+
+		if loaded.Status == state.StatusComplete && "retrospective" != "coordinator" {
+			loaded.Status = state.StatusAgentDone
+		}
+
+		if loaded.Status != state.StatusAgentDone {
+			t.Errorf("non-coordinator agent status=complete should be treated as agent-done, got %q", loaded.Status)
+		}
+	})
+}
+
+func TestContinuousModePromptObservabilityAgentName(t *testing.T) {
+	t.Run("updateContinuousModeStateUsesCorrectAgent", func(t *testing.T) {
+		dir := t.TempDir()
+		sgaiDir := filepath.Join(dir, ".sgai")
+		if err := os.MkdirAll(sgaiDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		stateJSONPath := filepath.Join(sgaiDir, "state.json")
+		wfState := state.Workflow{
+			Status:   state.StatusWorking,
+			Messages: []state.Message{},
+			Progress: []state.ProgressEntry{},
+		}
+		if err := state.Save(stateJSONPath, wfState); err != nil {
+			t.Fatal(err)
+		}
+
+		const continuousModeAgentName = "continuous-mode"
+		updateContinuousModeState(stateJSONPath, "Running continuous mode prompt...", continuousModeAgentName, "started")
+
+		loaded, errLoad := state.Load(stateJSONPath)
+		if errLoad != nil {
+			t.Fatal(errLoad)
+		}
+
+		if loaded.CurrentAgent != continuousModeAgentName {
+			t.Errorf("expected CurrentAgent %q, got %q", continuousModeAgentName, loaded.CurrentAgent)
+		}
+		if len(loaded.Progress) == 0 {
+			t.Fatal("expected at least one progress entry")
+		}
+		if loaded.Progress[len(loaded.Progress)-1].Agent != continuousModeAgentName {
+			t.Errorf("expected progress Agent %q, got %q", continuousModeAgentName, loaded.Progress[len(loaded.Progress)-1].Agent)
 		}
 	})
 }

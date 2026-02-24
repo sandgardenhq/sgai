@@ -341,6 +341,21 @@ function useTheme() {
 
 ---
 
+## Dead Code Detection Checklist
+
+Before marking any work as complete, verify NO dead code exists:
+
+- [ ] No unused imports (including default imports, named imports, type-only imports)
+- [ ] No unused variables or functions (including exported ones that aren't used)
+- [ ] No unused components (components defined but never rendered)
+- [ ] No unused CSS classes (classes defined in CSS modules but never used)
+- [ ] No commented-out code (code that was disabled but left behind)
+- [ ] No console.log statements left in (debug statements)
+- [ ] No TODO/FIXME comments without issue tracker references
+- [ ] No empty render methods returning null without explanation
+
+---
+
 ## React Best Practices Skill
 
 You **MUST** use the `react-best-practices` skill when writing, reviewing, or refactoring React code. The skill contains 57 performance optimization rules across 8 categories from Vercel Engineering, covering:

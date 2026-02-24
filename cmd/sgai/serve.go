@@ -116,7 +116,6 @@ func stripFrontmatter(content string) string {
 
 type session struct {
 	mu           sync.Mutex
-	cmd          *exec.Cmd
 	cancel       context.CancelFunc
 	running      bool
 	outputLog    *circularLogBuffer
@@ -443,13 +442,18 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 			})
 		}()
 
-		continuousPrompt := readContinuousModePrompt(workspacePath)
-		if continuousPrompt != "" {
-			setContinuousAutoMode(workspacePath)
-			runContinuousWorkflow(ctx, []string{workspacePath}, continuousPrompt, mcpURL, logWriter)
-		} else {
-			runWorkflow(ctx, []string{workspacePath}, mcpURL, logWriter)
+		wfState, errLoad := state.Load(statePath(workspacePath))
+		if errLoad != nil && !os.IsNotExist(errLoad) {
+			return
 		}
+
+		branch := dispatchBranch(wfState.InteractionMode)
+		cfg := branchConfig{
+			workspacePath: workspacePath,
+			mcpURL:        mcpURL,
+			logWriter:     logWriter,
+		}
+		branch.run(ctx, cfg)
 	}()
 
 	return startSessionResult{sess: sess}

@@ -194,10 +194,6 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		if _, err := os.Stat(retrospectiveDir); os.IsNotExist(err) {
 			log.Fatalln("retrospective directory from PROJECT_MANAGEMENT.md does not exist:", retrospectiveDir)
 		}
-
-		if err := setupOutputCapture(retrospectiveDir); err != nil {
-			log.Fatalln("failed to setup output capture:", err)
-		}
 	default:
 		retrospectiveDir = filepath.Join(retrospectivesBaseDir, generateRetrospectiveDirName())
 		if err := os.MkdirAll(retrospectiveDir, 0755); err != nil {
@@ -224,11 +220,20 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		if err := copyToRetrospective(goalPath, goalRetrospectivePath); err != nil {
 			log.Fatalln("failed to copy GOAL.md to retrospective:", err)
 		}
-
-		if err := setupOutputCapture(retrospectiveDir); err != nil {
-			log.Fatalln("failed to setup output capture:", err)
-		}
 	}
+
+	retroStdoutLog, retroStderrLog, errRetroLogs := openRetrospectiveLogs(retrospectiveDir)
+	if errRetroLogs != nil {
+		log.Fatalln("failed to open retrospective logs:", errRetroLogs)
+	}
+	defer func() {
+		if errClose := retroStdoutLog.Close(); errClose != nil {
+			log.Println("failed to close stdout log:", errClose)
+		}
+		if errClose := retroStderrLog.Close(); errClose != nil {
+			log.Println("failed to close stderr log:", errClose)
+		}
+	}()
 
 	defer func() {
 		if retrospectiveDir != "" {
@@ -288,7 +293,7 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			return
 		}
 		unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
-		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
+		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
 		if wfState.Status == state.StatusComplete {
 			if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
 				continue
@@ -336,7 +341,7 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 				return
 			}
 			unlockInteractiveForRetrospective(&wfState, currentAgent, stateJSONPath, paddedsgai)
-			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter)
+			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
 
 			if wfState.Status == state.StatusComplete {
 				if redirectToPendingMessageAgent(&wfState, stateJSONPath, paddedsgai) {
@@ -522,6 +527,8 @@ type multiModelConfig struct {
 	paddedsgai       string
 	mcpURL           string
 	logWriter        io.Writer
+	stdoutLog        io.Writer
+	stderrLog        io.Writer
 }
 
 func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
@@ -733,12 +740,8 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			"SGAI_MCP_INTERACTIVE="+interactiveEnv)
 		cmd.Stdin = strings.NewReader(msg)
 
-		var stderrOut io.Writer = os.Stderr
-		var stdoutOut io.Writer = os.Stdout
-		if cfg.logWriter != nil {
-			stderrOut = io.MultiWriter(os.Stderr, cfg.logWriter)
-			stdoutOut = io.MultiWriter(os.Stdout, cfg.logWriter)
-		}
+		stderrOut := buildAgentStderrWriter(cfg.logWriter, cfg.stderrLog)
+		stdoutOut := buildAgentStdoutWriter(cfg.logWriter, cfg.stdoutLog)
 		stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
 		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, statePath: cfg.statePath, currentAgent: cfg.agent, startTime: time.Now()}
 
@@ -797,6 +800,14 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 
 		switch newState.Status {
 		case "complete":
+			if cfg.agent != "coordinator" {
+				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "set status=complete, only coordinator can complete workflow; treating as agent-done")
+				newState.Status = state.StatusAgentDone
+				if err := state.Save(cfg.statePath, newState); err != nil {
+					log.Fatalln("failed to save state:", err)
+				}
+				return newState
+			}
 			if cfg.agent == "coordinator" {
 				count := 0
 				for _, todo := range wfState.Todos {
@@ -921,7 +932,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 	}
 }
 
-func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, mcpURL string, logWriter io.Writer) state.Workflow {
+func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, mcpURL string, logWriter, stdoutLog, stderrLog io.Writer) state.Workflow {
 	cfg := multiModelConfig{
 		dir:              dir,
 		goalPath:         goalPath,
@@ -933,6 +944,8 @@ func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag
 		paddedsgai:       paddedsgai,
 		mcpURL:           mcpURL,
 		logWriter:        logWriter,
+		stdoutLog:        stdoutLog,
+		stderrLog:        stderrLog,
 	}
 	return runMultiModelAgent(ctx, cfg, wfState, metadata, iterationCounter)
 }
@@ -1497,48 +1510,24 @@ func generateRetrospectiveDirName() string {
 	return timestamp + "." + string(suffix)
 }
 
-func setupOutputCapture(retrospectiveDir string) error {
+func openRetrospectiveLogs(retrospectiveDir string) (io.WriteCloser, io.WriteCloser, error) {
 	stdoutLogPath := filepath.Join(retrospectiveDir, "stdout.log")
 	stderrLogPath := filepath.Join(retrospectiveDir, "stderr.log")
 
-	stdoutLog, err := prepareLogFile(stdoutLogPath)
-	if err != nil {
-		return fmt.Errorf("preparing stdout.log: %w", err)
+	stdoutLog, errStdout := prepareLogFile(stdoutLogPath)
+	if errStdout != nil {
+		return nil, nil, fmt.Errorf("preparing stdout.log: %w", errStdout)
 	}
 
-	stderrLog, err := prepareLogFile(stderrLogPath)
-	if err != nil {
-		return fmt.Errorf("preparing stderr.log: %w", err)
-	}
-
-	originalStdout := os.Stdout
-	originalStderr := os.Stderr
-
-	stdoutR, stdoutW, err := os.Pipe()
-	if err != nil {
-		return fmt.Errorf("creating stdout pipe: %w", err)
-	}
-
-	stderrR, stderrW, err := os.Pipe()
-	if err != nil {
-		return fmt.Errorf("creating stderr pipe: %w", err)
-	}
-
-	os.Stdout = stdoutW
-	os.Stderr = stderrW
-
-	go func() {
-		if _, err := io.Copy(io.MultiWriter(originalStdout, stdoutLog), stdoutR); err != nil {
-			log.Println("write failed:", err)
+	stderrLog, errStderr := prepareLogFile(stderrLogPath)
+	if errStderr != nil {
+		if errClose := stdoutLog.Close(); errClose != nil {
+			log.Println("failed to close stdout log during error cleanup:", errClose)
 		}
-	}()
-	go func() {
-		if _, err := io.Copy(io.MultiWriter(originalStderr, stderrLog), stderrR); err != nil {
-			log.Println("write failed:", err)
-		}
-	}()
+		return nil, nil, fmt.Errorf("preparing stderr.log: %w", errStderr)
+	}
 
-	return nil
+	return stdoutLog, stderrLog, nil
 }
 
 func waitForStateTransition(ctx context.Context, dir, statePath string) (string, bool) {
