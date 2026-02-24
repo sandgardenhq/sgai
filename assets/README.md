@@ -1,4 +1,4 @@
-# Sgai (pronounced "Sky")
+# Sgai (pronounced "Sky") - Goal-Driven AI Software Factory
 
 Define your goal. Launch the dashboard.
 Watch AI agents plan, execute, and validate your software — with you in control.
@@ -180,10 +180,16 @@ See the [GOALS directory](https://github.com/sandgardenhq/sgai/tree/main/GOALS) 
 
 ## Development
 
-Developer documentation lives in `docs/`.
+Developer documentation lives in `docs/`, produced by [Doc Holiday](https://doc.holiday), of course!
 
 ---
 
 ## License
 
 [https://github.com/sandgardenhq/sgai/blob/main/LICENSE](https://github.com/sandgardenhq/sgai/blob/main/LICENSE)
+
+---
+
+## About
+
+Sgai was created by [Ulderico Cirello](https://cirello.org/), and is maintained by [Sandgarden](https://www.sandgarden.com/).
