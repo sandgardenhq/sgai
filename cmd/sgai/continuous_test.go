@@ -484,7 +484,8 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 
 	stateJSONPath := filepath.Join(sgaiDir, "state.json")
 	wfState := state.Workflow{
-		Status: state.StatusComplete,
+		Status:       state.StatusComplete,
+		CurrentAgent: "continuous-mode",
 	}
 	if err := state.Save(stateJSONPath, wfState); err != nil {
 		t.Fatal(err)
@@ -502,6 +503,9 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	}
 	if loaded.InteractionMode != state.ModeContinuous {
 		t.Errorf("expected interactionMode %q, got %q", state.ModeContinuous, loaded.InteractionMode)
+	}
+	if loaded.CurrentAgent != "coordinator" {
+		t.Errorf("expected currentAgent to be reset to coordinator, got %q", loaded.CurrentAgent)
 	}
 }
 
