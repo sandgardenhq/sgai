@@ -286,6 +286,7 @@ func resetWorkflowForNextCycle(stateJSONPath string) {
 	}
 	wfState.Status = state.StatusWorking
 	wfState.InteractionMode = state.ModeContinuous
+	wfState.CurrentAgent = "coordinator"
 	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
 		log.Println("failed to reset workflow for next cycle:", errSave)
 	}
