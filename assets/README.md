@@ -1,11 +1,13 @@
-# Sgai (pronounced “Sky”)
-
-![Sgai Dashboard](https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/08-Workspace.png?raw=true)
+# Sgai (pronounced "Sky")
 
 Define your goal. Launch the dashboard.
 Watch AI agents plan, execute, and validate your software — with you in control.
 
+**Example:** "Build a drag-and-drop image compressor" → 3 agents (developer, reviewer, designer) → Working app with tests passing → 45 minutes.
+
 **📺 [Watch the 4-minute demo →](https://youtu.be/NYmjhwLUg8Q)**
+
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/08-Workspace.png?raw=true" alt="Sgai Dashboard" width="800">
 
 ---
 
@@ -15,10 +17,10 @@ Sgai turns software development into a **goal-driven, multi-agent workflow**.
 
 Instead of prompting step-by-step, you:
 
-1. Define the outcome.
-2. Agents decompose it into a directed acyclic graph (DAG) of work.
-3. You supervise execution and answer questions.
-4. Completion gates (tests, linting, etc.) determine success.
+1. **Define the outcome** — "Build a music sequencer web app"
+2. **Agents plan the work** — Breaking it into a visual workflow diagram of tasks
+3. **You supervise** — Watch progress, answer questions when agents need guidance
+4. **Success checks** — Tests, linting, or other validation determines "done"
 
 Not autocomplete. Not a chat window.
 A local AI software factory.
@@ -27,11 +29,11 @@ A local AI software factory.
 
 ## Why Try It?
 
-* See AI work as a visible execution graph — not hidden reasoning
-* Coordinate multiple agent roles (developer, reviewer, coordinator)
-* Keep humans in the loop
-* Enforce correctness before marking work complete
-* Run entirely inside your local repository
+* **See what's happening** — Visual workflow diagram instead of hidden AI reasoning
+* **Multiple specialists** — Developer writes code, reviewer checks it, safety analyst validates
+* **Approve before execution** — Review the plan and answer questions, then agents work autonomously
+* **Proof of completion** — Tests must pass before work is marked done
+* **Works locally** — Runs in your repository, nothing leaves your machine
 
 ---
 
@@ -52,7 +54,8 @@ This runs the official installation guide automatically and launches a demo work
 ### Manual Installation
 
 **Required:** Go, Node.js, bun, opencode
-**Recommended:** jj, tmux, ripgrep, Graphviz
+
+**Recommended:** jj (version control), tmux (session management), ripgrep (code search), Graphviz (diagram rendering)
 
 ```bash
 go install github.com/sandgardenhq/sgai/cmd/sgai@latest
@@ -91,39 +94,64 @@ Most users create goals using the built-in wizard.
 
 Goals are stored in `GOAL.md` and describe outcomes — not implementation steps.
 
+**Example GOAL.md:**
+
+```markdown
 ---
+flow: |
+  "backend-developer" -> "code-reviewer"
+completionGateScript: make test
+interactive: yes
+---
+
+# Build a REST API
+
+Create endpoints for user registration and login with JWT auth.
+
+- [ ] POST /register validates email, hashes password
+- [ ] POST /login returns JWT token
+- [ ] Tests pass before completion
+```
+
+See [GOAL.example.md](GOAL.example.md) for full reference.
 
 ### 2. Agents Plan the Work
 
-![Choose a Template](https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/02-ChooseATemplate.png?raw=true)
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/02-ChooseATemplate.png?raw=true" alt="Choose a Template" width="600">
 
-Sgai decomposes your goal into a DAG of coordinated agents with defined roles.
+Sgai breaks your goal into a workflow diagram of coordinated agents with defined roles.
 
 Dependencies are explicit. Execution is visible.
 
----
+### 3. Approve the Plan & Monitor
 
-### 3. Supervise Execution
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/09-Questions.png?raw=true" alt="Agent Questions" width="600">
 
-![Agent Questions](https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/09-Questions.png?raw=true)
+Before execution begins, agents ask clarifying questions about your goal.
 
-Agents pause when they need clarification — making assumptions explicit instead of hidden.
+Once you approve the plan, agents work autonomously — executing tasks, running tests, and validating completion.
 
 You can:
 
-* Watch real-time progress
-* Answer agent questions
-* Start, stop, or fork sessions
-* Review diffs before accepting changes
+* Monitor real-time progress (optional)
+* Interrupt execution if needed
+* Review diffs and session history
+* Fork sessions to try different approaches
 
-Completion gates determine when work is actually done.
+Most of the time, you approve the plan and come back when it's done.
+
+### 4. Learn from Past Sessions with _Skills_
+
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/11-Skills.png?raw=true" alt="Skills Library" width="500">
+
+Sgai extracts reusable skills and code snippets from completed sessions — your agents get smarter over time.
 
 ---
 
 ## What Happens to Your Code?
 
 * Agents operate inside your local repository
-* Changes go through your VCS (jj recommended)
+* Changes go through your version control (we recommend jj, but Git works)
 * Sgai does not automatically push to remote repositories
 
 You stay in control.
@@ -142,24 +170,17 @@ See the [GOALS directory](https://github.com/sandgardenhq/sgai/tree/main/GOALS) 
 
 ---
 
-## Discussions
+## Questions?
 
-Active discussions:
-[https://github.com/sandgardenhq/sgai/discussions](https://github.com/sandgardenhq/sgai/discussions)
+**Found a bug or have a feature request?** [Open an issue →](https://github.com/sandgardenhq/sgai/issues)
+
+**Want to discuss ideas or share what you built?** [Start a discussion →](https://github.com/sandgardenhq/sgai/discussions)
 
 ---
 
 ## Development
 
 Developer documentation lives in `docs/`.
-
----
-
-## Project Status
-
-Sgai is actively evolving. Expect iteration and breaking changes.
-
-Feedback and issues are welcome.
 
 ---
 
