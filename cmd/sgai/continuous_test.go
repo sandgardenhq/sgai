@@ -500,8 +500,8 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	if loaded.Status != state.StatusWorking {
 		t.Errorf("expected status 'working', got %q", loaded.Status)
 	}
-	if loaded.InteractionMode != state.ModeSelfDrive {
-		t.Errorf("expected interactionMode %q, got %q", state.ModeSelfDrive, loaded.InteractionMode)
+	if loaded.InteractionMode != state.ModeContinuous {
+		t.Errorf("expected interactionMode %q, got %q", state.ModeContinuous, loaded.InteractionMode)
 	}
 }
 

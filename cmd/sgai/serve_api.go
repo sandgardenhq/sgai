@@ -112,7 +112,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/commits", s.handleAPIWorkspaceCommits)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/description", s.handleAPIUpdateDescription)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/selfdrive", s.handleAPISelfDrive)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/pin", s.handleAPITogglePin)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor", s.handleAPIOpenEditor)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
@@ -814,7 +813,7 @@ func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request
 func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailResponse {
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive
+	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive || wfState.InteractionMode == state.ModeContinuous
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -1076,7 +1075,7 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 
 	wfState, _ := state.Load(statePath(workspacePath))
 
-	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive
+	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive || wfState.InteractionMode == state.ModeContinuous
 	var running bool
 	s.mu.Lock()
 	sess := s.sessions[workspacePath]
@@ -1660,9 +1659,13 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Auto {
+	continuousPrompt := readContinuousModePrompt(workspacePath)
+	switch {
+	case continuousPrompt != "":
+		wfState.InteractionMode = state.ModeContinuous
+	case req.Auto:
 		wfState.InteractionMode = state.ModeSelfDrive
-	} else {
+	default:
 		wfState.InteractionMode = state.ModeBrainstorming
 	}
 	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
@@ -2652,91 +2655,6 @@ func (s *Server) handleAPIUpdateDescription(w http.ResponseWriter, r *http.Reque
 		Updated:     true,
 		Description: req.Description,
 	})
-}
-
-type apiSelfDriveResponse struct {
-	Running  bool   `json:"running"`
-	AutoMode bool   `json:"autoMode"`
-	Message  string `json:"message"`
-}
-
-func (s *Server) handleAPISelfDrive(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	if classifyWorkspace(workspacePath) == workspaceRoot {
-		http.Error(w, "root workspace cannot start agentic work", http.StatusBadRequest)
-		return
-	}
-
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-
-	var wasRunning bool
-	if sess != nil {
-		sess.mu.Lock()
-		wasRunning = sess.running
-		sess.mu.Unlock()
-	}
-
-	wfState, errLoadState := state.Load(statePath(workspacePath))
-	if errLoadState != nil && !os.IsNotExist(errLoadState) {
-		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
-		return
-	}
-
-	if wasRunning {
-		var oldPid int
-		sess.mu.Lock()
-		if sess.cmd != nil && sess.cmd.Process != nil {
-			oldPid = sess.cmd.Process.Pid
-		}
-		sess.mu.Unlock()
-		s.stopSession(workspacePath)
-		if oldPid > 0 {
-			waitForProcessExit(oldPid, 5*time.Second)
-		}
-	}
-
-	wfState.InteractionMode = state.ModeSelfDrive
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
-		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
-		return
-	}
-
-	result := s.startSession(workspacePath)
-	if result.startError != nil {
-		http.Error(w, result.startError.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
-
-	writeJSON(w, apiSelfDriveResponse{
-		Running:  true,
-		AutoMode: true,
-		Message:  "self-drive mode activated",
-	})
-}
-
-func waitForProcessExit(pid int, timeout time.Duration) {
-	deadline := time.After(timeout)
-	for {
-		errProbe := syscall.Kill(pid, 0)
-		if errProbe != nil {
-			return
-		}
-		select {
-		case <-deadline:
-			return
-		case <-time.After(50 * time.Millisecond):
-		}
-	}
 }
 
 type apiTogglePinResponse struct {

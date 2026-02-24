@@ -34,7 +34,6 @@ import type {
   ApiCommitsResponse,
   ApiSteerResponse,
   ApiUpdateDescriptionResponse,
-  ApiSelfDriveResponse,
   ApiTogglePinResponse,
   ApiOpenEditorResponse,
   ApiOpenOpencodeResponse,
@@ -187,11 +186,6 @@ export const api = {
       fetchJSON<ApiUpdateDescriptionResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/description`,
         { method: "POST", body: JSON.stringify({ description }) },
-      ),
-    selfdrive: (name: string) =>
-      fetchJSON<ApiSelfDriveResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/selfdrive`,
-        { method: "POST" },
       ),
     togglePin: (name: string) =>
       fetchJSON<ApiTogglePinResponse>(

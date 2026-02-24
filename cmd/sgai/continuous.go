@@ -108,7 +108,6 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 		cmd.Env = append(os.Environ(),
 			"OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"),
 			"SGAI_MCP_URL="+mcpURL,
-			"SGAI_AGENT_IDENTITY=continuous-mode",
 			"SGAI_MCP_INTERACTIVE=auto")
 		cmd.Stdin = strings.NewReader(prompt)
 
@@ -286,7 +285,7 @@ func resetWorkflowForNextCycle(stateJSONPath string) {
 		return
 	}
 	wfState.Status = state.StatusWorking
-	wfState.InteractionMode = state.ModeSelfDrive
+	wfState.InteractionMode = state.ModeContinuous
 	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
 		log.Println("failed to reset workflow for next cycle:", errSave)
 	}
@@ -327,16 +326,4 @@ func readContinuousModeAutoCron(workspacePath string) (time.Duration, string) {
 	}
 
 	return autoDuration, metadata.ContinuousModeCron
-}
-
-func setContinuousAutoMode(workspacePath string) {
-	stateJSONPath := filepath.Join(workspacePath, ".sgai", "state.json")
-	wfState, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		return
-	}
-	wfState.InteractionMode = state.ModeSelfDrive
-	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
-		log.Println("failed to set continuous auto mode:", errSave)
-	}
 }

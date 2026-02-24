@@ -206,3 +206,31 @@ func (w *sessionLogWriter) addLine(text string) {
 	w.sess.outputLog.add(logLine{text: text})
 	w.srv.publishToWorkspace(w.workspacePath, sseEvent{Type: "log:append", Data: map[string]string{"workspace": w.workspaceName}})
 }
+
+func buildAgentStderrWriter(logWriter, stderrLog io.Writer) io.Writer {
+	base := io.Writer(os.Stderr)
+	if logWriter != nil && stderrLog != nil {
+		return io.MultiWriter(base, logWriter, stderrLog)
+	}
+	if logWriter != nil {
+		return io.MultiWriter(base, logWriter)
+	}
+	if stderrLog != nil {
+		return io.MultiWriter(base, stderrLog)
+	}
+	return base
+}
+
+func buildAgentStdoutWriter(logWriter, stdoutLog io.Writer) io.Writer {
+	base := io.Writer(os.Stdout)
+	if logWriter != nil && stdoutLog != nil {
+		return io.MultiWriter(base, logWriter, stdoutLog)
+	}
+	if logWriter != nil {
+		return io.MultiWriter(base, logWriter)
+	}
+	if stdoutLog != nil {
+		return io.MultiWriter(base, stdoutLog)
+	}
+	return base
+}

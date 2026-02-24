@@ -446,11 +446,11 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startSelfDriveTransition(async () => {
       try {
-        const response = await api.workspaces.selfdrive(workspaceName);
-        setDetail((prev) => prev ? { ...prev, running: response.running, interactiveAuto: response.autoMode } : prev);
+        const response = await api.workspaces.start(workspaceName, true);
+        setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
         setRefreshKey((k) => k + 1);
       } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Failed to toggle self-drive");
+        setActionError(err instanceof Error ? err.message : "Failed to start self-drive session");
       }
     });
   };
