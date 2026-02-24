@@ -351,7 +351,7 @@ func TestLoadProjectConfigWithActions(t *testing.T) {
 
 	content := `{
 		"actions": [
-			{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "using GH make a prompt"},
+			{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "using GH make a prompt", "description": "PR description"},
 			{"name": "Run Tests", "model": "openai/gpt-4", "prompt": "run the test suite"}
 		]
 	}`
@@ -378,9 +378,15 @@ func TestLoadProjectConfigWithActions(t *testing.T) {
 	if config.Actions[0].Prompt != "using GH make a prompt" {
 		t.Errorf("Actions[0].Prompt = %q; want %q", config.Actions[0].Prompt, "using GH make a prompt")
 	}
+	if config.Actions[0].Description != "PR description" {
+		t.Errorf("Actions[0].Description = %q; want %q", config.Actions[0].Description, "PR description")
+	}
 
 	if config.Actions[1].Name != "Run Tests" {
 		t.Errorf("Actions[1].Name = %q; want %q", config.Actions[1].Name, "Run Tests")
+	}
+	if config.Actions[1].Description != "" {
+		t.Errorf("Actions[1].Description = %q; want empty (omitempty)", config.Actions[1].Description)
 	}
 }
 
@@ -430,8 +436,8 @@ func TestLoadActionsForAPI(t *testing.T) {
 		configPath := filepath.Join(dir, configFileName)
 		content := `{
 			"actions": [
-				{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "create a PR"},
-				{"name": "Deploy", "model": "openai/gpt-4", "prompt": "deploy to prod"}
+				{"name": "Create PR", "model": "anthropic/claude-opus-4-6 (max)", "prompt": "create a PR", "description": "Create a draft PR"},
+				{"name": "Deploy", "model": "openai/gpt-4", "prompt": "deploy to prod", "description": "Deploy the build"}
 			]
 		}`
 		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
@@ -451,8 +457,14 @@ func TestLoadActionsForAPI(t *testing.T) {
 		if actions[0].Prompt != "create a PR" {
 			t.Errorf("actions[0].Prompt = %q; want %q", actions[0].Prompt, "create a PR")
 		}
+		if actions[0].Description != "Create a draft PR" {
+			t.Errorf("actions[0].Description = %q; want %q", actions[0].Description, "Create a draft PR")
+		}
 		if actions[1].Name != "Deploy" {
 			t.Errorf("actions[1].Name = %q; want %q", actions[1].Name, "Deploy")
+		}
+		if actions[1].Description != "Deploy the build" {
+			t.Errorf("actions[1].Description = %q; want %q", actions[1].Description, "Deploy the build")
 		}
 	})
 
@@ -502,6 +514,9 @@ func assertDefaultActions(t *testing.T, actions []apiActionEntry) {
 		}
 		if actions[i].Prompt != want.Prompt {
 			t.Errorf("actions[%d].Prompt = %q; want %q", i, actions[i].Prompt, want.Prompt)
+		}
+		if actions[i].Description != want.Description {
+			t.Errorf("actions[%d].Description = %q; want %q", i, actions[i].Description, want.Description)
 		}
 	}
 }

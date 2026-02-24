@@ -3,17 +3,20 @@
     {
       "name": "Create PR",
       "model": "anthropic/claude-opus-4-6 (max)",
-      "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me."
+      "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
+      "description": "Create a draft pull request from current changes"
     },
     {
       "name": "Upstream Sync",
       "model": "anthropic/claude-opus-4-6 (max)",
-      "prompt": "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push"
+      "prompt": "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
+      "description": "Fetch and rebase against upstream main branch"
     },
     {
       "name": "Deploy",
       "model": "anthropic/claude-opus-4-6 (max)",
-      "prompt": "run bash(`make deploy`)"
+      "prompt": "run bash(`make deploy`)",
+      "description": "Deploy the current build"
     }
   ]
 }

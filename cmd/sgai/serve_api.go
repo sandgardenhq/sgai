@@ -740,9 +740,10 @@ func convertWorkspaceInfo(w workspaceInfo) apiWorkspaceEntry {
 }
 
 type apiActionEntry struct {
-	Name   string `json:"name"`
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
+	Name        string `json:"name"`
+	Model       string `json:"model"`
+	Prompt      string `json:"prompt"`
+	Description string `json:"description,omitempty"`
 }
 
 type apiWorkspaceDetailResponse struct {

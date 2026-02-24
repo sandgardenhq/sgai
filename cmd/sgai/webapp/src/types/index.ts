@@ -78,6 +78,7 @@ export interface ApiActionEntry {
   name: string;
   model: string;
   prompt: string;
+  description?: string;
 }
 
 export interface ApiWorkspaceDetailResponse {

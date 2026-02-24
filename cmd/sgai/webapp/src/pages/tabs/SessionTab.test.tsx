@@ -80,8 +80,8 @@ const todosResponse: ApiTodosResponse = {
 };
 
 const testActions: ApiActionEntry[] = [
-  { name: "Create PR", model: "anthropic/claude-opus-4-6 (max)", prompt: "using GH make a PR" },
-  { name: "Run Tests", model: "anthropic/claude-opus-4-6", prompt: "run all tests" },
+  { name: "Create PR", model: "anthropic/claude-opus-4-6 (max)", prompt: "using GH make a PR", description: "Create a draft pull request" },
+  { name: "Run Tests", model: "anthropic/claude-opus-4-6", prompt: "run all tests", description: "Run the test suite" },
 ];
 
 function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: boolean; actions?: ApiActionEntry[] }) {
@@ -319,6 +319,63 @@ describe("SessionTab", () => {
     });
 
     expect(screen.queryByRole("toolbar", { name: "Action buttons" })).toBeNull();
+  });
+
+  it("shows description in tooltip content when action has description", async () => {
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab({ actions: testActions });
+
+    await waitFor(() => {
+      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
+    });
+
+    const createPrButton = screen.getByRole("button", { name: "Create PR" });
+    fireEvent.focus(createPrButton);
+
+    await waitFor(() => {
+      const tooltipContent = document.querySelector("[data-slot='tooltip-content']");
+      expect(tooltipContent).not.toBeNull();
+      expect(tooltipContent?.textContent).toContain("Create a draft pull request");
+    });
+  });
+
+  it("shows model in tooltip content when action has no description", async () => {
+    const actionsWithoutDescription: ApiActionEntry[] = [
+      { name: "Deploy", model: "anthropic/claude-opus-4-6", prompt: "deploy to prod" },
+    ];
+    mockFetch.mockImplementation((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url.includes("/todos")) {
+        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
+      }
+      if (url.includes("/adhoc")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      }
+      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+    });
+    renderSessionTab({ actions: actionsWithoutDescription });
+
+    await waitFor(() => {
+      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
+    });
+
+    const deployButton = screen.getByRole("button", { name: "Deploy" });
+    fireEvent.focus(deployButton);
+
+    await waitFor(() => {
+      const tooltipContent = document.querySelector("[data-slot='tooltip-content']");
+      expect(tooltipContent).not.toBeNull();
+      expect(tooltipContent?.textContent).toContain("anthropic/claude-opus-4-6");
+    });
   });
 
   it("triggers adhoc run when action button is clicked", async () => {
