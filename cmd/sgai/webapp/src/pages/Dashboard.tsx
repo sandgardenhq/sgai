@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -20,10 +20,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Loader2, Inbox } from "lucide-react";
-import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 import { cn } from "@/lib/utils";
-import type { ApiWorkspaceEntry } from "@/types";
+import type { ApiWorkspaceEntry } from "@/lib/factory-state";
 
 function WorkspaceTreeSkeleton() {
   return (
@@ -183,16 +182,7 @@ interface InProgressSectionProps {
 }
 
 function InProgressSection({ workspaces, selectedName }: InProgressSectionProps) {
-  const inProgress = workspaces.flatMap((w) => {
-    const items: ApiWorkspaceEntry[] = [];
-    if (w.inProgress || w.running) items.push(w);
-    if (w.forks) {
-      for (const fork of w.forks) {
-        if (fork.inProgress || fork.running) items.push(fork);
-      }
-    }
-    return items;
-  });
+  const inProgress = deduplicateByName(workspaces.filter((w) => w.inProgress || w.running));
 
   if (inProgress.length === 0) return null;
 
@@ -246,6 +236,15 @@ function InProgressSection({ workspaces, selectedName }: InProgressSectionProps)
       </SidebarMenu>
     </div>
   );
+}
+
+function deduplicateByName(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[] {
+  const seen = new Set<string>();
+  return workspaces.filter((w) => {
+    if (seen.has(w.name)) return false;
+    seen.add(w.name);
+    return true;
+  });
 }
 
 function collectAllWorkspaces(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[] {
@@ -353,49 +352,11 @@ function DashboardContent({ children }: DashboardContentProps): JSX.Element {
   const navigate = useNavigate();
   const { setOpenMobile } = useSidebar();
 
-  const [workspaces, setWorkspaces] = useState<ApiWorkspaceEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const hasLoadedOnce = useRef(false);
-
-  const workspaceUpdateEvent = useSSEEvent("workspace:update");
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!hasLoadedOnce.current) {
-      setLoading(true);
-    }
-    setError(null);
-
-    api.workspaces
-      .list()
-      .then((response) => {
-        if (!cancelled) {
-          setWorkspaces(response.workspaces ?? []);
-          setLoading(false);
-          hasLoadedOnce.current = true;
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-
-  useEffect(() => {
-    if (workspaceUpdateEvent === null) return;
-    const timeoutId = setTimeout(() => {
-      setRefreshKey((k) => k + 1);
-    }, 100);
-    return () => clearTimeout(timeoutId);
-  }, [workspaceUpdateEvent]);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const loading = fetchStatus === "fetching" && workspaces.length === 0;
+  const error = fetchStatus === "error" && workspaces.length === 0
+    ? new Error("Failed to load workspaces")
+    : null;
 
   useEffect(() => {
     if (selectedName) {
@@ -436,7 +397,7 @@ function DashboardContent({ children }: DashboardContentProps): JSX.Element {
                 <InProgressSection workspaces={workspaces} selectedName={selectedName} />
                 <SidebarMenu>
                   {workspaces.length > 0 ? (
-                    workspaces.map((workspace) => (
+                    workspaces.filter((w) => !w.isFork).map((workspace) => (
                       <WorkspaceTreeItem
                         key={workspace.name}
                         workspace={workspace}

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,9 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiCommitEntry, ApiCommitsResponse } from "@/types";
+import { useFactoryState } from "@/lib/factory-state";
+import type { ApiCommitEntry } from "@/types";
 
 interface CommitsTabProps {
   workspaceName: string;
@@ -76,59 +74,24 @@ function CommitTableRow({ entry }: { entry: ApiCommitEntry }) {
 }
 
 export function CommitsTab({ workspaceName }: CommitsTabProps) {
-  const [data, setData] = useState<ApiCommitsResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
+  const commits = workspace?.commits ?? [];
 
-  const changesEvent = useWorkspaceSSEEvent(workspaceName, "changes:update");
+  if (fetchStatus === "fetching" && !workspace) return <CommitsTabSkeleton />;
 
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !data ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .commits(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setData(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (changesEvent !== null) {
-      setRefreshKey((k) => k + 1);
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load commits
+        </p>
+      );
     }
-  }, [changesEvent]);
-
-  if (loading && !data) return <CommitsTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load commits: {error.message}
-      </p>
-    );
+    return null;
   }
 
-  if (!data) return null;
-
-  if (data.commits.length === 0) {
+  if (commits.length === 0) {
     return <p className="text-sm italic text-muted-foreground">No commits found</p>;
   }
 
@@ -144,7 +107,7 @@ export function CommitsTab({ workspaceName }: CommitsTabProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.commits.map((entry) => (
+        {commits.map((entry) => (
           <CommitTableRow key={entry.changeId} entry={entry} />
         ))}
       </TableBody>

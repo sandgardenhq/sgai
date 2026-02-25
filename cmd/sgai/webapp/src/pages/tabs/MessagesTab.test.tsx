@@ -2,56 +2,89 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { MessagesTab } from "./MessagesTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiMessagesResponse } from "@/types";
+import type { ApiMessageEntry, ApiWorkspaceEntry } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
+const baseWorkspace: Partial<ApiWorkspaceEntry> = {
+  name: "test-project",
+  dir: "/projects/test-project",
+  running: false,
+  needsInput: false,
+  inProgress: false,
+  pinned: false,
+  isRoot: false,
+  isFork: false,
+  status: "idle",
+  badgeClass: "",
+  badgeText: "",
+  hasSgai: true,
+  hasEditedGoal: false,
+  interactiveAuto: false,
+  continuousMode: false,
+  currentAgent: "",
+  currentModel: "",
+  task: "",
+  goalContent: "",
+  rawGoalContent: "",
+  pmContent: "",
+  hasProjectMgmt: false,
+  svgHash: "",
+  totalExecTime: "0s",
+  latestProgress: "",
+  humanMessage: "",
+  agentSequence: [],
+  cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+  events: [],
+  projectTodos: [],
+  agentTodos: [],
+  changes: { description: "", diffLines: [] },
+  commits: [],
+  log: [],
+};
 
-const originalEventSource = globalThis.EventSource;
+const sampleMessages: ApiMessageEntry[] = [
+  { id: 1, fromAgent: "coordinator", toAgent: "backend-developer", body: "Please implement the API", subject: "API Implementation", read: true },
+  { id: 2, fromAgent: "backend-developer", toAgent: "coordinator", body: "API done", subject: "API Complete", read: false },
+];
+
+const markdownMessages: ApiMessageEntry[] = [
+  {
+    id: 3,
+    fromAgent: "coordinator",
+    toAgent: "backend-developer",
+    body: "## Task\n\nPlease implement the **API** with:\n\n- endpoint `/users`\n- endpoint `/posts`\n\n```go\nfunc main() {}\n```",
+    subject: "API Implementation",
+    read: true,
+  },
+];
+
+type FactoryStateOverride = {
+  workspaces?: ApiWorkspaceEntry[];
+  fetchStatus?: "idle" | "fetching" | "error";
+};
+
+let mockFactoryOverride: FactoryStateOverride = {};
+
+mock.module("@/lib/factory-state", () => ({
+  useFactoryState: () => ({
+    workspaces: mockFactoryOverride.workspaces ?? [{ ...baseWorkspace, messages: sampleMessages }],
+    fetchStatus: mockFactoryOverride.fetchStatus ?? "idle",
+    lastFetchedAt: Date.now(),
+  }),
+  resetFactoryStateStore: () => {},
+}));
+
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
+  mockFactoryOverride = {};
 });
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
-
-const messagesResponse: ApiMessagesResponse = {
-  messages: [
-    { id: 1, fromAgent: "coordinator", toAgent: "backend-developer", body: "Please implement the API", subject: "API Implementation", read: true },
-    { id: 2, fromAgent: "backend-developer", toAgent: "coordinator", body: "API done", subject: "API Complete", read: false },
-  ],
-};
-
-const markdownMessagesResponse: ApiMessagesResponse = {
-  messages: [
-    {
-      id: 3,
-      fromAgent: "coordinator",
-      toAgent: "backend-developer",
-      body: "## Task\n\nPlease implement the **API** with:\n\n- endpoint `/users`\n- endpoint `/posts`\n\n```go\nfunc main() {}\n```",
-      subject: "API Implementation",
-      read: true,
-    },
-  ],
-};
 
 function renderMessagesTab() {
   return render(
@@ -64,15 +97,14 @@ function renderMessagesTab() {
 }
 
 describe("MessagesTab", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+  it("renders loading skeleton when fetching and no workspace yet", () => {
+    mockFactoryOverride = { workspaces: [], fetchStatus: "fetching" };
     renderMessagesTab();
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders messages when data loads", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(messagesResponse)));
+  it("renders messages from factory state", async () => {
     renderMessagesTab();
 
     await waitFor(() => {
@@ -83,7 +115,6 @@ describe("MessagesTab", () => {
   });
 
   it("shows unread messages with bold styling", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(messagesResponse)));
     renderMessagesTab();
 
     await waitFor(() => {
@@ -98,7 +129,7 @@ describe("MessagesTab", () => {
   });
 
   it("renders empty state when no messages", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ messages: [] })));
+    mockFactoryOverride = { workspaces: [{ ...baseWorkspace, messages: [] } as ApiWorkspaceEntry] };
     renderMessagesTab();
 
     await waitFor(() => {
@@ -106,8 +137,8 @@ describe("MessagesTab", () => {
     });
   });
 
-  it("renders error state", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
+  it("renders error state when fetchStatus is error and no workspace", async () => {
+    mockFactoryOverride = { workspaces: [], fetchStatus: "error" };
     renderMessagesTab();
 
     await waitFor(() => {
@@ -115,20 +146,8 @@ describe("MessagesTab", () => {
     });
   });
 
-  it("calls messages API on mount", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(messagesResponse)));
-    renderMessagesTab();
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain("/api/v1/workspaces/test-project/messages");
-  });
-
   it("renders markdown content in message body", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(markdownMessagesResponse)));
+    mockFactoryOverride = { workspaces: [{ ...baseWorkspace, messages: markdownMessages } as ApiWorkspaceEntry] };
     renderMessagesTab();
 
     await waitFor(() => {
@@ -145,7 +164,6 @@ describe("MessagesTab", () => {
       expect(heading!.textContent).toBe("Task");
     });
 
-    const bold = document.querySelector("strong");
     const strongTexts = Array.from(document.querySelectorAll("strong")).map((el) => el.textContent);
     expect(strongTexts).toContain("API");
 

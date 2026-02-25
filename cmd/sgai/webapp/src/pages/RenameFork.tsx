@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
+import { useFactoryState } from "@/lib/factory-state";
 import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
 import { Link } from "react-router";
-import type { ApiWorkspaceDetailResponse } from "@/types";
 
 export function RenameFork() {
   const { name: workspaceName = "" } = useParams<{ name: string }>();
@@ -16,38 +16,11 @@ export function RenameFork() {
   const [newName, setNewName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ApiWorkspaceDetailResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!workspaceName) return;
-    let cancelled = false;
-    setIsLoading(true);
-    setLoadError(null);
-
-    api.workspaces
-      .get(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setDetail(response);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoadError("Failed to load workspace details");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName]);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const detail = workspaces.find((ws) => ws.name === workspaceName) ?? null;
+  const isLoading = fetchStatus === "fetching" && detail === null;
+  const loadError = fetchStatus === "error" && detail === null ? "Failed to load workspace details" : null;
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {

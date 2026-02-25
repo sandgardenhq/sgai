@@ -260,7 +260,7 @@ func TestHandleAPIUpdateSummaryPreventsAutoOverwrite(t *testing.T) {
 	}
 }
 
-func TestBuildWorkspaceDetailIncludesSummary(t *testing.T) {
+func TestBuildWorkspaceFullStateIncludesSummary(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -276,7 +276,11 @@ func TestBuildWorkspaceDetailIncludesSummary(t *testing.T) {
 	}
 
 	srv := NewServer(rootDir)
-	detail := srv.buildWorkspaceDetail(workspace)
+	ws := workspaceInfo{
+		Directory: workspace,
+		DirName:   "test-project",
+	}
+	detail := srv.buildWorkspaceFullState(ws, nil)
 	if detail.Summary != "Test project summary" {
 		t.Errorf("detail.Summary = %q; want %q", detail.Summary, "Test project summary")
 	}
@@ -285,7 +289,7 @@ func TestBuildWorkspaceDetailIncludesSummary(t *testing.T) {
 	}
 }
 
-func TestConvertWorkspaceInfoIncludesSummary(t *testing.T) {
+func TestBuildWorkspaceFullStateIncludesSummaryInState(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -299,14 +303,14 @@ func TestConvertWorkspaceInfoIncludesSummary(t *testing.T) {
 		t.Fatal(errSave)
 	}
 
-	info := workspaceInfo{
+	srv := NewServer(rootDir)
+	ws := workspaceInfo{
 		Directory:    workspace,
 		DirName:      "test-project",
 		HasWorkspace: true,
 	}
-
-	entry := convertWorkspaceInfo(info)
-	if entry.Summary != "Sidebar summary" {
-		t.Errorf("entry.Summary = %q; want %q", entry.Summary, "Sidebar summary")
+	detail := srv.buildWorkspaceFullState(ws, nil)
+	if detail.Summary != "Sidebar summary" {
+		t.Errorf("detail.Summary = %q; want %q", detail.Summary, "Sidebar summary")
 	}
 }

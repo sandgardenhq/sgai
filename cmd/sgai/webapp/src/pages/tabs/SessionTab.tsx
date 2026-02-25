@@ -1,7 +1,6 @@
-import { useState, useEffect, useTransition, type MouseEvent } from "react";
+import { useState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight, Square } from "lucide-react";
 import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
-import type { ApiSessionResponse, ApiAgentCost, ApiStepCost, ApiTodosResponse, ApiTodoEntry, ApiActionEntry } from "@/types";
+import type { ApiAgentCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
   workspaceName: string;
@@ -52,16 +51,6 @@ export function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps)
   );
 }
 
-function SessionTabSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-24 w-full rounded-xl" />
-      <Skeleton className="h-32 w-full rounded-xl" />
-      <Skeleton className="h-48 w-full rounded-xl" />
-    </div>
-  );
-}
-
 function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
 }
@@ -70,8 +59,7 @@ function formatStepCost(cost: number): string {
   return `$${cost.toFixed(6)}`;
 }
 
-function CostSection({ session }: { session: ApiSessionResponse }) {
-  const { cost } = session;
+function CostSection({ cost }: { cost: { totalCost: number; totalTokens?: { input?: number; output?: number; cacheRead?: number }; byAgent?: ApiAgentCost[] } }) {
   const totalInput = (cost.totalTokens?.input ?? 0) + (cost.totalTokens?.cacheRead ?? 0);
 
   return (
@@ -205,7 +193,7 @@ function TodoList({ todos, emptyMessage }: { todos: ApiTodoEntry[]; emptyMessage
   );
 }
 
-function TasksSection({ todos }: { todos: ApiTodosResponse }) {
+function TasksSection({ projectTodos, agentTodos }: { projectTodos: ApiTodoEntry[]; agentTodos: ApiTodoEntry[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card>
@@ -213,7 +201,7 @@ function TasksSection({ todos }: { todos: ApiTodosResponse }) {
           <CardTitle className="text-base">Project TODO</CardTitle>
         </CardHeader>
         <CardContent>
-          <TodoList todos={todos.projectTodos ?? []} emptyMessage="No project todos" />
+          <TodoList todos={projectTodos ?? []} emptyMessage="No project todos" />
         </CardContent>
       </Card>
 
@@ -222,7 +210,7 @@ function TasksSection({ todos }: { todos: ApiTodosResponse }) {
           <CardTitle className="text-base">Agent TODO</CardTitle>
         </CardHeader>
         <CardContent>
-          <TodoList todos={todos.agentTodos ?? []} emptyMessage="No active agent todos" />
+          <TodoList todos={agentTodos ?? []} emptyMessage="No active agent todos" />
         </CardContent>
       </Card>
     </div>
@@ -230,14 +218,6 @@ function TasksSection({ todos }: { todos: ApiTodosResponse }) {
 }
 
 export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }: SessionTabProps) {
-  const [session, setSession] = useState<ApiSessionResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [todos, setTodos] = useState<ApiTodosResponse | null>(null);
-  const [todosError, setTodosError] = useState<Error | null>(null);
-  const [todosLoading, setTodosLoading] = useState(true);
-  const [todosRefreshKey, setTodosRefreshKey] = useState(0);
   const [steerMessage, setSteerMessage] = useState("");
   const [steerError, setSteerError] = useState<string | null>(null);
   const [steerSuccess, setSteerSuccess] = useState(false);
@@ -257,86 +237,14 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }
     outputRef: actionOutputRef,
   } = useAdhocRun({ workspaceName, skipModelsFetch: true });
 
-  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
-  const todosEvent = useWorkspaceSSEEvent(workspaceName, "todos:update");
+  const { workspaces } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !session ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .session(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setSession(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (sessionUpdateEvent !== null) {
-      setRefreshKey((k) => k + 1);
-    }
-  }, [sessionUpdateEvent]);
-
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setTodosLoading((prev) => !todos ? true : prev);
-    setTodosError(null);
-
-    api.workspaces
-      .todos(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setTodos(response);
-          setTodosLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setTodosError(err instanceof Error ? err : new Error(String(err)));
-          setTodosLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, todosRefreshKey]);
-
-  useEffect(() => {
-    if (todosEvent !== null) {
-      setTodosRefreshKey((k) => k + 1);
-    }
-  }, [todosEvent]);
-
-  if ((loading && !session) || (todosLoading && !todos)) return <SessionTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load session: {error.message}
-      </p>
-    );
-  }
-
-  if (!session) return null;
+  const agentSequence = workspace?.agentSequence ?? [];
+  const cost = workspace?.cost;
+  const modelStatuses = workspace?.modelStatuses;
+  const projectTodos = workspace?.projectTodos ?? [];
+  const agentTodos = workspace?.agentTodos ?? [];
 
   const handleSteerSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -458,25 +366,21 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }
           <CardTitle className="text-base">Tasks</CardTitle>
         </CardHeader>
         <CardContent>
-          {todosError ? (
-            <p className="text-sm text-destructive">Failed to load todos: {todosError.message}</p>
-          ) : todos ? (
-            <TasksSection todos={todos} />
-          ) : null}
+          <TasksSection projectTodos={projectTodos} agentTodos={agentTodos} />
         </CardContent>
       </Card>
 
-      <CostSection session={session} />
+      {cost && <CostSection cost={cost} />}
 
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Agent Sequence</CardTitle>
         </CardHeader>
         <CardContent>
-          {session.agentSequence && session.agentSequence.length > 0 ? (
+          {agentSequence && agentSequence.length > 0 ? (
             <ScrollArea className="max-h-[300px]">
               <ol className="list-decimal list-inside space-y-1 text-sm">
-                {session.agentSequence.map((entry) => (
+                {agentSequence.map((entry) => (
                   <li key={`${entry.agent}-${entry.elapsedTime}`} className="flex items-center gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -499,14 +403,14 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }
         </CardContent>
       </Card>
 
-      {session.modelStatuses && session.modelStatuses.length > 0 && (
+      {modelStatuses && modelStatuses.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Model Consensus</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm">
-              {session.modelStatuses.map((ms) => (
+              {modelStatuses.map((ms) => (
                 <li key={`${ms.modelId}-${ms.status}`} className="flex items-center gap-2">
                   <span>
                     {ms.status === "model-working" ? "◐" : ms.status === "model-done" ? "●" : "✕"}

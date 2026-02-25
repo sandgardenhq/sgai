@@ -1,66 +1,59 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, afterEach, mock } from "bun:test";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SpecificationTab } from "./SpecificationTab";
-import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
-import type { ApiWorkspaceDetailResponse } from "@/types";
-
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
-const mockFetch = mock(() => Promise.resolve(new Response("{}")));
-
-beforeEach(() => {
-  mockFetch.mockReset();
-  globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
-});
+import type { ApiWorkspaceEntry } from "@/types";
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  resetAllWorkspaceSSEStores();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
-const workspaceDetailResponse: ApiWorkspaceDetailResponse = {
-  name: "test-project",
-  dir: "/home/user/test-project",
-  running: true,
-  needsInput: false,
-  status: "running",
-  badgeClass: "running",
-  badgeText: "Running",
-  isRoot: true,
-  isFork: false,
-  pinned: false,
-  hasSgai: true,
-  hasEditedGoal: false,
-  interactiveAuto: false,
-  currentAgent: "coordinator",
-  currentModel: "anthropic/claude-opus-4-6",
-  task: "",
-  goalContent: "# Test Goal\n\nBuild amazing things",
-  pmContent: "## Project Status\n\nIn progress",
-  hasProjectMgmt: true,
-  svgHash: "abc123",
-  totalExecTime: "5m",
-  latestProgress: "Tests passing",
-  agentSequence: [],
-  cost: { totalCost: 0, inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 },
-};
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-project",
+    dir: "/home/user/test-project",
+    running: false,
+    needsInput: false,
+    inProgress: false,
+    pinned: false,
+    isRoot: false,
+    isFork: false,
+    status: "stopped",
+    badgeClass: "",
+    badgeText: "",
+    hasSgai: true,
+    hasEditedGoal: false,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "",
+    currentModel: "",
+    task: "",
+    goalContent: "",
+    rawGoalContent: "",
+    pmContent: "",
+    hasProjectMgmt: false,
+    svgHash: "",
+    totalExecTime: "0s",
+    latestProgress: "",
+    humanMessage: "",
+    agentSequence: [],
+    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    ...overrides,
+  };
+}
 
-function renderSpecificationTab() {
+function renderSpecificationTab(workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle") {
+  mock.module("@/lib/factory-state", () => ({
+    useFactoryState: () => ({ workspaces, fetchStatus, lastFetchedAt: Date.now() }),
+    resetFactoryStateStore: () => {},
+  }));
   return render(
     <MemoryRouter>
       <SpecificationTab workspaceName="test-project" />
@@ -69,63 +62,63 @@ function renderSpecificationTab() {
 }
 
 describe("SpecificationTab", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
-    renderSpecificationTab();
+  it("renders loading skeleton when fetching with no workspace", () => {
+    renderSpecificationTab([], "fetching");
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders GOAL.md content when data loads", async () => {
-    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
-    renderSpecificationTab();
+  it("renders null when workspace not found and idle", () => {
+    const { container } = renderSpecificationTab([], "idle");
+    expect(container.firstChild).toBeNull();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("GOAL.md")).toBeDefined();
+  it("renders GOAL.md content from factory state", () => {
+    const workspace = makeWorkspace({
+      goalContent: "# Test Goal\n\nBuild amazing things",
+      hasProjectMgmt: true,
+      pmContent: "## Project Status\n\nIn progress",
     });
+    renderSpecificationTab([workspace]);
 
+    expect(screen.getByText("GOAL.md")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Test Goal" })).toBeDefined();
   });
 
-  it("renders PROJECT_MANAGEMENT.md when available", async () => {
-    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
-    const { container } = renderSpecificationTab();
+  it("renders PROJECT_MANAGEMENT.md when available", () => {
+    const workspace = makeWorkspace({
+      goalContent: "# Test Goal\n\nBuild amazing things",
+      hasProjectMgmt: true,
+      pmContent: "## Project Status\n\nIn progress",
+    });
+    const { container } = renderSpecificationTab([workspace]);
     const view = within(container);
 
-    await waitFor(() => {
-      expect(view.getByText("PROJECT_MANAGEMENT.md")).toBeDefined();
-    });
-
+    expect(view.getByText("PROJECT_MANAGEMENT.md")).toBeDefined();
     expect(view.getAllByText("Project Status").length).toBeGreaterThan(0);
     expect(view.getAllByText("In progress").length).toBeGreaterThan(0);
   });
 
-  it("renders empty state when no GOAL.md", async () => {
-    const noGoalResponse = { ...workspaceDetailResponse, goalContent: "", hasProjectMgmt: false, pmContent: "" };
-    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(noGoalResponse))));
-    renderSpecificationTab();
+  it("renders empty state when no GOAL.md", () => {
+    const workspace = makeWorkspace({ goalContent: "", hasProjectMgmt: false, pmContent: "" });
+    renderSpecificationTab([workspace]);
 
-    await waitFor(() => {
-      expect(screen.getByText("No GOAL.md file found")).toBeDefined();
-    });
+    expect(screen.getByText("No GOAL.md file found")).toBeDefined();
   });
 
-  it("renders error state", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
-    renderSpecificationTab();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load specification/i)).toBeDefined();
-    });
+  it("renders error state when fetchStatus is error and no workspace", () => {
+    renderSpecificationTab([], "error");
+    expect(screen.getByText(/Failed to load specification/i)).toBeDefined();
   });
 
-  it("calls workspace detail API on mount", async () => {
-    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify(workspaceDetailResponse))));
-    renderSpecificationTab();
+  it("does not call individual workspace API endpoint", () => {
+    const mockFetch = mock(() => Promise.resolve(new Response("{}")));
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-    await waitFor(() => {
-      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project"))).toBe(true);
-    });
+    const workspace = makeWorkspace({ goalContent: "# Goal" });
+    renderSpecificationTab([workspace]);
+
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project") && !url.includes("/api/v1/state"))).toBe(false);
   });
 });

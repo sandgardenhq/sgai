@@ -2,36 +2,24 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { RunTab } from "./RunTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiModelsResponse } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
+mock.module("@/lib/factory-state", () => ({
+  useFactoryState: () => ({ workspaces: [], fetchStatus: "idle", lastFetchedAt: 1000000 }),
+  resetFactoryStateStore: () => {},
+}));
 
-const originalEventSource = globalThis.EventSource;
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
   window.localStorage.clear();
 });
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
 const modelsResponse: ApiModelsResponse = {

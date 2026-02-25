@@ -1,66 +1,83 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, afterEach, mock } from "bun:test";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { EventsTab } from "./EventsTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiEventsResponse } from "@/types";
+import type { ApiWorkspaceEntry } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
-
-beforeEach(() => {
-  mockFetch.mockReset();
-  globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
-});
+globalThis.fetch = mockFetch as unknown as typeof fetch;
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
+  mockFetch.mockReset();
 });
 
-const eventsResponse: ApiEventsResponse = {
-  events: [
-    {
-      timestamp: "2026-02-08T10:00:00Z",
-      formattedTime: "10:00 AM",
-      agent: "coordinator",
-      description: "Started workflow",
-      showDateDivider: true,
-      dateDivider: "Feb 8, 2026",
-    },
-    {
-      timestamp: "2026-02-08T10:05:00Z",
-      formattedTime: "10:05 AM",
-      agent: "backend-developer",
-      description: "Implementing API endpoints",
-      showDateDivider: false,
-      dateDivider: "",
-    },
-  ],
-  currentAgent: "backend-developer",
-  currentModel: "anthropic/claude-opus-4-6",
-  svgHash: "abc123",
-  needsInput: false,
-  humanMessage: "",
-  goalContent: "# Test Goal",
-};
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-project",
+    dir: "/home/user/test-project",
+    running: false,
+    needsInput: false,
+    inProgress: false,
+    pinned: false,
+    isRoot: false,
+    isFork: false,
+    status: "stopped",
+    badgeClass: "",
+    badgeText: "",
+    hasSgai: true,
+    hasEditedGoal: false,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "coordinator",
+    currentModel: "anthropic/claude-opus-4-6",
+    task: "",
+    goalContent: "",
+    rawGoalContent: "",
+    pmContent: "",
+    hasProjectMgmt: false,
+    svgHash: "abc123",
+    totalExecTime: "0s",
+    latestProgress: "",
+    humanMessage: "",
+    agentSequence: [],
+    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    ...overrides,
+  };
+}
 
-function renderEventsTab(goalContent?: string) {
+const sampleEvents = [
+  {
+    timestamp: "2026-02-08T10:00:00Z",
+    formattedTime: "10:00 AM",
+    agent: "coordinator",
+    description: "Started workflow",
+    showDateDivider: true,
+    dateDivider: "Feb 8, 2026",
+  },
+  {
+    timestamp: "2026-02-08T10:05:00Z",
+    formattedTime: "10:05 AM",
+    agent: "backend-developer",
+    description: "Implementing API endpoints",
+    showDateDivider: false,
+    dateDivider: "",
+  },
+];
+
+function renderEventsTab(workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle", goalContent?: string) {
+  mock.module("@/lib/factory-state", () => ({
+    useFactoryState: () => ({ workspaces, fetchStatus, lastFetchedAt: Date.now() }),
+    resetFactoryStateStore: () => {},
+  }));
   return render(
     <MemoryRouter>
       <TooltipProvider>
@@ -71,88 +88,75 @@ function renderEventsTab(goalContent?: string) {
 }
 
 describe("EventsTab", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
-    renderEventsTab();
+  it("renders loading skeleton when fetching with no workspace", () => {
+    renderEventsTab([], "fetching");
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders events timeline when data loads", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(eventsResponse)));
-    renderEventsTab();
+  it("renders null when workspace not found and idle", () => {
+    const { container } = renderEventsTab([], "idle");
+    expect(container.firstChild).toBeNull();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByText("Started workflow")).toBeDefined();
-    });
+  it("renders error state when fetch fails and workspace not found", () => {
+    renderEventsTab([], "error");
+    expect(screen.getByText(/Failed to load events/i)).toBeDefined();
+  });
 
+  it("renders events timeline from factory state", () => {
+    const workspace = makeWorkspace({ events: sampleEvents });
+    renderEventsTab([workspace]);
+
+    expect(screen.getByText("Started workflow")).toBeDefined();
     expect(screen.getByText("Implementing API endpoints")).toBeDefined();
     expect(screen.getByText("Feb 8, 2026")).toBeDefined();
   });
 
-  it("renders GOAL.md section when goal content is provided", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(eventsResponse)));
-    renderEventsTab("# Test Goal");
+  it("renders GOAL.md section when goalContent prop is provided", () => {
+    const workspace = makeWorkspace({ events: sampleEvents });
+    renderEventsTab([workspace], "idle", "# Test Goal");
 
-    await waitFor(() => {
-      expect(screen.getByText("GOAL.md")).toBeDefined();
-    });
-
+    expect(screen.getByText("GOAL.md")).toBeDefined();
     const summary = screen.getByText("GOAL.md");
     const details = summary.closest("details");
     expect(details).not.toBeNull();
-    expect(details?.hasAttribute("open")).toBe(false);
     expect(screen.getByText("Test Goal")).toBeDefined();
   });
 
-  it("uses workflow svg endpoint for workflow image", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(eventsResponse)));
-    renderEventsTab();
-
-    await waitFor(() => {
-      expect(screen.getAllByAltText("Workflow graph").length).toBeGreaterThan(0);
-    });
+  it("uses workflow svg endpoint with svgHash from workspace", () => {
+    const workspace = makeWorkspace({ events: sampleEvents, svgHash: "abc123" });
+    renderEventsTab([workspace]);
 
     const img = screen.getAllByAltText("Workflow graph")[0] as HTMLImageElement;
     expect(img.src).toContain("/api/v1/workspaces/test-project/workflow.svg");
     expect(img.src).toContain("abc123");
   });
 
-  it("renders empty state when no events", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({
+  it("renders empty state when no events", () => {
+    const workspace = makeWorkspace({ events: [] });
+    renderEventsTab([workspace]);
+
+    expect(screen.getByText("No events recorded yet")).toBeDefined();
+  });
+
+  it("does not call individual events API endpoint", () => {
+    const workspace = makeWorkspace({ events: sampleEvents });
+    renderEventsTab([workspace]);
+
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/events"))).toBe(false);
+  });
+
+  it("renders human message when needsInput and humanMessage present", () => {
+    const workspace = makeWorkspace({
       events: [],
-      currentAgent: "",
-      currentModel: "",
-      svgHash: "",
-      needsInput: false,
-      humanMessage: "",
-      goalContent: "",
-    })));
-    renderEventsTab();
-
-    await waitFor(() => {
-      expect(screen.getByText("No events recorded yet")).toBeDefined();
+      needsInput: true,
+      humanMessage: "What should I do next?",
+      currentAgent: "coordinator",
     });
-  });
+    renderEventsTab([workspace]);
 
-  it("renders error state", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
-    renderEventsTab();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load events/i)).toBeDefined();
-    });
-  });
-
-  it("calls events API on mount", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(eventsResponse)));
-    renderEventsTab();
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain("/api/v1/workspaces/test-project/events");
+    expect(screen.getByText("What should I do next?")).toBeDefined();
   });
 });

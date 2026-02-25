@@ -8,11 +8,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
-import { useSSEEvent, useWorkspaceSSEEvent } from "@/hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import { ActionBar } from "./tabs/SessionTab";
 import { ChevronRight, Square } from "lucide-react";
-import type { ApiWorkspaceDetailResponse, ApiActionEntry } from "@/types";
+import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
@@ -245,11 +245,9 @@ export function WorkspaceDetail(): JSX.Element | null {
   const activeTab = tabPath?.split("/")[0] || "progress";
   const navigate = useNavigate();
 
-  const [detail, setDetail] = useState<ApiWorkspaceDetailResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [summaryOverride, setSummaryOverride] = useState<{ value: string; manual: boolean } | null>(null);
+  const [runningOverride, setRunningOverride] = useState<boolean | null>(null);
   const previousWorkspaceRef = useRef<string | null>(null);
   const [isStartStopPending, startStartStopTransition] = useTransition();
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
@@ -259,84 +257,52 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isResetPending, startResetTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
 
-  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
-  const workspaceUpdateEvent = useSSEEvent("workspace:update");
-  const sseDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { workspaces, fetchStatus } = useFactoryState();
+
+  const detail: ApiWorkspaceEntry | null = workspaces.find((ws) => ws.name === workspaceName) ?? null;
+  const loading = fetchStatus === "fetching" && detail === null;
+  const error: Error | null = fetchStatus === "error" && detail === null ? new Error("Failed to load workspace state") : null;
 
   useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    const isWorkspaceChange = previousWorkspaceRef.current !== workspaceName;
-    if (isWorkspaceChange) {
+    if (previousWorkspaceRef.current !== workspaceName) {
       previousWorkspaceRef.current = workspaceName;
-      setDetail(null);
-      setLoading(true);
-    } else if (!detail) {
-      setLoading(true);
+      setSummaryOverride(null);
+      setRunningOverride(null);
     }
-    setError(null);
+  }, [workspaceName]);
 
-    api.workspaces
-      .get(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setDetail(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
+  useEffect(() => {
+    if (runningOverride !== null && detail?.running === runningOverride) {
+      setRunningOverride(null);
+    }
+  }, [detail?.running, runningOverride]);
 
   useEffect(() => {
     if (!workspaceName) return;
     setActionError(null);
   }, [workspaceName]);
 
-  useEffect(() => {
-    if (!workspaceName) return;
-    if (sessionUpdateEvent !== null || workspaceUpdateEvent !== null) {
-      if (sseDebounceTimerRef.current !== null) {
-        clearTimeout(sseDebounceTimerRef.current);
-      }
-      sseDebounceTimerRef.current = setTimeout(() => {
-        sseDebounceTimerRef.current = null;
-        setRefreshKey((k) => k + 1);
-      }, 500);
-    }
-    return () => {
-      if (sseDebounceTimerRef.current !== null) {
-        clearTimeout(sseDebounceTimerRef.current);
-        sseDebounceTimerRef.current = null;
-      }
-    };
-  }, [sessionUpdateEvent, workspaceUpdateEvent, workspaceName]);
-
+  const totalExecTimeRaw = detail?.totalExecTime;
+  const detailRunning = detail?.running;
   useEffect(() => {
     if (!detail) return;
-    const parsed = parseExecTime(detail.totalExecTime ?? "");
+    const parsed = parseExecTime(totalExecTimeRaw ?? "");
     if (parsed !== null) {
       setExecTimeSeconds(parsed);
-    } else if (detail.running) {
+    } else if (detailRunning) {
       setExecTimeSeconds(0);
     } else {
       setExecTimeSeconds(null);
     }
-    if (!detail.running) return;
+    if (!detailRunning) return;
     const timer = setInterval(() => {
       setExecTimeSeconds((prev) => (prev === null ? prev : prev + 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [detail?.totalExecTime, detail?.running]);
+  }, [totalExecTimeRaw, detailRunning]);
+
+  const effectiveSummary = summaryOverride !== null ? summaryOverride.value : detail?.summary;
+  const effectiveSummaryManual = summaryOverride !== null ? summaryOverride.manual : detail?.summaryManual;
 
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
@@ -365,7 +331,6 @@ export function WorkspaceDetail(): JSX.Element | null {
     startResetTransition(async () => {
       try {
         await api.workspaces.reset(workspaceName);
-        setRefreshKey((k) => k + 1);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to reset session");
       }
@@ -387,14 +352,8 @@ export function WorkspaceDetail(): JSX.Element | null {
     }
   }, [detail, hasForks, activeTab, navigate, workspaceName]);
 
-  useEffect(() => {
-    if (error && error.message.toLowerCase().includes("workspace not found")) {
-      navigate("/", { replace: true });
-    }
-  }, [error, navigate]);
-
   const handleSummarySaved = useCallback((newSummary: string) => {
-    setDetail((prev) => prev ? { ...prev, summary: newSummary, summaryManual: true } : prev);
+    setSummaryOverride({ value: newSummary, manual: true });
   }, []);
 
   if (loading && !detail) return <WorkspaceDetailSkeleton />;
@@ -416,6 +375,8 @@ export function WorkspaceDetail(): JSX.Element | null {
     return <NoWorkspaceState name={detail.name} dir={detail.dir} />;
   }
 
+  const effectiveRunning = runningOverride !== null ? runningOverride : (detail.running ?? false);
+
   const totalExecTime = detail.totalExecTime?.trim() ?? "";
   const fallbackExecTime = totalExecTime && totalExecTime !== "-" ? totalExecTime : "0s";
   const displayExecTime = execTimeSeconds !== null
@@ -430,22 +391,23 @@ export function WorkspaceDetail(): JSX.Element | null {
   const statusLine = detail.task?.trim() || detail.status?.trim();
   const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
-  const selfDriveLabel = detail.running ? "Self-Drive" : "Self-drive";
-  const showForkAction = !detail.isFork && !detail.running;
-  const showComposeGoalAction = !detail.running;
+  const selfDriveLabel = effectiveRunning ? "Self-Drive" : "Self-drive";
+  const showForkAction = !detail.isFork && !effectiveRunning;
+  const showComposeGoalAction = !effectiveRunning;
   const showEditGoalAction = detail.hasSgai || Boolean(detail.goalContent?.trim());
-  const showOpenEditorAction = !detail.running;
-  const showOpenOpencodeAction = detail.running;
-  const isActionDisabled = detail.running || isStartStopPending || isSelfDrivePending;
+  const showOpenEditorAction = !effectiveRunning;
+  const showOpenOpencodeAction = effectiveRunning;
+  const isActionDisabled = effectiveRunning || isStartStopPending || isSelfDrivePending;
 
   const handleStart = () => {
     if (!workspaceName) return;
     setActionError(null);
     startStartStopTransition(async () => {
       try {
-        const response = await api.workspaces.start(workspaceName, false);
-        setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
-        setRefreshKey((k) => k + 1);
+        const result = await api.workspaces.start(workspaceName, false);
+        if (result.running) {
+          setRunningOverride(true);
+        }
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to start session");
       }
@@ -455,11 +417,10 @@ export function WorkspaceDetail(): JSX.Element | null {
   const handleStop = () => {
     if (!workspaceName) return;
     setActionError(null);
+    setRunningOverride(null);
     startStartStopTransition(async () => {
       try {
-        const response = await api.workspaces.stop(workspaceName);
-        setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
-        setRefreshKey((k) => k + 1);
+        await api.workspaces.stop(workspaceName);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to stop session");
       }
@@ -471,9 +432,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startSelfDriveTransition(async () => {
       try {
-        const response = await api.workspaces.start(workspaceName, true);
-        setDetail((prev) => prev ? { ...prev, running: response.running } : prev);
-        setRefreshKey((k) => k + 1);
+        await api.workspaces.start(workspaceName, true);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to start self-drive session");
       }
@@ -485,8 +444,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startPinTransition(async () => {
       try {
-        const response = await api.workspaces.togglePin(workspaceName);
-        setDetail((prev) => prev ? { ...prev, pinned: response.pinned } : prev);
+        await api.workspaces.togglePin(workspaceName);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to toggle pin");
       }
@@ -541,7 +499,7 @@ export function WorkspaceDetail(): JSX.Element | null {
             </Tooltip>
             <InlineSummaryEditor
               workspaceName={workspaceName}
-              summary={detail.summary}
+              summary={effectiveSummary}
               onSaved={handleSummarySaved}
             />
           </div>
@@ -561,8 +519,8 @@ export function WorkspaceDetail(): JSX.Element | null {
                 </TooltipTrigger>
                 <TooltipContent>Total execution time</TooltipContent>
               </Tooltip>
-              <Badge variant={detail.running ? "default" : "secondary"}>
-                {detail.running ? "running" : "stopped"}
+              <Badge variant={effectiveRunning ? "default" : "secondary"}>
+                {effectiveRunning ? "running" : "stopped"}
               </Badge>
             </div>
           )}
@@ -630,14 +588,14 @@ export function WorkspaceDetail(): JSX.Element | null {
                       <Button
                         type="button"
                         size="sm"
-                        variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
+                        variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
                         onClick={handleSelfDrive}
                         disabled={isActionDisabled}
-                        aria-pressed={detail.running && detail.interactiveAuto}
+                        aria-pressed={effectiveRunning && detail.interactiveAuto}
                       >
                         Continuous Self-Drive
                       </Button>
-                      {detail.running && (
+                      {effectiveRunning && (
                         <Button
                           type="button"
                           size="sm"
@@ -654,24 +612,24 @@ export function WorkspaceDetail(): JSX.Element | null {
                       <Button
                         type="button"
                         size="sm"
-                        variant={(detail.running && detail.interactiveAuto) ? "default" : "outline"}
+                        variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
                         onClick={handleSelfDrive}
                         disabled={isActionDisabled}
-                        aria-pressed={detail.running && detail.interactiveAuto}
+                        aria-pressed={effectiveRunning && detail.interactiveAuto}
                       >
                         {selfDriveLabel}
                       </Button>
                       <Button
                         type="button"
                         size="sm"
-                        variant={(detail.running && !detail.interactiveAuto) ? "default" : "outline"}
+                        variant={(effectiveRunning && !detail.interactiveAuto) ? "default" : "outline"}
                         onClick={handleStart}
                         disabled={isActionDisabled}
-                        aria-pressed={detail.running && !detail.interactiveAuto}
+                        aria-pressed={effectiveRunning && !detail.interactiveAuto}
                       >
                         Start
                       </Button>
-                      {detail.running && (
+                      {effectiveRunning && (
                         <Button
                           type="button"
                           size="sm"

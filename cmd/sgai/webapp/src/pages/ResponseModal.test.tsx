@@ -2,24 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ResponseModal } from "./ResponseModal";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiPendingQuestionResponse, ApiWorkspaceDetailResponse } from "@/types";
-
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
-const mockFetch = mock(() => Promise.resolve(new Response("{}")));
+import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
 
 const pendingQuestion: ApiPendingQuestionResponse = {
   questionId: "modal-q-123",
@@ -35,64 +19,82 @@ const pendingQuestion: ApiPendingQuestionResponse = {
   ],
 };
 
-const workspaceDetail: ApiWorkspaceDetailResponse = {
-  name: "test-workspace",
-  dir: "/tmp/test-workspace",
-  running: false,
-  needsInput: true,
-  status: "waiting",
-  badgeClass: "",
-  badgeText: "waiting",
-  isRoot: true,
-  isFork: false,
-  pinned: false,
-  hasSgai: true,
-  hasEditedGoal: false,
-  interactiveAuto: false,
-  currentAgent: "backend-developer",
-  currentModel: "claude-opus-4",
-  task: "",
-  goalContent: "<p>Goal content for modal</p>",
-  pmContent: "<p>PM content for modal</p>",
-  hasProjectMgmt: true,
-  svgHash: "",
-  totalExecTime: "",
-  latestProgress: "",
-  agentSequence: [],
-  cost: { totalCost: 0, inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 },
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-workspace",
+    dir: "/tmp/test-workspace",
+    running: false,
+    needsInput: true,
+    inProgress: true,
+    pinned: false,
+    isRoot: true,
+    isFork: false,
+    status: "waiting",
+    badgeClass: "",
+    badgeText: "waiting",
+    hasSgai: true,
+    hasEditedGoal: false,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "backend-developer",
+    currentModel: "claude-opus-4",
+    task: "",
+    goalContent: "<p>Goal content for modal</p>",
+    rawGoalContent: "# Goal content",
+    pmContent: "<p>PM content for modal</p>",
+    hasProjectMgmt: true,
+    svgHash: "",
+    totalExecTime: "",
+    latestProgress: "",
+    humanMessage: "",
+    agentSequence: [],
+    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    pendingQuestion: pendingQuestion,
+    ...overrides,
+  };
+}
+
+type MockFactoryState = {
+  workspaces: ApiWorkspaceEntry[];
+  fetchStatus: "idle" | "fetching" | "error";
 };
+
+let mockFactoryState: MockFactoryState = {
+  workspaces: [makeWorkspace()],
+  fetchStatus: "idle",
+};
+
+mock.module("@/lib/factory-state", () => ({
+  useFactoryState: () => mockFactoryState,
+  resetFactoryStateStore: () => {},
+}));
+
+const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
   cleanup();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
   sessionStorage.clear();
+  mockFactoryState = {
+    workspaces: [makeWorkspace()],
+    fetchStatus: "idle",
+  };
 });
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
   sessionStorage.clear();
 });
 
-function createFetchHandler() {
-  return (url: string | URL | Request) => {
-    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-    if (urlStr.includes("/pending-question")) {
-      return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-    }
-    if (urlStr.includes("/api/v1/workspaces/") && !urlStr.includes("/respond")) {
-      return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-    }
-    return Promise.resolve(new Response("{}"));
-  };
-}
-
 function renderModal(open = true, onOpenChange = mock(() => {}), onResponseSubmitted = mock(() => {})) {
-  mockFetch.mockImplementation(createFetchHandler());
-
   return {
     onOpenChange,
     onResponseSubmitted,
@@ -120,7 +122,7 @@ describe("ResponseModal", () => {
     });
   });
 
-  it("renders agent badge", async () => {
+  it("renders agent badge from factory state", async () => {
     renderModal();
 
     await waitFor(() => {
@@ -128,7 +130,7 @@ describe("ResponseModal", () => {
     });
   });
 
-  it("renders choices", async () => {
+  it("renders choices from factory state", async () => {
     renderModal();
 
     await waitFor(() => {
@@ -148,24 +150,10 @@ describe("ResponseModal", () => {
     });
   });
 
-  it("does not fetch when closed", () => {
-    renderModal(false);
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it("fetches pending question when opened", async () => {
+  it("does not call pending-question API when open (uses factory state)", () => {
     renderModal(true);
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
-    });
-
-    const calls = mockFetch.mock.calls;
-    const pendingQuestionCall = calls.find((call) => {
-      const urlStr = (call as unknown[])[0] as string;
-      return urlStr.includes("/pending-question");
-    });
-    expect(pendingQuestionCall).toBeDefined();
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("/pending-question"))).toBe(false);
   });
 
   it("submits response and calls onResponseSubmitted", async () => {
@@ -174,16 +162,10 @@ describe("ResponseModal", () => {
 
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         return Promise.resolve(
           new Response(JSON.stringify({ success: true, message: "ok" })),
         );
-      }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -205,8 +187,8 @@ describe("ResponseModal", () => {
       expect(screen.getAllByText("PostgreSQL").length).toBeGreaterThan(0);
     });
 
-    const radio = document.querySelector('#modal-choice-0-0') as HTMLInputElement;
-    fireEvent.click(radio);
+    const firstRadio = screen.getAllByRole("radio")[0] as HTMLInputElement;
+    fireEvent.click(firstRadio);
 
     const submitBtns = screen.getAllByText("Send Response");
     fireEvent.click(submitBtns[0]);
@@ -216,20 +198,14 @@ describe("ResponseModal", () => {
     });
   });
 
-  it("disables buttons during submission (R-18)", async () => {
+  it("disables buttons during submission", async () => {
     let resolveSubmit: (() => void) | null = null;
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         return new Promise<Response>((resolve) => {
           resolveSubmit = () => resolve(new Response(JSON.stringify({ success: true, message: "ok" })));
         });
-      }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -269,7 +245,7 @@ describe("ResponseModal", () => {
     resolveSubmit?.();
   });
 
-  it("persists modal response state to sessionStorage (R-8)", async () => {
+  it("persists modal response state to sessionStorage", async () => {
     renderModal();
 
     await waitFor(() => {
@@ -286,17 +262,11 @@ describe("ResponseModal", () => {
     expect(parsed.questionId).toBe("modal-q-123");
   });
 
-  it("shows error on 409 conflict (R-21)", async () => {
+  it("shows error on 409 conflict", async () => {
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         return Promise.resolve(new Response("question expired", { status: 409 }));
-      }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
       }
       return Promise.resolve(new Response("{}"));
     });
@@ -328,8 +298,8 @@ describe("ResponseModal", () => {
     });
   });
 
-  it("renders loading skeleton while fetching", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+  it("renders loading skeleton when fetching and workspace not found", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "fetching" };
 
     render(
       <MemoryRouter>
@@ -347,10 +317,8 @@ describe("ResponseModal", () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders error state on fetch failure", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.reject(new Error("Connection refused")),
-    );
+  it("renders error state when fetchStatus is error and no workspace", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "error" };
 
     render(
       <MemoryRouter>
@@ -364,13 +332,11 @@ describe("ResponseModal", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load question/i)).toBeDefined();
-    });
+    expect(screen.getByText(/Failed to load question/i)).toBeDefined();
   });
 
-  it("always renders DialogDescription for accessibility", async () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+  it("always renders DialogDescription for accessibility when loading", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "fetching" };
 
     render(
       <MemoryRouter>
@@ -387,7 +353,7 @@ describe("ResponseModal", () => {
     expect(screen.getByText("Loading agent question...")).toBeDefined();
   });
 
-  it("renders ResponseContext with workspace data in modal (feature parity)", async () => {
+  it("renders ResponseContext with workspace data in modal", async () => {
     renderModal();
 
     await waitFor(() => {

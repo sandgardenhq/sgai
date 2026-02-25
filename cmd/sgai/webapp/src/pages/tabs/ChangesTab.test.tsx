@@ -1,48 +1,72 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, afterEach, mock } from "bun:test";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ChangesTab } from "./ChangesTab";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
-import type { ApiChangesResponse } from "@/types";
+import type { ApiWorkspaceEntry } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
-
-beforeEach(() => {
-  mockFetch.mockReset();
-  globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
-});
+globalThis.fetch = mockFetch as unknown as typeof fetch;
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
+  mockFetch.mockReset();
 });
 
-const changesResponse: ApiChangesResponse = {
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-project",
+    dir: "/home/user/test-project",
+    running: false,
+    needsInput: false,
+    inProgress: false,
+    pinned: false,
+    isRoot: false,
+    isFork: false,
+    status: "stopped",
+    badgeClass: "",
+    badgeText: "",
+    hasSgai: true,
+    hasEditedGoal: false,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "",
+    currentModel: "",
+    task: "",
+    goalContent: "",
+    rawGoalContent: "",
+    pmContent: "",
+    hasProjectMgmt: false,
+    svgHash: "",
+    totalExecTime: "0s",
+    latestProgress: "",
+    humanMessage: "",
+    agentSequence: [],
+    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    ...overrides,
+  };
+}
+
+const statData = {
   description: "Add new feature",
   diffLines: [
-    { lineNumber: 1, text: "diff --git a/main.go b/main.go", class: "header" },
-    { lineNumber: 2, text: "+func newFunction() {", class: "add" },
-    { lineNumber: 3, text: "-func oldFunction() {", class: "remove" },
-    { lineNumber: 4, text: " func unchanged() {", class: "" },
+    { lineNumber: 1, text: "cmd/sgai/serve.go     | 10 +++++-----", class: "" },
+    { lineNumber: 2, text: "cmd/sgai/serve_api.go | 25 ++++++++++++++++---------", class: "" },
+    { lineNumber: 3, text: "3 files changed, 20 insertions(+), 15 deletions(-)", class: "" },
   ],
 };
 
-function renderChangesTab() {
+function renderChangesTab(workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle") {
+  mock.module("@/lib/factory-state", () => ({
+    useFactoryState: () => ({ workspaces, fetchStatus, lastFetchedAt: Date.now() }),
+    resetFactoryStateStore: () => {},
+  }));
   return render(
     <MemoryRouter>
       <ChangesTab workspaceName="test-project" />
@@ -51,91 +75,61 @@ function renderChangesTab() {
 }
 
 describe("ChangesTab", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
-    renderChangesTab();
+  it("renders loading skeleton when fetching with no workspace", () => {
+    renderChangesTab([], "fetching");
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders diff lines when data loads", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(changesResponse)));
-    renderChangesTab();
+  it("renders null when workspace not found and idle", () => {
+    const { container } = renderChangesTab([], "idle");
+    expect(container.firstChild).toBeNull();
+  });
 
-    await waitFor(() => {
-      expect(screen.getByRole("textbox", { name: "Commit Description" })).toBeDefined();
-    });
+  it("renders error state when fetch fails and workspace not found", () => {
+    renderChangesTab([], "error");
+    expect(screen.getByText(/Failed to load changes/i)).toBeDefined();
+  });
 
-    expect(screen.queryByText("Commit Description")).toBeNull();
+  it("renders stat lines from factory state", () => {
+    const workspace = makeWorkspace({ changes: statData });
+    renderChangesTab([workspace]);
 
-    await waitFor(() => {
-      const descriptionInput = screen.getByRole("textbox", { name: "Commit Description" }) as HTMLInputElement;
-      expect(descriptionInput.value).toBe("Add new feature");
-    });
+    const descriptionInput = screen.getByRole("textbox", { name: "Commit Description" }) as HTMLInputElement;
+    expect(descriptionInput.value).toBe("Add new feature");
     expect(screen.getByRole("button", { name: "Update" })).toBeDefined();
-    expect(screen.getByText("Diff")).toBeDefined();
-    expect(screen.getByText("+func newFunction() {")).toBeDefined();
-    expect(screen.getByText("-func oldFunction() {")).toBeDefined();
+    expect(screen.getByText("Diff Stat")).toBeDefined();
+    expect(screen.getByText((content) => content.includes("serve.go") && content.includes("+++++"))).toBeDefined();
   });
 
-  it("renders diff lines with line numbers", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(changesResponse)));
-    renderChangesTab();
+  it("renders View Full Diff button", () => {
+    const workspace = makeWorkspace({ changes: statData });
+    renderChangesTab([workspace]);
 
-    await waitFor(() => {
-      expect(screen.getByText("+func newFunction() {")).toBeDefined();
-    });
-
-    const addLine = screen.getByText("+func newFunction() {");
-    expect(addLine.getAttribute("data-line-number")).toBe("2");
+    expect(screen.getByRole("button", { name: "View Full Diff" })).toBeDefined();
   });
 
-  it("applies diff line styling by line class", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(changesResponse)));
-    const { container } = renderChangesTab();
-    const view = within(container);
+  it("renders stat lines with line number attributes", () => {
+    const workspace = makeWorkspace({ changes: statData });
+    const { container } = renderChangesTab([workspace]);
 
-    await waitFor(() => {
-      expect(view.getByText("+func newFunction() {")).toBeDefined();
-    });
-
-    const addLine = view.getByText("+func newFunction() {");
-    const removeLine = view.getByText("-func oldFunction() {");
-    const headerLine = view.getByText("diff --git a/main.go b/main.go");
-
-    expect(addLine.className).toContain("border-l-4");
-    expect(addLine.className).toContain("border-green-500");
-    expect(removeLine.className).toContain("border-red-500");
-    expect(headerLine.className).toContain("border-yellow-400");
+    const line = container.querySelector("[data-line-number='1']");
+    expect(line).not.toBeNull();
+    expect(line?.textContent).toContain("serve.go");
   });
 
-  it("renders empty diff state", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ description: "", diffLines: [] })));
-    renderChangesTab();
+  it("renders empty diff state when no diff lines", () => {
+    const workspace = makeWorkspace({ changes: { description: "", diffLines: [] } });
+    renderChangesTab([workspace]);
 
-    await waitFor(() => {
-      expect(screen.getByText("No changes to display")).toBeDefined();
-    });
+    expect(screen.getByText("No changes to display")).toBeDefined();
   });
 
-  it("renders error state", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
-    renderChangesTab();
+  it("does not call individual changes API endpoint", () => {
+    const workspace = makeWorkspace({ changes: statData });
+    renderChangesTab([workspace]);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load changes/i)).toBeDefined();
-    });
-  });
-
-  it("calls changes API on mount", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(changesResponse)));
-    renderChangesTab();
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
-    expect(calledUrl).toContain("/api/v1/workspaces/test-project/changes");
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/changes"))).toBe(false);
   });
 });

@@ -1,9 +1,6 @@
-import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiWorkspaceDetailResponse } from "@/types";
+import { useFactoryState } from "@/lib/factory-state";
 
 interface SpecificationTabProps {
   workspaceName: string;
@@ -21,67 +18,31 @@ function SpecificationTabSkeleton() {
 }
 
 export function SpecificationTab({ workspaceName }: SpecificationTabProps) {
-  const [detail, setDetail] = useState<ApiWorkspaceDetailResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
-  const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
+  if (fetchStatus === "fetching" && !workspace) return <SpecificationTabSkeleton />;
 
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !detail ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .get(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setDetail(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (sessionUpdateEvent !== null) {
-      setRefreshKey((k) => k + 1);
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load specification
+        </p>
+      );
     }
-  }, [sessionUpdateEvent]);
-
-  if (loading && !detail) return <SpecificationTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load specification: {error.message}
-      </p>
-    );
+    return null;
   }
-
-  if (!detail) return null;
 
   return (
     <div className="space-y-4">
-      {detail.goalContent ? (
+      {workspace.goalContent ? (
         <details open>
           <summary className="cursor-pointer font-semibold text-sm mb-2">
             GOAL.md
           </summary>
           <MarkdownContent
-            content={detail.goalContent}
+            content={workspace.goalContent}
             className="p-4 border rounded-lg bg-muted/20"
           />
         </details>
@@ -91,13 +52,13 @@ export function SpecificationTab({ workspaceName }: SpecificationTabProps) {
         </div>
       )}
 
-      {detail.hasProjectMgmt && detail.pmContent && (
+      {workspace.hasProjectMgmt && workspace.pmContent && (
         <details open>
           <summary className="cursor-pointer font-semibold text-sm mb-2">
             PROJECT_MANAGEMENT.md
           </summary>
           <MarkdownContent
-            content={detail.pmContent}
+            content={workspace.pmContent}
             className="p-4 border rounded-lg bg-muted/20"
           />
         </details>

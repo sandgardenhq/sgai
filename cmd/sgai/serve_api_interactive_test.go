@@ -65,7 +65,7 @@ func TestSelfDriveSetsInteractionMode(t *testing.T) {
 	})
 }
 
-func TestBuildWorkspaceDetailUsesInteractionMode(t *testing.T) {
+func TestBuildWorkspaceFullStateUsesInteractionMode(t *testing.T) {
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
 	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
@@ -78,9 +78,13 @@ func TestBuildWorkspaceDetailUsesInteractionMode(t *testing.T) {
 	}
 
 	srv := NewServer(rootDir)
-	detail := srv.buildWorkspaceDetail(workspace)
+	ws := workspaceInfo{
+		Directory: workspace,
+		DirName:   "test-project",
+	}
+	detail := srv.buildWorkspaceFullState(ws, nil)
 	if !detail.InteractiveAuto {
-		t.Fatal("workspace detail should report interactive auto when mode is self-drive")
+		t.Fatal("workspace full state should report interactive auto when mode is self-drive")
 	}
 }
 
@@ -121,10 +125,11 @@ func TestStartAPISetsModeBrainstorming(t *testing.T) {
 	}
 }
 
-func TestHandleAPIWorkspaceSessionUsesInteractionMode(t *testing.T) {
+func TestHandleAPIStateUsesInteractionMode(t *testing.T) {
+	installFakeJJWithWorkspaceList(t, 1)
 	rootDir := t.TempDir()
 	workspace := filepath.Join(rootDir, "test-project")
-	if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+	if errMkdir := os.MkdirAll(filepath.Join(workspace, ".jj", "repo"), 0755); errMkdir != nil {
 		t.Fatal(errMkdir)
 	}
 	createsgaiDir(t, workspace)
@@ -134,20 +139,25 @@ func TestHandleAPIWorkspaceSessionUsesInteractionMode(t *testing.T) {
 	}
 
 	srv := NewServer(rootDir)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/test-project/session", nil)
-	req.SetPathValue("name", "test-project")
-	resp := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	srv.registerAPIRoutes(mux)
 
-	srv.handleAPIWorkspaceSession(resp, req)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
+	resp := httptest.NewRecorder()
+	mux.ServeHTTP(resp, req)
+
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
 	}
 
-	var got apiSessionResponse
+	var got apiFactoryState
 	if errDecode := json.NewDecoder(resp.Body).Decode(&got); errDecode != nil {
 		t.Fatalf("failed to decode response: %v", errDecode)
 	}
-	if !got.InteractiveAuto {
-		t.Fatal("session response should report interactive auto when mode is self-drive")
+	if len(got.Workspaces) == 0 {
+		t.Fatal("expected at least one workspace in state response")
+	}
+	if !got.Workspaces[0].InteractiveAuto {
+		t.Fatal("state response should report interactive auto when mode is self-drive")
 	}
 }

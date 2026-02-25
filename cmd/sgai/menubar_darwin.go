@@ -87,8 +87,8 @@ func menuBarClickHandler(ctx context.Context, state *darwinMenuBarState) {
 }
 
 func menuBarUpdateLoop(ctx context.Context, srv *Server, state *darwinMenuBarState) {
-	ch := srv.sseBroker.subscribe()
-	defer srv.sseBroker.unsubscribe(ch)
+	sub := srv.signals.subscribe()
+	defer srv.signals.unsubscribe(sub)
 
 	rebuildMenuFromServer(srv, state)
 
@@ -96,9 +96,9 @@ func menuBarUpdateLoop(ctx context.Context, srv *Server, state *darwinMenuBarSta
 		select {
 		case <-ctx.Done():
 			return
-		case <-ch.done:
+		case <-sub.done:
 			return
-		case <-ch.events:
+		case <-sub.ch:
 			rebuildMenuFromServer(srv, state)
 		}
 	}

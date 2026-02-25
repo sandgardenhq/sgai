@@ -2,105 +2,76 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WorkspaceDetail } from "./WorkspaceDetail";
-import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiWorkspaceDetailResponse } from "@/types";
+import type { ApiWorkspaceEntry } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  listeners: Map<string, ((event: MessageEvent) => void)[]> = new Map();
-  constructor(url: string) { this.url = url; }
-  addEventListener(type: string, listener: (event: MessageEvent) => void) {
-    const existing = this.listeners.get(type) ?? [];
-    existing.push(listener);
-    this.listeners.set(type, existing);
-  }
-  removeEventListener(type: string, listener: (event: MessageEvent) => void) {
-    const existing = this.listeners.get(type) ?? [];
-    this.listeners.set(type, existing.filter((item) => item !== listener));
-  }
-  close() { this.closed = true; }
-  simulateEvent(type: string, data: string) {
-    const event = new MessageEvent(type, { data });
-    const listeners = this.listeners.get(type) ?? [];
-    for (const listener of listeners) {
-      listener(event);
-    }
-  }
-}
-
-const originalEventSource = globalThis.EventSource;
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
-let mockEventSources: MockEventSource[] = [];
 
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   window.sessionStorage.clear();
-  mockEventSources = [];
-  (globalThis as unknown as { EventSource: typeof MockEventSource }).EventSource =
-    class extends MockEventSource {
-      constructor(url: string) {
-        super(url);
-        mockEventSources.push(this);
-      }
-    } as unknown as typeof EventSource;
-  resetDefaultSSEStore();
-  resetAllWorkspaceSSEStores();
 });
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  resetAllWorkspaceSSEStores();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
 });
 
-const workspaceDetail: ApiWorkspaceDetailResponse = {
-  name: "test-project",
-  dir: "/home/user/test-project",
-  running: true,
-  needsInput: false,
-  status: "working",
-  badgeClass: "running",
-  badgeText: "Running",
-  isRoot: false,
-  isFork: false,
-  pinned: false,
-  hasSgai: true,
-  hasEditedGoal: true,
-  interactiveAuto: false,
-  continuousMode: false,
-  currentAgent: "react-developer",
-  currentModel: "anthropic/claude-opus-4-6",
-  task: "Implementing Dashboard component",
-  goalContent: "<h1>Project Goal</h1>",
-  rawGoalContent: "# Project Goal",
-  fullGoalContent: "---\n---\n\n# Project Goal",
-  pmContent: "<p>PM Content</p>",
-  hasProjectMgmt: true,
-  svgHash: "abc123",
-  totalExecTime: "45m 30s",
-  latestProgress: "Working on React migration M2",
-  agentSequence: [
-    { agent: "coordinator", elapsedTime: "5m", isCurrent: false },
-    { agent: "react-developer", elapsedTime: "10m", isCurrent: true },
-  ],
-  cost: {
-    totalCost: 0.05,
-    inputTokens: 5000,
-    outputTokens: 2000,
-    cacheCreationInputTokens: 1000,
-    cacheReadInputTokens: 500,
-  },
-  forks: [],
-};
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-project",
+    dir: "/home/user/test-project",
+    running: true,
+    needsInput: false,
+    inProgress: true,
+    pinned: false,
+    isRoot: false,
+    isFork: false,
+    status: "working",
+    badgeClass: "running",
+    badgeText: "Running",
+    hasSgai: true,
+    hasEditedGoal: true,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "react-developer",
+    currentModel: "anthropic/claude-opus-4-6",
+    task: "Implementing Dashboard component",
+    goalContent: "<h1>Project Goal</h1>",
+    rawGoalContent: "# Project Goal",
+    fullGoalContent: "---\n---\n\n# Project Goal",
+    pmContent: "<p>PM Content</p>",
+    hasProjectMgmt: true,
+    svgHash: "abc123",
+    totalExecTime: "45m 30s",
+    latestProgress: "Working on React migration M2",
+    humanMessage: "",
+    agentSequence: [
+      { agent: "coordinator", elapsedTime: "5m", isCurrent: false },
+      { agent: "react-developer", elapsedTime: "10m", isCurrent: true },
+    ],
+    cost: {
+      totalCost: 0.05,
+      totalTokens: { input: 5000, output: 2000, reasoning: 100, cacheRead: 500, cacheWrite: 0 },
+      byAgent: [],
+    },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    forks: [],
+    ...overrides,
+  };
+}
 
-function renderWorkspaceDetail(path = "/workspaces/test-project/progress") {
+function renderWorkspaceDetail(path = "/workspaces/test-project/progress", workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle") {
+  mock.module("@/lib/factory-state", () => ({
+    useFactoryState: () => ({ workspaces, fetchStatus, lastFetchedAt: Date.now() }),
+    resetFactoryStateStore: () => {},
+  }));
   return render(
     <MemoryRouter initialEntries={[path]}>
       <TooltipProvider>
@@ -114,20 +85,15 @@ function renderWorkspaceDetail(path = "/workspaces/test-project/progress") {
 }
 
 describe("WorkspaceDetail", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(
-      () => new Promise(() => {}),
-    );
-    renderWorkspaceDetail();
+  it("renders loading skeleton when fetching with no workspace", () => {
+    renderWorkspaceDetail("/workspaces/test-project/progress", [], "fetching");
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders workspace header when data loads", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+  it("renders workspace header when data loads from factory state", async () => {
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
@@ -135,10 +101,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders status badge", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("running")).toBeDefined();
@@ -146,10 +110,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders execution timer", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("45m 30s")).toBeDefined();
@@ -160,10 +122,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders status line with agent and model", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
@@ -174,10 +134,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("does not render latest progress banner", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
@@ -187,10 +145,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders tab navigation", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     expect(await screen.findByRole("link", { name: "Progress" })).toBeDefined();
     expect(screen.getByRole("link", { name: "Log" })).toBeDefined();
@@ -199,20 +155,16 @@ describe("WorkspaceDetail", () => {
   });
 
   it("highlights active tab based on URL", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail("/workspaces/test-project/progress");
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     const progressLink = await screen.findByRole("link", { name: "Progress" });
     expect(progressLink.getAttribute("aria-current")).toBe("page");
   });
 
   it("renders entity browser links (Agents, Skills, Snippets)", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     expect(await screen.findByRole("button", { name: "Agents" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Skills" })).toBeDefined();
@@ -220,14 +172,10 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders workspace action buttons", async () => {
-    const stoppedDetail = { ...workspaceDetail, running: false };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(stoppedDetail))),
-    );
-    renderWorkspaceDetail();
+    const stoppedWorkspace = makeWorkspace({ running: false });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);
 
     expect(await screen.findByRole("button", { name: "Self-drive" })).toBeDefined();
-
     expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Fork" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Compose GOAL" })).toBeDefined();
@@ -238,10 +186,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("hides fork and compose actions when running", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    const { container } = renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: true });
+    const { container } = renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
     const view = within(container);
 
     await waitFor(() => {
@@ -255,26 +201,20 @@ describe("WorkspaceDetail", () => {
   });
 
   it("shows open in OpenCode when running", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: true });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     expect(await screen.findByRole("button", { name: "Open in OpenCode" })).toBeDefined();
   });
 
   it("shows fork, open editor, and pin actions for root workspaces with forks", async () => {
-    const rootWithForks = {
-      ...workspaceDetail,
+    const rootWithForks = makeWorkspace({
       isRoot: true,
       isFork: false,
       running: false,
-      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
-    };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(rootWithForks))),
-    );
-    renderWorkspaceDetail();
+      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0, commits: [] }],
+    });
+    renderWorkspaceDetail("/workspaces/test-project/forks", [rootWithForks]);
 
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
@@ -297,104 +237,57 @@ describe("WorkspaceDetail", () => {
   });
 
   it("shows open in OpenCode for running root workspaces with forks", async () => {
-    const rootRunning = {
-      ...workspaceDetail,
+    const rootRunning = makeWorkspace({
       isRoot: true,
       isFork: false,
       running: true,
-      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
-    };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(rootRunning))),
-    );
-    renderWorkspaceDetail();
+      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0, commits: [] }],
+    });
+    renderWorkspaceDetail("/workspaces/test-project/forks", [rootRunning]);
 
     expect(await screen.findByRole("button", { name: "Open in OpenCode" })).toBeDefined();
   });
 
   it("renders no-workspace state when hasSgai is false", async () => {
-    const noWorkspace = { ...workspaceDetail, hasSgai: false, isRoot: false };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(noWorkspace))),
-    );
-    renderWorkspaceDetail();
+    const noWorkspace = makeWorkspace({ hasSgai: false, isRoot: false });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [noWorkspace]);
 
     await waitFor(() => {
       expect(screen.getByText(/No workspace configured/i)).toBeDefined();
     });
   });
 
-  it("renders error message when API fails", async () => {
-    mockFetch.mockRejectedValue(new Error("Network error"));
-    renderWorkspaceDetail();
+  it("renders error message when fetchStatus is error", async () => {
+    renderWorkspaceDetail("/workspaces/test-project/progress", [], "error");
 
     await waitFor(() => {
       expect(screen.getByText(/Failed to load workspace/i)).toBeDefined();
     });
   });
 
-  it("calls workspace detail API with correct name", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
+  it("does not call individual workspace detail API endpoint", async () => {
+    const workspace = makeWorkspace();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
-      const detailCalls = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCalls.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("test-project")).toBeDefined();
     });
 
-    const detailCall = mockFetch.mock.calls.find(
-      (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-    );
-    const calledUrl = (detailCall as unknown[])[0] as string;
-    expect(calledUrl).toBe("/api/v1/workspaces/test-project");
-  });
-
-  it("refreshes detail on workspace SSE and global SSE events", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
-
-    await waitFor(() => {
-      const detailCalls = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCalls.length).toBe(1);
-      expect(mockEventSources.length).toBeGreaterThan(0);
-    });
-
-    const globalSource = mockEventSources.find((s) => s.url === "/api/v1/events/stream");
-    const workspaceSource = mockEventSources.find((s) => s.url.includes("/workspaces/test-project/events/stream"));
-    expect(globalSource).toBeDefined();
-    expect(workspaceSource).toBeDefined();
-
-    globalSource!.simulateEvent("workspace:update", JSON.stringify({ workspace: "test-project" }));
-    await waitFor(() => {
-      const detailCalls = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCalls.length).toBe(2);
-    });
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url === "/api/v1/workspaces/test-project")).toBe(false);
   });
 
   it("does not render action messages after start", async () => {
-    const stoppedDetail = { ...workspaceDetail, running: false };
+    const stoppedWorkspace = makeWorkspace({ running: false });
     mockFetch.mockImplementation((input) => {
       const url = String(input);
       if (url.includes("/api/v1/workspaces/test-project/start")) {
         return Promise.resolve(new Response(JSON.stringify({ running: true, message: "Session started" })));
       }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(stoppedDetail)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    renderWorkspaceDetail();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);
 
     const startButton = await screen.findByRole("button", { name: "Start" });
     fireEvent.click(startButton);
@@ -404,20 +297,17 @@ describe("WorkspaceDetail", () => {
     });
   });
 
-  it("sends auto=false when Start is clicked even if interactiveAuto is true", async () => {
-    const stoppedAutoDetail = { ...workspaceDetail, running: false, interactiveAuto: true };
-    mockFetch.mockImplementation((input, init) => {
+  it("sends auto=false when Start is clicked", async () => {
+    const stoppedWorkspace = makeWorkspace({ running: false, interactiveAuto: true });
+    mockFetch.mockImplementation((input) => {
       const url = String(input);
       if (url.includes("/api/v1/workspaces/test-project/start")) {
         return Promise.resolve(new Response(JSON.stringify({ running: true, message: "Session started" })));
       }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(stoppedAutoDetail)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    renderWorkspaceDetail();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);
 
     const startButton = await screen.findByRole("button", { name: "Start" });
     fireEvent.click(startButton);
@@ -433,19 +323,16 @@ describe("WorkspaceDetail", () => {
   });
 
   it("sends auto=true when Self-Drive is clicked", async () => {
-    const stoppedDetail = { ...workspaceDetail, running: false };
+    const stoppedWorkspace = makeWorkspace({ running: false });
     mockFetch.mockImplementation((input) => {
       const url = String(input);
       if (url.includes("/api/v1/workspaces/test-project/start")) {
         return Promise.resolve(new Response(JSON.stringify({ running: true, message: "Session started" })));
       }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(stoppedDetail)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    renderWorkspaceDetail();
+    renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);
 
     const selfDriveButton = await screen.findByRole("button", { name: "Self-drive" });
     fireEvent.click(selfDriveButton);
@@ -461,11 +348,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("hides respond button when there is no pending question", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace({ needsInput: false });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
@@ -474,37 +358,23 @@ describe("WorkspaceDetail", () => {
     expect(screen.queryByRole("button", { name: "Respond" })).toBeNull();
   });
 
-  it("shows respond button when a pending question exists", async () => {
-    const detailWithInput = { ...workspaceDetail, needsInput: true };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(detailWithInput))),
-    );
-
-    renderWorkspaceDetail();
+  it("shows respond button when needsInput is true", async () => {
+    const workspace = makeWorkspace({ needsInput: true });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     const respondButton = await screen.findByRole("button", { name: "Respond" });
     expect(respondButton).toBeDefined();
   });
 
   it("hides status and timer pills for root workspaces with forks", async () => {
-    const rootWithForks = {
-      ...workspaceDetail,
+    const rootWithForks = makeWorkspace({
       isRoot: true,
       isFork: false,
       running: false,
-      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0 }],
-    };
-    mockFetch.mockImplementation((url: string | URL | Request) => {
-      if (typeof url === "string" && url.includes("/api/v1/models")) {
-        return Promise.resolve(new Response(JSON.stringify({
-          models: [{ id: "test-model", name: "Test Model" }],
-          defaultModel: "test-model",
-        })));
-      }
-      return Promise.resolve(new Response(JSON.stringify(rootWithForks)));
+      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0, commits: [] }],
     });
 
-    const { container } = renderWorkspaceDetail();
+    const { container } = renderWorkspaceDetail("/workspaces/test-project/forks", [rootWithForks]);
     await waitFor(() => {
       expect(screen.getByText("test-project")).toBeDefined();
     });
@@ -515,33 +385,9 @@ describe("WorkspaceDetail", () => {
     expect(headerScope?.queryByText("stopped") ?? null).toBeNull();
   });
 
-  it("does not poll while running — relies on SSE events instead", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
-    );
-    renderWorkspaceDetail();
-
-    await waitFor(() => {
-      const detailCalls = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCalls.length).toBe(1);
-    });
-
-    await new Promise((r) => setTimeout(r, 3500));
-
-    const detailCalls = mockFetch.mock.calls.filter(
-      (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-    );
-    expect(detailCalls.length).toBe(1);
-  });
-
   it("renders rename link for fork workspaces", async () => {
-    const forkDetail = { ...workspaceDetail, isFork: true };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(forkDetail))),
-    );
-    renderWorkspaceDetail();
+    const forkWorkspace = makeWorkspace({ isFork: true });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [forkWorkspace]);
 
     await waitFor(() => {
       expect(screen.getByText(/test-project ✏️/)).toBeDefined();
@@ -549,11 +395,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders stopped badge when not running", async () => {
-    const stopped = { ...workspaceDetail, running: false };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(stopped))),
-    );
-    renderWorkspaceDetail();
+    const stoppedWorkspace = makeWorkspace({ running: false });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);
 
     await waitFor(() => {
       expect(screen.getByText("stopped")).toBeDefined();
@@ -561,11 +404,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders Continuous Self-Drive button when continuousMode is true and not running", async () => {
-    const continuousDetail = { ...workspaceDetail, running: false, continuousMode: true };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(continuousDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: false, continuousMode: true });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     expect(await screen.findByRole("button", { name: "Continuous Self-Drive" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Self-drive" })).toBeNull();
@@ -574,11 +414,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders Continuous Self-Drive and Stop buttons when continuousMode is true and running", async () => {
-    const continuousRunning = { ...workspaceDetail, running: true, continuousMode: true };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(continuousRunning))),
-    );
-    const { container } = renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: true, continuousMode: true });
+    const { container } = renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
     const view = within(container);
 
     expect(await view.findByRole("button", { name: "Continuous Self-Drive" })).toBeDefined();
@@ -588,11 +425,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders normal buttons when continuousMode is false and not running", async () => {
-    const normalDetail = { ...workspaceDetail, running: false, continuousMode: false };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(normalDetail))),
-    );
-    renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: false, continuousMode: false });
+    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
 
     expect(await screen.findByRole("button", { name: "Self-drive" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
@@ -601,11 +435,8 @@ describe("WorkspaceDetail", () => {
   });
 
   it("renders normal buttons when continuousMode is false and running", async () => {
-    const normalRunning = { ...workspaceDetail, running: true, continuousMode: false };
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify(normalRunning))),
-    );
-    const { container } = renderWorkspaceDetail();
+    const workspace = makeWorkspace({ running: true, continuousMode: false });
+    const { container } = renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
     const view = within(container);
 
     expect(await view.findByRole("button", { name: "Self-Drive" })).toBeDefined();
@@ -614,19 +445,16 @@ describe("WorkspaceDetail", () => {
   });
 
   it("shows interrupted banner and reset action when status is working but session is stopped", async () => {
-    const interrupted = { ...workspaceDetail, running: false, status: "working" };
+    const interrupted = makeWorkspace({ running: false, status: "working" });
     mockFetch.mockImplementation((input: string | URL | Request) => {
       const url = String(input);
       if (url.includes("/reset")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, status: "idle" })));
       }
-      if (url.includes("/api/v1/workspaces/test-project")) {
-        return Promise.resolve(new Response(JSON.stringify(interrupted)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    renderWorkspaceDetail("/workspaces/test-project/progress");
+    renderWorkspaceDetail("/workspaces/test-project/progress", [interrupted]);
 
     await waitFor(() => {
       expect(screen.getByText("sgai was interrupted while working. Reset state to start fresh.")).toBeDefined();

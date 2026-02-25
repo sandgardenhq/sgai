@@ -90,10 +90,7 @@ func (g *summaryGenerator) runGeneration(workspacePath string) {
 
 	saveSummaryIfNotManual(workspacePath, summary)
 
-	g.server.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{
-		Type: "session:update",
-		Data: map[string]string{"workspace": filepath.Base(workspacePath)},
-	})
+	g.server.notifyStateChange()
 }
 
 func (g *summaryGenerator) stop() {

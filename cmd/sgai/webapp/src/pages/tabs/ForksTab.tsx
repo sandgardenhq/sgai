@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useTransition, type MouseEvent } from "react";
+import { useState, useTransition, useMemo, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +13,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PromptHistory } from "@/components/PromptHistory";
 import { api } from "@/lib/api";
-import { useSSEEvent } from "@/hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
-import type { ApiForksResponse, ApiForkEntry, ApiForkCommit } from "@/types";
+import type { ApiForkEntry, ApiForkCommit } from "@/types";
 
 interface ForksTabProps {
   workspaceName: string;
@@ -79,7 +79,7 @@ function ForkCommitList({ commits }: { commits: ApiForkCommit[] }) {
   );
 }
 
-function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry; rootName: string; needsInput: boolean; onRefresh: () => void }) {
+function ForkRow({ fork, rootName, needsInput }: { fork: ApiForkEntry; rootName: string; needsInput: boolean }) {
   const navigate = useNavigate();
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActionPending, startActionTransition] = useTransition();
@@ -109,7 +109,6 @@ function ForkRow({ fork, rootName, needsInput, onRefresh }: { fork: ApiForkEntry
     startActionTransition(async () => {
       try {
         await api.workspaces.deleteFork(rootName, fork.dir);
-        onRefresh();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to delete fork");
       }
@@ -341,78 +340,32 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
 }
 
 export function ForksTab({ workspaceName }: ForksTabProps) {
-  const [data, setData] = useState<ApiForksResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [needsInputMap, setNeedsInputMap] = useState<Record<string, boolean>>({});
-  const hasLoadedRef = useRef(false);
+  const { workspaces: allWorkspaces, fetchStatus } = useFactoryState();
 
-  const workspaceEvent = useSSEEvent("workspace:update");
+  const workspace = allWorkspaces.find((ws) => ws.name === workspaceName);
 
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    if (!hasLoadedRef.current) {
-      setLoading(true);
+  const needsInputMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const ws of allWorkspaces) {
+      map[ws.name] = ws.needsInput;
     }
-    setError(null);
+    return map;
+  }, [allWorkspaces]);
 
-    Promise.all([
-      api.workspaces.forks(workspaceName),
-      api.workspaces.list(),
-    ])
-      .then(([response, listResponse]) => {
-        if (!cancelled) {
-          setData(response);
-          const nextNeedsInput: Record<string, boolean> = {};
-          for (const ws of listResponse.workspaces ?? []) {
-            nextNeedsInput[ws.name] = ws.needsInput;
-            if (ws.forks) {
-              for (const fork of ws.forks) {
-                nextNeedsInput[fork.name] = fork.needsInput;
-              }
-            }
-          }
-          setNeedsInputMap(nextNeedsInput);
-          setLoading(false);
-          hasLoadedRef.current = true;
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-          hasLoadedRef.current = true;
-        }
-      });
+  if (fetchStatus === "fetching" && !workspace) return <ForksTabSkeleton />;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (workspaceEvent !== null) {
-      setRefreshKey((k) => k + 1);
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load forks
+        </p>
+      );
     }
-  }, [workspaceEvent]);
-
-  if (loading && !data) return <ForksTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load forks: {error.message}
-      </p>
-    );
+    return null;
   }
 
-  if (!data) return null;
-
-  const forks = data.forks ?? [];
-  const handleRefresh = () => setRefreshKey((k) => k + 1);
+  const forks = workspace.forks ?? [];
 
   return (
     <div className="space-y-4">
@@ -427,7 +380,6 @@ export function ForksTab({ workspaceName }: ForksTabProps) {
             fork={fork}
             rootName={workspaceName}
             needsInput={needsInputMap[fork.name] ?? false}
-            onRefresh={handleRefresh}
           />
         ))
       )}

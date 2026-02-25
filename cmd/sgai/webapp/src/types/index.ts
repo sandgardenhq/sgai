@@ -42,56 +42,10 @@ export interface ApiWorkspaceEntry {
   inProgress: boolean;
   pinned: boolean;
   isRoot: boolean;
-  status: string;
-  hasSgai: boolean;
-  summary?: string;
-  forks?: ApiWorkspaceEntry[];
-}
-
-export interface ApiWorkspacesResponse {
-  workspaces: ApiWorkspaceEntry[];
-}
-
-export interface ApiAgentSequenceEntry {
-  agent: string;
-  elapsedTime: string;
-  isCurrent: boolean;
-}
-
-export interface ApiWorkspaceForkSummary {
-  name: string;
-  dir: string;
-  running: boolean;
-  commitAhead: number;
-  summary?: string;
-}
-
-export interface SessionCost {
-  totalCost: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-}
-
-export interface ApiActionEntry {
-  name: string;
-  model: string;
-  prompt: string;
-  description?: string;
-}
-
-export interface ApiWorkspaceDetailResponse {
-  name: string;
-  dir: string;
-  running: boolean;
-  needsInput: boolean;
+  isFork: boolean;
   status: string;
   badgeClass: string;
   badgeText: string;
-  isRoot: boolean;
-  isFork: boolean;
-  pinned: boolean;
   hasSgai: boolean;
   hasEditedGoal: boolean;
   interactiveAuto: boolean;
@@ -107,13 +61,43 @@ export interface ApiWorkspaceDetailResponse {
   svgHash: string;
   totalExecTime: string;
   latestProgress: string;
-  agentSequence: ApiAgentSequenceEntry[];
-  cost: SessionCost;
+  humanMessage: string;
   summary?: string;
   summaryManual?: boolean;
-  forks?: ApiWorkspaceForkSummary[];
+  agentSequence: ApiAgentSequenceEntry[];
+  cost: ApiSessionCost;
+  modelStatuses?: ApiModelStatusEntry[];
+  agentModels?: ApiAgentModelEntry[];
+  events: ApiEventEntry[];
+  messages: ApiMessageEntry[];
+  projectTodos: ApiTodoEntry[];
+  agentTodos: ApiTodoEntry[];
+  changes: ApiChangesData;
+  commits: ApiCommitEntry[];
+  forks?: ApiForkEntry[];
+  log: ApiLogEntry[];
+  pendingQuestion?: ApiPendingQuestionResponse;
   actions?: ApiActionEntry[];
 }
+
+export interface ApiWorkspacesResponse {
+  workspaces: ApiWorkspaceEntry[];
+}
+
+export interface ApiAgentSequenceEntry {
+  agent: string;
+  elapsedTime: string;
+  isCurrent: boolean;
+}
+
+
+export interface ApiActionEntry {
+  name: string;
+  model: string;
+  prompt: string;
+  description?: string;
+}
+
 
 export interface ApiGoalResponse {
   content: string;
@@ -246,25 +230,6 @@ export interface ApiSessionActionResponse {
   message: string;
 }
 
-export interface ApiSessionResponse {
-  name: string;
-  status: string;
-  running: boolean;
-  needsInput: boolean;
-  interactiveAuto: boolean;
-  badgeClass: string;
-  badgeText: string;
-  currentAgent: string;
-  currentModel: string;
-  task: string;
-  humanMessage: string;
-  latestProgress: string;
-  totalExecTime: string;
-  svgHash: string;
-  agentSequence: ApiAgentSequenceEntry[];
-  cost: ApiSessionCost;
-  modelStatuses?: ApiModelStatusEntry[];
-}
 
 export interface ApiModelStatusEntry {
   modelId: string;
@@ -321,9 +286,6 @@ export interface ApiMessageEntry {
   createdAt?: string;
 }
 
-export interface ApiMessagesResponse {
-  messages: ApiMessageEntry[];
-}
 
 export interface ApiTodoEntry {
   id: string;
@@ -332,20 +294,12 @@ export interface ApiTodoEntry {
   priority: string;
 }
 
-export interface ApiTodosResponse {
-  projectTodos: ApiTodoEntry[];
-  agentTodos: ApiTodoEntry[];
-  currentAgent: string;
-}
 
 export interface ApiLogEntry {
   prefix: string;
   text: string;
 }
 
-export interface ApiLogResponse {
-  lines: ApiLogEntry[];
-}
 
 export interface ApiDiffLine {
   lineNumber: number;
@@ -353,10 +307,15 @@ export interface ApiDiffLine {
   class: string;
 }
 
-export interface ApiChangesResponse {
+export interface ApiChangesData {
   description: string;
   diffLines: ApiDiffLine[];
 }
+
+export interface ApiDiffResponse {
+  diff: string;
+}
+
 
 export interface ApiCommitEntry {
   changeId: string;
@@ -368,9 +327,6 @@ export interface ApiCommitEntry {
   graphChar: string;
 }
 
-export interface ApiCommitsResponse {
-  commits: ApiCommitEntry[];
-}
 
 export interface ApiEventEntry {
   timestamp: string;
@@ -386,17 +342,6 @@ export interface ApiAgentModelEntry {
   models: string[];
 }
 
-export interface ApiEventsResponse {
-  events: ApiEventEntry[];
-  currentAgent: string;
-  currentModel: string;
-  svgHash: string;
-  needsInput: boolean;
-  humanMessage: string;
-  goalContent: string;
-  modelStatuses?: ApiModelStatusEntry[];
-  agentModels?: ApiAgentModelEntry[];
-}
 
 export interface ApiForkCommit {
   changeId: string;
@@ -410,15 +355,13 @@ export interface ApiForkEntry {
   name: string;
   dir: string;
   running: boolean;
+  needsInput: boolean;
+  inProgress: boolean;
+  pinned: boolean;
   commitAhead: number;
   summary?: string;
   commits: ApiForkCommit[];
 }
-
-export interface ApiForksResponse {
-  forks: ApiForkEntry[];
-}
-
 
 
 export interface ApiComposerAgentConf {
@@ -581,28 +524,3 @@ export interface ApiAdhocResponse {
   message: string;
 }
 
-
-
-export type SSEEventType =
-  | "workspace:update"
-  | "session:update"
-  | "messages:new"
-  | "todos:update"
-  | "log:append"
-  | "changes:update"
-  | "events:new"
-  | "compose:update";
-
-export interface SSEEvent {
-  type: SSEEventType;
-  data: unknown;
-  timestamp: string;
-}
-
-export type ConnectionStatus = "connected" | "disconnected" | "reconnecting";
-
-export interface SSEStoreSnapshot {
-  connectionStatus: ConnectionStatus;
-  lastEvent: SSEEvent | null;
-  events: Record<SSEEventType, unknown>;
-}
