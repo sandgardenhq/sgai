@@ -758,7 +758,9 @@ func TestLoadPinnedProjects(t *testing.T) {
 
 	t.Run("withPaths", func(t *testing.T) {
 		configDir := t.TempDir()
-		data, _ := json.Marshal([]string{"/path/to/a", "/path/to/b"})
+		dirA := t.TempDir()
+		dirB := t.TempDir()
+		data, _ := json.Marshal([]string{dirA, dirB})
 		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -772,11 +774,11 @@ func TestLoadPinnedProjects(t *testing.T) {
 		if len(srv.pinnedDirs) != 2 {
 			t.Fatalf("pinnedDirs should have 2 entries; got %d", len(srv.pinnedDirs))
 		}
-		if !srv.pinnedDirs["/path/to/a"] {
-			t.Error("expected /path/to/a to be pinned")
+		if !srv.pinnedDirs[dirA] {
+			t.Errorf("expected %s to be pinned", dirA)
 		}
-		if !srv.pinnedDirs["/path/to/b"] {
-			t.Error("expected /path/to/b to be pinned")
+		if !srv.pinnedDirs[dirB] {
+			t.Errorf("expected %s to be pinned", dirB)
 		}
 	})
 
@@ -791,6 +793,42 @@ func TestLoadPinnedProjects(t *testing.T) {
 		}
 		if err := srv.loadPinnedProjects(); err == nil {
 			t.Error("loadPinnedProjects() should return error for invalid JSON")
+		}
+	})
+
+	t.Run("prunesNonexistentDirectories", func(t *testing.T) {
+		configDir := t.TempDir()
+		realDir := t.TempDir()
+		data, _ := json.Marshal([]string{realDir, "/nonexistent/path/that/does/not/exist"})
+		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		srv := &Server{
+			pinnedDirs:      make(map[string]bool),
+			pinnedConfigDir: configDir,
+		}
+		if err := srv.loadPinnedProjects(); err != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
+		}
+		if len(srv.pinnedDirs) != 1 {
+			t.Fatalf("pinnedDirs should have 1 entry; got %d", len(srv.pinnedDirs))
+		}
+		if !srv.pinnedDirs[realDir] {
+			t.Errorf("expected %s to be pinned", realDir)
+		}
+		diskData, err := os.ReadFile(filepath.Join(configDir, "pinned.json"))
+		if err != nil {
+			t.Fatalf("failed to read pinned.json: %v", err)
+		}
+		var diskDirs []string
+		if err := json.Unmarshal(diskData, &diskDirs); err != nil {
+			t.Fatalf("failed to parse pinned.json: %v", err)
+		}
+		if len(diskDirs) != 1 {
+			t.Fatalf("pinned.json on disk should have 1 entry; got %d", len(diskDirs))
+		}
+		if diskDirs[0] != realDir {
+			t.Errorf("pinned.json on disk should contain %s; got %s", realDir, diskDirs[0])
 		}
 	})
 }
@@ -880,11 +918,12 @@ func TestTogglePin(t *testing.T) {
 
 	t.Run("persistsToDisk", func(t *testing.T) {
 		configDir := filepath.Join(t.TempDir(), "sgai")
+		projectDir := t.TempDir()
 		srv := &Server{
 			pinnedDirs:      make(map[string]bool),
 			pinnedConfigDir: configDir,
 		}
-		if err := srv.togglePin("/path/to/project"); err != nil {
+		if err := srv.togglePin(projectDir); err != nil {
 			t.Fatalf("togglePin() unexpected error: %v", err)
 		}
 		srv2 := &Server{
@@ -894,7 +933,7 @@ func TestTogglePin(t *testing.T) {
 		if err := srv2.loadPinnedProjects(); err != nil {
 			t.Fatalf("loadPinnedProjects() unexpected error: %v", err)
 		}
-		if !srv2.isPinned("/path/to/project") {
+		if !srv2.isPinned(projectDir) {
 			t.Error("pinned project should persist across server instances")
 		}
 	})
