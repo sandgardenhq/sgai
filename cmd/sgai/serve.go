@@ -1342,11 +1342,16 @@ func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
 	if cached, ok := s.workspaceScanCache.get("scan"); ok {
 		return cached, nil
 	}
-	result, err := s.workspaceScanFlight.do("scan", s.doScanWorkspaceGroups)
-	if err == nil {
-		s.workspaceScanCache.set("scan", result)
-	}
-	return result, err
+	return s.workspaceScanFlight.do("scan", func() ([]workspaceGroup, error) {
+		if cached, ok := s.workspaceScanCache.get("scan"); ok {
+			return cached, nil
+		}
+		result, err := s.doScanWorkspaceGroups()
+		if err == nil {
+			s.workspaceScanCache.set("scan", result)
+		}
+		return result, err
+	})
 }
 
 func (s *Server) invalidateWorkspaceScanCache() {
