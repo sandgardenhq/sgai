@@ -9,6 +9,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
 import { useSSEEvent, useWorkspaceSSEEvent } from "@/hooks/useSSE";
+import { useAdhocRun } from "@/hooks/useAdhocRun";
+import { ActionBar } from "./tabs/SessionTab";
+import { ChevronRight, Square } from "lucide-react";
 import type { ApiWorkspaceDetailResponse, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -333,6 +336,23 @@ export function WorkspaceDetail(): JSX.Element | null {
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
   const isInterrupted = detail ? (detail.status === "working" && !detail.running) : false;
+
+  const [actionOutputOpen, setActionOutputOpen] = useState(false);
+  const {
+    output: actionOutput,
+    isRunning: isActionRunning,
+    runError: actionRunError,
+    startRun: startActionRun,
+    stopRun: stopActionRun,
+    outputRef: actionOutputRef,
+  } = useAdhocRun({ workspaceName, skipModelsFetch: true });
+
+  const hasRootActions = isForkedRoot && Boolean(detail?.actions && detail.actions.length > 0);
+
+  const handleActionClick = useCallback((action: ApiActionEntry) => {
+    setActionOutputOpen(true);
+    startActionRun(action.prompt, action.model);
+  }, [startActionRun]);
 
   const handleReset = () => {
     if (!workspaceName) return;
@@ -807,6 +827,47 @@ export function WorkspaceDetail(): JSX.Element | null {
         </div>
 
         <div className="pt-4">
+          {hasRootActions && (
+            <div className="space-y-3 mb-4">
+              <ActionBar
+                actions={detail.actions!}
+                isRunning={isActionRunning}
+                onActionClick={handleActionClick}
+              />
+              {actionRunError ? (
+                <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
+              ) : null}
+              {(isActionRunning || actionOutput) ? (
+                <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
+                  <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                    <ChevronRight
+                      className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
+                      aria-hidden="true"
+                    />
+                    Output
+                    {isActionRunning && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => { e.preventDefault(); stopActionRun(); }}
+                        className="ml-auto"
+                      >
+                        <Square className="mr-1 h-3 w-3" />
+                        Stop
+                      </Button>
+                    )}
+                  </summary>
+                  <pre
+                    ref={actionOutputRef}
+                    className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
+                  >
+                    {actionOutput || (isActionRunning ? "Running..." : "")}
+                  </pre>
+                </details>
+              ) : null}
+            </div>
+          )}
           <Suspense fallback={<TabSkeleton />}>
             <TabContent
               activeTab={activeTab}
