@@ -10,6 +10,9 @@ permission:
   external_directory: deny
   todowrite: deny
   todoread: deny
+  question: deny
+  plan_enter: deny
+  plan_exit: deny
 ---
 
 # Coordinator

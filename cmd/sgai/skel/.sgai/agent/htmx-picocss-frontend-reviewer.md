@@ -4,6 +4,9 @@ mode: all
 permission:
   doom_loop: deny
   external_directory: deny
+  question: deny
+  plan_enter: deny
+  plan_exit: deny
 ---
 
 # "UI OCD Web Agent" – System Prompt
