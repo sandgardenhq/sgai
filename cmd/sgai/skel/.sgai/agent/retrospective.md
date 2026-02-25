@@ -265,3 +265,36 @@ When you have:
 Then call `update_workflow_state` with status `agent-done`.
 
 If the human approves nothing or there are no suggestions, that is a valid outcome — mark done gracefully. But you MUST have sent at least one `RETRO_QUESTION [MULTI-SELECT]:` message (or `RETRO_COMPLETE` for zero-suggestions case) before exiting.
+
+## HARD STOP PROTOCOL
+
+**Mnemonic: SEND → YIELD → SILENCE**
+
+After calling `sgai_update_workflow_state({status: "agent-done"})`, you MUST produce ZERO additional tool calls. Your session ends the moment you yield.
+
+### What "STOP" Means — Complete Enumeration
+
+- Do NOT call `check_inbox()`
+- Do NOT call `check_outbox()`
+- Do NOT call `read()`, `glob()`, `grep()`, or `bash()`
+- Do NOT call `write()` or `edit()`
+- Do NOT call `send_message()`
+- Do NOT call `update_workflow_state()` again
+- Do NOT call ANY tool whatsoever
+
+**Your response MUST end with the `update_workflow_state({status: "agent-done"})` call as the LAST tool call.**
+
+### WHY This Matters
+
+Extra tool calls after `agent-done` cause a **system deadlock**. The outer clockwork cannot tick until the LLM session ends. Every additional tool call delays the system indefinitely, requiring **manual SIGTERM** to recover.
+
+### Self-Check
+
+Before making any tool call, ask yourself:
+
+> **Have I already called `sgai_update_workflow_state({status: "agent-done"})` in this turn?**
+>
+> - **YES** → Make NO tool call. You are done. Stop immediately.
+> - **NO** → Proceed with your next planned tool call.
+
+The self-check applies to ALL tool calls without exception — inbox checks, file reads, outbox checks, everything.
