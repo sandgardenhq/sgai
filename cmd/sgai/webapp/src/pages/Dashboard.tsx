@@ -45,13 +45,8 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
 
   return (
     <span className="flex items-center gap-1 shrink-0">
-      {workspace.pinned && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="text-[0.7rem] opacity-70">📌</span>
-          </TooltipTrigger>
-          <TooltipContent>Pinned</TooltipContent>
-        </Tooltip>
+      {isActive && (
+        <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
       )}
       {workspace.needsInput && (
         <Tooltip>
@@ -61,8 +56,13 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
           <TooltipContent>Waiting for response</TooltipContent>
         </Tooltip>
       )}
-      {isActive && (
-        <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
+      {workspace.pinned && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-[0.7rem] opacity-70">📌</span>
+          </TooltipTrigger>
+          <TooltipContent>Pinned</TooltipContent>
+        </Tooltip>
       )}
     </span>
   );
@@ -135,41 +135,41 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
         <div className="ml-2.5 pl-4 relative before:content-[''] before:absolute before:left-2.5 before:top-0 before:bottom-2 before:w-0.5 before:bg-border before:rounded-sm">
           <SidebarMenu>
             {workspace.forks?.map((fork) => {
-            const forkSelected = fork.name === selectedName;
-            return (
-              <SidebarMenuItem key={fork.name}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={forkSelected}
-                  className="relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
-                >
-                  <Link to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}>
-                    <span className="flex-1 min-w-0 flex flex-col">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-                            {fork.name}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">{fork.name}</TooltipContent>
-                      </Tooltip>
-                      {fork.summary && (
+              const forkSelected = fork.name === selectedName;
+              return (
+                <SidebarMenuItem key={fork.name}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={forkSelected}
+                    className="relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
+                  >
+                    <Link to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}>
+                      <span className="flex-1 min-w-0 flex flex-col">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="text-[0.65rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap leading-tight">
-                              {fork.summary}
+                            <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                              {fork.name}
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">{fork.summary}</TooltipContent>
+                          <TooltipContent side="right">{fork.name}</TooltipContent>
                         </Tooltip>
-                      )}
-                    </span>
-                    <WorkspaceIndicators workspace={fork} />
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
+                        {fork.summary && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-[0.65rem] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap leading-tight">
+                                {fork.summary}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">{fork.summary}</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      <WorkspaceIndicators workspace={fork} />
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </div>
       )}
