@@ -13,6 +13,12 @@
       "description": "Fetch and rebase against upstream main branch"
     },
     {
+      "name": "Absorb Overlay Directory",
+      "model": "anthropic/claude-opus-4-6 (max)",
+      "prompt": "run bash(`make absorb-sgai`)",
+      "description": "Absorb sgai/ into cmd/sgai/skel/.sgai/"
+    },
+    {
       "name": "Deploy",
       "model": "anthropic/claude-opus-4-6 (max)",
       "prompt": "run bash(`make deploy`)",

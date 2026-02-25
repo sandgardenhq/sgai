@@ -106,4 +106,16 @@ describe("CommitsTab", () => {
     const calledUrl = (mockFetch.mock.calls[0] as unknown[])[0] as string;
     expect(calledUrl).toContain("/api/v1/workspaces/test-project/commits");
   });
+
+  it("renders table headers", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(commitsResponse)));
+    renderCommitsTab();
+
+    await waitFor(() => {
+      expect(screen.getByText("Change ID")).toBeDefined();
+    });
+
+    expect(screen.getByText("Time")).toBeDefined();
+    expect(screen.getByText("Description")).toBeDefined();
+  });
 });
