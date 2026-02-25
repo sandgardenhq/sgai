@@ -1,274 +1,197 @@
-# Sandgarden AI Software Factory
+<img src="https://raw.githubusercontent.com/sandgardenhq/sgai/refs/heads/main/assets/images/logo.png" alt="Sgai Logo" width="200">
 
-Define your goals in `GOAL.md`, launch the web dashboard, and watch AI agents work together to build your software. Monitor progress in real-time, provide guidance when needed, and iterate until your goals are achieved.
+# Sgai (pronounced "Sky") - Goal-Driven AI Software Factory
 
-## Automated Setup with opencode
+Define your goal. Launch the dashboard.
+Watch AI agents plan, execute, and validate your software — with you in control.
 
-The fastest way to install SGAI is with [opencode](https://opencode.ai).
+**Example:** "Build a drag-and-drop image compressor" → 3 agents (developer, reviewer, designer) → Working app with tests passing → 45 minutes.
 
-**Before you begin:**
+**📺 [Watch the 4-minute demo →](https://youtu.be/NYmjhwLUg8Q)**
 
-1. **opencode must be up-to-date.** Update it with `opencode update` or reinstall from [opencode.ai/docs/#install](https://opencode.ai/docs/#install).
-2. **You must be authenticated to Claude.** Run `opencode auth login`, select **Anthropic** → **Claude Pro/Max**, and complete the OAuth flow.
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/08-Workspace.png?raw=true" alt="Sgai Dashboard" width="800">
 
-Then run:
+---
 
-```sh
-opencode --model anthropic/claude-opus-4-6 run "install SGAI using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+## What Is Sgai?
+
+Sgai turns software development into a **goal-driven, multi-agent workflow**.
+
+Instead of prompting step-by-step, you:
+
+1. **Define the outcome** — "Build a music sequencer web app"
+2. **Agents plan the work** — Breaking it into a visual workflow diagram of tasks
+3. **You supervise** — Watch progress, answer questions when agents need guidance
+4. **Success checks** — Tests, linting, or other validation determines "done"
+
+Not autocomplete. Not a chat window.
+A local AI software factory.
+
+---
+
+## Why Try It?
+
+* **See what's happening** — Visual workflow diagram instead of hidden AI reasoning
+* **Multiple specialists** — Developer writes code, reviewer checks it, safety analyst validates
+* **Approve before execution** — Review the plan and answer questions, then agents work autonomously
+* **Proof of completion** — Tests must pass before work is marked done
+* **Works locally** — Runs in your repository, nothing leaves your machine
+
+---
+
+## Quick Start
+
+### Recommended: Automated Setup via opencode
+
+```bash
+opencode update
+opencode auth login
+opencode --model anthropic/claude-opus-4-6 run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
 
-This reads [`INSTALLATION.md`](INSTALLATION.md) and automatically detects your platform, installs dependencies, sets up a demo workspace, and starts the dashboard. See [INSTALLATION.md](INSTALLATION.md) for the full step-by-step instructions.
+This runs the official installation guide automatically and launches a demo workspace.
 
-## Prerequisites
+---
 
-| Dependency                                   | Purpose                                                                   |                           |
-|----------------------------------------------|---------------------------------------------------------------------------|---------------------------|
-| [Node.js](https://nodejs.org)                | JavaScript runtime — provides `npx` for MCP server auto-installation      |                           |
-| [bun](https://bun.sh)                        | JavaScript runtime and bundler — builds the React frontend                |                           |
-| [opencode](https://opencode.ai)              | AI inference engine — executes agents, validates models, exports sessions |                           |
-| [jj](https://docs.jj-vcs.dev/) (Jujutsu)     | VCS integration in web UI (diffs, logs, workspace forking)                |                           |
-| [dot](https://graphviz.org/) (Graphviz)      | Renders workflow DAG as proper SVG                                        | Plain-text SVG fallback   |
-| [gh](https://cli.github.com/) (GitHub CLI)   | Creates draft PRs from fork merge flow                                    | Optional — merge works without PR creation |
-| [tmux](https://github.com/tmux/tmux)         | Terminal multiplexer — manages detached sessions for agent processes       |                           |
-| [rg](https://github.com/BurntSushi/ripgrep) (ripgrep) | Fast text search — used by completion verification and code search skills |                           |
+### Manual Installation
 
-### Environment Variables
+**Required:** Go, Node.js, bun, opencode
 
-| Variable        | Purpose                                                                         |
-|-----------------|---------------------------------------------------------------------------------|
-| `SGAI_NTFY`     | URL for [ntfy](https://ntfy.sh) push notifications (optional remote alerting)   |
+**Recommended:** jj (version control), tmux (session management), ripgrep (code search), Graphviz (diagram rendering)
 
-## Installation
+```bash
+go install github.com/sandgardenhq/sgai/cmd/sgai@latest
+```
 
-```sh
+Or build from source:
+
+```bash
 git clone https://github.com/sandgardenhq/sgai.git
 cd sgai
 cd cmd/sgai/webapp && bun install && cd ../../..
 make build
 ```
 
-## Quick Start (macOS)
+See [INSTALLATION.md](https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md) for details.
 
-1. **Install dependencies via Homebrew:**
+---
 
-   ```sh
-   brew install node anomalyco/tap/opencode jj graphviz oven-sh/bun/bun tmux ripgrep
-   ```
+## Run It
 
-2. **Log in to your AI provider:**
+```bash
+sgai serve
+```
 
-   ```sh
-   opencode auth login
-   ```
+Open: [http://localhost:8080](http://localhost:8080)
 
-   Select **Anthropic** → **Claude Pro/Max** and complete the OAuth flow in your browser.
-   For other providers or advanced configuration, see the [providers documentation](https://opencode.ai/docs/providers/).
-
-3. **Create a `GOAL.md` in your project directory:**
-
-   ```markdown
-   ---
-   completionGateScript: make test
-   flow: |
-     "general-purpose"
-     "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-   interactive: yes
-   ---
-
-   # My Project Goal
-
-   Build a REST API with user authentication.
-
-   ## Tasks
-
-   - [ ] Create user registration endpoint
-   - [ ] Create login endpoint with JWT
-   - [ ] Add password hashing
-   ```
-
-4. **Launch the web dashboard:**
-
-   ```sh
-   sgai
-   ```
-
-   Open [http://localhost:8080](http://localhost:8080) in your browser to monitor and control the workflow.
+---
 
 ## How It Works
 
-```
-GOAL.md → sgai → Monitor in Browser → Iterate
-```
+**📺 Prefer watching? See the demo → [https://youtu.be/NYmjhwLUg8Q](https://youtu.be/NYmjhwLUg8Q)**
 
-1. **Define your goals** — Write a `GOAL.md` file describing what you want to build
-2. **Launch the dashboard** — Run `sgai` to start the web interface
-3. **Monitor progress** — Watch agents work in real-time, see diffs, logs, and status updates
-4. **Provide guidance** — When agents need clarification, respond through the web UI
-5. **Iterate** — Review results, update goals, and continue until satisfied
+### 1. Create a Goal
 
-The web dashboard shows:
-- Real-time workflow status and agent activity
-- SVG visualization of the agent DAG
-- Start/Stop controls for the engine
-- Session management and retrospective browsing
-- Goal editing and agent/skill/snippet listing
-- Human response interface for agent questions
+Most users create goals using the built-in wizard.
 
-## Features
+Goals are stored in `GOAL.md` and describe outcomes — not implementation steps.
 
-- **Web dashboard** — Monitor and control agent execution via React SPA with real-time SSE updates, start/stop controls, and human-in-the-loop response interface
-- **Multi-agent orchestration** — DOT-format directed acyclic graphs, inter-agent messaging, coordinator pattern for delegation
-- **GOAL.md-driven development** — Define what you want to build, not how; the AI agents figure out the implementation
-- **Human-in-the-loop** — Interactive mode for when agents need clarification (web UI or terminal)
-- **MCP server** — Exposes workflow management tools (state updates, messaging, skills, snippets) to AI agents
-- **Retrospective system** — Analyze completed sessions, extract reusable skills and snippets
-- **Multi-model support** — Assign different AI models per agent role, run multiple models concurrently
-- **Go-native** — Single binary, fast startup, minimal dependencies
-
-## GOAL.md Reference
-
-Create a `GOAL.md` file in your project directory to define your goals:
+**Example GOAL.md:**
 
 ```markdown
 ---
-completionGateScript: make test-go
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
-models:
-  "coordinator": "anthropic/claude-opus-4-6"
-  "backend-go-developer": "anthropic/claude-sonnet-4-5"
+  "backend-developer" -> "code-reviewer"
+completionGateScript: make test
 interactive: yes
 ---
 
-# My Project Goal
+# Build a REST API
 
-Describe what you want to build here. Be specific about behavior,
-not implementation. Focus on outcomes.
+Create endpoints for user registration and login with JWT auth.
 
-## Requirements
-
-- What should happen when a user does X?
-- What constraints exist?
-- What does success look like?
-
-## Tasks
-
-- [ ] Task 1
-- [ ] Task 2
-  - [ ] Task 2.1
-- [ ] Task 3
-- [ ] Task 4
+- [ ] POST /register validates email, hashes password
+- [ ] POST /login returns JWT token
+- [ ] Tests pass before completion
 ```
 
-### Frontmatter Options
+See [GOAL.example.md](GOAL.example.md) for full reference.
 
-| Field         | Description                                              |
-|---------------|----------------------------------------------------------|
-| `flow`        | DOT-format DAG defining agent execution order            |
-| `models`      | Per-agent AI model assignments (supports variant syntax) |
-| `completionGateScript`   | Shell command that determines workflow completion        |
-| `interactive` | `yes` (respond via web UI), `no` (exit when agent asks a question), `auto` (self-driving) |
+### 2. Agents Plan the Work
 
-### Action Bar
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/02-ChooseATemplate.png?raw=true" alt="Choose a Template" width="600">
 
-The Internals tab includes an **action bar** — a row of buttons that execute prompts with specified models. Each button triggers an ad-hoc agent run.
+Sgai breaks your goal into a workflow diagram of coordinated agents with defined roles.
 
-**Default actions:** Three built-in actions are available out of the box:
+Dependencies are explicit. Execution is visible.
 
-| Action          | Description                                          |
-|-----------------|------------------------------------------------------|
-| Create PR       | Archives GOAL.md, creates a draft PR via `gh`        |
-| Upstream Sync   | Fetches all remotes, rebases against `main@origin`   |
+### 3. Approve the Plan & Monitor
 
-**Custom actions via `sgai.json`:** Define an `actions` array to configure your own buttons:
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/09-Questions.png?raw=true" alt="Agent Questions" width="600">
 
-```json
-{
-  "actions": [
-    {
-      "name": "My Action",
-      "model": "anthropic/claude-opus-4-6 (max)",
-      "prompt": "do something useful"
-    }
-  ]
-}
-```
+Before execution begins, agents ask clarifying questions about your goal.
 
-Each action has three fields:
+Once you approve the plan, agents work autonomously — executing tasks, running tests, and validating completion.
 
-| Field    | Description                                                     |
-|----------|-----------------------------------------------------------------|
-| `name`   | Button label shown in the action bar                            |
-| `model`  | Model to use (supports variant syntax, see below)               |
-| `prompt` | The prompt sent to the model when the button is clicked         |
+You can:
 
-**Override behavior:** If you define **any** actions in `sgai.json`, **all** defaults are replaced. To keep the defaults alongside your own, re-define them in `sgai.json`.
+* Monitor real-time progress (optional)
+* Interrupt execution if needed
+* Review diffs and session history
+* Fork sessions to try different approaches
 
-**Model variant syntax:** The `model` field supports the same variant syntax as the `models` frontmatter attribute. For example, `"anthropic/claude-opus-4-6 (max)"` resolves to model `claude-opus-4-6` with variant `max`.
+Most of the time, you approve the plan and come back when it's done.
 
-See [`sgai.example.json`](sgai.example.json) for a complete example.
+### 4. Learn from Past Sessions with _Skills_
 
-## Usage
+<img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/11-Skills.png?raw=true" alt="Skills Library" width="500">
 
-```sh
-sgai                                # Start on localhost:8080
-sgai --listen-addr 0.0.0.0:8080    # Start accessible externally
-```
+Sgai extracts reusable skills and code snippets from completed sessions — your agents get smarter over time.
 
-## Frontend Development
+---
 
-The web dashboard is a React SPA in `cmd/sgai/webapp/`. Built artifacts are embedded in the Go binary via `//go:embed`.
+## What Happens to Your Code?
 
-### Frontend Stack
+* Agents operate inside your local repository
+* Changes go through your version control (we recommend jj, but Git works)
+* Sgai does not automatically push to remote repositories
 
-| Technology                                    | Purpose                                 |
-|-----------------------------------------------|-----------------------------------------|
-| [React 19](https://react.dev)                 | UI framework                            |
-| [TypeScript](https://www.typescriptlang.org)  | Type-safe JavaScript                    |
-| [Tailwind CSS v4](https://tailwindcss.com)    | Utility-first CSS                       |
-| [shadcn/ui](https://ui.shadcn.com) + Radix UI | Accessible component library            |
-| [React Router](https://reactrouter.com)       | Client-side routing                     |
-| [Lucide React](https://lucide.dev)            | Icons                                   |
+You stay in control.
 
-### Build Commands
-
-```sh
-cd cmd/sgai/webapp
-
-bun install          # Install frontend dependencies
-bun run build        # Production build → dist/
-bun run dev.ts       # Dev server with file watching (proxies API to Go backend)
-bun test src/        # Run unit/component tests
-```
-
-`make build` runs the full pipeline: frontend build (`bun install` + `bun run build`) → Go lint → Go binary.
-
-After making frontend changes, always run:
-
-```sh
-bun run build && make build
-```
+---
 
 ## Contributing
 
-Contributions happen through specifications, not code.
+Sgai accepts improvements as specifications inside `GOALS/`.
 
-**Why specification files instead of code?**
+1. Create `GOALS/YYYY_MM_DD_feature_name.md`
+2. Describe desired behavior and success criteria
+3. Submit a PR
 
-sgai uses configurable AI engines under the hood, but it's the opinionated experience layer. Specifications are translated into implementation by AI. Source code is generated output, not the source of truth. Contributing specs means:
+See the [GOALS directory](https://github.com/sandgardenhq/sgai/tree/main/GOALS) for examples.
 
-- We discuss *what* to build, not *how* to build it
-- Conversations lead to better outcomes than isolated code changes
-- Maintainers can validate proposals against the current implementation
+---
 
-**How to contribute:**
+## Questions?
 
-1. Create a spec file in `GOALS/` following the naming convention:
-   `YYYY_MM_DD_summarized_name.md` (e.g., `2025_12_23_add_parallel_execution.md`)
+**Found a bug or have a feature request?** [Open an issue →](https://github.com/sandgardenhq/sgai/issues)
 
-2. Submit a PR with your spec proposal
+**Want to discuss ideas or share what you built?** [Start a discussion →](https://github.com/sandgardenhq/sgai/discussions)
 
-3. Maintainers will discuss the proposal and, if accepted, run the specification against the current implementation to validate
+---
 
-All are welcome. Questions? Open an issue.
+## Development
+
+Developer documentation lives in `docs/`, produced by [Doc Holiday](https://doc.holiday), of course!
+
+---
+
+## License
+
+[https://github.com/sandgardenhq/sgai/blob/main/LICENSE](https://github.com/sandgardenhq/sgai/blob/main/LICENSE)
+
+---
+
+## About
+
+Sgai was created by [Ulderico Cirello](https://cirello.org/), and is maintained by [Sandgarden](https://www.sandgarden.com/).
