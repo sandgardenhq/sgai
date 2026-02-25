@@ -237,6 +237,13 @@ type Server struct {
 	summaryGen *summaryGenerator
 
 	workspaceScanFlight singleflight[string, []workspaceGroup]
+	workspaceScanCache  *ttlCache[string, []workspaceGroup]
+	classifyFlight      singleflight[string, workspaceKind]
+	classifyCache       *ttlCache[string, workspaceKind]
+	bookmarkFlight      singleflight[string, string]
+	bookmarkCache       *ttlCache[string, string]
+	svgFlight           singleflight[string, string]
+	svgCache            *ttlCache[string, string]
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -263,19 +270,23 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		}
 	}
 	return &Server{
-		sessions:         make(map[string]*session),
-		everStartedDirs:  make(map[string]bool),
-		pinnedDirs:       make(map[string]bool),
-		pinnedConfigDir:  filepath.Join(xdg.ConfigHome, "sgai"),
-		adhocStates:      make(map[string]*adhocPromptState),
-		sseBroker:        newSSEBroker(),
-		workspaceBrokers: make(map[string]*sseBroker),
-		composerSessions: make(map[string]*composerSession),
-		rootDir:          absRootDir,
-		editorAvailable:  editorAvail,
-		isTerminalEditor: editor.isTerminal,
-		editorName:       editor.name,
-		editor:           editor,
+		sessions:           make(map[string]*session),
+		everStartedDirs:    make(map[string]bool),
+		pinnedDirs:         make(map[string]bool),
+		pinnedConfigDir:    filepath.Join(xdg.ConfigHome, "sgai"),
+		adhocStates:        make(map[string]*adhocPromptState),
+		sseBroker:          newSSEBroker(),
+		workspaceBrokers:   make(map[string]*sseBroker),
+		composerSessions:   make(map[string]*composerSession),
+		rootDir:            absRootDir,
+		editorAvailable:    editorAvail,
+		isTerminalEditor:   editor.isTerminal,
+		editorName:         editor.name,
+		editor:             editor,
+		workspaceScanCache: newTTLCache[string, []workspaceGroup](3 * time.Second),
+		classifyCache:      newTTLCache[string, workspaceKind](5 * time.Second),
+		bookmarkCache:      newTTLCache[string, string](30 * time.Second),
+		svgCache:           newTTLCache[string, string](10 * time.Second),
 	}
 }
 
@@ -625,15 +636,6 @@ func linesWithTrailingEmpty(content string) []string {
 	return lines
 }
 
-func getWorkflowSVGHash(dir string, currentAgent string) string {
-	svg := getWorkflowSVG(dir, currentAgent)
-	if svg == "" {
-		return ""
-	}
-	hash := sha256.Sum256([]byte(svg))
-	return hex.EncodeToString(hash[:8])
-}
-
 func getWorkflowSVG(dir string, currentAgent string) string {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	goalData, err := os.ReadFile(goalPath)
@@ -663,6 +665,33 @@ func getWorkflowSVG(dir string, currentAgent string) string {
 	dotContent = injectLightTheme(dotContent)
 
 	return renderDotToSVG(dotContent)
+}
+
+func (s *Server) getWorkflowSVGCached(dir string, currentAgent string) string {
+	cacheKey := dir + "|" + currentAgent
+	if cached, ok := s.svgCache.get(cacheKey); ok {
+		return cached
+	}
+	svg, _ := s.svgFlight.do(cacheKey, func() (string, error) {
+		if cached, ok := s.svgCache.get(cacheKey); ok {
+			return cached, nil
+		}
+		svg := getWorkflowSVG(dir, currentAgent)
+		if svg != "" {
+			s.svgCache.set(cacheKey, svg)
+		}
+		return svg, nil
+	})
+	return svg
+}
+
+func (s *Server) getWorkflowSVGHashCached(dir string, currentAgent string) string {
+	svg := s.getWorkflowSVGCached(dir, currentAgent)
+	if svg == "" {
+		return ""
+	}
+	hash := sha256.Sum256([]byte(svg))
+	return hex.EncodeToString(hash[:8])
 }
 
 type eventsProgressDisplay struct {
@@ -929,6 +958,21 @@ func classifyWorkspace(dir string) workspaceKind {
 	return workspaceStandalone
 }
 
+func (s *Server) classifyWorkspaceCached(dir string) workspaceKind {
+	if kind, ok := s.classifyCache.get(dir); ok {
+		return kind
+	}
+	kind, _ := s.classifyFlight.do(dir, func() (workspaceKind, error) {
+		if kind, ok := s.classifyCache.get(dir); ok {
+			return kind, nil
+		}
+		kind := classifyWorkspace(dir)
+		s.classifyCache.set(dir, kind)
+		return kind, nil
+	})
+	return kind
+}
+
 func hassgaiDirectory(dir string) bool {
 	info, err := os.Stat(filepath.Join(dir, ".sgai"))
 	return err == nil && info.IsDir()
@@ -974,6 +1018,21 @@ func resolveBaseBookmark(rootDir string) string {
 		}
 	}
 	return "main"
+}
+
+func (s *Server) resolveBaseBookmarkCached(rootDir string) string {
+	if bookmark, ok := s.bookmarkCache.get(rootDir); ok {
+		return bookmark
+	}
+	bookmark, _ := s.bookmarkFlight.do(rootDir, func() (string, error) {
+		if bookmark, ok := s.bookmarkCache.get(rootDir); ok {
+			return bookmark, nil
+		}
+		bookmark := resolveBaseBookmark(rootDir)
+		s.bookmarkCache.set(rootDir, bookmark)
+		return bookmark, nil
+	})
+	return bookmark
 }
 
 func runJJLogForFork(bookmark, forkDir string) []jjCommit {
@@ -1280,7 +1339,18 @@ func (s *Server) togglePin(dir string) error {
 }
 
 func (s *Server) scanWorkspaceGroups() ([]workspaceGroup, error) {
-	return s.workspaceScanFlight.do("scan", s.doScanWorkspaceGroups)
+	if cached, ok := s.workspaceScanCache.get("scan"); ok {
+		return cached, nil
+	}
+	result, err := s.workspaceScanFlight.do("scan", s.doScanWorkspaceGroups)
+	if err == nil {
+		s.workspaceScanCache.set("scan", result)
+	}
+	return result, err
+}
+
+func (s *Server) invalidateWorkspaceScanCache() {
+	s.workspaceScanCache.delete("scan")
 }
 
 func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
@@ -1293,7 +1363,7 @@ func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
 	var standaloneGroups []workspaceGroup
 
 	for _, proj := range projects {
-		switch classifyWorkspace(proj.Directory) {
+		switch s.classifyWorkspaceCached(proj.Directory) {
 		case workspaceRoot:
 			if _, exists := rootMap[proj.Directory]; !exists {
 				rootMap[proj.Directory] = &workspaceGroup{

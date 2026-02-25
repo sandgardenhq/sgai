@@ -115,6 +115,10 @@ export interface ApiWorkspaceDetailResponse {
   actions?: ApiActionEntry[];
 }
 
+export interface ApiGoalResponse {
+  content: string;
+}
+
 export interface ApiCreateWorkspaceRequest {
   name: string;
 }

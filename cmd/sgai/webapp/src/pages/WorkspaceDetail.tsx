@@ -261,6 +261,7 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   const sessionUpdateEvent = useWorkspaceSSEEvent(workspaceName, "session:update");
   const workspaceUpdateEvent = useSSEEvent("workspace:update");
+  const sseDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!workspaceName) return;
@@ -304,17 +305,21 @@ export function WorkspaceDetail(): JSX.Element | null {
   useEffect(() => {
     if (!workspaceName) return;
     if (sessionUpdateEvent !== null || workspaceUpdateEvent !== null) {
-      setRefreshKey((k) => k + 1);
+      if (sseDebounceTimerRef.current !== null) {
+        clearTimeout(sseDebounceTimerRef.current);
+      }
+      sseDebounceTimerRef.current = setTimeout(() => {
+        sseDebounceTimerRef.current = null;
+        setRefreshKey((k) => k + 1);
+      }, 500);
     }
+    return () => {
+      if (sseDebounceTimerRef.current !== null) {
+        clearTimeout(sseDebounceTimerRef.current);
+        sseDebounceTimerRef.current = null;
+      }
+    };
   }, [sessionUpdateEvent, workspaceUpdateEvent, workspaceName]);
-
-  useEffect(() => {
-    if (!workspaceName || !detail?.running) return;
-    const timer = setInterval(() => {
-      setRefreshKey((k) => k + 1);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [workspaceName, detail?.running]);
 
   useEffect(() => {
     if (!detail) return;

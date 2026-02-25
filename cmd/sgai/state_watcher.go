@@ -30,7 +30,7 @@ func (s *Server) startStateWatcher() {
 
 func (s *Server) stateWatcherLoop(ctx context.Context) {
 	snapshots := make(map[string]workspaceStateSnapshot)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
