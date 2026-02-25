@@ -212,6 +212,11 @@ func isEditorAvailable(command string) bool {
 	return err == nil
 }
 
+type jjChangesResult struct {
+	diffLines   []apiDiffLine
+	description string
+}
+
 // Server handles HTTP requests for the sgai serve command.
 type Server struct {
 	mu               sync.Mutex
@@ -244,6 +249,11 @@ type Server struct {
 	bookmarkCache       *ttlCache[string, string]
 	svgFlight           singleflight[string, string]
 	svgCache            *ttlCache[string, string]
+
+	jjChangesFlight    singleflight[string, jjChangesResult]
+	forkCommitsFlight  singleflight[string, int]
+	forkLogFlight      singleflight[string, []jjCommit]
+	workspaceLogFlight singleflight[string, []jjCommit]
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -1046,6 +1056,14 @@ func runJJLogForFork(bookmark, forkDir string) []jjCommit {
 	return parseJJLogOutput(string(output))
 }
 
+func (s *Server) runJJLogForForkCached(bookmark, forkDir string) []jjCommit {
+	key := bookmark + "|" + forkDir
+	commits, _ := s.forkLogFlight.do(key, func() ([]jjCommit, error) {
+		return runJJLogForFork(bookmark, forkDir), nil
+	})
+	return commits
+}
+
 func countForkCommitsAhead(bookmark, forkDir string) int {
 	revset := fmt.Sprintf("ancestors(@, 2) ~ ancestors(%s@, 2)", bookmark)
 	cmd := exec.Command("jj", "log", "-r", revset, "--no-graph", "-T", "change_id ++ \"\\n\"")
@@ -1059,6 +1077,14 @@ func countForkCommitsAhead(bookmark, forkDir string) int {
 		return 0
 	}
 	return len(strings.Split(trimmed, "\n"))
+}
+
+func (s *Server) countForkCommitsAheadCached(bookmark, forkDir string) int {
+	key := bookmark + "|" + forkDir
+	count, _ := s.forkCommitsFlight.do(key, func() (int, error) {
+		return countForkCommitsAhead(bookmark, forkDir), nil
+	})
+	return count
 }
 
 func parseJJLogOutput(output string) []jjCommit {
