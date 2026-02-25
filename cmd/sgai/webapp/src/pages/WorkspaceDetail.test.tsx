@@ -515,7 +515,7 @@ describe("WorkspaceDetail", () => {
     expect(headerScope?.queryByText("stopped") ?? null).toBeNull();
   });
 
-  it("polls for workspace detail while running", async () => {
+  it("does not poll while running — relies on SSE events instead", async () => {
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify(workspaceDetail))),
     );
@@ -530,12 +530,10 @@ describe("WorkspaceDetail", () => {
 
     await new Promise((r) => setTimeout(r, 3500));
 
-    await waitFor(() => {
-      const detailCalls = mockFetch.mock.calls.filter(
-        (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
-      );
-      expect(detailCalls.length).toBeGreaterThan(1);
-    });
+    const detailCalls = mockFetch.mock.calls.filter(
+      (call) => (call[0] as string) === "/api/v1/workspaces/test-project",
+    );
+    expect(detailCalls.length).toBe(1);
   });
 
   it("renders rename link for fork workspaces", async () => {

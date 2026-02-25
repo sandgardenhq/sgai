@@ -102,6 +102,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/goal", s.handleAPIGetGoal)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/summary", s.handleAPIUpdateSummary)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStatus)
@@ -826,7 +827,7 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 
 	badgeClass, badgeText := badgeStatus(wfState, running)
 	needsInput := wfState.NeedsHumanInput()
-	kind := classifyWorkspace(workspacePath)
+	kind := s.classifyWorkspaceCached(workspacePath)
 
 	currentAgent := wfState.CurrentAgent
 	if currentAgent == "" {
@@ -876,7 +877,7 @@ func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailRe
 		FullGoalContent: fullGoalContent,
 		PMContent:       pmContent,
 		HasProjectMgmt:  hasProjectMgmt,
-		SVGHash:         getWorkflowSVGHash(workspacePath, currentAgent),
+		SVGHash:         s.getWorkflowSVGHashCached(workspacePath, currentAgent),
 		TotalExecTime:   totalExecTime,
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		AgentSequence:   agentSeq,
@@ -953,7 +954,7 @@ func (s *Server) collectForkSummaries(rootDir string) []apiWorkspaceForkSummary 
 		if grp.Root.Directory != rootDir {
 			continue
 		}
-		bookmark := resolveBaseBookmark(rootDir)
+		bookmark := s.resolveBaseBookmarkCached(rootDir)
 		summaries := make([]apiWorkspaceForkSummary, 0, len(grp.Forks))
 		for _, fork := range grp.Forks {
 			forkState, _ := state.Load(statePath(fork.Directory))
@@ -1010,6 +1011,8 @@ func (s *Server) handleAPICreateWorkspace(w http.ResponseWriter, r *http.Request
 		http.Error(w, "failed to initialize workspace", http.StatusInternalServerError)
 		return
 	}
+
+	s.invalidateWorkspaceScanCache()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -1117,7 +1120,7 @@ func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Reques
 		HumanMessage:    wfState.HumanMessage,
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		TotalExecTime:   calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
-		SVGHash:         getWorkflowSVGHash(workspacePath, currentAgent),
+		SVGHash:         s.getWorkflowSVGHashCached(workspacePath, currentAgent),
 		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
 		ModelStatuses:   modelStatuses,
@@ -1378,7 +1381,7 @@ func (s *Server) handleAPIWorkspaceEvents(w http.ResponseWriter, r *http.Request
 		Events:        events,
 		CurrentAgent:  currentAgent,
 		CurrentModel:  resolveCurrentModel(workspacePath, wfState),
-		SVGHash:       getWorkflowSVGHash(workspacePath, currentAgent),
+		SVGHash:       s.getWorkflowSVGHashCached(workspacePath, currentAgent),
 		NeedsInput:    wfState.NeedsHumanInput(),
 		HumanMessage:  wfState.HumanMessage,
 		GoalContent:   goalContent,
@@ -1435,7 +1438,7 @@ func (s *Server) collectForksForAPI(rootDir string) []apiForkEntry {
 		if grp.Root.Directory != rootDir {
 			continue
 		}
-		bookmark := resolveBaseBookmark(rootDir)
+		bookmark := s.resolveBaseBookmarkCached(rootDir)
 		forks := make([]apiForkEntry, 0, len(grp.Forks))
 		for _, fork := range grp.Forks {
 			commits := convertJJCommitsForAPI(runJJLogForFork(bookmark, fork.Directory))
@@ -1642,7 +1645,7 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if classifyWorkspace(workspacePath) == workspaceRoot {
+	if s.classifyWorkspaceCached(workspacePath) == workspaceRoot {
 		http.Error(w, "root workspace cannot start agentic work", http.StatusBadRequest)
 		return
 	}
@@ -2011,7 +2014,7 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if classifyWorkspace(workspacePath) == workspaceFork {
+	if s.classifyWorkspaceCached(workspacePath) == workspaceFork {
 		http.Error(w, "forks cannot create new forks", http.StatusBadRequest)
 		return
 	}
@@ -2056,6 +2059,9 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 		log.Println("failed to create GOAL.md for fork:", errGoal)
 	}
 
+	s.invalidateWorkspaceScanCache()
+	s.classifyCache.delete(workspacePath)
+
 	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
 		"action":    "forked",
@@ -2089,7 +2095,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if classifyWorkspace(workspacePath) != workspaceRoot {
+	if s.classifyWorkspaceCached(workspacePath) != workspaceRoot {
 		http.Error(w, "workspace is not a root", http.StatusBadRequest)
 		return
 	}
@@ -2111,7 +2117,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if classifyWorkspace(forkDir) != workspaceFork {
+	if s.classifyWorkspaceCached(forkDir) != workspaceFork {
 		http.Error(w, "fork workspace not found", http.StatusBadRequest)
 		return
 	}
@@ -2136,6 +2142,10 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to remove fork directory", http.StatusInternalServerError)
 		return
 	}
+
+	s.invalidateWorkspaceScanCache()
+	s.classifyCache.delete(workspacePath)
+	s.classifyCache.delete(forkDir)
 
 	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
@@ -2165,7 +2175,7 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if classifyWorkspace(workspacePath) != workspaceFork {
+	if s.classifyWorkspaceCached(workspacePath) != workspaceFork {
 		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
 		return
 	}
@@ -2241,6 +2251,25 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 	})
 }
 
+type apiGoalResponse struct {
+	Content string `json:"content"`
+}
+
+func (s *Server) handleAPIGetGoal(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	data, errRead := os.ReadFile(filepath.Join(workspacePath, "GOAL.md"))
+	if errRead != nil {
+		http.Error(w, "failed to read GOAL.md", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, apiGoalResponse{Content: string(data)})
+}
+
 type apiUpdateGoalRequest struct {
 	Content string `json:"content"`
 }
@@ -2272,6 +2301,11 @@ func (s *Server) handleAPIUpdateGoal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to write GOAL.md", http.StatusInternalServerError)
 		return
 	}
+
+	prefix := workspacePath + "|"
+	s.svgCache.deleteFunc(func(k string) bool {
+		return strings.HasPrefix(k, prefix)
+	})
 
 	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
 		"workspace": filepath.Base(workspacePath),
@@ -2495,7 +2529,7 @@ func (s *Server) handleAPIWorkflowSVG(w http.ResponseWriter, r *http.Request) {
 		currentAgent = "Unknown"
 	}
 
-	svg := getWorkflowSVG(workspacePath, currentAgent)
+	svg := s.getWorkflowSVGCached(workspacePath, currentAgent)
 	if svg == "" {
 		http.Error(w, "workflow SVG not available", http.StatusNotFound)
 		return
@@ -2528,7 +2562,7 @@ func (s *Server) handleAPIWorkspaceCommits(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	commits := filteredCommitsForWorkspace(workspacePath)
+	commits := s.filteredCommitsForWorkspace(workspacePath)
 	entries := make([]apiCommitEntry, 0, len(commits))
 	for _, c := range commits {
 		entries = append(entries, apiCommitEntry{
@@ -2565,8 +2599,8 @@ func runJJLogForStandalone(dir string) []jjCommit {
 	return parseJJLogOutput(string(output))
 }
 
-func filteredCommitsForWorkspace(workspacePath string) []jjCommit {
-	switch classifyWorkspace(workspacePath) {
+func (s *Server) filteredCommitsForWorkspace(workspacePath string) []jjCommit {
+	switch s.classifyWorkspaceCached(workspacePath) {
 	case workspaceStandalone:
 		commits := runJJLogForStandalone(workspacePath)
 		if len(commits) > 0 {
@@ -2578,7 +2612,7 @@ func filteredCommitsForWorkspace(workspacePath string) []jjCommit {
 		if rootDir == "" {
 			return runJJLogForWorkspace(workspacePath)
 		}
-		bookmark := resolveBaseBookmark(rootDir)
+		bookmark := s.resolveBaseBookmarkCached(rootDir)
 		commits := runJJLogForFork(bookmark, workspacePath)
 		if len(commits) > 0 {
 			return commits

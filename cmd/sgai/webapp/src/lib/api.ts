@@ -10,6 +10,7 @@ import type {
   ApiSessionActionResponse,
   ApiWorkspacesResponse,
   ApiWorkspaceDetailResponse,
+  ApiGoalResponse,
   ApiCreateWorkspaceResponse,
   ApiSessionResponse,
   ApiMessagesResponse,
@@ -156,6 +157,10 @@ export const api = {
       fetchJSON<ApiRenameResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/rename`,
         { method: "POST", body: JSON.stringify({ name: newName }) },
+      ),
+    getGoal: (name: string) =>
+      fetchJSON<ApiGoalResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/goal`,
       ),
     updateGoal: (name: string, content: string) =>
       fetchJSON<ApiUpdateGoalResponse>(

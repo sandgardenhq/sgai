@@ -4,33 +4,10 @@ import { MemoryRouter, Routes, Route } from "react-router";
 import { EditGoal } from "./EditGoal";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const mockWorkspaceDetail = {
-  name: "test-ws",
-  dir: "/tmp/test-ws",
-  running: false,
-  needsInput: false,
-  status: "idle",
-  badgeClass: "",
-  badgeText: "Idle",
-  isRoot: true,
-  isFork: false,
-  pinned: false,
-  hasSgai: true,
-  hasEditedGoal: true,
-  interactiveAuto: false,
-  currentAgent: "",
-  currentModel: "",
-  task: "",
-  goalContent: "<h1>My Project</h1>\n<p>Build something great</p>",
-  rawGoalContent: "# My Project\n\nBuild something great",
-  fullGoalContent: "---\ntitle: My Project\n---\n\n# My Project\n\nBuild something great",
-  pmContent: "",
-  hasProjectMgmt: false,
-  svgHash: "",
-  totalExecTime: "",
-  latestProgress: "",
-  agentSequence: [],
-  cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+const mockGoalContent = "---\ntitle: My Project\n---\n\n# My Project\n\nBuild something great";
+
+const mockGoalResponse = {
+  content: mockGoalContent,
 };
 
 function mockFetchSequence(responses: unknown[]) {
@@ -73,7 +50,7 @@ describe("EditGoal", () => {
   });
 
   test("renders heading and textarea after load", async () => {
-    fetchSpy = mockFetchSequence([mockWorkspaceDetail]);
+    fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -82,25 +59,16 @@ describe("EditGoal", () => {
   });
 
   test("loads GOAL.md content from server", async () => {
-    fetchSpy = mockFetchSequence([mockWorkspaceDetail]);
+    fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
     const textarea = screen.getByLabelText("GOAL.md Content") as HTMLTextAreaElement;
-    expect(textarea.value).toBe("---\ntitle: My Project\n---\n\n# My Project\n\nBuild something great");
-  });
-
-  test("falls back to rawGoalContent when full content is missing", async () => {
-    fetchSpy = mockFetchSequence([{ ...mockWorkspaceDetail, fullGoalContent: undefined }]);
-    await act(async () => { renderPage(); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
-
-    const textarea = screen.getByLabelText("GOAL.md Content") as HTMLTextAreaElement;
-    expect(textarea.value).toBe("# My Project\n\nBuild something great");
+    expect(textarea.value).toBe(mockGoalContent);
   });
 
   test("renders save and cancel buttons", async () => {
-    fetchSpy = mockFetchSequence([mockWorkspaceDetail]);
+    fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -109,7 +77,7 @@ describe("EditGoal", () => {
   });
 
   test("renders back link", async () => {
-    fetchSpy = mockFetchSequence([mockWorkspaceDetail]);
+    fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -117,7 +85,7 @@ describe("EditGoal", () => {
   });
 
   test("saves and shows success message", async () => {
-    fetchSpy = mockFetchSequence([mockWorkspaceDetail, { updated: true, workspace: "test-ws" }]);
+    fetchSpy = mockFetchSequence([mockGoalResponse, { updated: true, workspace: "test-ws" }]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -134,7 +102,7 @@ describe("EditGoal", () => {
       callIndex++;
       if (callIndex === 1) {
         return Promise.resolve(
-          new Response(JSON.stringify(mockWorkspaceDetail), { status: 200, headers: { "Content-Type": "application/json" } }),
+          new Response(JSON.stringify(mockGoalResponse), { status: 200, headers: { "Content-Type": "application/json" } }),
         );
       }
       return Promise.resolve(new Response("content cannot be empty", { status: 400 }));
@@ -156,7 +124,7 @@ describe("EditGoal", () => {
       callIndex++;
       if (callIndex === 1) {
         return Promise.resolve(
-          new Response(JSON.stringify(mockWorkspaceDetail), { status: 200, headers: { "Content-Type": "application/json" } }),
+          new Response(JSON.stringify(mockGoalResponse), { status: 200, headers: { "Content-Type": "application/json" } }),
         );
       }
       return new Promise(() => {});

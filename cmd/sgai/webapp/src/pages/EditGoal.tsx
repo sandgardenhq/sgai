@@ -34,9 +34,9 @@ export function EditGoal(): JSX.Element {
     async function loadGoal() {
       setIsLoading(true);
       try {
-        const detail = await api.workspaces.get(workspaceName);
+        const goal = await api.workspaces.getGoal(workspaceName);
         if (!cancelled) {
-          setContent(detail.fullGoalContent ?? detail.rawGoalContent ?? "");
+          setContent(goal.content);
         }
       } catch {
         if (!cancelled) {
