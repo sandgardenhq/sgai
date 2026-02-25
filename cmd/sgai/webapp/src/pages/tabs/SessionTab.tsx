@@ -21,13 +21,13 @@ interface SessionTabProps {
   actions?: ApiActionEntry[];
 }
 
-interface ActionBarProps {
+export interface ActionBarProps {
   actions: ApiActionEntry[];
   isRunning: boolean;
   onActionClick: (action: ApiActionEntry) => void;
 }
 
-function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps) {
+export function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps) {
   if (actions.length === 0) return null;
 
   return (
