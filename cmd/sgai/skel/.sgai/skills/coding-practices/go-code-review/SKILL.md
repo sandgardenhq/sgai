@@ -288,6 +288,71 @@ func Lookup(key string) (value string, ok bool)
 func Lookup(key string) string  // returns "" on not found
 ```
 
+## Switch Statements
+
+### Direct Evaluation
+
+- [ ] Use switch with expressions for cleaner multi-way conditionals
+- [ ] Prefer switch over long if-else chains
+- [ ] Switch evaluates cases top-to-bottom, first match wins
+- [ ] No need for break statements (they're automatic)
+
+```go
+// GOOD - switch with direct evaluation
+switch status := getStatus(); status {
+case StatusPending:
+    return "pending"
+case StatusActive:
+    return "active"
+case StatusDone:
+    return "done"
+default:
+    return "unknown"
+}
+
+// BAD - long if-else chain
+if status := getStatus(); status == StatusPending {
+    return "pending"
+} else if status == StatusActive {
+    return "active"
+} else if status == StatusDone {
+    return "done"
+} else {
+    return "unknown"
+}
+```
+
+### Type Switches
+
+- [ ] Use type switches for interface type assertions
+- [ ] Use comma-ok idiom for safe type assertion
+
+```go
+// Type switch
+var i interface{} = "hello"
+switch v := i.(type) {
+case string:
+    fmt.Println("string:", v)
+case int:
+    fmt.Println("int:", v)
+default:
+    fmt.Println("unknown type")
+}
+```
+
+### Fallthrough
+
+- [ ] Avoid fallthrough unless intentional
+- [ ] Use comma-separated cases when multiple values need same handling
+
+```go
+// GOOD - comma-separated cases
+switch kind {
+case "admin", "owner", "superadmin":
+    grantFullAccess()
+}
+```
+
 ## Modern Go Idioms (Go 1.21+)
 
 ### Standard Library Preferences
@@ -387,6 +452,7 @@ For fast reviews, check these critical items:
 7. **Context** - First param when used
 8. **Interfaces** - At consumer, not producer
 9. **Modern idioms** - Uses slices/maps packages where applicable
+10. **Switch statements** - Use switch for multi-way conditionals
 
 ## Review Output Format
 

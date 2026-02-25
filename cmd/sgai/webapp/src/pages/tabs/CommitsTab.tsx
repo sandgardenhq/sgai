@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
 import type { ApiCommitEntry, ApiCommitsResponse } from "@/types";
@@ -13,58 +20,58 @@ interface CommitsTabProps {
 
 function CommitsTabSkeleton() {
   return (
-    <div className="space-y-3">
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <Skeleton className="h-20 w-full rounded-xl" />
+    <div className="space-y-2">
+      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-6 w-full" />
     </div>
   );
 }
 
-function CommitRow({ entry }: { entry: ApiCommitEntry }) {
+function TruncatedCell({ value, maxWidth }: { value: string; maxWidth: string }) {
   return (
-    <div className="flex gap-3 py-3 border-b last:border-b-0">
-      <span className="font-mono text-muted-foreground w-4 shrink-0">{entry.graphChar}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="font-mono font-semibold text-foreground truncate max-w-[120px]">
-                {entry.changeId}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{entry.changeId}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="font-mono truncate max-w-[120px]">
-                {entry.commitId}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{entry.commitId}</TooltipContent>
-          </Tooltip>
-          <span className="whitespace-nowrap">{entry.timestamp}</span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`font-mono truncate block ${maxWidth}`}>{value}</span>
+      </TooltipTrigger>
+      <TooltipContent>{value}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function CommitTableRow({ entry }: { entry: ApiCommitEntry }) {
+  return (
+    <TableRow>
+      <TableCell>
+        <TruncatedCell value={entry.changeId} maxWidth="max-w-[100px]" />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <TruncatedCell value={entry.commitId} maxWidth="max-w-[100px]" />
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+        {entry.timestamp}
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <div className="flex flex-wrap gap-1">
           {entry.bookmarks?.map((bookmark) => (
             <Badge key={bookmark} variant="secondary" className="text-[0.65rem]">
               {bookmark}
             </Badge>
           ))}
         </div>
+      </TableCell>
+      <TableCell>
         <Tooltip>
           <TooltipTrigger asChild>
-            <p className="text-sm mt-1 truncate max-w-full">
+            <span className="block truncate max-w-[200px] md:max-w-[400px] text-sm">
               {entry.description || "(no description)"}
-            </p>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{entry.description || "(no description)"}</TooltipContent>
         </Tooltip>
-        {entry.workspaces && entry.workspaces.length > 0 && (
-          <div className="mt-1 text-xs text-muted-foreground">
-            Workspaces: {entry.workspaces.join(", ")}
-          </div>
-        )}
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -121,22 +128,26 @@ export function CommitsTab({ workspaceName }: CommitsTabProps) {
 
   if (!data) return null;
 
+  if (data.commits.length === 0) {
+    return <p className="text-sm italic text-muted-foreground">No commits found</p>;
+  }
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Commits</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data.commits.length === 0 ? (
-          <p className="text-sm italic text-muted-foreground">No commits found</p>
-        ) : (
-          <div className="divide-y divide-border/50">
-            {data.commits.map((entry, index) => (
-              <CommitRow key={`${entry.changeId}-${index}`} entry={entry} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Change ID</TableHead>
+          <TableHead className="hidden md:table-cell">Commit ID</TableHead>
+          <TableHead>Time</TableHead>
+          <TableHead className="hidden md:table-cell">Bookmarks</TableHead>
+          <TableHead>Description</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {data.commits.map((entry) => (
+          <CommitTableRow key={entry.changeId} entry={entry} />
+        ))}
+      </TableBody>
+    </Table>
   );
 }

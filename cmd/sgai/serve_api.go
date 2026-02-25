@@ -2528,7 +2528,7 @@ func (s *Server) handleAPIWorkspaceCommits(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	commits := runJJLogForWorkspace(workspacePath)
+	commits := filteredCommitsForWorkspace(workspacePath)
 	entries := make([]apiCommitEntry, 0, len(commits))
 	for _, c := range commits {
 		entries = append(entries, apiCommitEntry{
@@ -2553,6 +2553,40 @@ func runJJLogForWorkspace(dir string) []jjCommit {
 		return nil
 	}
 	return parseJJLogOutput(string(output))
+}
+
+func runJJLogForStandalone(dir string) []jjCommit {
+	cmd := exec.Command("jj", "log", "-r", "remote_bookmarks()..@", "-T", jjLogTemplate)
+	cmd.Dir = dir
+	output, errCmd := cmd.Output()
+	if errCmd != nil {
+		return nil
+	}
+	return parseJJLogOutput(string(output))
+}
+
+func filteredCommitsForWorkspace(workspacePath string) []jjCommit {
+	switch classifyWorkspace(workspacePath) {
+	case workspaceStandalone:
+		commits := runJJLogForStandalone(workspacePath)
+		if len(commits) > 0 {
+			return commits
+		}
+		return runJJLogForWorkspace(workspacePath)
+	case workspaceFork:
+		rootDir := getRootWorkspacePath(workspacePath)
+		if rootDir == "" {
+			return runJJLogForWorkspace(workspacePath)
+		}
+		bookmark := resolveBaseBookmark(rootDir)
+		commits := runJJLogForFork(bookmark, workspacePath)
+		if len(commits) > 0 {
+			return commits
+		}
+		return runJJLogForWorkspace(workspacePath)
+	default:
+		return runJJLogForWorkspace(workspacePath)
+	}
 }
 
 type apiSteerRequest struct {
