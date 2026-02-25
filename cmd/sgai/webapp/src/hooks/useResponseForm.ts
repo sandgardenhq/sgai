@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { ApiPendingQuestionResponse, ApiWorkspaceDetailResponse } from "@/types";
+import { useFactoryState } from "@/lib/factory-state";
+import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
 
 export interface StoredResponseState {
   selections: Record<string, string[]>;
@@ -50,7 +51,7 @@ interface UseResponseFormOptions {
 
 interface UseResponseFormReturn {
   question: ApiPendingQuestionResponse | null;
-  workspaceDetail: ApiWorkspaceDetailResponse | null;
+  workspaceDetail: ApiWorkspaceEntry | null;
   loading: boolean;
   error: Error | null;
   submitting: boolean;
@@ -69,63 +70,43 @@ export function useResponseForm({
   onQuestionMissing,
   onSubmitSuccess,
 }: UseResponseFormOptions): UseResponseFormReturn {
-  const [question, setQuestion] = useState<ApiPendingQuestionResponse | null>(null);
-  const [workspaceDetail, setWorkspaceDetail] = useState<ApiWorkspaceDetailResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
   const [selections, setSelections] = useState<Record<string, string[]>>({});
   const [otherText, setOtherText] = useState("");
-
   const hasUnsavedChangesRef = useRef(false);
+  const previousQuestionIdRef = useRef<string | null>(null);
+
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName) ?? null;
+  const question = workspace?.pendingQuestion ?? null;
+  const loading = fetchStatus === "fetching" && workspace === null;
+  const error: Error | null = fetchStatus === "error" && workspace === null
+    ? new Error("Failed to load workspace state")
+    : null;
 
   useEffect(() => {
     if (!active || !workspaceName) return;
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setSubmitError(null);
+    if (question === null && workspace !== null) {
+      onQuestionMissing?.();
+      return;
+    }
 
-    const questionPromise = api.workspaces.pendingQuestion(workspaceName);
-    const detailPromise = api.workspaces.get(workspaceName).catch(() => null);
+    if (!question) return;
 
-    Promise.all([questionPromise, detailPromise])
-      .then(([questionResponse, detailResponse]) => {
-        if (cancelled) return;
-
-        if (!questionResponse) {
-          onQuestionMissing?.();
-          return;
-        }
-
-        setQuestion(questionResponse);
-        setWorkspaceDetail(detailResponse);
-
-        const stored = loadStoredState(storagePrefix, workspaceName);
-        if (stored && stored.questionId === questionResponse.questionId) {
-          setSelections(stored.selections);
-          setOtherText(stored.otherText);
-        } else {
-          setSelections({});
-          setOtherText("");
-        }
-
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [active, workspaceName, storagePrefix, onQuestionMissing]);
+    if (previousQuestionIdRef.current !== question.questionId) {
+      previousQuestionIdRef.current = question.questionId;
+      const stored = loadStoredState(storagePrefix, workspaceName);
+      if (stored && stored.questionId === question.questionId) {
+        setSelections(stored.selections);
+        setOtherText(stored.otherText);
+      } else {
+        setSelections({});
+        setOtherText("");
+      }
+    }
+  }, [active, workspaceName, storagePrefix, question, workspace, onQuestionMissing]);
 
   useEffect(() => {
     if (!question) return;
@@ -214,7 +195,7 @@ export function useResponseForm({
 
   return {
     question,
-    workspaceDetail,
+    workspaceDetail: workspace,
     loading,
     error,
     submitting,

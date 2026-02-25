@@ -2,24 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { ResponseMultiChoice } from "./ResponseMultiChoice";
-import { resetDefaultSSEStore } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiPendingQuestionResponse, ApiWorkspaceDetailResponse } from "@/types";
-
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
-const mockFetch = mock(() => Promise.resolve(new Response("{}")));
+import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
 
 const pendingQuestion: ApiPendingQuestionResponse = {
   questionId: "abc123def456",
@@ -76,72 +60,85 @@ const markdownMessageQuestion: ApiPendingQuestionResponse = {
   questions: [],
 };
 
-const workspaceDetail: ApiWorkspaceDetailResponse = {
-  name: "test-project",
-  dir: "/tmp/test-project",
-  running: false,
-  needsInput: true,
-  status: "waiting",
-  badgeClass: "",
-  badgeText: "waiting",
-  isRoot: true,
-  isFork: false,
-  pinned: false,
-  hasSgai: true,
-  hasEditedGoal: false,
-  interactiveAuto: false,
-  currentAgent: "coordinator",
-  currentModel: "claude-opus-4",
-  task: "",
-  goalContent: "<p>Test goal content</p>",
-  pmContent: "<p>Test PM content</p>",
-  hasProjectMgmt: true,
-  svgHash: "",
-  totalExecTime: "",
-  latestProgress: "",
-  agentSequence: [],
-  cost: { totalCost: 0, inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 },
-  summary: "A brief summary of the test project",
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
+  return {
+    name: "test-project",
+    dir: "/tmp/test-project",
+    running: false,
+    needsInput: true,
+    inProgress: true,
+    pinned: false,
+    isRoot: true,
+    isFork: false,
+    status: "waiting",
+    badgeClass: "",
+    badgeText: "waiting",
+    hasSgai: true,
+    hasEditedGoal: false,
+    interactiveAuto: false,
+    continuousMode: false,
+    currentAgent: "coordinator",
+    currentModel: "claude-opus-4",
+    task: "",
+    goalContent: "<p>Test goal content</p>",
+    rawGoalContent: "# Test Goal",
+    pmContent: "<p>Test PM content</p>",
+    hasProjectMgmt: true,
+    svgHash: "",
+    totalExecTime: "",
+    latestProgress: "",
+    humanMessage: "",
+    agentSequence: [],
+    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
+    events: [],
+    messages: [],
+    projectTodos: [],
+    agentTodos: [],
+    changes: { description: "", diffLines: [] },
+    commits: [],
+    log: [],
+    summary: "A brief summary of the test project",
+    summaryManual: false,
+    pendingQuestion: pendingQuestion,
+    ...overrides,
+  };
+}
+
+type MockFactoryState = {
+  workspaces: ApiWorkspaceEntry[];
+  fetchStatus: "idle" | "fetching" | "error";
 };
 
-const workspaceDetailNoSummary: ApiWorkspaceDetailResponse = {
-  ...workspaceDetail,
-  summary: undefined,
+let mockFactoryState: MockFactoryState = {
+  workspaces: [makeWorkspace()],
+  fetchStatus: "idle",
 };
+
+mock.module("@/lib/factory-state", () => ({
+  useFactoryState: () => mockFactoryState,
+  resetFactoryStateStore: () => {},
+}));
+
+const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
   cleanup();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
   sessionStorage.clear();
+  mockFactoryState = {
+    workspaces: [makeWorkspace()],
+    fetchStatus: "idle",
+  };
 });
 
 afterEach(() => {
   cleanup();
-  resetDefaultSSEStore();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
   sessionStorage.clear();
 });
 
-function createFetchHandler(question: ApiPendingQuestionResponse | null = pendingQuestion) {
-  return (url: string | URL | Request) => {
-    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-    if (urlStr.includes("/pending-question")) {
-      if (question) {
-        return Promise.resolve(new Response(JSON.stringify(question)));
-      }
-      return Promise.resolve(new Response(null, { status: 204 }));
-    }
-    if (urlStr.includes("/api/v1/workspaces/") && !urlStr.includes("/respond")) {
-      return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-    }
-    return Promise.resolve(new Response("{}"));
-  };
-}
-
-function renderResponse(question: ApiPendingQuestionResponse | null = pendingQuestion) {
-  mockFetch.mockImplementation(createFetchHandler(question));
+function renderResponse(workspace: ApiWorkspaceEntry = makeWorkspace()) {
+  mockFactoryState = { workspaces: [workspace], fetchStatus: "idle" };
 
   return render(
     <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
@@ -156,8 +153,8 @@ function renderResponse(question: ApiPendingQuestionResponse | null = pendingQue
 }
 
 describe("ResponseMultiChoice", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
+  it("renders loading skeleton when fetching and no workspace found", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "fetching" };
     render(
       <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
         <TooltipProvider>
@@ -170,7 +167,7 @@ describe("ResponseMultiChoice", () => {
     expect(screen.getByRole("status", { name: /loading response/i })).toBeDefined();
   });
 
-  it("renders question and choices when loaded", async () => {
+  it("renders question and choices from factory state", async () => {
     renderResponse();
 
     await waitFor(() => {
@@ -196,7 +193,7 @@ describe("ResponseMultiChoice", () => {
   });
 
   it("renders checkboxes for multi-select questions", async () => {
-    renderResponse(multiSelectQuestion);
+    renderResponse(makeWorkspace({ pendingQuestion: multiSelectQuestion }));
 
     await waitFor(() => {
       expect(screen.getAllByText("Dark mode").length).toBeGreaterThan(0);
@@ -207,7 +204,7 @@ describe("ResponseMultiChoice", () => {
   });
 
   it("renders multiple question blocks", async () => {
-    renderResponse(multipleQuestions);
+    renderResponse(makeWorkspace({ pendingQuestion: multipleQuestions }));
 
     await waitFor(() => {
       expect(screen.getAllByText("First question?").length).toBeGreaterThan(0);
@@ -219,7 +216,7 @@ describe("ResponseMultiChoice", () => {
   });
 
   it("renders markdown message as formatted content", async () => {
-    renderResponse(markdownMessageQuestion);
+    renderResponse(makeWorkspace({ pendingQuestion: markdownMessageQuestion }));
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Markdown Title" })).toBeDefined();
@@ -258,7 +255,7 @@ describe("ResponseMultiChoice", () => {
   });
 
   it("toggles checkbox choices", async () => {
-    renderResponse(multiSelectQuestion);
+    renderResponse(makeWorkspace({ pendingQuestion: multiSelectQuestion }));
 
     await waitFor(() => {
       expect(screen.getAllByText("Dark mode").length).toBeGreaterThan(0);
@@ -277,35 +274,20 @@ describe("ResponseMultiChoice", () => {
     expect(checkbox0.checked).toBe(false);
   });
 
-  it("submits response successfully", async () => {
+  it("submits response successfully via API", async () => {
     let submitCalled = false;
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         submitCalled = true;
         return Promise.resolve(
           new Response(JSON.stringify({ success: true, message: "response submitted" })),
         );
       }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    render(
-      <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/workspaces/:name/respond" element={<ResponseMultiChoice />} />
-            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
-          </Routes>
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderResponse();
 
     await waitFor(() => {
       expect(screen.getAllByText("Option A").length).toBeGreaterThan(0);
@@ -325,28 +307,13 @@ describe("ResponseMultiChoice", () => {
   it("shows error on failed submission", async () => {
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         return Promise.resolve(new Response("question expired", { status: 409 }));
-      }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
       }
       return Promise.resolve(new Response("{}"));
     });
 
-    render(
-      <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/workspaces/:name/respond" element={<ResponseMultiChoice />} />
-            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
-          </Routes>
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderResponse();
 
     await waitFor(() => {
       expect(screen.getAllByText("Option A").length).toBeGreaterThan(0);
@@ -363,34 +330,19 @@ describe("ResponseMultiChoice", () => {
     });
   });
 
-  it("disables submit button during submission (R-18)", async () => {
+  it("disables submit button during submission", async () => {
     let resolveSubmit: (() => void) | null = null;
     mockFetch.mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
       if (urlStr.includes("/respond")) {
         return new Promise<Response>((resolve) => {
           resolveSubmit = () => resolve(new Response(JSON.stringify({ success: true, message: "ok" })));
         });
       }
-      if (urlStr.includes("/api/v1/workspaces/")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-      }
       return Promise.resolve(new Response("{}"));
     });
 
-    render(
-      <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/workspaces/:name/respond" element={<ResponseMultiChoice />} />
-            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
-          </Routes>
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderResponse();
 
     await waitFor(() => {
       expect(screen.getAllByText("Send Response").length).toBeGreaterThan(0);
@@ -412,7 +364,7 @@ describe("ResponseMultiChoice", () => {
     resolveSubmit?.();
   });
 
-  it("persists response state to sessionStorage (R-8)", async () => {
+  it("persists response state to sessionStorage", async () => {
     renderResponse();
 
     await waitFor(() => {
@@ -429,11 +381,8 @@ describe("ResponseMultiChoice", () => {
     expect(parsed.questionId).toBe("abc123def456");
   });
 
-  it("renders error when API fails", async () => {
-    mockFetch.mockImplementation(() =>
-      Promise.reject(new Error("Network error")),
-    );
-
+  it("renders error state when fetchStatus is error and workspace not found", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "error" };
     render(
       <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
         <TooltipProvider>
@@ -444,24 +393,15 @@ describe("ResponseMultiChoice", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load question/i)).toBeDefined();
-    });
+    expect(screen.getByText(/Failed to load question/i)).toBeDefined();
   });
 
-  it("calls pending-question API on mount", async () => {
+  it("does not call individual pending-question or workspace detail API endpoints", () => {
     renderResponse();
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
-    });
-
-    const calls = mockFetch.mock.calls;
-    const pendingQuestionCall = calls.find((call) => {
-      const urlStr = (call as unknown[])[0] as string;
-      return urlStr.includes("/pending-question");
-    });
-    expect(pendingQuestionCall).toBeDefined();
+    const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("/pending-question"))).toBe(false);
+    expect(calledUrls.some((url) => url.match(/\/api\/v1\/workspaces\/[^/]+$/))).toBe(false);
   });
 
   it("renders back link", async () => {
@@ -472,9 +412,8 @@ describe("ResponseMultiChoice", () => {
     });
   });
 
-  it("shows workspace required for legacy workspace query param", async () => {
-    mockFetch.mockImplementation(createFetchHandler());
-
+  it("shows workspace required when no workspace name in path", () => {
+    mockFactoryState = { workspaces: [], fetchStatus: "idle" };
     render(
       <MemoryRouter initialEntries={["/respond?workspace=test-project"]}>
         <TooltipProvider>
@@ -486,45 +425,10 @@ describe("ResponseMultiChoice", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Workspace required")).toBeDefined();
-    });
+    expect(screen.getByText("Workspace required")).toBeDefined();
   });
 
-  it("shows workspace required for legacy dir query param", async () => {
-    mockFetch.mockImplementation((url: string | URL | Request) => {
-      const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.endsWith("/api/v1/workspaces")) {
-        return Promise.resolve(new Response(JSON.stringify({
-          workspaces: [{ name: "test-project", dir: "/tmp/test-project", running: false, needsInput: true, inProgress: true, pinned: false, isRoot: true, status: "waiting", hasSgai: true }],
-        })));
-      }
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
-      if (urlStr.includes("/api/v1/workspaces/") && !urlStr.includes("/respond")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetail)));
-      }
-      return Promise.resolve(new Response("{}"));
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/respond?dir=%2Ftmp%2Ftest-project"]}>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/respond" element={<ResponseMultiChoice />} />
-            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
-          </Routes>
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Workspace required")).toBeDefined();
-    });
-  });
-
-  it("renders ResponseContext with workspace data (feature parity)", async () => {
+  it("renders ResponseContext with workspace goal and PM content", async () => {
     renderResponse();
 
     await waitFor(() => {
@@ -560,27 +464,7 @@ describe("ResponseMultiChoice", () => {
   });
 
   it("hides workspace summary when not present", async () => {
-    mockFetch.mockImplementation((url: string | URL | Request) => {
-      const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-      if (urlStr.includes("/pending-question")) {
-        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
-      }
-      if (urlStr.includes("/api/v1/workspaces/") && !urlStr.includes("/respond")) {
-        return Promise.resolve(new Response(JSON.stringify(workspaceDetailNoSummary)));
-      }
-      return Promise.resolve(new Response("{}"));
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
-        <TooltipProvider>
-          <Routes>
-            <Route path="/workspaces/:name/respond" element={<ResponseMultiChoice />} />
-            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
-          </Routes>
-        </TooltipProvider>
-      </MemoryRouter>,
-    );
+    renderResponse(makeWorkspace({ summary: undefined }));
 
     await waitFor(() => {
       expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);

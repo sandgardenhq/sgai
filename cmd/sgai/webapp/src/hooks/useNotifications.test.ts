@@ -1,31 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test";
-import { renderHook } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, afterAll, mock } from "bun:test";
+import { renderHook, act } from "@testing-library/react";
 import { useNotifications } from "./useNotifications";
-import { api } from "../lib/api";
-import type { ApiWorkspacesResponse } from "../types";
+import type { FactoryStateSnapshot } from "../lib/factory-state";
 
-import {
-  useSSEEvent as _realUseSSEEvent,
-  useSSEStore as _realUseSSEStore,
-  useWorkspaceSSEEvent as _realUseWorkspaceSSEEvent,
-  useConnectionStatus as _realUseConnectionStatus,
-} from "./useSSE";
+import { useFactoryState as _realUseFactoryState } from "../lib/factory-state";
 
 const savedExports = {
-  useSSEEvent: _realUseSSEEvent,
-  useSSEStore: _realUseSSEStore,
-  useWorkspaceSSEEvent: _realUseWorkspaceSSEEvent,
-  useConnectionStatus: _realUseConnectionStatus,
+  useFactoryState: _realUseFactoryState,
 };
 
-let mockSSEEvent: unknown = null;
+let mockFactoryState: FactoryStateSnapshot = {
+  workspaces: [],
+  fetchStatus: "idle",
+  lastFetchedAt: null,
+};
 
-mock.module("./useSSE", () => ({
-  useSSEEvent: () => mockSSEEvent,
+mock.module("../lib/factory-state", () => ({
+  useFactoryState: () => mockFactoryState,
+  resetFactoryStateStore: () => {},
 }));
 
 afterAll(() => {
-  mock.module("./useSSE", () => savedExports);
+  mock.module("../lib/factory-state", () => savedExports);
 });
 
 class MockNotification {
@@ -67,89 +63,99 @@ function restoreNotificationAPI(): void {
   }
 }
 
-function makeWorkspacesResponse(
+function makeWorkspaces(
   workspaces: { name: string; needsInput: boolean; forks?: { name: string; needsInput: boolean }[] }[],
-): ApiWorkspacesResponse {
-  return {
-    workspaces: workspaces.map((ws) => ({
-      name: ws.name,
-      dir: `/tmp/${ws.name}`,
+): FactoryStateSnapshot["workspaces"] {
+  return workspaces.map((ws) => ({
+    name: ws.name,
+    dir: `/tmp/${ws.name}`,
+    running: false,
+    needsInput: ws.needsInput,
+    inProgress: false,
+    pinned: false,
+    isRoot: true,
+    status: "idle",
+    hasSgai: true,
+    forks: ws.forks?.map((f) => ({
+      name: f.name,
+      dir: `/tmp/${f.name}`,
       running: false,
-      needsInput: ws.needsInput,
+      needsInput: f.needsInput,
       inProgress: false,
       pinned: false,
-      isRoot: true,
+      isRoot: false,
       status: "idle",
       hasSgai: true,
-      forks: ws.forks?.map((f) => ({
-        name: f.name,
-        dir: `/tmp/${f.name}`,
-        running: false,
-        needsInput: f.needsInput,
-        inProgress: false,
-        pinned: false,
-        isRoot: false,
-        status: "idle",
-        hasSgai: true,
-      })),
     })),
-  };
-}
-
-function flushPromises(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  }));
 }
 
 describe("useNotifications", () => {
-  let listSpy: ReturnType<typeof spyOn>;
-
   beforeEach(() => {
-    mockSSEEvent = null;
+    mockFactoryState = {
+      workspaces: [],
+      fetchStatus: "idle",
+      lastFetchedAt: null,
+    };
     setNotificationAPI("granted");
-    listSpy = spyOn(api.workspaces, "list");
   });
 
   afterEach(() => {
     restoreNotificationAPI();
-    listSpy.mockRestore();
   });
 
-  it("does not fetch when no SSE event received", () => {
-    mockSSEEvent = null;
+  it("does not fire notification when state not yet fetched", () => {
+    mockFactoryState = {
+      workspaces: [],
+      fetchStatus: "idle",
+      lastFetchedAt: null,
+    };
     renderHook(() => useNotifications());
-    expect(listSpy).not.toHaveBeenCalled();
+    expect(MockNotification.instances).toHaveLength(0);
   });
 
-  it("fetches workspaces on SSE event", async () => {
-    const response = makeWorkspacesResponse([
-      { name: "project-a", needsInput: false },
-    ]);
-    listSpy.mockResolvedValue(response);
+  it("does not fire notification when needsInput stays false", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    mockSSEEvent = { ts: 1 };
-    renderHook(() => useNotifications());
-
-    await flushPromises();
-    expect(listSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("fires notification on false-to-true transition", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-
-    mockSSEEvent = { ts: 1 };
     const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(0);
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
+
+    expect(MockNotification.instances).toHaveLength(0);
+  });
+
+  it("fires notification on false-to-true transition", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+
+    const { rerender } = renderHook(() => useNotifications());
+
+    expect(MockNotification.instances).toHaveLength(0);
+
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
+    rerender();
 
     expect(MockNotification.instances).toHaveLength(1);
     expect(MockNotification.instances[0].title).toBe("Approval Needed");
@@ -159,108 +165,98 @@ describe("useNotifications", () => {
     expect(MockNotification.instances[0].options.tag).toBe("project-a");
   });
 
-  it("does not fire notification when needsInput stays false", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
+  it("does not re-fire notification when needsInput stays true", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    mockSSEEvent = { ts: 1 };
     const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 2 };
-    rerender();
-    await flushPromises();
-
-    expect(MockNotification.instances).toHaveLength(0);
-  });
-
-  it("does not re-fire notification when needsInput stays true", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-
-    mockSSEEvent = { ts: 1 };
-    const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
-
-    // First appearance with needsInput=true fires once (unknown→true transition)
     expect(MockNotification.instances).toHaveLength(1);
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
 
-    // Second event with same state should NOT fire again
     expect(MockNotification.instances).toHaveLength(1);
   });
 
-  it("re-fires notification after needsInput cycles back through false to true", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 1 };
-    const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
+  it("re-fires notification after needsInput cycles back through false to true", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    const { rerender } = renderHook(() => useNotifications());
+
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
     expect(MockNotification.instances).toHaveLength(1);
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 3 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 2,
+      };
+    });
     rerender();
-    await flushPromises();
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 4 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 3,
+      };
+    });
     rerender();
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(2);
   });
 
-  it("fires notification for nested forks", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([
+  it("fires notification for nested forks", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([
         {
           name: "root-ws",
           needsInput: false,
           forks: [{ name: "fork-1", needsInput: false }],
         },
       ]),
-    );
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    mockSSEEvent = { ts: 1 };
     const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([
-        {
-          name: "root-ws",
-          needsInput: false,
-          forks: [{ name: "fork-1", needsInput: true }],
-        },
-      ]),
-    );
-    mockSSEEvent = { ts: 2 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([
+          {
+            name: "root-ws",
+            needsInput: false,
+            forks: [{ name: "fork-1", needsInput: true }],
+          },
+        ]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(1);
     expect(MockNotification.instances[0].options.body).toBe(
@@ -268,70 +264,69 @@ describe("useNotifications", () => {
     );
   });
 
-  it("does not fire notification when permission is default", async () => {
+  it("does not fire notification when permission is default", () => {
     setNotificationAPI("default");
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 1 };
-    const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    const { rerender } = renderHook(() => useNotifications());
+
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(0);
   });
 
-  it("skips notification when permission is denied", async () => {
+  it("skips notification when permission is denied", () => {
     setNotificationAPI("denied");
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 1 };
-    const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    const { rerender } = renderHook(() => useNotifications());
+
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(0);
   });
 
-  it("handles API errors gracefully", async () => {
-    listSpy.mockRejectedValueOnce(new Error("Network error"));
+  it("sets onclick handler on notification", () => {
+    mockFactoryState = {
+      workspaces: makeWorkspaces([{ name: "project-a", needsInput: false }]),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
 
-    mockSSEEvent = { ts: 1 };
-    renderHook(() => useNotifications());
-    await flushPromises();
-
-    expect(MockNotification.instances).toHaveLength(0);
-  });
-
-  it("sets onclick handler on notification", async () => {
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: false }]),
-    );
-    mockSSEEvent = { ts: 1 };
     const { rerender } = renderHook(() => useNotifications());
-    await flushPromises();
 
-    listSpy.mockResolvedValueOnce(
-      makeWorkspacesResponse([{ name: "project-a", needsInput: true }]),
-    );
-    mockSSEEvent = { ts: 2 };
+    act(() => {
+      mockFactoryState = {
+        workspaces: makeWorkspaces([{ name: "project-a", needsInput: true }]),
+        fetchStatus: "idle",
+        lastFetchedAt: Date.now() + 1,
+      };
+    });
     rerender();
-    await flushPromises();
 
     expect(MockNotification.instances).toHaveLength(1);
     expect(MockNotification.instances[0].onclick).toBeFunction();

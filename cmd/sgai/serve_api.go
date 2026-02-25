@@ -15,7 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -24,77 +23,62 @@ import (
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
-type sseClient struct {
-	events chan sseEvent
-	done   chan struct{}
+type signalSubscriber struct {
+	ch   chan struct{}
+	done chan struct{}
 }
 
-type sseEvent struct {
-	Type string `json:"type"`
-	Data any    `json:"data"`
+type signalBroker struct {
+	mu          sync.Mutex
+	subscribers map[*signalSubscriber]struct{}
 }
 
-type sseBroker struct {
-	mu      sync.Mutex
-	clients map[*sseClient]struct{}
-}
-
-func newSSEBroker() *sseBroker {
-	return &sseBroker{
-		clients: make(map[*sseClient]struct{}),
+func newSignalBroker() *signalBroker {
+	return &signalBroker{
+		subscribers: make(map[*signalSubscriber]struct{}),
 	}
 }
 
-func (b *sseBroker) subscribe() *sseClient {
-	c := &sseClient{
-		events: make(chan sseEvent, 64),
-		done:   make(chan struct{}),
+func (b *signalBroker) subscribe() *signalSubscriber {
+	s := &signalSubscriber{
+		ch:   make(chan struct{}, 1),
+		done: make(chan struct{}),
 	}
 	b.mu.Lock()
-	b.clients[c] = struct{}{}
+	b.subscribers[s] = struct{}{}
 	b.mu.Unlock()
-	return c
+	return s
 }
 
-func (b *sseBroker) unsubscribe(c *sseClient) {
+func (b *signalBroker) unsubscribe(s *signalSubscriber) {
 	b.mu.Lock()
-	delete(b.clients, c)
+	delete(b.subscribers, s)
 	b.mu.Unlock()
-	close(c.done)
+	close(s.done)
 }
 
-func (b *sseBroker) publish(evt sseEvent) {
+func (b *signalBroker) notify() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for c := range b.clients {
+	for s := range b.subscribers {
 		select {
-		case c.events <- evt:
+		case s.ch <- struct{}{}:
 		default:
 		}
 	}
 }
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/events/stream", s.handleSSEStream)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/events/stream", s.handleWorkspaceSSEStream)
+	mux.HandleFunc("GET /api/v1/state", s.handleAPIState)
+	mux.HandleFunc("GET /api/v1/signal", s.handleSignalStream)
 	mux.HandleFunc("GET /api/v1/agents", s.handleAPIAgents)
 	mux.HandleFunc("GET /api/v1/skills", s.handleAPISkills)
 	mux.HandleFunc("GET /api/v1/skills/{name...}", s.handleAPISkillDetail)
 	mux.HandleFunc("GET /api/v1/snippets", s.handleAPISnippets)
 	mux.HandleFunc("GET /api/v1/snippets/{lang}", s.handleAPISnippetsByLanguage)
 	mux.HandleFunc("GET /api/v1/snippets/{lang}/{fileName}", s.handleAPISnippetDetail)
-	mux.HandleFunc("GET /api/v1/workspaces", s.handleAPIWorkspaces)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}", s.handleAPIWorkspaceDetail)
 	mux.HandleFunc("POST /api/v1/workspaces", s.handleAPICreateWorkspace)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/session", s.handleAPIWorkspaceSession)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/messages", s.handleAPIWorkspaceMessages)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/todos", s.handleAPIWorkspaceTodos)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/log", s.handleAPIWorkspaceLog)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/changes", s.handleAPIWorkspaceChanges)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/events", s.handleAPIWorkspaceEvents)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/forks", s.handleAPIWorkspaceForks)
 
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/pending-question", s.handleAPIPendingQuestion)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/respond", s.handleAPIRespond)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/start", s.handleAPIStartSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
@@ -110,7 +94,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
 
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/workflow.svg", s.handleAPIWorkflowSVG)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/commits", s.handleAPIWorkspaceCommits)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/description", s.handleAPIUpdateDescription)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/pin", s.handleAPITogglePin)
@@ -118,6 +101,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
 	mux.HandleFunc("GET /api/v1/models", s.handleAPIListModels)
 	mux.HandleFunc("GET /api/v1/compose", s.handleAPIComposeState)
 	mux.HandleFunc("POST /api/v1/compose", s.handleAPIComposeSave)
@@ -126,7 +110,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/compose/draft", s.handleAPIComposeDraft)
 }
 
-func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSignalStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
@@ -137,162 +121,338 @@ func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
 
-	client := s.sseBroker.subscribe()
-	defer s.sseBroker.unsubscribe(client)
-
-	s.sendSSESnapshot(w, flusher)
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case <-client.done:
-			return
-		case evt := <-client.events:
-			if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
-				return
-			}
-		}
-	}
-}
-
-func (s *Server) handleWorkspaceSSEStream(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-
-	workspaceName := r.PathValue("name")
-	if workspaceName == "" {
-		http.Error(w, "workspace name is required", http.StatusBadRequest)
-		return
-	}
-
-	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
-	if workspacePath == "" {
-		http.Error(w, "workspace not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no")
-
-	broker := s.workspaceBroker(workspacePath)
-	client := broker.subscribe()
-	defer broker.unsubscribe(client)
-
-	s.sendWorkspaceSSESnapshot(w, flusher, workspacePath)
+	sub := s.signals.subscribe()
+	defer s.signals.unsubscribe(sub)
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
-		case <-client.done:
+		case <-sub.done:
 			return
-		case evt := <-client.events:
-			if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
+		case <-sub.ch:
+			if _, errWrite := fmt.Fprintf(w, "event: reload\ndata: {}\n\n"); errWrite != nil {
 				return
 			}
+			flusher.Flush()
 		}
 	}
 }
 
-func (s *Server) sendWorkspaceSSESnapshot(w http.ResponseWriter, flusher http.Flusher, workspacePath string) {
-	snapshot := s.buildWorkspaceSSESnapshot(workspacePath)
-	evt := sseEvent{Type: "snapshot", Data: snapshot}
-	if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
-		log.Println("failed to send workspace snapshot:", errWrite)
+type apiFactoryState struct {
+	Workspaces []apiWorkspaceFullState `json:"workspaces"`
+}
+
+type apiWorkspaceFullState struct {
+	Name            string                      `json:"name"`
+	Dir             string                      `json:"dir"`
+	Running         bool                        `json:"running"`
+	NeedsInput      bool                        `json:"needsInput"`
+	InProgress      bool                        `json:"inProgress"`
+	Pinned          bool                        `json:"pinned"`
+	IsRoot          bool                        `json:"isRoot"`
+	IsFork          bool                        `json:"isFork"`
+	HasSGAI         bool                        `json:"hasSgai"`
+	Status          string                      `json:"status"`
+	BadgeClass      string                      `json:"badgeClass"`
+	BadgeText       string                      `json:"badgeText"`
+	HasEditedGoal   bool                        `json:"hasEditedGoal"`
+	InteractiveAuto bool                        `json:"interactiveAuto"`
+	ContinuousMode  bool                        `json:"continuousMode"`
+	CurrentAgent    string                      `json:"currentAgent"`
+	CurrentModel    string                      `json:"currentModel"`
+	Task            string                      `json:"task"`
+	GoalContent     string                      `json:"goalContent"`
+	RawGoalContent  string                      `json:"rawGoalContent"`
+	FullGoalContent string                      `json:"fullGoalContent"`
+	PMContent       string                      `json:"pmContent"`
+	HasProjectMgmt  bool                        `json:"hasProjectMgmt"`
+	SVGHash         string                      `json:"svgHash"`
+	TotalExecTime   string                      `json:"totalExecTime"`
+	LatestProgress  string                      `json:"latestProgress"`
+	HumanMessage    string                      `json:"humanMessage"`
+	Summary         string                      `json:"summary,omitempty"`
+	SummaryManual   bool                        `json:"summaryManual,omitempty"`
+	AgentSequence   []apiAgentSequenceEntry     `json:"agentSequence"`
+	Cost            state.SessionCost           `json:"cost"`
+	ModelStatuses   []apiModelStatusEntry       `json:"modelStatuses,omitempty"`
+	AgentModels     []apiAgentModelEntry        `json:"agentModels,omitempty"`
+	Events          []apiEventEntry             `json:"events"`
+	Messages        []apiMessageEntry           `json:"messages"`
+	ProjectTodos    []apiTodoEntry              `json:"projectTodos"`
+	AgentTodos      []apiTodoEntry              `json:"agentTodos"`
+	Changes         apiChangesResponse          `json:"changes"`
+	Commits         []apiCommitEntry            `json:"commits"`
+	Forks           []apiForkEntry              `json:"forks,omitempty"`
+	Log             []apiLogEntry               `json:"log"`
+	PendingQuestion *apiPendingQuestionResponse `json:"pendingQuestion,omitempty"`
+	Actions         []apiActionEntry            `json:"actions,omitempty"`
+}
+
+func (s *Server) handleAPIState(w http.ResponseWriter, _ *http.Request) {
+	if cached, ok := s.stateCache.get("state"); ok {
+		writeJSON(w, cached)
+		return
+	}
+	factoryState, _ := s.stateFlight.do("state", func() (apiFactoryState, error) {
+		if cached, ok := s.stateCache.get("state"); ok {
+			return cached, nil
+		}
+		s.mu.Lock()
+		genBefore := s.stateGeneration
+		s.mu.Unlock()
+		result := s.buildFullFactoryState()
+		s.mu.Lock()
+		genAfter := s.stateGeneration
+		s.mu.Unlock()
+		if genBefore == genAfter {
+			s.stateCache.set("state", result)
+		}
+		return result, nil
+	})
+	writeJSON(w, factoryState)
+}
+
+func (s *Server) warmStateCache() {
+	s.mu.Lock()
+	genBefore := s.stateGeneration
+	s.mu.Unlock()
+	result := s.buildFullFactoryState()
+	s.mu.Lock()
+	genAfter := s.stateGeneration
+	s.mu.Unlock()
+	if genBefore == genAfter {
+		s.stateCache.set("state", result)
 	}
 }
 
-type sseWorkspaceDetailSnapshot struct {
-	Name       string `json:"name"`
-	Running    bool   `json:"running"`
-	NeedsInput bool   `json:"needsInput"`
-	Status     string `json:"status"`
+func (s *Server) loadWorkspaceState(dir string) state.Workflow {
+	stPath := statePath(dir)
+	info, errStat := os.Stat(stPath)
+	if errStat != nil {
+		return state.Workflow{}
+	}
+	if info.Size() > maxStateSizeBytes {
+		return state.Workflow{}
+	}
+	wfState, errLoad := state.Load(stPath)
+	if errLoad != nil {
+		return state.Workflow{}
+	}
+	return wfState
 }
 
-func (s *Server) buildWorkspaceSSESnapshot(workspacePath string) sseWorkspaceDetailSnapshot {
-	running, needsInput := s.getWorkspaceStatus(workspacePath)
-	wfState, _ := state.Load(statePath(workspacePath))
+func (s *Server) buildFullFactoryState() apiFactoryState {
+	groups, errScan := s.scanWorkspaceGroups()
+	if errScan != nil {
+		return apiFactoryState{}
+	}
+
+	var allWorkspaces []workspaceInfo
+	for _, grp := range groups {
+		allWorkspaces = append(allWorkspaces, grp.Root)
+		allWorkspaces = append(allWorkspaces, grp.Forks...)
+	}
+
+	workspaces := make([]apiWorkspaceFullState, len(allWorkspaces))
+	var wg sync.WaitGroup
+	for i, ws := range allWorkspaces {
+		wg.Go(func() {
+			workspaces[i] = s.buildWorkspaceFullState(ws, groups)
+		})
+	}
+	wg.Wait()
+
+	return apiFactoryState{Workspaces: workspaces}
+}
+
+const maxStateSizeBytes = 10 * 1024 * 1024
+
+func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGroup) apiWorkspaceFullState {
+	wfState := s.loadWorkspaceState(ws.Directory)
+	kind := s.classifyWorkspaceCached(ws.Directory)
+
+	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive || wfState.InteractionMode == state.ModeContinuous
+	badgeClass, badgeText := badgeStatus(wfState, ws.Running)
+	needsInput := wfState.NeedsHumanInput()
+
+	currentAgent := wfState.CurrentAgent
+	if currentAgent == "" {
+		currentAgent = "Unknown"
+	}
+
 	status := wfState.Status
 	if status == "" {
 		status = "-"
 	}
-	return sseWorkspaceDetailSnapshot{
-		Name:       filepath.Base(workspacePath),
-		Running:    running,
-		NeedsInput: needsInput,
-		Status:     status,
-	}
-}
 
-func (s *Server) sendSSESnapshot(w http.ResponseWriter, flusher http.Flusher) {
-	snapshot := s.buildSSESnapshot()
-	evt := sseEvent{Type: "snapshot", Data: snapshot}
-	if errWrite := writeSSEEvent(w, flusher, evt); errWrite != nil {
-		log.Println("failed to send snapshot:", errWrite)
-	}
-}
+	goalContent, rawGoalContent, fullGoalContent, pmContent, hasProjectMgmt := readGoalAndPMForAPI(ws.Directory)
 
-type sseSnapshot struct {
-	Workspaces []sseWorkspaceSnapshot `json:"workspaces"`
-}
-
-type sseWorkspaceSnapshot struct {
-	Name    string `json:"name"`
-	Dir     string `json:"dir"`
-	Running bool   `json:"running"`
-	Status  string `json:"status"`
-}
-
-func (s *Server) buildSSESnapshot() sseSnapshot {
-	groups, errScan := s.scanWorkspaceGroups()
-	if errScan != nil {
-		return sseSnapshot{}
+	hasEditedGoal := false
+	if data, errRead := os.ReadFile(filepath.Join(ws.Directory, "GOAL.md")); errRead == nil {
+		body := extractBody(data)
+		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
 	}
 
-	var workspaces []sseWorkspaceSnapshot
-	for _, grp := range groups {
-		workspaces = append(workspaces, sseWorkspaceSnapshot{
-			Name:    grp.Root.DirName,
-			Dir:     grp.Root.Directory,
-			Running: grp.Root.Running,
-			Status:  workspaceStatusText(grp.Root),
-		})
-		for _, fork := range grp.Forks {
-			workspaces = append(workspaces, sseWorkspaceSnapshot{
-				Name:    fork.DirName,
-				Dir:     fork.Directory,
-				Running: fork.Running,
-				Status:  workspaceStatusText(fork),
-			})
+	agentSeq := convertAgentSequence(
+		prepareAgentSequenceDisplay(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress)),
+	)
+	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress))
+
+	modelStatuses := convertModelStatuses(orderedModelStatuses(ws.Directory, wfState.ModelStatuses))
+
+	reversedProgress := slices.Clone(wfState.Progress)
+	slices.Reverse(reversedProgress)
+	events := convertEventsForAPI(formatProgressForDisplay(reversedProgress))
+
+	messages := convertMessagesForAPI(wfState.Messages)
+
+	var logLines []apiLogEntry
+	s.mu.Lock()
+	sess := s.sessions[ws.Directory]
+	s.mu.Unlock()
+	if sess != nil && sess.outputLog != nil {
+		for _, line := range sess.outputLog.lines() {
+			logLines = append(logLines, apiLogEntry{Prefix: line.prefix, Text: line.text})
 		}
 	}
 
-	return sseSnapshot{Workspaces: workspaces}
+	var changesResult jjChangesResult
+	if hasJJRepo(ws.Directory) {
+		changesResult = s.collectJJChangesCached(ws.Directory)
+	}
+	changes := apiChangesResponse{
+		Description: changesResult.description,
+		DiffLines:   changesResult.diffLines,
+	}
+
+	var commits []apiCommitEntry
+	if hasJJRepo(ws.Directory) {
+		commits = buildCommitEntries(s.filteredCommitsForWorkspace(ws.Directory))
+	}
+
+	var pendingQuestion *apiPendingQuestionResponse
+	if wfState.NeedsHumanInput() {
+		agentName := currentAgent
+		var questions []apiQuestionItem
+		if wfState.MultiChoiceQuestion != nil {
+			questions = make([]apiQuestionItem, 0, len(wfState.MultiChoiceQuestion.Questions))
+			for _, q := range wfState.MultiChoiceQuestion.Questions {
+				questions = append(questions, apiQuestionItem{
+					Question:    q.Question,
+					Choices:     q.Choices,
+					MultiSelect: q.MultiSelect,
+				})
+			}
+		}
+		pendingQuestion = &apiPendingQuestionResponse{
+			QuestionID: generateQuestionID(wfState),
+			Type:       questionType(wfState),
+			AgentName:  agentName,
+			Message:    wfState.HumanMessage,
+			Questions:  questions,
+		}
+	}
+
+	full := apiWorkspaceFullState{
+		Name:            ws.DirName,
+		Dir:             ws.Directory,
+		Running:         ws.Running,
+		NeedsInput:      needsInput,
+		InProgress:      ws.InProgress,
+		Pinned:          ws.Pinned,
+		IsRoot:          kind == workspaceRoot,
+		IsFork:          kind == workspaceFork,
+		HasSGAI:         ws.HasWorkspace,
+		Status:          status,
+		BadgeClass:      badgeClass,
+		BadgeText:       badgeText,
+		HasEditedGoal:   hasEditedGoal,
+		InteractiveAuto: interactiveAuto,
+		ContinuousMode:  readContinuousModePrompt(ws.Directory) != "",
+		CurrentAgent:    currentAgent,
+		CurrentModel:    resolveCurrentModel(ws.Directory, wfState),
+		Task:            wfState.Task,
+		GoalContent:     goalContent,
+		RawGoalContent:  rawGoalContent,
+		FullGoalContent: fullGoalContent,
+		PMContent:       pmContent,
+		HasProjectMgmt:  hasProjectMgmt,
+		SVGHash:         s.getWorkflowSVGHashCached(ws.Directory, currentAgent),
+		TotalExecTime:   totalExecTime,
+		LatestProgress:  getLatestProgress(wfState.Progress),
+		HumanMessage:    wfState.HumanMessage,
+		Summary:         wfState.Summary,
+		SummaryManual:   wfState.SummaryManual,
+		AgentSequence:   agentSeq,
+		Cost:            wfState.Cost,
+		ModelStatuses:   modelStatuses,
+		AgentModels:     collectAgentModels(ws.Directory),
+		Events:          events,
+		Messages:        messages,
+		ProjectTodos:    convertTodosForAPI(wfState.ProjectTodos),
+		AgentTodos:      convertTodosForAPI(wfState.Todos),
+		Changes:         changes,
+		Commits:         commits,
+		Log:             logLines,
+		PendingQuestion: pendingQuestion,
+		Actions:         loadActionsForAPI(ws.Directory),
+	}
+
+	if kind == workspaceRoot {
+		full.Forks = s.collectForksForAPIFromGroups(ws.Directory, groups)
+	}
+
+	return full
 }
 
-func workspaceStatusText(w workspaceInfo) string {
-	wfState, _ := state.Load(statePath(w.Directory))
-	class, _ := badgeStatus(wfState, w.Running)
-	return class
+func buildCommitEntries(commits []jjCommit) []apiCommitEntry {
+	entries := make([]apiCommitEntry, 0, len(commits))
+	for _, c := range commits {
+		entries = append(entries, apiCommitEntry{
+			ChangeID:    c.ChangeID,
+			CommitID:    c.CommitID,
+			Workspaces:  c.Workspaces,
+			Timestamp:   c.Timestamp,
+			Bookmarks:   c.Bookmarks,
+			Description: c.Description,
+			GraphChar:   c.GraphChar,
+		})
+	}
+	return entries
 }
 
-func writeSSEEvent(w http.ResponseWriter, flusher http.Flusher, evt sseEvent) error {
-	data, errMarshal := json.Marshal(evt.Data)
-	if errMarshal != nil {
-		return errMarshal
+func (s *Server) collectForksForAPIFromGroups(rootDir string, groups []workspaceGroup) []apiForkEntry {
+	for _, grp := range groups {
+		if grp.Root.Directory != rootDir {
+			continue
+		}
+		bookmark := s.resolveBaseBookmarkCached(rootDir)
+		forks := make([]apiForkEntry, len(grp.Forks))
+		var wg sync.WaitGroup
+		for i, fork := range grp.Forks {
+			wg.Go(func() {
+				commits := convertJJCommitsForAPI(s.runJJLogForForkCached(bookmark, fork.Directory))
+				wfState := s.loadWorkspaceState(fork.Directory)
+				forks[i] = apiForkEntry{
+					Name:        fork.DirName,
+					Dir:         fork.Directory,
+					Running:     fork.Running,
+					NeedsInput:  wfState.NeedsHumanInput(),
+					InProgress:  fork.InProgress,
+					Pinned:      fork.Pinned,
+					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
+					Commits:     commits,
+					Summary:     wfState.Summary,
+				}
+			})
+		}
+		wg.Wait()
+		return forks
 	}
-	_, errWrite := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", evt.Type, data)
-	if errWrite != nil {
-		return errWrite
-	}
-	flusher.Flush()
 	return nil
 }
 
@@ -678,67 +838,6 @@ func (s *Server) handleAPISnippetDetail(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-type apiWorkspaceEntry struct {
-	Name       string              `json:"name"`
-	Dir        string              `json:"dir"`
-	Running    bool                `json:"running"`
-	NeedsInput bool                `json:"needsInput"`
-	InProgress bool                `json:"inProgress"`
-	Pinned     bool                `json:"pinned"`
-	IsRoot     bool                `json:"isRoot"`
-	Status     string              `json:"status"`
-	HasSGAI    bool                `json:"hasSgai"`
-	Summary    string              `json:"summary,omitempty"`
-	Forks      []apiWorkspaceEntry `json:"forks,omitempty"`
-}
-
-type apiWorkspacesResponse struct {
-	Workspaces []apiWorkspaceEntry `json:"workspaces"`
-}
-
-func (s *Server) handleAPIWorkspaces(w http.ResponseWriter, _ *http.Request) {
-	groups, errScan := s.scanWorkspaceGroups()
-	if errScan != nil {
-		http.Error(w, "failed to scan workspaces", http.StatusInternalServerError)
-		return
-	}
-
-	workspaces := convertWorkspaceGroups(groups)
-	writeJSON(w, apiWorkspacesResponse{Workspaces: workspaces})
-}
-
-func convertWorkspaceGroups(groups []workspaceGroup) []apiWorkspaceEntry {
-	result := make([]apiWorkspaceEntry, 0, len(groups))
-	for _, grp := range groups {
-		entry := convertWorkspaceInfo(grp.Root)
-		if len(grp.Forks) > 0 {
-			entry.Forks = make([]apiWorkspaceEntry, 0, len(grp.Forks))
-			for _, fork := range grp.Forks {
-				entry.Forks = append(entry.Forks, convertWorkspaceInfo(fork))
-			}
-		}
-		result = append(result, entry)
-	}
-	return result
-}
-
-func convertWorkspaceInfo(w workspaceInfo) apiWorkspaceEntry {
-	wfState, _ := state.Load(statePath(w.Directory))
-	_, statusText := badgeStatus(wfState, w.Running)
-	return apiWorkspaceEntry{
-		Name:       w.DirName,
-		Dir:        w.Directory,
-		Running:    w.Running,
-		NeedsInput: w.NeedsInput,
-		InProgress: w.InProgress,
-		Pinned:     w.Pinned,
-		IsRoot:     w.IsRoot,
-		Status:     statusText,
-		HasSGAI:    w.HasWorkspace,
-		Summary:    wfState.Summary,
-	}
-}
-
 type apiActionEntry struct {
 	Name        string `json:"name"`
 	Model       string `json:"model"`
@@ -746,153 +845,10 @@ type apiActionEntry struct {
 	Description string `json:"description,omitempty"`
 }
 
-type apiWorkspaceDetailResponse struct {
-	Name            string                    `json:"name"`
-	Dir             string                    `json:"dir"`
-	Running         bool                      `json:"running"`
-	NeedsInput      bool                      `json:"needsInput"`
-	Status          string                    `json:"status"`
-	BadgeClass      string                    `json:"badgeClass"`
-	BadgeText       string                    `json:"badgeText"`
-	IsRoot          bool                      `json:"isRoot"`
-	IsFork          bool                      `json:"isFork"`
-	Pinned          bool                      `json:"pinned"`
-	HasSGAI         bool                      `json:"hasSgai"`
-	HasEditedGoal   bool                      `json:"hasEditedGoal"`
-	InteractiveAuto bool                      `json:"interactiveAuto"`
-	ContinuousMode  bool                      `json:"continuousMode"`
-	CurrentAgent    string                    `json:"currentAgent"`
-	CurrentModel    string                    `json:"currentModel"`
-	Task            string                    `json:"task"`
-	GoalContent     string                    `json:"goalContent"`
-	RawGoalContent  string                    `json:"rawGoalContent"`
-	FullGoalContent string                    `json:"fullGoalContent"`
-	PMContent       string                    `json:"pmContent"`
-	HasProjectMgmt  bool                      `json:"hasProjectMgmt"`
-	SVGHash         string                    `json:"svgHash"`
-	TotalExecTime   string                    `json:"totalExecTime"`
-	LatestProgress  string                    `json:"latestProgress"`
-	AgentSequence   []apiAgentSequenceEntry   `json:"agentSequence"`
-	Cost            state.SessionCost         `json:"cost"`
-	Summary         string                    `json:"summary,omitempty"`
-	SummaryManual   bool                      `json:"summaryManual,omitempty"`
-	Forks           []apiWorkspaceForkSummary `json:"forks,omitempty"`
-	Actions         []apiActionEntry          `json:"actions,omitempty"`
-}
-
 type apiAgentSequenceEntry struct {
 	Agent       string `json:"agent"`
 	ElapsedTime string `json:"elapsedTime"`
 	IsCurrent   bool   `json:"isCurrent"`
-}
-
-type apiWorkspaceForkSummary struct {
-	Name        string `json:"name"`
-	Dir         string `json:"dir"`
-	Running     bool   `json:"running"`
-	CommitAhead int    `json:"commitAhead"`
-	Summary     string `json:"summary,omitempty"`
-}
-
-func (s *Server) handleAPIWorkspaceDetail(w http.ResponseWriter, r *http.Request) {
-	workspaceName := r.PathValue("name")
-	if workspaceName == "" {
-		http.Error(w, "workspace name is required", http.StatusBadRequest)
-		return
-	}
-
-	workspacePath := s.resolveWorkspaceNameToPath(workspaceName)
-	if workspacePath == "" {
-		http.Error(w, "workspace not found", http.StatusNotFound)
-		return
-	}
-
-	detail := s.buildWorkspaceDetail(workspacePath)
-	writeJSON(w, detail)
-}
-
-func (s *Server) buildWorkspaceDetail(workspacePath string) apiWorkspaceDetailResponse {
-	wfState, _ := state.Load(statePath(workspacePath))
-
-	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive || wfState.InteractionMode == state.ModeContinuous
-	var running bool
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-	if sess != nil {
-		sess.mu.Lock()
-		running = sess.running
-		sess.mu.Unlock()
-	}
-
-	badgeClass, badgeText := badgeStatus(wfState, running)
-	needsInput := wfState.NeedsHumanInput()
-	kind := s.classifyWorkspaceCached(workspacePath)
-
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
-	task := wfState.Task
-	status := wfState.Status
-	if status == "" {
-		status = "-"
-	}
-
-	goalContent, rawGoalContent, fullGoalContent, pmContent, hasProjectMgmt := readGoalAndPMForAPI(workspacePath)
-
-	hasEditedGoal := false
-	if data, errRead := os.ReadFile(filepath.Join(workspacePath, "GOAL.md")); errRead == nil {
-		body := extractBody(data)
-		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
-	}
-
-	agentSeq := convertAgentSequence(
-		prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
-	)
-
-	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress))
-
-	detail := apiWorkspaceDetailResponse{
-		Name:            filepath.Base(workspacePath),
-		Dir:             workspacePath,
-		Running:         running,
-		NeedsInput:      needsInput,
-		Status:          status,
-		BadgeClass:      badgeClass,
-		BadgeText:       badgeText,
-		IsRoot:          kind == workspaceRoot,
-		IsFork:          kind == workspaceFork,
-		Pinned:          s.isPinned(workspacePath),
-		HasSGAI:         hassgaiDirectory(workspacePath),
-		HasEditedGoal:   hasEditedGoal,
-		InteractiveAuto: interactiveAuto,
-		ContinuousMode:  readContinuousModePrompt(workspacePath) != "",
-		CurrentAgent:    currentAgent,
-		CurrentModel:    resolveCurrentModel(workspacePath, wfState),
-		Task:            task,
-		GoalContent:     goalContent,
-		RawGoalContent:  rawGoalContent,
-		FullGoalContent: fullGoalContent,
-		PMContent:       pmContent,
-		HasProjectMgmt:  hasProjectMgmt,
-		SVGHash:         s.getWorkflowSVGHashCached(workspacePath, currentAgent),
-		TotalExecTime:   totalExecTime,
-		LatestProgress:  getLatestProgress(wfState.Progress),
-		AgentSequence:   agentSeq,
-		Cost:            wfState.Cost,
-		Summary:         wfState.Summary,
-		SummaryManual:   wfState.SummaryManual,
-	}
-
-	if kind == workspaceRoot {
-		detail.Forks = s.collectForkSummaries(workspacePath)
-	}
-
-	detail.Actions = loadActionsForAPI(workspacePath)
-
-	return detail
 }
 
 func loadActionsForAPI(workspacePath string) []apiActionEntry {
@@ -942,38 +898,6 @@ func convertAgentSequence(displays []agentSequenceDisplay) []apiAgentSequenceEnt
 		result = append(result, apiAgentSequenceEntry(d))
 	}
 	return result
-}
-
-func (s *Server) collectForkSummaries(rootDir string) []apiWorkspaceForkSummary {
-	groups, errScan := s.scanWorkspaceGroups()
-	if errScan != nil {
-		return nil
-	}
-
-	for _, grp := range groups {
-		if grp.Root.Directory != rootDir {
-			continue
-		}
-		bookmark := s.resolveBaseBookmarkCached(rootDir)
-		summaries := make([]apiWorkspaceForkSummary, len(grp.Forks))
-		var wg sync.WaitGroup
-		for i, fork := range grp.Forks {
-			wg.Go(func() {
-				forkState, _ := state.Load(statePath(fork.Directory))
-				summaries[i] = apiWorkspaceForkSummary{
-					Name:        fork.DirName,
-					Dir:         fork.Directory,
-					Running:     fork.Running,
-					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
-					Summary:     forkState.Summary,
-				}
-			})
-		}
-		wg.Wait()
-		return summaries
-	}
-
-	return nil
 }
 
 type apiCreateWorkspaceRequest struct {
@@ -1049,86 +973,9 @@ func (s *Server) resolveWorkspaceFromPath(w http.ResponseWriter, r *http.Request
 	return workspacePath, true
 }
 
-type apiSessionResponse struct {
-	Name            string                  `json:"name"`
-	Status          string                  `json:"status"`
-	Running         bool                    `json:"running"`
-	NeedsInput      bool                    `json:"needsInput"`
-	InteractiveAuto bool                    `json:"interactiveAuto"`
-	BadgeClass      string                  `json:"badgeClass"`
-	BadgeText       string                  `json:"badgeText"`
-	CurrentAgent    string                  `json:"currentAgent"`
-	CurrentModel    string                  `json:"currentModel"`
-	Task            string                  `json:"task"`
-	HumanMessage    string                  `json:"humanMessage"`
-	LatestProgress  string                  `json:"latestProgress"`
-	TotalExecTime   string                  `json:"totalExecTime"`
-	SVGHash         string                  `json:"svgHash"`
-	AgentSequence   []apiAgentSequenceEntry `json:"agentSequence"`
-	Cost            state.SessionCost       `json:"cost"`
-	ModelStatuses   []apiModelStatusEntry   `json:"modelStatuses,omitempty"`
-}
-
 type apiModelStatusEntry struct {
 	ModelID string `json:"modelId"`
 	Status  string `json:"status"`
-}
-
-func (s *Server) handleAPIWorkspaceSession(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState, _ := state.Load(statePath(workspacePath))
-
-	interactiveAuto := wfState.InteractionMode == state.ModeSelfDrive || wfState.InteractionMode == state.ModeContinuous
-	var running bool
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-	if sess != nil {
-		sess.mu.Lock()
-		running = sess.running
-		sess.mu.Unlock()
-	}
-
-	badgeClass, badgeText := badgeStatus(wfState, running)
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
-	status := wfState.Status
-	if status == "" {
-		status = "-"
-	}
-
-	agentSeq := convertAgentSequence(
-		prepareAgentSequenceDisplay(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
-	)
-
-	modelStatuses := convertModelStatuses(orderedModelStatuses(workspacePath, wfState.ModelStatuses))
-
-	writeJSON(w, apiSessionResponse{
-		Name:            filepath.Base(workspacePath),
-		Status:          status,
-		Running:         running,
-		NeedsInput:      wfState.NeedsHumanInput(),
-		InteractiveAuto: interactiveAuto,
-		BadgeClass:      badgeClass,
-		BadgeText:       badgeText,
-		CurrentAgent:    currentAgent,
-		CurrentModel:    resolveCurrentModel(workspacePath, wfState),
-		Task:            wfState.Task,
-		HumanMessage:    wfState.HumanMessage,
-		LatestProgress:  getLatestProgress(wfState.Progress),
-		TotalExecTime:   calculateTotalExecutionTime(wfState.AgentSequence, running, getLastActivityTime(wfState.Progress)),
-		SVGHash:         s.getWorkflowSVGHashCached(workspacePath, currentAgent),
-		AgentSequence:   agentSeq,
-		Cost:            wfState.Cost,
-		ModelStatuses:   modelStatuses,
-	})
 }
 
 func convertModelStatuses(displays []modelStatusDisplay) []apiModelStatusEntry {
@@ -1153,31 +1000,22 @@ type apiMessageEntry struct {
 	CreatedAt string `json:"createdAt,omitempty"`
 }
 
-type apiMessagesResponse struct {
-	Messages []apiMessageEntry `json:"messages"`
-}
-
-func (s *Server) handleAPIWorkspaceMessages(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState, _ := state.Load(statePath(workspacePath))
-	messages := convertMessagesForAPI(wfState.Messages)
-	writeJSON(w, apiMessagesResponse{Messages: messages})
-}
+const maxMessageBodyBytes = 10 * 1024
 
 func convertMessagesForAPI(messages []state.Message) []apiMessageEntry {
 	result := make([]apiMessageEntry, 0, len(messages))
 	for i := len(messages) - 1; i >= 0; i-- {
 		msg := messages[i]
 		subject := extractSubject(msg.Body)
+		body := msg.Body
+		if len(body) > maxMessageBodyBytes {
+			body = body[:maxMessageBodyBytes] + "...[truncated]"
+		}
 		result = append(result, apiMessageEntry{
 			ID:        msg.ID,
 			FromAgent: msg.FromAgent,
 			ToAgent:   msg.ToAgent,
-			Body:      msg.Body,
+			Body:      body,
 			Subject:   subject,
 			Read:      msg.Read,
 			ReadAt:    msg.ReadAt,
@@ -1192,31 +1030,6 @@ type apiTodoEntry struct {
 	Content  string `json:"content"`
 	Status   string `json:"status"`
 	Priority string `json:"priority"`
-}
-
-type apiTodosResponse struct {
-	ProjectTodos []apiTodoEntry `json:"projectTodos"`
-	AgentTodos   []apiTodoEntry `json:"agentTodos"`
-	CurrentAgent string         `json:"currentAgent"`
-}
-
-func (s *Server) handleAPIWorkspaceTodos(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState, _ := state.Load(statePath(workspacePath))
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
-	writeJSON(w, apiTodosResponse{
-		ProjectTodos: convertTodosForAPI(wfState.ProjectTodos),
-		AgentTodos:   convertTodosForAPI(wfState.Todos),
-		CurrentAgent: currentAgent,
-	})
 }
 
 func convertTodosForAPI(todos []state.TodoItem) []apiTodoEntry {
@@ -1237,49 +1050,6 @@ type apiLogEntry struct {
 	Text   string `json:"text"`
 }
 
-type apiLogResponse struct {
-	Lines []apiLogEntry `json:"lines"`
-}
-
-func (s *Server) handleAPIWorkspaceLog(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var lines []apiLogEntry
-
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-
-	if sess != nil && sess.outputLog != nil {
-		logLines := sess.outputLog.lines()
-		for _, line := range logLines {
-			lines = append(lines, apiLogEntry{Prefix: line.prefix, Text: line.text})
-		}
-	}
-
-	maxLines := parseOptionalIntParam(r, "lines", 0)
-	if maxLines > 0 && len(lines) > maxLines {
-		lines = lines[len(lines)-maxLines:]
-	}
-
-	writeJSON(w, apiLogResponse{Lines: lines})
-}
-
-func parseOptionalIntParam(r *http.Request, name string, defaultVal int) int {
-	val := r.URL.Query().Get(name)
-	if val == "" {
-		return defaultVal
-	}
-	parsed, errParse := strconv.Atoi(val)
-	if errParse != nil || parsed < 0 {
-		return defaultVal
-	}
-	return parsed
-}
-
 type apiChangesResponse struct {
 	Description string        `json:"description"`
 	DiffLines   []apiDiffLine `json:"diffLines"`
@@ -1291,20 +1061,6 @@ type apiDiffLine struct {
 	Class      string `json:"class"`
 }
 
-func (s *Server) handleAPIWorkspaceChanges(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	result := s.collectJJChangesCached(workspacePath)
-
-	writeJSON(w, apiChangesResponse{
-		Description: result.description,
-		DiffLines:   result.diffLines,
-	})
-}
-
 func (s *Server) collectJJChangesCached(dir string) jjChangesResult {
 	result, _ := s.jjChangesFlight.do(dir, func() (jjChangesResult, error) {
 		diffLines, description := collectJJChanges(dir)
@@ -1314,10 +1070,10 @@ func (s *Server) collectJJChangesCached(dir string) jjChangesResult {
 }
 
 func collectJJChanges(dir string) ([]apiDiffLine, string) {
-	diffCmd := exec.Command("jj", "diff", "--git")
-	diffCmd.Dir = dir
-	rawDiff, errDiff := diffCmd.Output()
-	if errDiff != nil {
+	statCmd := exec.Command("jj", "diff", "--stat")
+	statCmd.Dir = dir
+	rawStat, errStat := statCmd.Output()
+	if errStat != nil {
 		return nil, ""
 	}
 
@@ -1329,18 +1085,47 @@ func collectJJChanges(dir string) ([]apiDiffLine, string) {
 	}
 
 	var diffLines []apiDiffLine
-	for line := range strings.SplitSeq(string(rawDiff), "\n") {
+	for line := range strings.SplitSeq(string(rawStat), "\n") {
 		if line == "" && len(diffLines) == 0 {
 			continue
 		}
 		diffLines = append(diffLines, apiDiffLine{
 			LineNumber: len(diffLines) + 1,
 			Text:       line,
-			Class:      classifyDiffLine(line),
+			Class:      "diff-stat-line",
 		})
 	}
 
 	return diffLines, strings.TrimSpace(string(rawDesc))
+}
+
+func collectJJFullDiff(dir string) string {
+	diffCmd := exec.Command("jj", "diff", "--git")
+	diffCmd.Dir = dir
+	rawDiff, errDiff := diffCmd.Output()
+	if errDiff != nil {
+		return ""
+	}
+	return string(rawDiff)
+}
+
+type apiFullDiffResponse struct {
+	Diff string `json:"diff"`
+}
+
+func (s *Server) handleAPIWorkspaceDiff(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	if !hasJJRepo(workspacePath) {
+		writeJSON(w, apiFullDiffResponse{})
+		return
+	}
+
+	diff := collectJJFullDiff(workspacePath)
+	writeJSON(w, apiFullDiffResponse{Diff: diff})
 }
 
 type apiEventEntry struct {
@@ -1355,51 +1140,6 @@ type apiEventEntry struct {
 type apiAgentModelEntry struct {
 	Agent  string   `json:"agent"`
 	Models []string `json:"models"`
-}
-
-type apiEventsResponse struct {
-	Events        []apiEventEntry       `json:"events"`
-	CurrentAgent  string                `json:"currentAgent"`
-	CurrentModel  string                `json:"currentModel"`
-	SVGHash       string                `json:"svgHash"`
-	NeedsInput    bool                  `json:"needsInput"`
-	HumanMessage  string                `json:"humanMessage"`
-	GoalContent   string                `json:"goalContent"`
-	ModelStatuses []apiModelStatusEntry `json:"modelStatuses,omitempty"`
-	AgentModels   []apiAgentModelEntry  `json:"agentModels,omitempty"`
-}
-
-func (s *Server) handleAPIWorkspaceEvents(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState, _ := state.Load(statePath(workspacePath))
-
-	reversedProgress := slices.Clone(wfState.Progress)
-	slices.Reverse(reversedProgress)
-
-	events := convertEventsForAPI(formatProgressForDisplay(reversedProgress))
-
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
-	goalContent, _, _, _, _ := readGoalAndPMForAPI(workspacePath)
-
-	writeJSON(w, apiEventsResponse{
-		Events:        events,
-		CurrentAgent:  currentAgent,
-		CurrentModel:  resolveCurrentModel(workspacePath, wfState),
-		SVGHash:       s.getWorkflowSVGHashCached(workspacePath, currentAgent),
-		NeedsInput:    wfState.NeedsHumanInput(),
-		HumanMessage:  wfState.HumanMessage,
-		GoalContent:   goalContent,
-		ModelStatuses: convertModelStatuses(orderedModelStatuses(workspacePath, wfState.ModelStatuses)),
-		AgentModels:   collectAgentModels(workspacePath),
-	})
 }
 
 func convertEventsForAPI(displays []eventsProgressDisplay) []apiEventEntry {
@@ -1422,54 +1162,12 @@ type apiForkEntry struct {
 	Name        string          `json:"name"`
 	Dir         string          `json:"dir"`
 	Running     bool            `json:"running"`
+	NeedsInput  bool            `json:"needsInput"`
+	InProgress  bool            `json:"inProgress"`
+	Pinned      bool            `json:"pinned"`
 	CommitAhead int             `json:"commitAhead"`
 	Commits     []apiForkCommit `json:"commits"`
-}
-
-type apiForksResponse struct {
-	Forks []apiForkEntry `json:"forks"`
-}
-
-func (s *Server) handleAPIWorkspaceForks(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	forks := s.collectForksForAPI(workspacePath)
-	writeJSON(w, apiForksResponse{Forks: forks})
-}
-
-func (s *Server) collectForksForAPI(rootDir string) []apiForkEntry {
-	groups, errScan := s.scanWorkspaceGroups()
-	if errScan != nil {
-		return nil
-	}
-
-	for _, grp := range groups {
-		if grp.Root.Directory != rootDir {
-			continue
-		}
-		bookmark := s.resolveBaseBookmarkCached(rootDir)
-		forks := make([]apiForkEntry, len(grp.Forks))
-		var wg sync.WaitGroup
-		for i, fork := range grp.Forks {
-			wg.Go(func() {
-				commits := convertJJCommitsForAPI(s.runJJLogForForkCached(bookmark, fork.Directory))
-				forks[i] = apiForkEntry{
-					Name:        fork.DirName,
-					Dir:         fork.Directory,
-					Running:     fork.Running,
-					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
-					Commits:     commits,
-				}
-			})
-		}
-		wg.Wait()
-		return forks
-	}
-
-	return nil
+	Summary     string          `json:"summary,omitempty"`
 }
 
 func convertJJCommitsForAPI(commits []jjCommit) []apiForkCommit {
@@ -1524,45 +1222,6 @@ type apiPendingQuestionResponse struct {
 	AgentName  string            `json:"agentName"`
 	Message    string            `json:"message"`
 	Questions  []apiQuestionItem `json:"questions,omitempty"`
-}
-
-func (s *Server) handleAPIPendingQuestion(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState, _ := state.Load(statePath(workspacePath))
-
-	if !wfState.NeedsHumanInput() {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	agentName := wfState.CurrentAgent
-	if agentName == "" {
-		agentName = "Unknown"
-	}
-
-	var questions []apiQuestionItem
-	if wfState.MultiChoiceQuestion != nil {
-		questions = make([]apiQuestionItem, 0, len(wfState.MultiChoiceQuestion.Questions))
-		for _, q := range wfState.MultiChoiceQuestion.Questions {
-			questions = append(questions, apiQuestionItem{
-				Question:    q.Question,
-				Choices:     q.Choices,
-				MultiSelect: q.MultiSelect,
-			})
-		}
-	}
-
-	writeJSON(w, apiPendingQuestionResponse{
-		QuestionID: generateQuestionID(wfState),
-		Type:       questionType(wfState),
-		AgentName:  agentName,
-		Message:    wfState.HumanMessage,
-		Questions:  questions,
-	})
 }
 
 type apiRespondRequest struct {
@@ -1626,9 +1285,7 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
 }
@@ -1709,9 +1366,7 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiSessionActionResponse{
 		Name:    filepath.Base(workspacePath),
@@ -1747,9 +1402,7 @@ func (s *Server) handleAPIStopSession(w http.ResponseWriter, r *http.Request) {
 		message = "session already stopped"
 	}
 
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiSessionActionResponse{
 		Name:    filepath.Base(workspacePath),
@@ -1770,9 +1423,7 @@ func (s *Server) handleAPIResetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "session:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiSessionActionResponse{
 		Name:    filepath.Base(workspacePath),
@@ -1893,10 +1544,7 @@ func (s *Server) handleAPIComposeSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.publishToWorkspace(workspacePath, sseEvent{Type: "compose:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "saved",
-	}})
+	s.notifyStateChange()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -2005,10 +1653,7 @@ func (s *Server) handleAPIComposeDraft(w http.ResponseWriter, r *http.Request) {
 	cs.wizard = wizardState(req.Wizard)
 	cs.mu.Unlock()
 
-	s.publishToWorkspace(workspacePath, sseEvent{Type: "compose:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "draft-saved",
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiComposeDraftResponse{Saved: true})
 }
@@ -2077,12 +1722,7 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 
 	s.invalidateWorkspaceScanCache()
 	s.classifyCache.delete(workspacePath)
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "forked",
-		"fork":      name,
-	}})
+	s.notifyStateChange()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -2162,12 +1802,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 	s.invalidateWorkspaceScanCache()
 	s.classifyCache.delete(workspacePath)
 	s.classifyCache.delete(forkDir)
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "deleted",
-		"fork":      forkName,
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiDeleteForkResponse{
 		Deleted: true,
@@ -2255,12 +1890,7 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 	s.mu.Unlock()
 
 	s.invalidateWorkspaceScanCache()
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": oldName,
-		"action":    "renamed",
-		"newName":   newName,
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiRenameResponse{
 		Name:    newName,
@@ -2324,11 +1954,7 @@ func (s *Server) handleAPIUpdateGoal(w http.ResponseWriter, r *http.Request) {
 	s.svgCache.deleteFunc(func(k string) bool {
 		return strings.HasPrefix(k, prefix)
 	})
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "goal-updated",
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiUpdateGoalResponse{
 		Updated:   true,
@@ -2373,10 +1999,7 @@ func (s *Server) handleAPIUpdateSummary(w http.ResponseWriter, r *http.Request) 
 	}
 
 	workspaceName := filepath.Base(workspacePath)
-	s.publishGlobalAndWorkspace(workspaceName, workspacePath, sseEvent{
-		Type: "session:update",
-		Data: map[string]string{"workspace": workspaceName},
-	})
+	s.notifyStateChange()
 
 	writeJSON(w, apiUpdateSummaryResponse{
 		Updated:   true,
@@ -2490,10 +2113,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 		st.mu.Unlock()
 	}()
 
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "adhoc-started",
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiAdhocResponse{
 		Running: true,
@@ -2518,11 +2138,7 @@ func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
 
 	st := s.getAdhocState(workspacePath)
 	st.stop()
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "adhoc-stopped",
-	}})
+	s.notifyStateChange()
 
 	st.mu.Lock()
 	output := st.output.String()
@@ -2570,35 +2186,8 @@ type apiCommitEntry struct {
 	GraphChar   string   `json:"graphChar"`
 }
 
-type apiCommitsResponse struct {
-	Commits []apiCommitEntry `json:"commits"`
-}
-
-func (s *Server) handleAPIWorkspaceCommits(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	commits := s.filteredCommitsForWorkspace(workspacePath)
-	entries := make([]apiCommitEntry, 0, len(commits))
-	for _, c := range commits {
-		entries = append(entries, apiCommitEntry{
-			ChangeID:    c.ChangeID,
-			CommitID:    c.CommitID,
-			Workspaces:  c.Workspaces,
-			Timestamp:   c.Timestamp,
-			Bookmarks:   c.Bookmarks,
-			Description: c.Description,
-			GraphChar:   c.GraphChar,
-		})
-	}
-
-	writeJSON(w, apiCommitsResponse{Commits: entries})
-}
-
 func runJJLogForWorkspace(dir string) []jjCommit {
-	cmd := exec.Command("jj", "log", "-T", jjLogTemplate)
+	cmd := exec.Command("jj", "log", "-n", "50", "-T", jjLogTemplate)
 	cmd.Dir = dir
 	output, errCmd := cmd.Output()
 	if errCmd != nil {
@@ -2704,9 +2293,7 @@ func (s *Server) handleAPISteer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{Type: "messages:new", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiSteerResponse{Success: true, Message: "steering instruction added"})
 }
@@ -2748,9 +2335,7 @@ func (s *Server) handleAPIUpdateDescription(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	s.publishToWorkspace(workspacePath, sseEvent{Type: "changes:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-	}})
+	s.notifyStateChange()
 
 	writeJSON(w, apiUpdateDescriptionResponse{
 		Updated:     true,
@@ -2775,13 +2360,9 @@ func (s *Server) handleAPITogglePin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.invalidateWorkspaceScanCache()
+	s.notifyStateChange()
 
 	pinned := s.isPinned(workspacePath)
-
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": filepath.Base(workspacePath),
-		"action":    "pin-toggled",
-	}})
 
 	writeJSON(w, apiTogglePinResponse{
 		Pinned:  pinned,

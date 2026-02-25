@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 import { cn } from "@/lib/utils";
-import type { ApiMessagesResponse, ApiMessageEntry } from "@/types";
+import type { ApiMessageEntry } from "@/types";
 
 interface MessagesTabProps {
   workspaceName: string;
@@ -60,59 +58,23 @@ function MessageItem({ message }: { message: ApiMessageEntry }) {
 }
 
 export function MessagesTab({ workspaceName }: MessagesTabProps) {
-  const [data, setData] = useState<ApiMessagesResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
-  const messagesEvent = useWorkspaceSSEEvent(workspaceName, "messages:new");
+  if (fetchStatus === "fetching" && !workspace) return <MessagesTabSkeleton />;
 
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !data ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .messages(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setData(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (messagesEvent !== null) {
-      setRefreshKey((k) => k + 1);
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load messages
+        </p>
+      );
     }
-  }, [messagesEvent]);
-
-  if (loading && !data) return <MessagesTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load messages: {error.message}
-      </p>
-    );
+    return null;
   }
 
-  if (!data) return null;
-
-  const messages = data.messages ?? [];
+  const messages = workspace.messages ?? [];
 
   if (messages.length === 0) {
     return <p className="text-sm italic text-muted-foreground">No messages</p>;

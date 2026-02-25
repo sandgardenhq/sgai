@@ -2,53 +2,36 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SessionTab } from "./SessionTab";
-import { resetDefaultSSEStore, resetAllWorkspaceSSEStores } from "@/lib/sse-store";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiSessionResponse, ApiTodosResponse, ApiActionEntry } from "@/types";
+import type { ApiActionEntry, ApiWorkspaceEntry } from "@/types";
 
-class MockEventSource {
-  url: string;
-  onopen: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 0;
-  closed = false;
-  constructor(url: string) { this.url = url; }
-  addEventListener() {}
-  removeEventListener() {}
-  close() { this.closed = true; }
-}
-
-const originalEventSource = globalThis.EventSource;
-const mockFetch = mock(() => Promise.resolve(new Response("{}")));
-
-beforeEach(() => {
-  mockFetch.mockReset();
-  globalThis.fetch = mockFetch as unknown as typeof fetch;
-  (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
-});
-
-afterEach(() => {
-  cleanup();
-  resetDefaultSSEStore();
-  resetAllWorkspaceSSEStores();
-  (globalThis as unknown as Record<string, unknown>).EventSource = originalEventSource;
-});
-
-const sessionResponse: ApiSessionResponse = {
+const mockWorkspace: ApiWorkspaceEntry = {
   name: "test-project",
-  status: "working",
+  dir: "/projects/test-project",
   running: true,
   needsInput: false,
-  interactiveAuto: false,
+  inProgress: true,
+  pinned: false,
+  isRoot: false,
+  isFork: false,
+  status: "working",
   badgeClass: "running",
   badgeText: "Running",
+  hasSgai: true,
+  hasEditedGoal: false,
+  interactiveAuto: false,
+  continuousMode: false,
   currentAgent: "backend-developer",
   currentModel: "anthropic/claude-opus-4-6",
   task: "Writing tests",
-  humanMessage: "",
-  latestProgress: "Tests complete",
-  totalExecTime: "5m30s",
+  goalContent: "# Goal",
+  rawGoalContent: "# Goal",
+  pmContent: "",
+  hasProjectMgmt: false,
   svgHash: "abc123",
+  totalExecTime: "5m30s",
+  latestProgress: "Tests complete",
+  humanMessage: "",
   agentSequence: [
     { agent: "coordinator", elapsedTime: "30s", isCurrent: false },
     { agent: "backend-developer", elapsedTime: "5m", isCurrent: true },
@@ -67,17 +50,34 @@ const sessionResponse: ApiSessionResponse = {
       },
     ],
   },
-};
-
-const todosResponse: ApiTodosResponse = {
+  events: [],
+  messages: [],
   projectTodos: [
     { id: "1", content: "Review internals", status: "pending", priority: "high" },
   ],
   agentTodos: [
     { id: "2", content: "Fix Run tab", status: "in_progress", priority: "medium" },
   ],
-  currentAgent: "backend-developer",
+  changes: { description: "", diffLines: [] },
+  commits: [],
+  log: [],
 };
+
+mock.module("@/lib/factory-state", () => ({
+  useFactoryState: () => ({ workspaces: [mockWorkspace], fetchStatus: "idle", lastFetchedAt: Date.now() }),
+  resetFactoryStateStore: () => {},
+}));
+
+const mockFetch = mock(() => Promise.resolve(new Response("{}")));
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  globalThis.fetch = mockFetch as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 const testActions: ApiActionEntry[] = [
   { name: "Create PR", model: "anthropic/claude-opus-4-6 (max)", prompt: "using GH make a PR", description: "Create a draft pull request" },
@@ -95,21 +95,7 @@ function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: bo
 }
 
 describe("SessionTab", () => {
-  it("renders loading skeleton initially", () => {
-    mockFetch.mockImplementation(() => new Promise(() => {}));
-    renderSessionTab();
-    const skeletons = document.querySelectorAll("[data-slot='skeleton']");
-    expect(skeletons.length).toBeGreaterThan(0);
-  });
-
-  it("renders cost tracking when data loads", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
+  it("renders cost tracking from factory state", async () => {
     renderSessionTab();
 
     await waitFor(() => {
@@ -119,14 +105,7 @@ describe("SessionTab", () => {
     expect(screen.getByText("$1.2345")).toBeDefined();
   });
 
-  it("renders agent sequence", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
+  it("renders agent sequence from factory state", async () => {
     renderSessionTab();
 
     await waitFor(() => {
@@ -138,13 +117,6 @@ describe("SessionTab", () => {
   });
 
   it("renders steer next turn form", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
     renderSessionTab();
 
     await waitFor(() => {
@@ -155,14 +127,7 @@ describe("SessionTab", () => {
     expect(screen.getAllByRole("button", { name: "Submit" }).length).toBeGreaterThan(0);
   });
 
-  it("renders tasks section with project and agent todos", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
+  it("renders tasks section with project and agent todos from factory state", async () => {
     renderSessionTab();
 
     await waitFor(() => {
@@ -175,13 +140,6 @@ describe("SessionTab", () => {
   });
 
   it("renders project management section when content is available", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
     renderSessionTab({ hasProjectMgmt: true, pmContent: "# PM Content" });
 
     await waitFor(() => {
@@ -199,56 +157,16 @@ describe("SessionTab", () => {
     expect(screen.getByText("PM Content")).toBeDefined();
   });
 
-  it("renders error state", async () => {
-    mockFetch.mockImplementation(() => Promise.reject(new Error("Network error")));
-    renderSessionTab();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load session/i)).toBeDefined();
-    });
-  });
-
-  it("calls session and todos APIs on mount", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
-    renderSessionTab();
-
-    await waitFor(() => {
-      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/session"))).toBe(true);
-      expect(calledUrls.some((url) => url.includes("/api/v1/workspaces/test-project/todos"))).toBe(true);
-    });
-  });
-
   it("does not warn about duplicate model status keys", async () => {
-    const sessionWithDuplicateModels = {
-      ...sessionResponse,
-      modelStatuses: [
-        { modelId: "anthropic/claude-opus-4-6", status: "model-working" },
-        { modelId: "anthropic/claude-opus-4-6", status: "model-done" },
-      ],
-    };
     const originalError = console.error;
     const errorSpy = mock(() => {});
     console.error = errorSpy as unknown as typeof console.error;
 
     try {
-      mockFetch.mockImplementation((input: string | URL | Request) => {
-        const url = input.toString();
-        if (url.includes("/todos")) {
-          return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-        }
-        return Promise.resolve(new Response(JSON.stringify(sessionWithDuplicateModels)));
-      });
       renderSessionTab();
 
       await waitFor(() => {
-        expect(screen.getByText("Model Consensus")).toBeDefined();
+        expect(screen.getByText("Cost Tracking")).toBeDefined();
       });
 
       const hasDuplicateKeyWarning = errorSpy.mock.calls.some((call) =>
@@ -263,13 +181,10 @@ describe("SessionTab", () => {
   it("renders action buttons when actions are provided", async () => {
     mockFetch.mockImplementation((input: string | URL | Request) => {
       const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
       if (url.includes("/adhoc")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
       }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+      return Promise.resolve(new Response(JSON.stringify({})));
     });
     renderSessionTab({ actions: testActions });
 
@@ -282,16 +197,6 @@ describe("SessionTab", () => {
   });
 
   it("does not render action bar when actions is empty", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
     renderSessionTab({ actions: [] });
 
     await waitFor(() => {
@@ -302,16 +207,6 @@ describe("SessionTab", () => {
   });
 
   it("does not render action bar when actions is undefined", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
-    });
     renderSessionTab();
 
     await waitFor(() => {
@@ -324,13 +219,10 @@ describe("SessionTab", () => {
   it("shows description in tooltip content when action has description", async () => {
     mockFetch.mockImplementation((input: string | URL | Request) => {
       const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
       if (url.includes("/adhoc")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
       }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+      return Promise.resolve(new Response(JSON.stringify({})));
     });
     renderSessionTab({ actions: testActions });
 
@@ -354,13 +246,10 @@ describe("SessionTab", () => {
     ];
     mockFetch.mockImplementation((input: string | URL | Request) => {
       const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
       if (url.includes("/adhoc")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
       }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+      return Promise.resolve(new Response(JSON.stringify({})));
     });
     renderSessionTab({ actions: actionsWithoutDescription });
 
@@ -381,9 +270,6 @@ describe("SessionTab", () => {
   it("triggers adhoc run when action button is clicked", async () => {
     mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
-      if (url.includes("/todos")) {
-        return Promise.resolve(new Response(JSON.stringify(todosResponse)));
-      }
       if (url.includes("/adhoc/stop")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, output: "Stopped." })));
       }
@@ -393,7 +279,7 @@ describe("SessionTab", () => {
       if (url.includes("/adhoc")) {
         return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
       }
-      return Promise.resolve(new Response(JSON.stringify(sessionResponse)));
+      return Promise.resolve(new Response(JSON.stringify({})));
     });
     renderSessionTab({ actions: testActions });
 

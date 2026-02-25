@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { useConnectionStatus } from "../hooks/useSSE";
+import { useFactoryState } from "@/lib/factory-state";
 
 export function ConnectionStatusBanner() {
-  const status = useConnectionStatus();
+  const { fetchStatus } = useFactoryState();
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    if (status === "connected") {
+    if (fetchStatus !== "error") {
       setShowBanner(false);
       return;
     }
@@ -16,7 +16,7 @@ export function ConnectionStatusBanner() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [status]);
+  }, [fetchStatus]);
 
   if (!showBanner) {
     return null;
@@ -28,9 +28,7 @@ export function ConnectionStatusBanner() {
       aria-live="polite"
       className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-yellow-950 text-center py-2 px-4 text-sm font-medium"
     >
-      {status === "reconnecting"
-        ? "Reconnecting to server..."
-        : "Disconnected from server. Retrying..."}
+      Unable to fetch state from server. Retrying...
     </div>
   );
 }

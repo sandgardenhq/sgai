@@ -1,4 +1,4 @@
-import { useState, useEffect, useTransition, type MouseEvent } from "react";
+import { useState, useTransition, type MouseEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import type { ApiEventsResponse, ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry } from "@/types";
+import { useFactoryState } from "@/lib/factory-state";
+import type { ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
@@ -29,8 +29,16 @@ function EventsTabSkeleton() {
   );
 }
 
-function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsResponse; workspaceName: string }) {
-  const svgUrl = `/api/v1/workspaces/${encodeURIComponent(workspaceName)}/workflow.svg${eventsData.svgHash ? `?h=${eventsData.svgHash}` : ""}`;
+function WorkflowSection({ svgHash, agentModels, modelStatuses, needsInput, humanMessage, currentAgent, workspaceName }: {
+  svgHash: string;
+  agentModels?: ApiAgentModelEntry[];
+  modelStatuses?: ApiModelStatusEntry[];
+  needsInput: boolean;
+  humanMessage: string;
+  currentAgent: string;
+  workspaceName: string;
+}) {
+  const svgUrl = `/api/v1/workspaces/${encodeURIComponent(workspaceName)}/workflow.svg${svgHash ? `?h=${svgHash}` : ""}`;
 
   return (
     <Card>
@@ -44,24 +52,24 @@ function WorkflowSection({ eventsData, workspaceName }: { eventsData: ApiEventsR
             />
           </div>
 
-          {eventsData.agentModels && eventsData.agentModels.length > 0 && (
+          {agentModels && agentModels.length > 0 && (
             <div className="lg:w-80 xl:w-96 shrink-0">
-              <AgentModelsTable entries={eventsData.agentModels} />
+              <AgentModelsTable entries={agentModels} />
             </div>
           )}
         </div>
 
-        {eventsData.modelStatuses && eventsData.modelStatuses.length > 0 && (
-          <ModelStatusList statuses={eventsData.modelStatuses} />
+        {modelStatuses && modelStatuses.length > 0 && (
+          <ModelStatusList statuses={modelStatuses} />
         )}
 
-        {eventsData.needsInput && eventsData.humanMessage && (
+        {needsInput && humanMessage && (
           <div className="mt-3 p-3 border rounded-lg bg-yellow-50">
             <p className="text-sm font-medium">
-              <Badge variant="default">{eventsData.currentAgent}</Badge>
+              <Badge variant="default">{currentAgent}</Badge>
             </p>
             <blockquote className="mt-2 text-sm italic border-l-2 pl-3 text-muted-foreground">
-              {eventsData.humanMessage}
+              {humanMessage}
             </blockquote>
           </div>
         )}
@@ -182,47 +190,11 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
 }
 
 export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
-  const [data, setData] = useState<ApiEventsResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [goalOpenError, setGoalOpenError] = useState<string | null>(null);
   const [isGoalOpenPending, startGoalOpenTransition] = useTransition();
 
-  const eventsEvent = useWorkspaceSSEEvent(workspaceName, "events:new");
-
-  useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !data ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .events(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setData(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (eventsEvent !== null) {
-      setRefreshKey((k) => k + 1);
-    }
-  }, [eventsEvent]);
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
   const handleOpenGoal = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -238,21 +210,30 @@ export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
     });
   };
 
-  if (loading && !data) return <EventsTabSkeleton />;
+  if (fetchStatus === "fetching" && !workspace) return <EventsTabSkeleton />;
 
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load events: {error.message}
-      </p>
-    );
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load events
+        </p>
+      );
+    }
+    return null;
   }
-
-  if (!data) return null;
 
   return (
     <div className="space-y-4">
-      <WorkflowSection eventsData={data} workspaceName={workspaceName} />
+      <WorkflowSection
+        svgHash={workspace.svgHash}
+        agentModels={workspace.agentModels}
+        modelStatuses={workspace.modelStatuses}
+        needsInput={workspace.needsInput}
+        humanMessage={workspace.humanMessage}
+        currentAgent={workspace.currentAgent}
+        workspaceName={workspaceName}
+      />
       {goalContent && (
         <details className="group">
           <summary className="cursor-pointer font-semibold text-sm mb-2 flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">
@@ -288,7 +269,7 @@ export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
       )}
       <Card>
         <CardContent className="p-4">
-          <EventTimeline events={data.events ?? []} />
+          <EventTimeline events={workspace.events ?? []} />
         </CardContent>
       </Card>
     </div>

@@ -242,8 +242,7 @@ type Server struct {
 	editor           editorOpener
 	shutdownCtx      context.Context
 
-	sseBroker        *sseBroker
-	workspaceBrokers map[string]*sseBroker
+	signals *signalBroker
 
 	adhocStates map[string]*adhocPromptState
 
@@ -265,6 +264,9 @@ type Server struct {
 	forkCommitsFlight  singleflight[string, int]
 	forkLogFlight      singleflight[string, []jjCommit]
 	workspaceLogFlight singleflight[string, []jjCommit]
+	stateFlight        singleflight[string, apiFactoryState]
+	stateCache         *ttlCache[string, apiFactoryState]
+	stateGeneration    uint64
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -296,8 +298,7 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		pinnedDirs:         make(map[string]bool),
 		pinnedConfigDir:    filepath.Join(xdg.ConfigHome, "sgai"),
 		adhocStates:        make(map[string]*adhocPromptState),
-		sseBroker:          newSSEBroker(),
-		workspaceBrokers:   make(map[string]*sseBroker),
+		signals:            newSignalBroker(),
 		composerSessions:   make(map[string]*composerSession),
 		rootDir:            absRootDir,
 		editorAvailable:    editorAvail,
@@ -308,29 +309,16 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		classifyCache:      newTTLCache[string, workspaceKind](5 * time.Second),
 		bookmarkCache:      newTTLCache[string, string](30 * time.Second),
 		svgCache:           newTTLCache[string, string](10 * time.Second),
+		stateCache:         newTTLCache[string, apiFactoryState](30 * time.Second),
 	}
 }
 
-func (s *Server) workspaceBroker(workspacePath string) *sseBroker {
+func (s *Server) notifyStateChange() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	b, ok := s.workspaceBrokers[workspacePath]
-	if !ok {
-		b = newSSEBroker()
-		s.workspaceBrokers[workspacePath] = b
-	}
-	return b
-}
-
-func (s *Server) publishToWorkspace(workspacePath string, evt sseEvent) {
-	s.workspaceBroker(workspacePath).publish(evt)
-}
-
-func (s *Server) publishGlobalAndWorkspace(workspaceName, workspacePath string, detailedEvt sseEvent) {
-	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
-		"workspace": workspaceName,
-	}})
-	s.publishToWorkspace(workspacePath, detailedEvt)
+	s.stateGeneration++
+	s.mu.Unlock()
+	s.stateCache.delete("state")
+	s.signals.notify()
 }
 
 func (s *Server) validateDirectory(dir string) (string, error) {
@@ -468,10 +456,7 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 			sess.running = false
 			sess.mu.Unlock()
 			s.clearEverStartedOnCompletion(workspacePath)
-			s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{
-				Type: "session:update",
-				Data: map[string]string{"workspace": filepath.Base(workspacePath)},
-			})
+			s.notifyStateChange()
 		}()
 
 		wfState, errLoad := state.Load(statePath(workspacePath))
@@ -509,10 +494,7 @@ func (s *Server) stopSession(workspacePath string) {
 	}
 
 	resetHumanCommunication(workspacePath)
-	s.publishGlobalAndWorkspace(filepath.Base(workspacePath), workspacePath, sseEvent{
-		Type: "session:update",
-		Data: map[string]string{"workspace": filepath.Base(workspacePath)},
-	})
+	s.notifyStateChange()
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
@@ -576,6 +558,7 @@ func cmdServe(args []string) {
 		log.Println("warning: failed to load pinned projects:", err)
 	}
 	srv.startStateWatcher()
+	go srv.warmStateCache()
 
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
@@ -824,21 +807,6 @@ func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bo
 	return result
 }
 
-func classifyDiffLine(line string) string {
-	switch {
-	case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
-		return "diff-line-add"
-	case strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
-		return "diff-line-del"
-	case strings.HasPrefix(line, "@@"):
-		return "diff-line-hunk"
-	case strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++"):
-		return "diff-line-file"
-	default:
-		return "diff-line-context"
-	}
-}
-
 func calculateTotalExecutionTime(sequence []state.AgentSequenceEntry, running bool, lastActivityTime string) string {
 	if len(sequence) == 0 {
 		return ""
@@ -996,6 +964,11 @@ func (s *Server) classifyWorkspaceCached(dir string) workspaceKind {
 
 func hassgaiDirectory(dir string) bool {
 	info, err := os.Stat(filepath.Join(dir, ".sgai"))
+	return err == nil && info.IsDir()
+}
+
+func hasJJRepo(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, ".jj"))
 	return err == nil && info.IsDir()
 }
 

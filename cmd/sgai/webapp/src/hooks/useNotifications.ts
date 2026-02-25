@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useSSEEvent } from "./useSSE";
-import { api } from "../lib/api";
-import type { ApiWorkspaceEntry } from "../types";
+import { useFactoryState } from "../lib/factory-state";
+import type { ApiWorkspaceEntry } from "../lib/factory-state";
 
 function collectNeedsInput(
   workspaces: ApiWorkspaceEntry[],
@@ -35,40 +34,26 @@ function fireNotification(workspaceName: string): void {
 }
 
 export function useNotifications(): void {
-  const event = useSSEEvent("workspace:update");
+  const { workspaces, lastFetchedAt } = useFactoryState();
   const previousStateRef = useRef<Map<string, boolean>>(new Map());
 
   useEffect(() => {
-    if (event === null) {
+    if (lastFetchedAt === null) {
       return;
     }
 
-    let cancelled = false;
+    const currentState = new Map<string, boolean>();
+    collectNeedsInput(workspaces, currentState);
 
-    api.workspaces.list().then((response) => {
-      if (cancelled) {
-        return;
+    const previous = previousStateRef.current;
+
+    for (const [name, needsInput] of currentState) {
+      const wasNeedingInput = previous.get(name) ?? false;
+      if (!wasNeedingInput && needsInput) {
+        fireNotification(name);
       }
+    }
 
-      const currentState = new Map<string, boolean>();
-      collectNeedsInput(response.workspaces, currentState);
-
-      const previous = previousStateRef.current;
-
-      for (const [name, needsInput] of currentState) {
-        const wasNeedingInput = previous.get(name) ?? false;
-        if (!wasNeedingInput && needsInput) {
-          fireNotification(name);
-        }
-      }
-
-      previousStateRef.current = currentState;
-    }).catch((err: unknown) => {
-      console.error("useNotifications: failed to fetch workspaces:", err);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [event]);
+    previousStateRef.current = currentState;
+  }, [workspaces, lastFetchedAt]);
 }

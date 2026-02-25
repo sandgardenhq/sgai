@@ -1,13 +1,11 @@
 import { useState, useEffect, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { useWorkspaceSSEEvent } from "@/hooks/useSSE";
-import { cn } from "@/lib/utils";
-import type { ApiChangesResponse, ApiDiffLine } from "@/types";
+import { useFactoryState } from "@/lib/factory-state";
+import type { ApiDiffLine } from "@/types";
 
 interface ChangesTabProps {
   workspaceName: string;
@@ -22,40 +20,18 @@ function ChangesTabSkeleton() {
   );
 }
 
-function diffLineColor(line: ApiDiffLine): string {
-  switch (line.class) {
-    case "add":
-      return "border-l-4 border-green-500 text-green-700 bg-green-50";
-    case "remove":
-      return "border-l-4 border-red-500 text-red-700 bg-red-50";
-    case "header":
-      return "border-l-4 border-yellow-400 text-yellow-800 bg-yellow-50 font-semibold";
-    case "range":
-      return "border-l-4 border-yellow-400 text-yellow-800 bg-yellow-50";
-    default:
-      break;
-  }
-
+function statLineStyle(line: ApiDiffLine): string {
   const trimmed = line.text.trimStart();
-  if (trimmed.startsWith("@@")) {
-    return "border-l-4 border-yellow-400 text-yellow-800 bg-yellow-50 font-semibold";
+  if (trimmed.startsWith("(") || trimmed.includes("changed")) {
+    return "text-muted-foreground text-xs italic";
   }
-  if (trimmed.startsWith("+++ ") || trimmed.startsWith("--- ")) {
-    return "border-l-4 border-yellow-400 text-yellow-800 bg-yellow-50";
-  }
-  if (trimmed.startsWith("+") && !trimmed.startsWith("+++")) {
-    return "border-l-4 border-green-500 text-green-700 bg-green-50";
-  }
-  if (trimmed.startsWith("-") && !trimmed.startsWith("---")) {
-    return "border-l-4 border-red-500 text-red-700 bg-red-50";
-  }
-  return "border-l-4 border-transparent";
+  return "text-sm";
 }
 
-function DiffLineRow({ line }: { line: ApiDiffLine }) {
+function StatLineRow({ line }: { line: ApiDiffLine }) {
   return (
     <div
-      className={cn("font-mono text-xs leading-5 whitespace-pre-wrap break-all px-2", diffLineColor(line))}
+      className={`font-mono leading-6 whitespace-pre px-3 ${statLineStyle(line)}`}
       data-line-number={line.lineNumber}
     >
       {line.text}
@@ -64,69 +40,35 @@ function DiffLineRow({ line }: { line: ApiDiffLine }) {
 }
 
 export function ChangesTab({ workspaceName }: ChangesTabProps) {
-  const [data, setData] = useState<ApiChangesResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [description, setDescription] = useState("");
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [isUpdating, startTransition] = useTransition();
 
-  const changesEvent = useWorkspaceSSEEvent(workspaceName, "changes:update");
+  const { workspaces, fetchStatus } = useFactoryState();
+  const workspace = workspaces.find((ws) => ws.name === workspaceName);
+  const changes = workspace?.changes;
 
   useEffect(() => {
-    if (!workspaceName) return;
-
-    let cancelled = false;
-    setLoading((prev) => !data ? true : prev);
-    setError(null);
-
-    api.workspaces
-      .changes(workspaceName)
-      .then((response) => {
-        if (!cancelled) {
-          setData(response);
-          setLoading(false);
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, refreshKey]);
-
-  useEffect(() => {
-    if (changesEvent !== null) {
-      setRefreshKey((k) => k + 1);
+    if (changes) {
+      setDescription(changes.description ?? "");
     }
-  }, [changesEvent]);
+  }, [changes]);
 
-  useEffect(() => {
-    if (data) {
-      setDescription(data.description ?? "");
+  if (fetchStatus === "fetching" && !workspace) return <ChangesTabSkeleton />;
+
+  if (!workspace) {
+    if (fetchStatus === "error") {
+      return (
+        <p className="text-sm text-destructive">
+          Failed to load changes
+        </p>
+      );
     }
-  }, [data]);
-
-  if (loading && !data) return <ChangesTabSkeleton />;
-
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load changes: {error.message}
-      </p>
-    );
+    return null;
   }
 
-  if (!data) return null;
-
-  const diffLines = data.diffLines ?? [];
+  const diffLines = changes?.diffLines ?? [];
 
   const handleUpdate = (event: React.FormEvent) => {
     event.preventDefault();
@@ -143,6 +85,10 @@ export function ChangesTab({ workspaceName }: ChangesTabProps) {
         setUpdateError(err instanceof Error ? err.message : "Failed to update description");
       }
     });
+  };
+
+  const handleViewFullDiff = () => {
+    window.open(`/workspace/${encodeURIComponent(workspaceName)}/diff`, "_blank");
   };
 
   return (
@@ -178,17 +124,25 @@ export function ChangesTab({ workspaceName }: ChangesTabProps) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Diff</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Diff Stat</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleViewFullDiff}
+            >
+              View Full Diff
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {diffLines.length > 0 ? (
-            <ScrollArea className="max-h-[calc(100vh-20rem)]">
-              <div className="divide-y divide-border/30">
-                {diffLines.map((line) => (
-                  <DiffLineRow key={line.lineNumber} line={line} />
-                ))}
-              </div>
-            </ScrollArea>
+            <div className="py-2">
+              {diffLines.map((line) => (
+                <StatLineRow key={line.lineNumber} line={line} />
+              ))}
+            </div>
           ) : (
             <p className="text-sm italic text-muted-foreground px-6 pb-4">No changes to display</p>
           )}

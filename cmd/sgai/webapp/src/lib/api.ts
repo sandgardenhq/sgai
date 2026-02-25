@@ -4,22 +4,11 @@ import type {
   SkillsResponse,
   Snippet,
   SnippetsResponse,
-  ApiPendingQuestionResponse,
   ApiRespondRequest,
   ApiRespondResponse,
   ApiSessionActionResponse,
-  ApiWorkspacesResponse,
-  ApiWorkspaceDetailResponse,
   ApiGoalResponse,
   ApiCreateWorkspaceResponse,
-  ApiSessionResponse,
-  ApiMessagesResponse,
-  ApiTodosResponse,
-  ApiLogResponse,
-  ApiChangesResponse,
-  ApiEventsResponse,
-  ApiForksResponse,
-
   ApiComposeStateResponse,
   ApiComposeTemplatesResponse,
   ApiComposePreviewResponse,
@@ -30,9 +19,7 @@ import type {
   ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
-
   ApiModelsResponse,
-  ApiCommitsResponse,
   ApiSteerResponse,
   ApiUpdateDescriptionResponse,
   ApiTogglePinResponse,
@@ -40,6 +27,7 @@ import type {
   ApiOpenOpencodeResponse,
   ApiDeleteForkResponse,
   ApiUpdateSummaryResponse,
+  ApiDiffResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -77,9 +65,6 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   workspaces: {
-    list: () => fetchJSON<ApiWorkspacesResponse>("/api/v1/workspaces"),
-    get: (name: string) =>
-      fetchJSON<ApiWorkspaceDetailResponse>(`/api/v1/workspaces/${encodeURIComponent(name)}`),
     create: (name: string) =>
       fetchJSON<ApiCreateWorkspaceResponse>("/api/v1/workspaces", {
         method: "POST",
@@ -110,43 +95,6 @@ export const api = {
           method: "POST",
           body: JSON.stringify(request),
         },
-      ),
-    pendingQuestion: (name: string) =>
-      fetchJSON<ApiPendingQuestionResponse | null>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/pending-question`,
-      ),
-    messages: (name: string) =>
-      fetchJSON<ApiMessagesResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/messages`,
-      ),
-    todos: (name: string) =>
-      fetchJSON<ApiTodosResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/todos`,
-      ),
-    log: (name: string, lines?: number) =>
-      fetchJSON<ApiLogResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/log${lines ? `?lines=${lines}` : ""}`,
-      ),
-    changes: (name: string) =>
-      fetchJSON<ApiChangesResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/changes`,
-      ),
-    events: (name: string) =>
-      fetchJSON<ApiEventsResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/events`,
-      ),
-    forks: (name: string) =>
-      fetchJSON<ApiForksResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/forks`,
-      ),
-    session: (name: string) =>
-      fetchJSON<ApiSessionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/session`,
-      ),
-
-    commits: (name: string) =>
-      fetchJSON<ApiCommitsResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/commits`,
       ),
     fork: (name: string, forkName: string) =>
       fetchJSON<ApiForkResponse>(
@@ -226,6 +174,10 @@ export const api = {
       fetchJSON<ApiUpdateSummaryResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/summary`,
         { method: "PUT", body: JSON.stringify({ summary }) },
+      ),
+    getDiff: (name: string) =>
+      fetchJSON<ApiDiffResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
       ),
   },
 

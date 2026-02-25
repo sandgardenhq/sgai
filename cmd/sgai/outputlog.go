@@ -204,7 +204,7 @@ func (w *sessionLogWriter) Write(data []byte) (int, error) {
 
 func (w *sessionLogWriter) addLine(text string) {
 	w.sess.outputLog.add(logLine{text: text})
-	w.srv.publishToWorkspace(w.workspacePath, sseEvent{Type: "log:append", Data: map[string]string{"workspace": w.workspaceName}})
+	w.srv.notifyStateChange()
 }
 
 func buildAgentStderrWriter(logWriter, stderrLog io.Writer) io.Writer {

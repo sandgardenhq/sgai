@@ -52,9 +52,9 @@ func (s *Server) pollWorkspaceStates(snapshots map[string]workspaceStateSnapshot
 	activeWorkspaces := make(map[string]bool)
 
 	for _, grp := range groups {
-		s.checkWorkspaceState(grp.Root.Directory, grp.Root.DirName, snapshots, activeWorkspaces)
+		s.checkWorkspaceState(grp.Root.Directory, snapshots, activeWorkspaces)
 		for _, fork := range grp.Forks {
-			s.checkWorkspaceState(fork.Directory, fork.DirName, snapshots, activeWorkspaces)
+			s.checkWorkspaceState(fork.Directory, snapshots, activeWorkspaces)
 		}
 	}
 
@@ -65,7 +65,7 @@ func (s *Server) pollWorkspaceStates(snapshots map[string]workspaceStateSnapshot
 	}
 }
 
-func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]workspaceStateSnapshot, activeWorkspaces map[string]bool) {
+func (s *Server) checkWorkspaceState(dir string, snapshots map[string]workspaceStateSnapshot, activeWorkspaces map[string]bool) {
 	activeWorkspaces[dir] = true
 	stPath := statePath(dir)
 	goalPath := filepath.Join(dir, "GOAL.md")
@@ -108,7 +108,7 @@ func (s *Server) checkWorkspaceState(dir, name string, snapshots map[string]work
 		return
 	}
 
-	s.emitStateChangeEvents(name, dir, prev, current)
+	s.emitStateChangeEvents(dir, prev, current)
 
 	if s.summaryGen != nil && wfState.Summary == "" && !wfState.SummaryManual && !prev.summaryGenTriggered {
 		current.summaryGenTriggered = true
@@ -136,40 +136,20 @@ func buildStateSnapshot(modTime time.Time, wfState state.Workflow, goalInfo os.F
 	return snapshot
 }
 
-func (s *Server) emitStateChangeEvents(workspaceName, workspacePath string, prev, current workspaceStateSnapshot) {
-	data := map[string]string{"workspace": workspaceName}
-	var publishedToWorkspace bool
+func (s *Server) emitStateChangeEvents(workspacePath string, prev, current workspaceStateSnapshot) {
+	changed := prev.status != current.status ||
+		prev.needsInput != current.needsInput ||
+		current.progressLen > prev.progressLen ||
+		prev.todosHash != current.todosHash ||
+		prev.messagesHash != current.messagesHash ||
+		prev.goalHash != current.goalHash
 
-	if prev.status != current.status || prev.needsInput != current.needsInput {
-		s.publishToWorkspace(workspacePath, sseEvent{Type: "session:update", Data: data})
-		publishedToWorkspace = true
+	if prev.goalHash != current.goalHash && s.summaryGen != nil {
+		s.summaryGen.trigger(workspacePath)
 	}
 
-	if current.progressLen > prev.progressLen {
-		s.publishToWorkspace(workspacePath, sseEvent{Type: "events:new", Data: data})
-		publishedToWorkspace = true
-	}
-
-	if prev.todosHash != current.todosHash {
-		s.publishToWorkspace(workspacePath, sseEvent{Type: "todos:update", Data: data})
-		publishedToWorkspace = true
-	}
-
-	if prev.messagesHash != current.messagesHash {
-		s.publishToWorkspace(workspacePath, sseEvent{Type: "messages:new", Data: data})
-		publishedToWorkspace = true
-	}
-
-	if prev.goalHash != current.goalHash {
-		s.publishToWorkspace(workspacePath, sseEvent{Type: "goal:update", Data: data})
-		publishedToWorkspace = true
-		if s.summaryGen != nil {
-			s.summaryGen.trigger(workspacePath)
-		}
-	}
-
-	if publishedToWorkspace {
-		s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: data})
+	if changed {
+		s.notifyStateChange()
 	}
 }
 
