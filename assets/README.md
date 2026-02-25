@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/sandgardenhq/sgai/refs/heads/main/assets/images/logo.png" alt="Sgai Logo" width="200">
+
 # Sgai (pronounced "Sky") - Goal-Driven AI Software Factory
 
 Define your goal. Launch the dashboard.
