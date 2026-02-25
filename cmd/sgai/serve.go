@@ -1229,11 +1229,17 @@ func (s *Server) loadPinnedProjects() error {
 	if errJSON := json.Unmarshal(data, &dirs); errJSON != nil {
 		return fmt.Errorf("parsing pinned projects: %w", errJSON)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.pinnedDirs = make(map[string]bool, len(dirs))
+	existing := make(map[string]bool, len(dirs))
 	for _, d := range dirs {
-		s.pinnedDirs[d] = true
+		if _, errStat := os.Stat(d); errStat == nil {
+			existing[d] = true
+		}
+	}
+	s.mu.Lock()
+	s.pinnedDirs = existing
+	s.mu.Unlock()
+	if len(existing) < len(dirs) {
+		return s.savePinnedProjects()
 	}
 	return nil
 }
