@@ -293,6 +293,7 @@ func Lookup(key string) string  // returns "" on not found
 ### Standard Library Preferences
 
 - [ ] Uses `slices.Sort` instead of `sort.Slice`
+- [ ] Uses `slices.Sort` instead of `sort.Ints`/`sort.Float64s`/`sort.Strings`
 - [ ] Uses `slices.Contains` instead of manual search loops
 - [ ] Uses `slices.Equal` instead of manual slice comparison
 - [ ] Uses `maps.Clone` instead of manual map copy loops
@@ -307,6 +308,7 @@ clone := maps.Clone(original)
 
 // BAD - unnecessary manual implementation
 sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
+sort.Ints(items)
 for _, item := range items {
     if item == target { found = true; break }
 }

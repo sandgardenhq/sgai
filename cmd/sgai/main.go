@@ -790,6 +790,14 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		jsonWriter.Flush()
 		capturedSessionID = jsonWriter.sessionID
 
+		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
+			timestamp := time.Now().Format("20060102150405")
+			sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
+			if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
+				log.Fatalln("failed to export session:", err)
+			}
+		}
+
 		newState, err := state.Load(cfg.statePath)
 		if err != nil {
 			log.Fatalln("failed to read state.json:", err)
@@ -857,14 +865,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 						log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
 					}
 				}
-
-				if capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
-					timestamp := time.Now().Format("20060102150405")
-					sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
-					if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
-						log.Fatalln("failed to export session:", err)
-					}
-				}
 			}
 			return newState
 
@@ -899,13 +899,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			continue
 
 		case state.StatusAgentDone:
-			if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
-				timestamp := time.Now().Format("20060102150405")
-				sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
-				if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
-					log.Fatalln("failed to export session:", err)
-				}
-			}
 			if err := state.Save(cfg.statePath, newState); err != nil {
 				log.Fatalln("failed to save state:", err)
 			}
