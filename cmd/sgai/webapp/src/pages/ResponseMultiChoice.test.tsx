@@ -101,6 +101,12 @@ const workspaceDetail: ApiWorkspaceDetailResponse = {
   latestProgress: "",
   agentSequence: [],
   cost: { totalCost: 0, inputTokens: 0, outputTokens: 0, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 },
+  summary: "A brief summary of the test project",
+};
+
+const workspaceDetailNoSummary: ApiWorkspaceDetailResponse = {
+  ...workspaceDetail,
+  summary: undefined,
 };
 
 beforeEach(() => {
@@ -527,5 +533,60 @@ describe("ResponseMultiChoice", () => {
 
     expect(screen.getByText("GOAL.md")).toBeDefined();
     expect(screen.getByText("PROJECT_MANAGEMENT.md")).toBeDefined();
+  });
+
+  it("displays workspace name in the card header", async () => {
+    renderResponse();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByTestId("workspace-name")).toBeDefined();
+    expect(screen.getByTestId("workspace-name").textContent).toBe("test-project");
+  });
+
+  it("displays workspace summary when present", async () => {
+    renderResponse();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByTestId("workspace-summary")).toBeDefined();
+    expect(screen.getByTestId("workspace-summary").textContent).toBe(
+      "A brief summary of the test project",
+    );
+  });
+
+  it("hides workspace summary when not present", async () => {
+    mockFetch.mockImplementation((url: string | URL | Request) => {
+      const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      if (urlStr.includes("/pending-question")) {
+        return Promise.resolve(new Response(JSON.stringify(pendingQuestion)));
+      }
+      if (urlStr.includes("/api/v1/workspaces/") && !urlStr.includes("/respond")) {
+        return Promise.resolve(new Response(JSON.stringify(workspaceDetailNoSummary)));
+      }
+      return Promise.resolve(new Response("{}"));
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/workspaces/test-project/respond"]}>
+        <TooltipProvider>
+          <Routes>
+            <Route path="/workspaces/:name/respond" element={<ResponseMultiChoice />} />
+            <Route path="/workspaces/:name/progress" element={<div>Progress Page</div>} />
+          </Routes>
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getByTestId("workspace-name")).toBeDefined();
+    expect(screen.queryByTestId("workspace-summary")).toBeNull();
   });
 });
