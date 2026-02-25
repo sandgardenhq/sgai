@@ -5,6 +5,9 @@ permission:
   webfetch: deny
   doom_loop: deny
   external_directory: deny
+  question: deny
+  plan_enter: deny
+  plan_exit: deny
 ---
 
 # Snippet Writer
