@@ -955,17 +955,21 @@ func (s *Server) collectForkSummaries(rootDir string) []apiWorkspaceForkSummary 
 			continue
 		}
 		bookmark := s.resolveBaseBookmarkCached(rootDir)
-		summaries := make([]apiWorkspaceForkSummary, 0, len(grp.Forks))
-		for _, fork := range grp.Forks {
-			forkState, _ := state.Load(statePath(fork.Directory))
-			summaries = append(summaries, apiWorkspaceForkSummary{
-				Name:        fork.DirName,
-				Dir:         fork.Directory,
-				Running:     fork.Running,
-				CommitAhead: countForkCommitsAhead(bookmark, fork.Directory),
-				Summary:     forkState.Summary,
+		summaries := make([]apiWorkspaceForkSummary, len(grp.Forks))
+		var wg sync.WaitGroup
+		for i, fork := range grp.Forks {
+			wg.Go(func() {
+				forkState, _ := state.Load(statePath(fork.Directory))
+				summaries[i] = apiWorkspaceForkSummary{
+					Name:        fork.DirName,
+					Dir:         fork.Directory,
+					Running:     fork.Running,
+					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
+					Summary:     forkState.Summary,
+				}
 			})
 		}
+		wg.Wait()
 		return summaries
 	}
 
@@ -1293,12 +1297,20 @@ func (s *Server) handleAPIWorkspaceChanges(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	diffOutput, description := collectJJChanges(workspacePath)
+	result := s.collectJJChangesCached(workspacePath)
 
 	writeJSON(w, apiChangesResponse{
-		Description: description,
-		DiffLines:   diffOutput,
+		Description: result.description,
+		DiffLines:   result.diffLines,
 	})
+}
+
+func (s *Server) collectJJChangesCached(dir string) jjChangesResult {
+	result, _ := s.jjChangesFlight.do(dir, func() (jjChangesResult, error) {
+		diffLines, description := collectJJChanges(dir)
+		return jjChangesResult{diffLines: diffLines, description: description}, nil
+	})
+	return result
 }
 
 func collectJJChanges(dir string) ([]apiDiffLine, string) {
@@ -1439,17 +1451,21 @@ func (s *Server) collectForksForAPI(rootDir string) []apiForkEntry {
 			continue
 		}
 		bookmark := s.resolveBaseBookmarkCached(rootDir)
-		forks := make([]apiForkEntry, 0, len(grp.Forks))
-		for _, fork := range grp.Forks {
-			commits := convertJJCommitsForAPI(runJJLogForFork(bookmark, fork.Directory))
-			forks = append(forks, apiForkEntry{
-				Name:        fork.DirName,
-				Dir:         fork.Directory,
-				Running:     fork.Running,
-				CommitAhead: countForkCommitsAhead(bookmark, fork.Directory),
-				Commits:     commits,
+		forks := make([]apiForkEntry, len(grp.Forks))
+		var wg sync.WaitGroup
+		for i, fork := range grp.Forks {
+			wg.Go(func() {
+				commits := convertJJCommitsForAPI(s.runJJLogForForkCached(bookmark, fork.Directory))
+				forks[i] = apiForkEntry{
+					Name:        fork.DirName,
+					Dir:         fork.Directory,
+					Running:     fork.Running,
+					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
+					Commits:     commits,
+				}
 			})
 		}
+		wg.Wait()
 		return forks
 	}
 
@@ -2238,6 +2254,8 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 	}
 	s.mu.Unlock()
 
+	s.invalidateWorkspaceScanCache()
+
 	s.sseBroker.publish(sseEvent{Type: "workspace:update", Data: map[string]string{
 		"workspace": oldName,
 		"action":    "renamed",
@@ -2589,6 +2607,13 @@ func runJJLogForWorkspace(dir string) []jjCommit {
 	return parseJJLogOutput(string(output))
 }
 
+func (s *Server) runJJLogForWorkspaceCached(dir string) []jjCommit {
+	commits, _ := s.workspaceLogFlight.do(dir, func() ([]jjCommit, error) {
+		return runJJLogForWorkspace(dir), nil
+	})
+	return commits
+}
+
 func runJJLogForStandalone(dir string) []jjCommit {
 	cmd := exec.Command("jj", "log", "-r", "remote_bookmarks()..@", "-T", jjLogTemplate)
 	cmd.Dir = dir
@@ -2599,27 +2624,35 @@ func runJJLogForStandalone(dir string) []jjCommit {
 	return parseJJLogOutput(string(output))
 }
 
+func (s *Server) runJJLogForStandaloneCached(dir string) []jjCommit {
+	key := "standalone|" + dir
+	commits, _ := s.workspaceLogFlight.do(key, func() ([]jjCommit, error) {
+		return runJJLogForStandalone(dir), nil
+	})
+	return commits
+}
+
 func (s *Server) filteredCommitsForWorkspace(workspacePath string) []jjCommit {
 	switch s.classifyWorkspaceCached(workspacePath) {
 	case workspaceStandalone:
-		commits := runJJLogForStandalone(workspacePath)
+		commits := s.runJJLogForStandaloneCached(workspacePath)
 		if len(commits) > 0 {
 			return commits
 		}
-		return runJJLogForWorkspace(workspacePath)
+		return s.runJJLogForWorkspaceCached(workspacePath)
 	case workspaceFork:
 		rootDir := getRootWorkspacePath(workspacePath)
 		if rootDir == "" {
-			return runJJLogForWorkspace(workspacePath)
+			return s.runJJLogForWorkspaceCached(workspacePath)
 		}
 		bookmark := s.resolveBaseBookmarkCached(rootDir)
-		commits := runJJLogForFork(bookmark, workspacePath)
+		commits := s.runJJLogForForkCached(bookmark, workspacePath)
 		if len(commits) > 0 {
 			return commits
 		}
-		return runJJLogForWorkspace(workspacePath)
+		return s.runJJLogForWorkspaceCached(workspacePath)
 	default:
-		return runJJLogForWorkspace(workspacePath)
+		return s.runJJLogForWorkspaceCached(workspacePath)
 	}
 }
 
@@ -2740,6 +2773,8 @@ func (s *Server) handleAPITogglePin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to toggle pin", http.StatusInternalServerError)
 		return
 	}
+
+	s.invalidateWorkspaceScanCache()
 
 	pinned := s.isPinned(workspacePath)
 
