@@ -87,6 +87,7 @@ GOOD PATTERN: Read files -> Write code -> Run tests -> THEN sgai_update_workflow
 # COMPLETION GATE
 CRITICALLY IMPORTANT: IF YOUR LAST MESSAGE IS NOT A TOOL CALL, THE HUMAN PARTNER WILL NOT SEE IT.
 DID YOU DO PRODUCTIVE WORK before updating state? If not, go do something useful first.
+EXCEPTION: After calling sgai_update_workflow_state({status:"agent-done"}), you MUST NOT make any more tool calls. A text-only response after agent-done is correct behavior — the system handles the transition.
 
 # CRITICAL: WHAT HAPPENS AFTER "agent-done"
 When you set status: "agent-done":

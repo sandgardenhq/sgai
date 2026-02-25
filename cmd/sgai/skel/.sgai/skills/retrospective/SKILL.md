@@ -216,6 +216,8 @@ sgai_send_message({
 })
 sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No actionable suggestions found after thorough analysis. Sent RETRO_COMPLETE." })
 // STOP HERE. Make NO more tool calls. Your turn is OVER.
+// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+// Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
 **CRITICAL:** The RETRO_COMPLETE message MUST include your analysis summary (files read, visit counts, per-category observations) as proof that you actually completed the analysis. A bare "No actionable improvements identified" without evidence is NOT acceptable.
@@ -243,6 +245,8 @@ sgai_send_message({
 // Then yield immediately
 sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Sent Skills category RETRO_QUESTION to coordinator" })
 // STOP HERE. Make NO more tool calls. Do NOT check inbox or outbox. Your turn is OVER.
+// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+// Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
 #### Full Example
@@ -254,6 +258,8 @@ sgai_send_message({
 })
 sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Sent Skills RETRO_QUESTION to coordinator" })
 // STOP HERE. Your turn is OVER.
+// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+// Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
 #### Processing Responses
