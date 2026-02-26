@@ -361,6 +361,7 @@ case "admin", "owner", "superadmin":
 - [ ] Uses `slices.Sort` instead of `sort.Ints`/`sort.Float64s`/`sort.Strings`
 - [ ] Uses `slices.Contains` instead of manual search loops
 - [ ] Uses `slices.Equal` instead of manual slice comparison
+- [ ] Uses `slices.Delete` instead of append pattern for slice deletion
 - [ ] Uses `maps.Clone` instead of manual map copy loops
 - [ ] Uses `maps.Equal` instead of manual map comparison
 - [ ] Uses `maps.Keys`/`maps.Values` (Go 1.23+) for iteration
@@ -446,13 +447,14 @@ For fast reviews, check these critical items:
 1. **gofmt** - Code is formatted
 2. **Errors handled** - No ignored errors
 3. **Doc comments** - Exports documented
-4. **Naming** - Short, idiomatic names
-5. **Tests** - Exist and helpful failures
-6. **No panics** - Error returns used
-7. **Context** - First param when used
-8. **Interfaces** - At consumer, not producer
-9. **Modern idioms** - Uses slices/maps packages where applicable
-10. **Switch statements** - Use switch for multi-way conditionals
+4. **slices.Delete** - Use for slice deletion (not append pattern)
+5. **Naming** - Short, idiomatic names
+6. **Tests** - Exist and helpful failures
+7. **No panics** - Error returns used
+8. **Context** - First param when used
+9. **Interfaces** - At consumer, not producer
+10. **Modern idioms** - Uses slices/maps packages where applicable
+11. **Switch statements** - Use switch for multi-way conditionals
 
 ## Review Output Format
 

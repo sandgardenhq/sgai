@@ -508,8 +508,9 @@ export interface ApiOpenEditorResponse {
   message: string;
 }
 
-export interface ApiOpenOpencodeResponse {
-  opened: boolean;
+export interface ApiDeleteMessageResponse {
+  deleted: boolean;
+  id: number;
   message: string;
 }
 

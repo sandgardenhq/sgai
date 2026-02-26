@@ -1,5 +1,5 @@
 import { useState, useTransition, type MouseEvent } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
-import type { ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry } from "@/types";
+import { useAdhocRun } from "@/hooks/useAdhocRun";
+import { ActionBar } from "./SessionTab";
+import type { ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry, ApiActionEntry } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
   goalContent?: string;
+  actions?: ApiActionEntry[];
 }
 
 function EventsTabSkeleton() {
@@ -189,9 +192,21 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
   );
 }
 
-export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
+export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProps) {
   const [goalOpenError, setGoalOpenError] = useState<string | null>(null);
   const [isGoalOpenPending, startGoalOpenTransition] = useTransition();
+  const [actionOutputOpen, setActionOutputOpen] = useState(false);
+
+  const hasActions = Boolean(actions && actions.length > 0);
+
+  const {
+    output: actionOutput,
+    isRunning: isActionRunning,
+    runError: actionRunError,
+    startRun: startActionRun,
+    stopRun: stopActionRun,
+    outputRef: actionOutputRef,
+  } = useAdhocRun({ workspaceName, skipModelsFetch: true });
 
   const { workspaces, fetchStatus } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
@@ -210,6 +225,11 @@ export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
     });
   };
 
+  const handleActionClick = (action: ApiActionEntry) => {
+    setActionOutputOpen(true);
+    startActionRun(action.prompt, action.model);
+  };
+
   if (fetchStatus === "fetching" && !workspace) return <EventsTabSkeleton />;
 
   if (!workspace) {
@@ -225,6 +245,47 @@ export function EventsTab({ workspaceName, goalContent }: EventsTabProps) {
 
   return (
     <div className="space-y-4">
+      {hasActions && (
+        <div className="space-y-3">
+          <ActionBar
+            actions={actions!}
+            isRunning={isActionRunning}
+            onActionClick={handleActionClick}
+          />
+          {actionRunError ? (
+            <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
+          ) : null}
+          {(isActionRunning || actionOutput) ? (
+            <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                <ChevronRight
+                  className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
+                  aria-hidden="true"
+                />
+                Output
+                {isActionRunning && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={(e) => { e.preventDefault(); stopActionRun(); }}
+                    className="ml-auto"
+                  >
+                    <Square className="mr-1 h-3 w-3" />
+                    Stop
+                  </Button>
+                )}
+              </summary>
+              <pre
+                ref={actionOutputRef}
+                className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
+              >
+                {actionOutput || (isActionRunning ? "Running..." : "")}
+              </pre>
+            </details>
+          ) : null}
+        </div>
+      )}
       <WorkflowSection
         svgHash={workspace.svgHash}
         agentModels={workspace.agentModels}

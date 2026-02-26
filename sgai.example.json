@@ -26,10 +26,10 @@
       "description": "Fetch and rebase against upstream main branch"
     },
     {
-      "name": "Deploy",
+      "name": "Start Application",
       "model": "anthropic/claude-opus-4-6 (max)",
-      "prompt": "run bash(`make deploy`)",
-      "description": "Deploy the current build"
+      "prompt": "start the application server and ensure it is running properly; use the instructions inside `.deploy/` if available; if this is a networked application, and it starts at localhost, use 'localhost:0' to randomize the application start.",
+      "description": "Start the application locally"
     }
   ]
 }

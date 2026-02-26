@@ -7,17 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { ChevronRight, Square } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
-import { useAdhocRun } from "@/hooks/useAdhocRun";
 import type { ApiAgentCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
   workspaceName: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
-  actions?: ApiActionEntry[];
 }
 
 export interface ActionBarProps {
@@ -217,25 +215,15 @@ function TasksSection({ projectTodos, agentTodos }: { projectTodos: ApiTodoEntry
   );
 }
 
-export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }: SessionTabProps) {
+export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: SessionTabProps) {
   const [steerMessage, setSteerMessage] = useState("");
   const [steerError, setSteerError] = useState<string | null>(null);
   const [steerSuccess, setSteerSuccess] = useState(false);
   const [isSteering, startSteerTransition] = useTransition();
   const [pmOpenError, setPmOpenError] = useState<string | null>(null);
   const [isPmOpenPending, startPmOpenTransition] = useTransition();
-  const [actionOutputOpen, setActionOutputOpen] = useState(false);
-
-  const hasActions = Boolean(actions && actions.length > 0);
-
-  const {
-    output: actionOutput,
-    isRunning: isActionRunning,
-    runError: actionRunError,
-    startRun: startActionRun,
-    stopRun: stopActionRun,
-    outputRef: actionOutputRef,
-  } = useAdhocRun({ workspaceName, skipModelsFetch: true });
+  const [startAppError, setStartAppError] = useState<string | null>(null);
+  const [isStartAppPending, startStartAppTransition] = useTransition();
 
   const { workspaces } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
@@ -245,6 +233,20 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }
   const modelStatuses = workspace?.modelStatuses;
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
+
+  const handleStartApplication = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!workspaceName || isStartAppPending) return;
+    setStartAppError(null);
+    startStartAppTransition(async () => {
+      try {
+        await api.workspaces.start(workspaceName, false);
+      } catch (err) {
+        setStartAppError(err instanceof Error ? err.message : "Failed to start application");
+      }
+    });
+  };
 
   const handleSteerSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -281,53 +283,21 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt, actions }
     });
   };
 
-  const handleActionClick = (action: ApiActionEntry) => {
-    setActionOutputOpen(true);
-    startActionRun(action.prompt, action.model);
-  };
-
   return (
     <div className="space-y-4">
-      {hasActions && (
-        <div className="space-y-3">
-          <ActionBar
-            actions={actions!}
-            isRunning={isActionRunning}
-            onActionClick={handleActionClick}
-          />
-          {actionRunError ? (
-            <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
-          ) : null}
-          {(isActionRunning || actionOutput) ? (
-            <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
-                <ChevronRight
-                  className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
-                  aria-hidden="true"
-                />
-                Output
-                {isActionRunning && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={(e) => { e.preventDefault(); stopActionRun(); }}
-                    className="ml-auto"
-                  >
-                    <Square className="mr-1 h-3 w-3" />
-                    Stop
-                  </Button>
-                )}
-              </summary>
-              <pre
-                ref={actionOutputRef}
-                className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
-              >
-                {actionOutput || (isActionRunning ? "Running..." : "")}
-              </pre>
-            </details>
-          ) : null}
-        </div>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleStartApplication}
+          disabled={isStartAppPending}
+        >
+          Start Application
+        </Button>
+      </div>
+      {startAppError && (
+        <p className="text-sm text-destructive" role="alert">{startAppError}</p>
       )}
 
       <Card>
