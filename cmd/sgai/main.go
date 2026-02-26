@@ -691,7 +691,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 
 			pendingCount := 0
 			for _, m := range wfState.Messages {
-				if m.ToAgent == cfg.agent {
+				if m.ToAgent == cfg.agent && !m.Read {
 					pendingCount++
 				}
 			}

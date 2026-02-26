@@ -875,7 +875,7 @@ function TabContent({
 }) {
   switch (activeTab) {
     case "progress":
-      return <EventsTab workspaceName={workspaceName} goalContent={goalContent} />;
+      return <EventsTab workspaceName={workspaceName} goalContent={goalContent} actions={actions} />;
     case "log":
       return <LogTab workspaceName={workspaceName} />;
     case "changes":
@@ -885,7 +885,7 @@ function TabContent({
     case "messages":
       return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
-      return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} actions={actions} />;
+      return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
 
     case "run":
       return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;

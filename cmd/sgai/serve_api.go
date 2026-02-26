@@ -101,7 +101,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
+	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/messages/{id}", s.handleAPIDeleteMessage)
 	mux.HandleFunc("GET /api/v1/models", s.handleAPIListModels)
 	mux.HandleFunc("GET /api/v1/compose", s.handleAPIComposeState)
 	mux.HandleFunc("POST /api/v1/compose", s.handleAPIComposeSave)
@@ -1097,35 +1097,6 @@ func collectJJChanges(dir string) ([]apiDiffLine, string) {
 	}
 
 	return diffLines, strings.TrimSpace(string(rawDesc))
-}
-
-func collectJJFullDiff(dir string) string {
-	diffCmd := exec.Command("jj", "diff", "--git")
-	diffCmd.Dir = dir
-	rawDiff, errDiff := diffCmd.Output()
-	if errDiff != nil {
-		return ""
-	}
-	return string(rawDiff)
-}
-
-type apiFullDiffResponse struct {
-	Diff string `json:"diff"`
-}
-
-func (s *Server) handleAPIWorkspaceDiff(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	if !hasJJRepo(workspacePath) {
-		writeJSON(w, apiFullDiffResponse{})
-		return
-	}
-
-	diff := collectJJFullDiff(workspacePath)
-	writeJSON(w, apiFullDiffResponse{Diff: diff})
 }
 
 type apiEventEntry struct {
@@ -2602,4 +2573,64 @@ func collectAgentModels(workspacePath string) []apiAgentModelEntry {
 		})
 	}
 	return result
+}
+
+// apiDeleteMessageResponse represents the response from deleting a message.
+type apiDeleteMessageResponse struct {
+	Deleted bool   `json:"deleted"`
+	ID      int    `json:"id"`
+	Message string `json:"message"`
+}
+
+// handleAPIDeleteMessage handles DELETE requests to remove a message from a workspace.
+func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		http.Error(w, "message id is required", http.StatusBadRequest)
+		return
+	}
+
+	var messageID int
+	if _, errScan := fmt.Sscanf(idStr, "%d", &messageID); errScan != nil {
+		http.Error(w, "invalid message id", http.StatusBadRequest)
+		return
+	}
+
+	wfState, errLoad := state.Load(statePath(workspacePath))
+	if errLoad != nil {
+		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
+		return
+	}
+
+	found := false
+	for i, msg := range wfState.Messages {
+		if msg.ID == messageID {
+			wfState.Messages = slices.Delete(wfState.Messages, i, i+1)
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "message not found", http.StatusNotFound)
+		return
+	}
+
+	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
+		return
+	}
+
+	s.notifyStateChange()
+
+	writeJSON(w, apiDeleteMessageResponse{
+		Deleted: true,
+		ID:      messageID,
+		Message: "message deleted successfully",
+	})
 }

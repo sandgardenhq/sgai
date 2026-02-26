@@ -24,6 +24,12 @@ func defaultActionConfigs() []actionConfig {
 			Prompt:      "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
 			Description: "Fetch and rebase against upstream main branch",
 		},
+		{
+			Name:        "Start Application",
+			Model:       "anthropic/claude-opus-4-6 (max)",
+			Prompt:      "start the application server and ensure it is running properly; use the instructions inside `.deploy/` if available; if this is a networked application, and it starts at localhost, use 'localhost:0' to randomize the application start.",
+			Description: "Start the application locally",
+		},
 	}
 }
 

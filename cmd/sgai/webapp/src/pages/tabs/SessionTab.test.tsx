@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router";
 import { SessionTab } from "./SessionTab";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiActionEntry, ApiWorkspaceEntry } from "@/types";
+import type { ApiWorkspaceEntry } from "@/types";
 
 const mockWorkspace: ApiWorkspaceEntry = {
   name: "test-project",
@@ -79,12 +79,7 @@ afterEach(() => {
   cleanup();
 });
 
-const testActions: ApiActionEntry[] = [
-  { name: "Create PR", model: "anthropic/claude-opus-4-6 (max)", prompt: "using GH make a PR", description: "Create a draft pull request" },
-  { name: "Run Tests", model: "anthropic/claude-opus-4-6", prompt: "run all tests", description: "Run the test suite" },
-];
-
-function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: boolean; actions?: ApiActionEntry[] }) {
+function renderSessionTab(extraProps?: { pmContent?: string; hasProjectMgmt?: boolean }) {
   return render(
     <MemoryRouter>
       <TooltipProvider>
@@ -178,120 +173,34 @@ describe("SessionTab", () => {
     }
   });
 
-  it("renders action buttons when actions are provided", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify({})));
-    });
-    renderSessionTab({ actions: testActions });
-
-    await waitFor(() => {
-      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
-    });
-
-    expect(screen.getByRole("button", { name: "Create PR" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Run Tests" })).toBeDefined();
-  });
-
-  it("does not render action bar when actions is empty", async () => {
-    renderSessionTab({ actions: [] });
-
-    await waitFor(() => {
-      expect(screen.getByText("Steer Next Turn")).toBeDefined();
-    });
-
-    expect(screen.queryByRole("toolbar", { name: "Action buttons" })).toBeNull();
-  });
-
-  it("does not render action bar when actions is undefined", async () => {
+  it("renders Start Application button", async () => {
     renderSessionTab();
 
     await waitFor(() => {
-      expect(screen.getByText("Steer Next Turn")).toBeDefined();
+      expect(screen.getByRole("button", { name: "Start Application" })).toBeDefined();
     });
-
-    expect(screen.queryByRole("toolbar", { name: "Action buttons" })).toBeNull();
   });
 
-  it("shows description in tooltip content when action has description", async () => {
+  it("calls start API when Start Application button is clicked", async () => {
     mockFetch.mockImplementation((input: string | URL | Request) => {
       const url = input.toString();
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
+      if (url.includes("/start")) {
+        return Promise.resolve(new Response(JSON.stringify({ running: true, status: "working", message: "Started" })));
       }
       return Promise.resolve(new Response(JSON.stringify({})));
     });
-    renderSessionTab({ actions: testActions });
+
+    renderSessionTab();
 
     await waitFor(() => {
-      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Start Application" })).toBeDefined();
     });
 
-    const createPrButton = screen.getByRole("button", { name: "Create PR" });
-    fireEvent.focus(createPrButton);
-
-    await waitFor(() => {
-      const tooltipContent = document.querySelector("[data-slot='tooltip-content']");
-      expect(tooltipContent).not.toBeNull();
-      expect(tooltipContent?.textContent).toContain("Create a draft pull request");
-    });
-  });
-
-  it("shows model in tooltip content when action has no description", async () => {
-    const actionsWithoutDescription: ApiActionEntry[] = [
-      { name: "Deploy", model: "anthropic/claude-opus-4-6", prompt: "deploy to prod" },
-    ];
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify({})));
-    });
-    renderSessionTab({ actions: actionsWithoutDescription });
-
-    await waitFor(() => {
-      expect(screen.getByRole("toolbar", { name: "Action buttons" })).toBeDefined();
-    });
-
-    const deployButton = screen.getByRole("button", { name: "Deploy" });
-    fireEvent.focus(deployButton);
-
-    await waitFor(() => {
-      const tooltipContent = document.querySelector("[data-slot='tooltip-content']");
-      expect(tooltipContent).not.toBeNull();
-      expect(tooltipContent?.textContent).toContain("anthropic/claude-opus-4-6");
-    });
-  });
-
-  it("triggers adhoc run when action button is clicked", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
-      const url = input.toString();
-      if (url.includes("/adhoc/stop")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "Stopped." })));
-      }
-      if (url.includes("/adhoc") && init?.method === "POST") {
-        return Promise.resolve(new Response(JSON.stringify({ running: true, output: "Running action..." })));
-      }
-      if (url.includes("/adhoc")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, output: "" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify({})));
-    });
-    renderSessionTab({ actions: testActions });
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Create PR" })).toBeDefined();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Create PR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Application" }));
 
     await waitFor(() => {
       const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes("/adhoc"))).toBe(true);
+      expect(calledUrls.some((url) => url.includes("/start"))).toBe(true);
     });
   });
 });

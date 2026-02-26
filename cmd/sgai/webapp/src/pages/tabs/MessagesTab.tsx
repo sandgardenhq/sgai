@@ -1,8 +1,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { useFactoryState } from "@/lib/factory-state";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
+import { useTransition, useState, useCallback } from "react";
 import type { ApiMessageEntry } from "@/types";
 
 interface MessagesTabProps {
@@ -19,7 +23,14 @@ function MessagesTabSkeleton() {
   );
 }
 
-function MessageItem({ message }: { message: ApiMessageEntry }) {
+interface MessageItemProps {
+  message: ApiMessageEntry;
+  workspaceName: string;
+  onDelete: (messageId: number) => void;
+  isDeleting: boolean;
+}
+
+function MessageItem({ message, workspaceName, onDelete, isDeleting }: MessageItemProps) {
   const isUnread = !message.read;
   return (
     <details className="border rounded-lg">
@@ -41,6 +52,21 @@ function MessageItem({ message }: { message: ApiMessageEntry }) {
             <TooltipContent className="max-w-sm">{message.subject}</TooltipContent>
           </Tooltip>
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="ml-auto h-6 w-6 shrink-0"
+          disabled={isDeleting}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(message.id);
+          }}
+          aria-label={`Delete message from ${message.fromAgent}`}
+        >
+          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+        </Button>
       </summary>
       {message.body && (
         <div className="px-4 pb-4 border-t pt-3 space-y-1">
@@ -60,6 +86,26 @@ function MessageItem({ message }: { message: ApiMessageEntry }) {
 export function MessagesTab({ workspaceName }: MessagesTabProps) {
   const { workspaces, fetchStatus } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleDelete = useCallback((messageId: number) => {
+    setDeleteError(null);
+    setDeletingId(messageId);
+    startTransition(async () => {
+      try {
+        const response = await api.workspaces.deleteMessage(workspaceName, messageId);
+        if (!response.deleted) {
+          setDeleteError(response.message || "Failed to delete message");
+        }
+      } catch (err) {
+        setDeleteError(err instanceof Error ? err.message : "Failed to delete message");
+      } finally {
+        setDeletingId(null);
+      }
+    });
+  }, [workspaceName]);
 
   if (fetchStatus === "fetching" && !workspace) return <MessagesTabSkeleton />;
 
@@ -82,8 +128,17 @@ export function MessagesTab({ workspaceName }: MessagesTabProps) {
 
   return (
     <div className="space-y-2">
+      {deleteError && (
+        <p className="text-sm text-destructive">{deleteError}</p>
+      )}
       {messages.map((msg) => (
-        <MessageItem key={msg.id} message={msg} />
+        <MessageItem 
+          key={msg.id} 
+          message={msg} 
+          workspaceName={workspaceName}
+          onDelete={handleDelete}
+          isDeleting={deletingId === msg.id || isPending}
+        />
       ))}
     </div>
   );

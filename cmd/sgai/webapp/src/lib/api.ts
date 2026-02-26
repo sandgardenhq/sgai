@@ -28,6 +28,7 @@ import type {
   ApiDeleteForkResponse,
   ApiUpdateSummaryResponse,
   ApiDiffResponse,
+  ApiDeleteMessageResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -178,6 +179,11 @@ export const api = {
     getDiff: (name: string) =>
       fetchJSON<ApiDiffResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
+      ),
+    deleteMessage: (name: string, messageId: number) =>
+      fetchJSON<ApiDeleteMessageResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/messages/${messageId}`,
+        { method: "DELETE" },
       ),
   },
 
