@@ -44,7 +44,7 @@ A local AI software factory.
 ### Recommended: Automated Setup via opencode
 
 ```bash
-opencode update
+opencode upgrade
 opencode auth login
 opencode --model anthropic/claude-opus-4-6 run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
