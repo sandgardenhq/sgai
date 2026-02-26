@@ -24,4 +24,4 @@ completionGateScript: make test
 - [x] move the Internal's button bar into the Progress tab
 - [x] add a `Start Application` button in the internal definitions
   - [x] add a `Start Application` button in the sgai.example.json too
-- [x] pending messages counter seems to be incorrect, counting double.
+- [x] needsInputCount counter seems to be incorrect, counting double.
