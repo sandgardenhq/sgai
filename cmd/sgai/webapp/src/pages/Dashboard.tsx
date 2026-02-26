@@ -257,7 +257,7 @@ function collectAllWorkspaces(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntr
       }
     }
   }
-  return all;
+  return deduplicateByName(all);
 }
 
 interface SidebarHeaderIndicatorsProps {
