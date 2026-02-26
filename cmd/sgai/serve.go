@@ -64,14 +64,25 @@ func scanForProjects(rootDir string) ([]project, error) {
 
 		dirPath := filepath.Join(rootDir, entry.Name())
 		sgaiDir := filepath.Join(dirPath, ".sgai")
+		goalPath := filepath.Join(dirPath, "GOAL.md")
 
-		hasWorkspace := false
+		sgaiInfo, errStatSGAI := os.Stat(sgaiDir)
+		hasWorkspace := errStatSGAI == nil && sgaiInfo.IsDir()
+
+		_, errStatGoal := os.Stat(goalPath)
+		hasGoalMD := errStatGoal == nil
+
+		if !hasWorkspace && !hasGoalMD {
+			continue
+		}
+
 		var modTime time.Time
-		sgaiInfo, errsgai := os.Stat(sgaiDir)
-		if errsgai == nil && sgaiInfo.IsDir() {
-			hasWorkspace = true
+		if hasWorkspace {
 			modTime = sgaiInfo.ModTime()
-		} else {
+		} else if hasGoalMD {
+			if errMkdir := os.MkdirAll(sgaiDir, 0755); errMkdir == nil {
+				hasWorkspace = true
+			}
 			entryInfo, errEntry := entry.Info()
 			if errEntry == nil {
 				modTime = entryInfo.ModTime()
