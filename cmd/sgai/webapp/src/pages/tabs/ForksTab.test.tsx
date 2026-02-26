@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ForksTab } from "./ForksTab";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -31,6 +31,9 @@ const sampleForks = [
     name: "project-alpha-fork1",
     dir: "/home/user/project-alpha-fork1",
     running: true,
+    needsInput: false,
+    inProgress: true,
+    pinned: false,
     commitAhead: 3,
     commits: [
       { changeId: "abc12345", commitId: "def67890", timestamp: "2026-02-08 10:00", bookmarks: ["main"], description: "Initial commit" },
@@ -41,6 +44,9 @@ const sampleForks = [
     name: "project-alpha-fork2",
     dir: "/home/user/project-alpha-fork2",
     running: false,
+    needsInput: false,
+    inProgress: false,
+    pinned: false,
     commitAhead: 0,
     commits: [],
   },
@@ -181,10 +187,15 @@ describe("ForksTab", () => {
     expect(screen.getByText("project-alpha-fork2")).toBeDefined();
   });
 
-  it("renders commit details for forks with commits", () => {
+  it("renders commit details for forks with commits after expanding", () => {
     setupModelsApiMock();
     const workspace = makeWorkspace();
     renderForksTab([workspace]);
+
+    const expandButtons = screen.getAllByRole("button", { name: "Expand commits" });
+    const enabledExpandButton = expandButtons.find((btn) => !btn.hasAttribute("disabled"));
+    expect(enabledExpandButton).toBeDefined();
+    fireEvent.click(enabledExpandButton!);
 
     expect(screen.getByText("Initial commit")).toBeDefined();
     expect(screen.getByText("Add feature")).toBeDefined();
@@ -267,5 +278,58 @@ describe("ForksTab", () => {
     });
 
     expect(screen.getByText("Claude Opus")).toBeDefined();
+  });
+
+  it("renders icon action buttons for each fork row", () => {
+    setupModelsApiMock();
+    const workspace = makeWorkspace();
+    renderForksTab([workspace]);
+
+    const editorButtons = screen.getAllByRole("button", { name: "Open in Editor" });
+    expect(editorButtons.length).toBe(2);
+
+    const openSgaiButtons = screen.getAllByRole("button", { name: "Open in sgai" });
+    expect(openSgaiButtons.length).toBe(2);
+
+    const deleteButtons = screen.getAllByRole("button", { name: "Delete fork" });
+    expect(deleteButtons.length).toBe(2);
+  });
+
+  it("renders sgai.json action buttons on each fork row", () => {
+    setupModelsApiMock();
+    const workspace = makeWorkspace();
+    const actions = [
+      { name: "Create PR", model: "some-model", prompt: "create pr", description: "Create a pull request" },
+      { name: "Sync", model: "some-model", prompt: "sync", description: "Sync with upstream" },
+    ];
+
+    mock.module("@/lib/factory-state", () => ({
+      useFactoryState: () => ({ workspaces: [workspace], fetchStatus: "idle", lastFetchedAt: Date.now() }),
+      resetFactoryStateStore: () => {},
+    }));
+
+    render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <ForksTab workspaceName="test-project" actions={actions} onActionClick={() => {}} />
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    const createPRButtons = screen.getAllByRole("button", { name: "Create PR" });
+    expect(createPRButtons.length).toBe(2);
+
+    const syncButtons = screen.getAllByRole("button", { name: "Sync" });
+    expect(syncButtons.length).toBe(2);
+  });
+
+  it("chevron expand button is disabled when fork has no commits", () => {
+    setupModelsApiMock();
+    const workspace = makeWorkspace();
+    renderForksTab([workspace]);
+
+    const expandButtons = screen.getAllByRole("button", { name: /expand commits/i });
+    const disabledExpand = expandButtons.filter((btn) => btn.hasAttribute("disabled"));
+    expect(disabledExpand.length).toBeGreaterThan(0);
   });
 });

@@ -10,7 +10,6 @@ import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
-import { ActionBar } from "./tabs/SessionTab";
 import { ChevronRight, Square } from "lucide-react";
 import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
@@ -318,9 +317,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     outputRef: actionOutputRef,
   } = useAdhocRun({ workspaceName, skipModelsFetch: true });
 
-  const hasRootActions = isForkedRoot && Boolean(detail?.actions && detail.actions.length > 0);
-
-  const handleActionClick = useCallback((action: ApiActionEntry) => {
+  const handleActionClick = useCallback((action: ApiActionEntry, _forkName?: string) => {
     setActionOutputOpen(true);
     startActionRun(action.prompt, action.model);
   }, [startActionRun]);
@@ -790,13 +787,8 @@ export function WorkspaceDetail(): JSX.Element | null {
         </div>
 
         <div className="pt-4">
-          {hasRootActions && (
+          {isForkedRoot && (actionRunError || isActionRunning || actionOutput) ? (
             <div className="space-y-3 mb-4">
-              <ActionBar
-                actions={detail.actions!}
-                isRunning={isActionRunning}
-                onActionClick={handleActionClick}
-              />
               {actionRunError ? (
                 <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
               ) : null}
@@ -830,7 +822,7 @@ export function WorkspaceDetail(): JSX.Element | null {
                 </details>
               ) : null}
             </div>
-          )}
+          ) : null}
           <Suspense fallback={<TabSkeleton />}>
             <TabContent
               activeTab={activeTab}
@@ -840,6 +832,7 @@ export function WorkspaceDetail(): JSX.Element | null {
               pmContent={detail.pmContent}
               hasProjectMgmt={detail.hasProjectMgmt}
               actions={detail.actions}
+              onActionClick={isForkedRoot ? handleActionClick : undefined}
             />
           </Suspense>
         </div>
@@ -864,6 +857,7 @@ function TabContent({
   pmContent,
   hasProjectMgmt,
   actions,
+  onActionClick,
 }: {
   activeTab: string;
   workspaceName: string;
@@ -872,6 +866,7 @@ function TabContent({
   pmContent?: string;
   hasProjectMgmt?: boolean;
   actions?: ApiActionEntry[];
+  onActionClick?: (action: ApiActionEntry, forkName: string) => void;
 }) {
   switch (activeTab) {
     case "progress":
@@ -890,7 +885,7 @@ function TabContent({
     case "run":
       return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
     case "forks":
-      return <ForksTab workspaceName={workspaceName} />;
+      return <ForksTab workspaceName={workspaceName} actions={actions} onActionClick={onActionClick} />;
     default:
       return <NotYetAvailable pageName={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab`} />;
   }
