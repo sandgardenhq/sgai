@@ -48,7 +48,7 @@ func installFakeJJWithWorkspaceList(t *testing.T, workspaceCount int) {
 	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-// TestScanForProjects tests that scanForProjects returns only directories with .sgai.
+// TestScanForProjects tests that scanForProjects returns only directories with .sgai or GOAL.md.
 func TestScanForProjects(t *testing.T) {
 	rootDir := t.TempDir()
 
@@ -81,8 +81,8 @@ func TestScanForProjects(t *testing.T) {
 		t.Fatalf("scanForProjects() error: %v", err)
 	}
 
-	if len(projects) != 3 {
-		t.Errorf("scanForProjects() returned %d projects, want 3", len(projects))
+	if len(projects) != 2 {
+		t.Errorf("scanForProjects() returned %d projects, want 2", len(projects))
 	}
 
 	var withWorkspace []string
@@ -95,12 +95,16 @@ func TestScanForProjects(t *testing.T) {
 		}
 	}
 
-	if len(withWorkspace) != 1 || withWorkspace[0] != "project-with-sgai" {
-		t.Errorf("expected 1 project with workspace (project-with-sgai), got %v", withWorkspace)
+	if len(withWorkspace) != 2 {
+		t.Errorf("expected 2 projects with workspace (both project-with-sgai and project-with-goal-only with auto-created .sgai), got %v", withWorkspace)
 	}
 
-	if len(withoutWorkspace) != 2 {
-		t.Errorf("expected 2 projects without workspace, got %v", withoutWorkspace)
+	if len(withoutWorkspace) != 0 {
+		t.Errorf("expected 0 projects without workspace, got %v", withoutWorkspace)
+	}
+
+	if _, err := os.Stat(filepath.Join(projectWithGoalOnly, ".sgai")); err != nil {
+		t.Errorf("expected .sgai directory to be auto-created for GOAL.md-only project: %v", err)
 	}
 }
 
@@ -124,8 +128,12 @@ func TestScanForProjectsIncludesGoalMDOnly(t *testing.T) {
 		t.Errorf("scanForProjects() returned %d projects, want 1", len(projects))
 	}
 
-	if len(projects) > 0 && projects[0].HasWorkspace {
-		t.Errorf("expected HasWorkspace=false for GOAL.md-only directory")
+	if len(projects) > 0 && !projects[0].HasWorkspace {
+		t.Errorf("expected HasWorkspace=true for GOAL.md-only directory (auto-created .sgai)")
+	}
+
+	if _, err := os.Stat(filepath.Join(projectWithGoalOnly, ".sgai")); err != nil {
+		t.Errorf("expected .sgai directory to be auto-created: %v", err)
 	}
 }
 
