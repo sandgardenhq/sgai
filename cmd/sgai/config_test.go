@@ -474,7 +474,7 @@ func TestLoadActionsForAPI(t *testing.T) {
 		assertDefaultActions(t, actions)
 	})
 
-	t.Run("emptyActionsReturnsDefaults", func(t *testing.T) {
+	t.Run("emptyActionsReturnsEmpty", func(t *testing.T) {
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, configFileName)
 		content := `{"actions": []}`
@@ -483,7 +483,9 @@ func TestLoadActionsForAPI(t *testing.T) {
 		}
 
 		actions := loadActionsForAPI(dir)
-		assertDefaultActions(t, actions)
+		if len(actions) != 0 {
+			t.Errorf("len(actions) = %d; want 0 (empty sgai.json actions should fully replace defaults)", len(actions))
+		}
 	})
 
 	t.Run("configWithoutActionsReturnsDefaults", func(t *testing.T) {

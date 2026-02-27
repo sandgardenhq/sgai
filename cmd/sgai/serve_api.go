@@ -850,7 +850,7 @@ type apiAgentSequenceEntry struct {
 
 func loadActionsForAPI(workspacePath string) []apiActionEntry {
 	config, errLoad := loadProjectConfig(workspacePath)
-	if errLoad != nil || config == nil || len(config.Actions) == 0 {
+	if errLoad != nil || config == nil || config.Actions == nil {
 		return convertActionsForAPI(defaultActionConfigs())
 	}
 	return convertActionsForAPI(config.Actions)
