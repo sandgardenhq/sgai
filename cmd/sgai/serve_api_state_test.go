@@ -366,7 +366,7 @@ func setupStateWorkspaceWithData(t *testing.T) (string, *Server) {
 	workspace, srv := setupStateTestWorkspace(t)
 
 	wfState := state.Workflow{
-		Status:       state.StatusWorking,
+		Status:       state.StatusAgentDone,
 		CurrentAgent: "test-agent",
 		Task:         "doing something",
 		HumanMessage: "",
@@ -383,7 +383,7 @@ func setupStateWorkspaceWithData(t *testing.T) (string, *Server) {
 			{Timestamp: "2026-01-01T00:00:01Z", Agent: "test-agent", Description: "started work"},
 		},
 	}
-	if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+	if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 		t.Fatal(errSave)
 	}
 
@@ -534,7 +534,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 		wfState := state.Workflow{
 			Cost: state.SessionCost{TotalCost: 1.23},
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -568,7 +568,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			CurrentAgent: "asking-agent",
 			HumanMessage: "what should I do?",
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -609,7 +609,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 		wfState := state.Workflow{
 			Status: state.StatusWorking,
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -673,7 +673,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 		wfState := state.Workflow{
 			Status: state.StatusWorking,
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -748,7 +748,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 				},
 			},
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -1039,7 +1039,7 @@ func TestBuildWorkspaceFullStateFields(t *testing.T) {
 				{Agent: "coord", StartTime: "2026-01-01T00:00:00Z", IsCurrent: true},
 			},
 		}
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
 			t.Fatal(errSave)
 		}
 

@@ -92,10 +92,7 @@ func (s *Server) checkWorkspaceState(dir string, snapshots map[string]workspaceS
 		}
 	}
 
-	wfState, errLoad := state.Load(stPath)
-	if errLoad != nil {
-		return
-	}
+	wfState := s.workspaceCoordinator(dir).State()
 
 	current := buildStateSnapshot(info.ModTime(), wfState, goalInfo)
 

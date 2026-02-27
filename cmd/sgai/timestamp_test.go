@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,31 +9,22 @@ import (
 )
 
 func TestMessageCreatedAtTimestamp(t *testing.T) {
-	tmpDir := t.TempDir()
-	sgaiDir := filepath.Join(tmpDir, ".sgai")
-	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
-		t.Fatalf("Failed to create .sgai directory: %v", err)
-	}
-
-	statePath := filepath.Join(sgaiDir, "state.json")
-
-	initialState := state.Workflow{
+	tmpDir := setupStateDir(t, state.Workflow{
 		Status:       "working",
 		CurrentAgent: "coordinator",
 		Messages:     []state.Message{},
-		VisitCounts: map[string]int{
-			"coordinator":          1,
-			"backend-go-developer": 0,
-		},
+	})
+	statePath := filepath.Join(tmpDir, ".sgai", "state.json")
+	coord, err := state.NewCoordinator(statePath)
+	if err != nil {
+		t.Fatalf("Failed to create coordinator: %v", err)
 	}
 
-	if err := state.Save(statePath, initialState); err != nil {
-		t.Fatalf("Failed to save initial state: %v", err)
-	}
+	dagAgents := []string{"coordinator", "backend-go-developer"}
 
 	beforeSend := time.Now().UTC()
 
-	result, err := sendMessage(tmpDir, "backend-go-developer", "Test message body")
+	result, err := sendMessage(coord, dagAgents, "coordinator", "backend-go-developer", "Test message body")
 	if err != nil {
 		t.Fatalf("sendMessage failed: %v", err)
 	}
@@ -43,16 +33,13 @@ func TestMessageCreatedAtTimestamp(t *testing.T) {
 		t.Fatal("sendMessage returned empty result")
 	}
 
-	loadedState, err := state.Load(statePath)
-	if err != nil {
-		t.Fatalf("Failed to load state after sendMessage: %v", err)
+	s := coord.State()
+
+	if len(s.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(s.Messages))
 	}
 
-	if len(loadedState.Messages) != 1 {
-		t.Fatalf("Expected 1 message, got %d", len(loadedState.Messages))
-	}
-
-	msg := loadedState.Messages[0]
+	msg := s.Messages[0]
 
 	if msg.CreatedAt == "" {
 		t.Fatal("Message CreatedAt field is empty - this is the bug!")

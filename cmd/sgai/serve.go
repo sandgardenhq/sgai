@@ -132,6 +132,7 @@ type session struct {
 	outputLog    *circularLogBuffer
 	mcpCloseOnce sync.Once
 	mcpCloseFn   func()
+	coord        *state.Coordinator
 }
 
 type editorOpener interface {
@@ -429,9 +430,30 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 	s.everStartedDirs[workspacePath] = true
 	s.mu.Unlock()
 
-	resetHumanCommunication(workspacePath)
+	coord, errCoord := state.NewCoordinator(statePath(workspacePath))
+	if errCoord != nil && !os.IsNotExist(errCoord) {
+		sess.mu.Lock()
+		sess.running = false
+		sess.mu.Unlock()
+		return startSessionResult{startError: fmt.Errorf("creating coordinator: %w", errCoord)}
+	}
+	if errCoord != nil {
+		coord = state.NewCoordinatorEmpty(statePath(workspacePath))
+	}
+	coord.OnUpdate(s.notifyStateChange)
+	_ = coord.UpdateState(func(wf *state.Workflow) {
+		wf.HumanMessage = ""
+		if state.IsHumanPending(wf.Status) {
+			wf.Status = state.StatusWorking
+		}
+	})
+	sess.mu.Lock()
+	sess.coord = coord
+	sess.mu.Unlock()
 
-	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath)
+	dagAgents := workspaceDagAgents(workspacePath)
+
+	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath, coord, dagAgents)
 	if errMCP != nil {
 		sess.mu.Lock()
 		sess.running = false
@@ -452,6 +474,7 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 	go func() {
 		defer func() {
 			sess.mcpCloseOnce.Do(mcpCloseFn)
+			coord.Stop()
 			sess.mu.Lock()
 			sess.running = false
 			sess.mu.Unlock()
@@ -459,16 +482,13 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 			s.notifyStateChange()
 		}()
 
-		wfState, errLoad := state.Load(statePath(workspacePath))
-		if errLoad != nil && !os.IsNotExist(errLoad) {
-			return
-		}
-
+		wfState := coord.State()
 		branch := dispatchBranch(wfState.InteractionMode)
 		cfg := branchConfig{
 			workspacePath: workspacePath,
 			mcpURL:        mcpURL,
 			logWriter:     logWriter,
+			coord:         coord,
 		}
 		branch.run(ctx, cfg)
 	}()
@@ -493,8 +513,23 @@ func (s *Server) stopSession(workspacePath string) {
 		sess.mu.Unlock()
 	}
 
-	resetHumanCommunication(workspacePath)
+	s.resetHumanCommunication(workspacePath)
+	s.flushGoalChecksumOnStop(workspacePath)
 	s.notifyStateChange()
+}
+
+func (s *Server) flushGoalChecksumOnStop(workspacePath string) {
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	checksum, errChecksum := computeGoalChecksum(goalPath)
+	if errChecksum != nil {
+		return
+	}
+	coord := s.workspaceCoordinator(workspacePath)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.GoalChecksum = checksum
+	}); errUpdate != nil {
+		log.Println("failed to flush goal checksum on stop:", errUpdate)
+	}
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
@@ -758,11 +793,12 @@ func renderMarkdown(content []byte) (string, error) {
 
 type agentSequenceDisplay struct {
 	Agent       string
+	Model       string
 	ElapsedTime string
 	IsCurrent   bool
 }
 
-func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bool, lastActivityTime string) []agentSequenceDisplay {
+func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bool, lastActivityTime string, workspacePath string) []agentSequenceDisplay {
 	now := time.Now().UTC()
 	result := make([]agentSequenceDisplay, 0, len(sequence))
 
@@ -797,8 +833,15 @@ func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bo
 			elapsed = endTime.Sub(startTime)
 		}
 		elapsedStr := formatDuration(elapsed)
+		var model string
+		if workspacePath != "" {
+			if models := modelsForAgentFromGoal(workspacePath, entry.Agent); len(models) > 0 {
+				model = models[0]
+			}
+		}
 		result = append(result, agentSequenceDisplay{
 			Agent:       entry.Agent,
+			Model:       model,
 			ElapsedTime: elapsedStr,
 			IsCurrent:   entry.IsCurrent,
 		})
@@ -835,17 +878,45 @@ func calculateTotalExecutionTime(sequence []state.AgentSequenceEntry, running bo
 	return formatDuration(elapsed)
 }
 
-func resetHumanCommunication(dir string) {
-	wfState, err := state.Load(statePath(dir))
-	if err != nil {
+func workspaceDagAgents(workspacePath string) []string {
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	goalContent, errRead := os.ReadFile(goalPath)
+	if errRead != nil {
+		return nil
+	}
+	metadata, errParse := parseYAMLFrontmatter(goalContent)
+	if errParse != nil {
+		return nil
+	}
+	flowDag, errFlow := parseFlow(metadata.Flow, workspacePath)
+	if errFlow != nil {
+		return nil
+	}
+	return flowDag.allAgents()
+}
+
+func (s *Server) resetHumanCommunication(workspacePath string) {
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	s.mu.Unlock()
+
+	if sess == nil {
 		return
 	}
-	wfState.HumanMessage = ""
-	if state.IsHumanPending(wfState.Status) {
-		wfState.Status = state.StatusWorking
+	sess.mu.Lock()
+	coord := sess.coord
+	sess.mu.Unlock()
+
+	if coord == nil {
+		return
 	}
-	if err := state.Save(statePath(dir), wfState); err != nil {
-		log.Println("failed to save state:", err)
+	if err := coord.UpdateState(func(wf *state.Workflow) {
+		wf.HumanMessage = ""
+		if state.IsHumanPending(wf.Status) {
+			wf.Status = state.StatusWorking
+		}
+	}); err != nil {
+		log.Println("failed to reset human communication state:", err)
 	}
 }
 
@@ -1231,6 +1302,30 @@ func isBookmark(s string) bool {
 	return strings.Contains(s, "@") || strings.Contains(s, "/")
 }
 
+func (s *Server) workspaceCoordinator(workspacePath string) *state.Coordinator {
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	s.mu.Unlock()
+	if sess != nil {
+		sess.mu.Lock()
+		coord := sess.coord
+		sess.mu.Unlock()
+		if coord != nil {
+			return coord
+		}
+	}
+	coord, errCoord := state.NewCoordinator(statePath(workspacePath))
+	if errCoord != nil {
+		return state.NewCoordinatorEmpty(statePath(workspacePath))
+	}
+	if coord.State().Status == state.StatusWorking {
+		_ = coord.UpdateState(func(wf *state.Workflow) {
+			wf.Status = ""
+		})
+	}
+	return coord
+}
+
 func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) {
 	s.mu.Lock()
 	sess := s.sessions[dir]
@@ -1241,7 +1336,7 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 		sess.mu.Unlock()
 	}
 
-	wfState, _ := state.Load(statePath(dir))
+	wfState := s.workspaceCoordinator(dir).State()
 	needsInput = wfState.NeedsHumanInput()
 	return running, needsInput
 }
@@ -1270,10 +1365,7 @@ func (s *Server) wasEverStarted(dir string) bool {
 }
 
 func (s *Server) clearEverStartedOnCompletion(dir string) {
-	wfState, err := state.Load(statePath(dir))
-	if err != nil {
-		return
-	}
+	wfState := s.workspaceCoordinator(dir).State()
 	if wfState.Status != state.StatusComplete {
 		return
 	}

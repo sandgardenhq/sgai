@@ -47,8 +47,8 @@ function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspace
     latestProgress: "Working on React migration M2",
     humanMessage: "",
     agentSequence: [
-      { agent: "coordinator", elapsedTime: "5m", isCurrent: false },
-      { agent: "react-developer", elapsedTime: "10m", isCurrent: true },
+      { agent: "coordinator", model: "anthropic/claude-opus-4-6 (max)", elapsedTime: "5m", isCurrent: false },
+      { agent: "react-developer", model: "anthropic/claude-opus-4-6", elapsedTime: "10m", isCurrent: true },
     ],
     cost: {
       totalCost: 0.05,
@@ -444,28 +444,4 @@ describe("WorkspaceDetail", () => {
     expect(view.queryByRole("button", { name: "Continuous Self-Drive" })).toBeNull();
   });
 
-  it("shows interrupted banner and reset action when status is working but session is stopped", async () => {
-    const interrupted = makeWorkspace({ running: false, status: "working" });
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = String(input);
-      if (url.includes("/reset")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: false, status: "idle" })));
-      }
-      return Promise.resolve(new Response("{}"));
-    });
-
-    renderWorkspaceDetail("/workspaces/test-project/progress", [interrupted]);
-
-    await waitFor(() => {
-      expect(screen.getByText("sgai was interrupted while working. Reset state to start fresh.")).toBeDefined();
-    });
-
-    const resetButton = screen.getByRole("button", { name: "Reset" });
-    fireEvent.click(resetButton);
-
-    await waitFor(() => {
-      const resetCalls = mockFetch.mock.calls.filter((call) => String(call[0]).includes("/reset"));
-      expect(resetCalls.length).toBe(1);
-    });
-  });
 });

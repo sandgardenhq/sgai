@@ -82,7 +82,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/respond", s.handleAPIRespond)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/start", s.handleAPIStartSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/reset", s.handleAPIResetSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
@@ -238,11 +237,7 @@ func (s *Server) loadWorkspaceState(dir string) state.Workflow {
 	if info.Size() > maxStateSizeBytes {
 		return state.Workflow{}
 	}
-	wfState, errLoad := state.Load(stPath)
-	if errLoad != nil {
-		return state.Workflow{}
-	}
-	return wfState
+	return s.workspaceCoordinator(dir).State()
 }
 
 func (s *Server) buildFullFactoryState() apiFactoryState {
@@ -298,7 +293,7 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 	}
 
 	agentSeq := convertAgentSequence(
-		prepareAgentSequenceDisplay(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress)),
+		prepareAgentSequenceDisplay(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress), ws.Directory),
 	)
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress))
 
@@ -847,6 +842,7 @@ type apiActionEntry struct {
 
 type apiAgentSequenceEntry struct {
 	Agent       string `json:"agent"`
+	Model       string `json:"model"`
 	ElapsedTime string `json:"elapsedTime"`
 	IsCurrent   bool   `json:"isCurrent"`
 }
@@ -1218,14 +1214,32 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wfState, errLoad := state.Load(statePath(workspacePath))
-	if errLoad != nil {
-		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
+	coord := s.sessionCoordinator(workspacePath)
+	if coord != nil {
+		s.handleRespondViaCoordinator(w, coord, req)
 		return
 	}
 
+	s.handleRespondLegacy(w, workspacePath, req)
+}
+
+func (s *Server) sessionCoordinator(workspacePath string) *state.Coordinator {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess := s.sessions[workspacePath]
+	if sess == nil {
+		return nil
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	return sess.coord
+}
+
+func (s *Server) handleRespondViaCoordinator(w http.ResponseWriter, coord *state.Coordinator, req apiRespondRequest) {
+	wfState := coord.State()
+
 	if !wfState.NeedsHumanInput() {
-		writeJSON(w, apiRespondResponse{Success: true, Message: "no pending question"})
+		http.Error(w, "no pending question", http.StatusConflict)
 		return
 	}
 
@@ -1235,23 +1249,60 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseText := buildAPIResponseText(req)
+	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
 	if responseText == "" {
 		http.Error(w, "response cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	responsePath := filepath.Join(workspacePath, ".sgai", "response.txt")
-	if errWrite := os.WriteFile(responsePath, []byte(responseText), 0644); errWrite != nil {
-		http.Error(w, "failed to write response", http.StatusInternalServerError)
+	if wfState.MultiChoiceQuestion != nil && wfState.MultiChoiceQuestion.IsWorkGate {
+		approvedViaSelection := slices.Contains(req.SelectedChoices, workGateApprovalText)
+		if approvedViaSelection {
+			if err := coord.UpdateState(func(wf *state.Workflow) {
+				if wf.InteractionMode == state.ModeBrainstorming {
+					wf.InteractionMode = state.ModeBuilding
+				}
+			}); err != nil {
+				http.Error(w, "failed to save work gate approval", http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	coord.Respond(responseText)
+
+	s.notifyStateChange()
+
+	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
+}
+
+func (s *Server) handleRespondLegacy(w http.ResponseWriter, workspacePath string, req apiRespondRequest) {
+	coord := s.workspaceCoordinator(workspacePath)
+	wfState := coord.State()
+
+	if !wfState.NeedsHumanInput() {
+		http.Error(w, "no pending question in legacy path", http.StatusConflict)
 		return
 	}
 
-	wfState.Status = state.StatusWorking
-	wfState.HumanMessage = ""
-	wfState.MultiChoiceQuestion = nil
-	wfState.Task = ""
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+	currentID := generateQuestionID(wfState)
+	if req.QuestionID != currentID {
+		http.Error(w, "question expired", http.StatusConflict)
+		return
+	}
+
+	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
+	if responseText == "" {
+		http.Error(w, "response cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Status = state.StatusWorking
+		wf.HumanMessage = ""
+		wf.MultiChoiceQuestion = nil
+		wf.Task = ""
+	}); errUpdate != nil {
 		http.Error(w, "failed to save state", http.StatusInternalServerError)
 		return
 	}
@@ -1261,12 +1312,14 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
 }
 
-func buildAPIResponseText(req apiRespondRequest) string {
+func buildAPIResponseText(req apiRespondRequest, multiChoice *state.MultiChoiceQuestion) string {
 	var parts []string
 	if len(req.SelectedChoices) > 0 {
 		parts = append(parts, "Selected: "+strings.Join(req.SelectedChoices, ", "))
 	}
-	if req.Answer != "" {
+	if req.Answer != "" && (multiChoice == nil || !multiChoice.IsWorkGate) {
+		parts = append(parts, req.Answer)
+	} else if req.Answer != "" && multiChoice != nil && multiChoice.IsWorkGate {
 		parts = append(parts, req.Answer)
 	}
 	return strings.Join(parts, "\n")
@@ -1300,22 +1353,22 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wfState, errLoadState := state.Load(statePath(workspacePath))
-	if errLoadState != nil && !os.IsNotExist(errLoadState) {
-		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
-		return
-	}
-
+	coord := s.workspaceCoordinator(workspacePath)
 	continuousPrompt := readContinuousModePrompt(workspacePath)
+
+	var interactionMode string
 	switch {
 	case continuousPrompt != "":
-		wfState.InteractionMode = state.ModeContinuous
+		interactionMode = state.ModeContinuous
 	case req.Auto:
-		wfState.InteractionMode = state.ModeSelfDrive
+		interactionMode = state.ModeSelfDrive
 	default:
-		wfState.InteractionMode = state.ModeBrainstorming
+		interactionMode = state.ModeBrainstorming
 	}
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.InteractionMode = interactionMode
+	}); errUpdate != nil {
 		http.Error(w, "failed to save workflow state", http.StatusInternalServerError)
 		return
 	}
@@ -1380,27 +1433,6 @@ func (s *Server) handleAPIStopSession(w http.ResponseWriter, r *http.Request) {
 		Status:  "stopped",
 		Running: false,
 		Message: message,
-	})
-}
-
-func (s *Server) handleAPIResetSession(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	if errRemove := os.Remove(statePath(workspacePath)); errRemove != nil && !os.IsNotExist(errRemove) {
-		http.Error(w, "failed to reset state", http.StatusInternalServerError)
-		return
-	}
-
-	s.notifyStateChange()
-
-	writeJSON(w, apiSessionActionResponse{
-		Name:    filepath.Base(workspacePath),
-		Status:  "reset",
-		Running: false,
-		Message: "session state reset",
 	})
 }
 
@@ -1955,16 +1987,13 @@ func (s *Server) handleAPIUpdateSummary(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	wfState, errLoad := state.Load(statePath(workspacePath))
-	if errLoad != nil {
-		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
-		return
-	}
+	coord := s.workspaceCoordinator(workspacePath)
+	summary := strings.TrimSpace(req.Summary)
 
-	wfState.Summary = strings.TrimSpace(req.Summary)
-	wfState.SummaryManual = true
-
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Summary = summary
+		wf.SummaryManual = true
+	}); errUpdate != nil {
 		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
 		return
 	}
@@ -1974,7 +2003,7 @@ func (s *Server) handleAPIUpdateSummary(w http.ResponseWriter, r *http.Request) 
 
 	writeJSON(w, apiUpdateSummaryResponse{
 		Updated:   true,
-		Summary:   wfState.Summary,
+		Summary:   summary,
 		Workspace: workspaceName,
 	})
 }
@@ -2128,7 +2157,7 @@ func (s *Server) handleAPIWorkflowSVG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wfState, _ := state.Load(statePath(workspacePath))
+	wfState := s.workspaceCoordinator(workspacePath).State()
 	currentAgent := wfState.CurrentAgent
 	if currentAgent == "" {
 		currentAgent = "Unknown"
@@ -2242,24 +2271,21 @@ func (s *Server) handleAPISteer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wfState, errLoad := state.Load(statePath(workspacePath))
-	if errLoad != nil {
-		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
-		return
-	}
+	coord := s.workspaceCoordinator(workspacePath)
+	steerBody := "Re-steering instruction: " + strings.TrimSpace(req.Message)
+	steerCreatedAt := time.Now().UTC().Format(time.RFC3339)
 
-	newMsg := state.Message{
-		FromAgent: "Human Partner",
-		ToAgent:   "coordinator",
-		Body:      "Re-steering instruction: " + strings.TrimSpace(req.Message),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	insertIdx := findSteerInsertPosition(wfState.Messages)
-	newMsg.ID = nextMessageID(wfState.Messages)
-	wfState.Messages = slices.Insert(wfState.Messages, insertIdx, newMsg)
-
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		newMsg := state.Message{
+			ID:        nextMessageID(wf.Messages),
+			FromAgent: "Human Partner",
+			ToAgent:   "coordinator",
+			Body:      steerBody,
+			CreatedAt: steerCreatedAt,
+		}
+		insertIdx := findSteerInsertPosition(wf.Messages)
+		wf.Messages = slices.Insert(wf.Messages, insertIdx, newMsg)
+	}); errUpdate != nil {
 		http.Error(w, "failed to save state", http.StatusInternalServerError)
 		return
 	}
@@ -2401,11 +2427,7 @@ func (s *Server) handleAPIOpenInOpenCode(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	wfState, errState := state.Load(statePath(workspacePath))
-	if errState != nil {
-		http.Error(w, "failed to load workflow state", http.StatusInternalServerError)
-		return
-	}
+	wfState := s.workspaceCoordinator(workspacePath).State()
 	currentAgent := wfState.CurrentAgent
 	sessionID := wfState.SessionID
 
@@ -2601,16 +2623,12 @@ func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	wfState, errLoad := state.Load(statePath(workspacePath))
-	if errLoad != nil {
-		http.Error(w, "failed to load workspace state", http.StatusInternalServerError)
-		return
-	}
+	coord := s.workspaceCoordinator(workspacePath)
+	wfState := coord.State()
 
 	found := false
-	for i, msg := range wfState.Messages {
+	for _, msg := range wfState.Messages {
 		if msg.ID == messageID {
-			wfState.Messages = slices.Delete(wfState.Messages, i, i+1)
 			found = true
 			break
 		}
@@ -2621,7 +2639,14 @@ func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		for i, msg := range wf.Messages {
+			if msg.ID == messageID {
+				wf.Messages = slices.Delete(wf.Messages, i, i+1)
+				break
+			}
+		}
+	}); errUpdate != nil {
 		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
 		return
 	}

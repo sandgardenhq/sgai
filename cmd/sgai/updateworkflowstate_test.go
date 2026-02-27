@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -27,24 +28,35 @@ func setupStateDir(t *testing.T, initial state.Workflow) string {
 	return tmpDir
 }
 
+func setupCoordinator(t *testing.T, initial state.Workflow) *state.Coordinator {
+	t.Helper()
+	workDir := setupStateDir(t, initial)
+	statePath := filepath.Join(workDir, ".sgai", "state.json")
+	coord, err := state.NewCoordinator(statePath)
+	if err != nil {
+		t.Fatalf("failed to create coordinator: %v", err)
+	}
+	return coord
+}
+
 func loadState(t *testing.T, workDir string) state.Workflow {
 	t.Helper()
-	statePath := filepath.Join(workDir, ".sgai", "state.json")
-	s, err := state.Load(statePath)
+	stPath := filepath.Join(workDir, ".sgai", "state.json")
+	coord, err := state.NewCoordinator(stPath)
 	if err != nil {
 		t.Fatalf("failed to load state: %v", err)
 	}
-	return s
+	return coord.State()
 }
 
 func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	t.Run("preservedOnWorking", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWaitingForHuman,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "doing something",
 			AddProgress: "progress note",
@@ -53,7 +65,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWaitingForHuman {
 			t.Errorf("expected status %q preserved, got %q", state.StatusWaitingForHuman, s.Status)
 		}
@@ -72,12 +84,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("preservedOnAgentDone", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWaitingForHuman,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "agent finished",
 		})
@@ -85,7 +97,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWaitingForHuman {
 			t.Errorf("expected status %q preserved, got %q", state.StatusWaitingForHuman, s.Status)
 		}
@@ -96,12 +108,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("preservedOnComplete", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWaitingForHuman,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "complete",
 			AddProgress: "claiming completion",
 		})
@@ -109,7 +121,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWaitingForHuman {
 			t.Errorf("expected status %q preserved, got %q", state.StatusWaitingForHuman, s.Status)
 		}
@@ -120,12 +132,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("preservedOnEmptyStatus", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWaitingForHuman,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "",
 			Task:        "new task",
 			AddProgress: "still working",
@@ -134,7 +146,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWaitingForHuman {
 			t.Errorf("expected status %q preserved, got %q", state.StatusWaitingForHuman, s.Status)
 		}
@@ -149,7 +161,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("taskAndProgressUpdatedDuringPreservation", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWaitingForHuman,
 			CurrentAgent: "coordinator",
 			Progress: []state.ProgressEntry{
@@ -157,7 +169,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			},
 		})
 
-		_, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "new task during wait",
 			AddProgress: "additional progress",
@@ -166,7 +178,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Task != "new task during wait" {
 			t.Errorf("expected task updated, got %q", s.Task)
 		}
@@ -183,12 +195,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("workingAfterHumanRespondedTransitionsNormally", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "finished after human responded",
 		})
@@ -196,19 +208,19 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusAgentDone {
 			t.Errorf("expected status %q after human responded, got %q", state.StatusAgentDone, s.Status)
 		}
 	})
 
 	t.Run("workingToAgentDoneTransitionsNormally", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "backend-go-developer",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "backend-go-developer", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "done with work",
 		})
@@ -216,7 +228,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusAgentDone {
 			t.Errorf("expected status %q, got %q", state.StatusAgentDone, s.Status)
 		}
@@ -231,12 +243,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("workingToWorkingTransitionsNormally", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status: "working",
 			Task:   "updated task",
 		})
@@ -244,19 +256,19 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWorking {
 			t.Errorf("expected status %q, got %q", state.StatusWorking, s.Status)
 		}
 	})
 
 	t.Run("invalidStatusRejectedRegardless", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status: "invalid-status",
 		})
 		if err != nil {
@@ -267,19 +279,19 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Errorf("expected invalid status error, got: %s", result)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Status != state.StatusWorking {
 			t.Errorf("status should not change on invalid input, got %q", s.Status)
 		}
 	})
 
 	t.Run("invalidStatusRejectedWhenNotPreserved", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusAgentDone,
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status: "bogus",
 		})
 		if err != nil {
@@ -292,12 +304,12 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 	})
 
 	t.Run("taskClearedOnAgentDone", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status: "agent-done",
 			Task:   "should be cleared",
 		})
@@ -305,19 +317,19 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Task != "" {
 			t.Errorf("expected task cleared on agent-done, got %q", s.Task)
 		}
 	})
 
 	t.Run("taskClearedOnComplete", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:       state.StatusWorking,
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(workDir, updateWorkflowStateArgs{
+		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
 			Status: "complete",
 			Task:   "should be cleared",
 		})
@@ -325,9 +337,72 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		s := loadState(t, workDir)
+		s := coord.State()
 		if s.Task != "" {
 			t.Errorf("expected task cleared on complete, got %q", s.Task)
+		}
+	})
+}
+
+func TestUpdateWorkflowStateProgressUsesCallerAgent(t *testing.T) {
+	t.Run("progressEntryUsesCallerAgentNotStateCurrentAgent", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "coordinator",
+		})
+
+		_, err := updateWorkflowState(context.Background(), coord, "backend-go-developer", updateWorkflowStateArgs{
+			Status:      "working",
+			Task:        "doing backend work",
+			AddProgress: "wrote the handler",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		s := coord.State()
+		if len(s.Progress) != 1 {
+			t.Fatalf("expected 1 progress entry, got %d", len(s.Progress))
+		}
+		if s.Progress[0].Agent != "backend-go-developer" {
+			t.Errorf("expected progress agent %q, got %q", "backend-go-developer", s.Progress[0].Agent)
+		}
+		if s.Progress[0].Description != "wrote the handler" {
+			t.Errorf("expected progress description %q, got %q", "wrote the handler", s.Progress[0].Description)
+		}
+	})
+
+	t.Run("multipleAgentsGetCorrectAgentInProgress", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "coordinator",
+		})
+
+		_, err := updateWorkflowState(context.Background(), coord, "react-developer", updateWorkflowStateArgs{
+			Status:      "working",
+			AddProgress: "built the component",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		_, err = updateWorkflowState(context.Background(), coord, "go-readability-reviewer", updateWorkflowStateArgs{
+			Status:      "working",
+			AddProgress: "reviewed the code",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		s := coord.State()
+		if len(s.Progress) != 2 {
+			t.Fatalf("expected 2 progress entries, got %d", len(s.Progress))
+		}
+		if s.Progress[0].Agent != "react-developer" {
+			t.Errorf("expected first progress agent %q, got %q", "react-developer", s.Progress[0].Agent)
+		}
+		if s.Progress[1].Agent != "go-readability-reviewer" {
+			t.Errorf("expected second progress agent %q, got %q", "go-readability-reviewer", s.Progress[1].Agent)
 		}
 	})
 }

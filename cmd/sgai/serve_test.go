@@ -950,7 +950,7 @@ func TestTogglePin(t *testing.T) {
 func writeStateFile(t *testing.T, dir, status string) {
 	t.Helper()
 	wf := state.Workflow{Status: status}
-	if err := state.Save(statePath(dir), wf); err != nil {
+	if _, err := state.NewCoordinatorWith(statePath(dir), wf); err != nil {
 		t.Fatalf("failed to write state file: %v", err)
 	}
 }
@@ -1002,4 +1002,139 @@ func TestClearEverStartedOnCompletion(t *testing.T) {
 			t.Error("everStartedDirs should persist when state file is missing")
 		}
 	})
+}
+
+func TestWorkspaceCoordinatorAutoResetsStaleWorkingState(t *testing.T) {
+	dir := t.TempDir()
+	createsgaiDir(t, dir)
+
+	wf := state.Workflow{
+		Status: state.StatusWorking,
+		Task:   "was doing something",
+	}
+	if _, err := state.NewCoordinatorWith(statePath(dir), wf); err != nil {
+		t.Fatalf("failed to write state file: %v", err)
+	}
+
+	srv := &Server{
+		sessions: make(map[string]*session),
+	}
+
+	coord := srv.workspaceCoordinator(dir)
+	got := coord.State()
+
+	if got.Status == state.StatusWorking {
+		t.Errorf("stale working status should be auto-reset, got %q", got.Status)
+	}
+}
+
+func TestFlushGoalChecksumOnStop(t *testing.T) {
+	t.Run("updatesGoalChecksumInState", func(t *testing.T) {
+		dir := t.TempDir()
+		createsgaiDir(t, dir)
+
+		goalContent := "# Test Goal\n\n- [ ] Do the thing\n"
+		if err := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := state.NewCoordinatorWith(statePath(dir), state.Workflow{
+			Status:       state.StatusWorking,
+			GoalChecksum: "old-checksum",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := &Server{
+			sessions: make(map[string]*session),
+		}
+		srv.flushGoalChecksumOnStop(dir)
+
+		coord := srv.workspaceCoordinator(dir)
+		got := coord.State()
+
+		if got.GoalChecksum == "old-checksum" {
+			t.Error("GoalChecksum should be updated from old value after stop")
+		}
+		if got.GoalChecksum == "" {
+			t.Error("GoalChecksum should not be empty after stop")
+		}
+	})
+
+	t.Run("noGoalFileSkipsSilently", func(t *testing.T) {
+		dir := t.TempDir()
+		createsgaiDir(t, dir)
+
+		if _, err := state.NewCoordinatorWith(statePath(dir), state.Workflow{
+			Status:       state.StatusWorking,
+			GoalChecksum: "original",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := &Server{
+			sessions: make(map[string]*session),
+		}
+		srv.flushGoalChecksumOnStop(dir)
+
+		coord := srv.workspaceCoordinator(dir)
+		got := coord.State()
+
+		if got.GoalChecksum != "original" {
+			t.Errorf("GoalChecksum should remain unchanged when no GOAL.md, got %q", got.GoalChecksum)
+		}
+	})
+}
+
+func TestInjectCurrentAgentStyle(t *testing.T) {
+	cases := []struct {
+		name         string
+		dot          string
+		currentAgent string
+		wantContains string
+		wantAbsent   string
+	}{
+		{
+			name: "highlightsActiveAgent",
+			dot: `strict digraph G {
+    rankdir=LR;
+    "backend-go-developer"
+    "coordinator"
+    "backend-go-developer" -> "coordinator"
+}`,
+			currentAgent: "backend-go-developer",
+			wantContains: `"backend-go-developer" [style=filled, fillcolor="#10b981", fontcolor=white]`,
+			wantAbsent:   `"coordinator" [style=filled`,
+		},
+		{
+			name: "unknownAgentLeavesUnchanged",
+			dot: `strict digraph G {
+    "coordinator"
+}`,
+			currentAgent: "Unknown",
+			wantAbsent:   `[style=filled`,
+		},
+		{
+			name: "onlyReplacesNodeDeclarationNotEdge",
+			dot: `strict digraph G {
+    "coordinator"
+    "coordinator" -> "backend-go-developer"
+}`,
+			currentAgent: "coordinator",
+			wantContains: `"coordinator" [style=filled, fillcolor="#10b981", fontcolor=white]
+    "coordinator" -> "backend-go-developer"`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := injectCurrentAgentStyle(tc.dot, tc.currentAgent)
+			if tc.wantContains != "" && !strings.Contains(got, tc.wantContains) {
+				t.Errorf("injectCurrentAgentStyle: expected to contain %q, got:\n%s", tc.wantContains, got)
+			}
+			if tc.wantAbsent != "" && strings.Contains(got, tc.wantAbsent) {
+				t.Errorf("injectCurrentAgentStyle: expected NOT to contain %q, got:\n%s", tc.wantAbsent, got)
+			}
+		})
+	}
 }

@@ -20,20 +20,12 @@ func TestSelfDriveSetsInteractionMode(t *testing.T) {
 		}
 		createsgaiDir(t, workspace)
 
-		wfState, errLoad := state.Load(statePath(workspace))
-		if errLoad != nil && !os.IsNotExist(errLoad) {
-			t.Fatal(errLoad)
+		wfCoord, errCoord := state.NewCoordinatorWith(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive})
+		if errCoord != nil {
+			t.Fatal(errCoord)
 		}
 
-		wfState.InteractionMode = state.ModeSelfDrive
-		if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
-			t.Fatal(errSave)
-		}
-
-		loaded, errReload := state.Load(statePath(workspace))
-		if errReload != nil {
-			t.Fatal(errReload)
-		}
+		loaded := wfCoord.State()
 		if loaded.InteractionMode != state.ModeSelfDrive {
 			t.Fatalf("InteractionMode should be %q after self-drive, got %q", state.ModeSelfDrive, loaded.InteractionMode)
 		}
@@ -47,14 +39,12 @@ func TestSelfDriveSetsInteractionMode(t *testing.T) {
 		}
 		createsgaiDir(t, workspace)
 
-		if errSave := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSave != nil {
-			t.Fatal(errSave)
+		coord, errCoord := state.NewCoordinatorWith(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive})
+		if errCoord != nil {
+			t.Fatal(errCoord)
 		}
 
-		loaded, errLoad := state.Load(statePath(workspace))
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
+		loaded := coord.State()
 
 		if loaded.InteractionMode != state.ModeSelfDrive {
 			t.Fatal("self-drive mode should have InteractionMode == ModeSelfDrive")
@@ -73,7 +63,7 @@ func TestBuildWorkspaceFullStateUsesInteractionMode(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
+	if _, errSaveState := state.NewCoordinatorWith(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
 		t.Fatal(errSaveState)
 	}
 
@@ -96,24 +86,18 @@ func TestStartAPISetsModeBrainstorming(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSave := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSave != nil {
-		t.Fatal(errSave)
+	coord, errCoord := state.NewCoordinatorWith(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive})
+	if errCoord != nil {
+		t.Fatal(errCoord)
 	}
 
-	wfState, errLoad := state.Load(statePath(workspace))
-	if errLoad != nil {
-		t.Fatal(errLoad)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.InteractionMode = state.ModeBrainstorming
+	}); errUpdate != nil {
+		t.Fatal(errUpdate)
 	}
 
-	wfState.InteractionMode = state.ModeBrainstorming
-	if errSave := state.Save(statePath(workspace), wfState); errSave != nil {
-		t.Fatal(errSave)
-	}
-
-	loaded, errReload := state.Load(statePath(workspace))
-	if errReload != nil {
-		t.Fatal(errReload)
-	}
+	loaded := coord.State()
 	if loaded.InteractionMode != state.ModeBrainstorming {
 		t.Fatalf("InteractionMode should be %q after interactive start, got %q", state.ModeBrainstorming, loaded.InteractionMode)
 	}
@@ -134,7 +118,7 @@ func TestHandleAPIStateUsesInteractionMode(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSaveState := state.Save(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
+	if _, errSaveState := state.NewCoordinatorWith(statePath(workspace), state.Workflow{InteractionMode: state.ModeSelfDrive}); errSaveState != nil {
 		t.Fatal(errSaveState)
 	}
 

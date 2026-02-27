@@ -48,16 +48,22 @@ func TestSaveSummaryIfNotManual(t *testing.T) {
 		}
 		createsgaiDir(t, workspace)
 
-		if errSave := state.Save(statePath(workspace), state.Workflow{}); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{}); errSave != nil {
 			t.Fatal(errSave)
 		}
 
-		saveSummaryIfNotManual(workspace, "A test summary")
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		srv := NewServer(rootDir)
+		srv.shutdownCtx = ctx
+		gen := newSummaryGenerator(ctx, srv)
+		gen.saveSummaryIfNotManual(workspace, "A test summary")
 
-		loaded, errLoad := state.Load(statePath(workspace))
+		loadedCoord, errLoad := state.NewCoordinator(statePath(workspace))
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
+		loaded := loadedCoord.State()
 		if loaded.Summary != "A test summary" {
 			t.Errorf("summary = %q; want %q", loaded.Summary, "A test summary")
 		}
@@ -71,19 +77,25 @@ func TestSaveSummaryIfNotManual(t *testing.T) {
 		}
 		createsgaiDir(t, workspace)
 
-		if errSave := state.Save(statePath(workspace), state.Workflow{
+		if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{
 			Summary:       "User written summary",
 			SummaryManual: true,
 		}); errSave != nil {
 			t.Fatal(errSave)
 		}
 
-		saveSummaryIfNotManual(workspace, "Auto generated summary")
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		srv := NewServer(rootDir)
+		srv.shutdownCtx = ctx
+		gen := newSummaryGenerator(ctx, srv)
+		gen.saveSummaryIfNotManual(workspace, "Auto generated summary")
 
-		loaded, errLoad := state.Load(statePath(workspace))
+		loadedCoord, errLoad := state.NewCoordinator(statePath(workspace))
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
+		loaded := loadedCoord.State()
 		if loaded.Summary != "User written summary" {
 			t.Errorf("summary = %q; want %q (should not be overwritten)", loaded.Summary, "User written summary")
 		}
@@ -181,7 +193,7 @@ func TestHandleAPIUpdateSummary(t *testing.T) {
 		t.Fatal(errMkdir)
 	}
 	createsgaiDir(t, workspace)
-	if errSave := state.Save(statePath(workspace), state.Workflow{Summary: "old summary"}); errSave != nil {
+	if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{Summary: "old summary"}); errSave != nil {
 		t.Fatal(errSave)
 	}
 
@@ -209,10 +221,11 @@ func TestHandleAPIUpdateSummary(t *testing.T) {
 		t.Errorf("summary = %q; want %q", resp.Summary, "My custom summary")
 	}
 
-	loaded, errLoad := state.Load(statePath(workspace))
+	loadedCoord, errLoad := state.NewCoordinator(statePath(workspace))
 	if errLoad != nil {
 		t.Fatal(errLoad)
 	}
+	loaded := loadedCoord.State()
 	if loaded.Summary != "My custom summary" {
 		t.Errorf("persisted summary = %q; want %q", loaded.Summary, "My custom summary")
 	}
@@ -229,11 +242,14 @@ func TestHandleAPIUpdateSummaryPreventsAutoOverwrite(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSave := state.Save(statePath(workspace), state.Workflow{}); errSave != nil {
+	if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{}); errSave != nil {
 		t.Fatal(errSave)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	srv := NewServer(rootDir)
+	srv.shutdownCtx = ctx
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
 
@@ -246,12 +262,14 @@ func TestHandleAPIUpdateSummaryPreventsAutoOverwrite(t *testing.T) {
 		t.Fatalf("status = %d; want %d", rr.Code, http.StatusOK)
 	}
 
-	saveSummaryIfNotManual(workspace, "This should not overwrite")
+	gen := newSummaryGenerator(ctx, srv)
+	gen.saveSummaryIfNotManual(workspace, "This should not overwrite")
 
-	loaded, errLoad := state.Load(statePath(workspace))
+	loadedCoord, errLoad := state.NewCoordinator(statePath(workspace))
 	if errLoad != nil {
 		t.Fatal(errLoad)
 	}
+	loaded := loadedCoord.State()
 	if loaded.Summary != "Manual summary" {
 		t.Errorf("summary = %q; want %q (should remain manual)", loaded.Summary, "Manual summary")
 	}
@@ -268,7 +286,7 @@ func TestBuildWorkspaceFullStateIncludesSummary(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSave := state.Save(statePath(workspace), state.Workflow{
+	if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{
 		Summary:       "Test project summary",
 		SummaryManual: true,
 	}); errSave != nil {
@@ -297,7 +315,7 @@ func TestBuildWorkspaceFullStateIncludesSummaryInState(t *testing.T) {
 	}
 	createsgaiDir(t, workspace)
 
-	if errSave := state.Save(statePath(workspace), state.Workflow{
+	if _, errSave := state.NewCoordinatorWith(statePath(workspace), state.Workflow{
 		Summary: "Sidebar summary",
 	}); errSave != nil {
 		t.Fatal(errSave)

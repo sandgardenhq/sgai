@@ -53,10 +53,11 @@ func TestTimestampFallbackLogic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wfState, err := state.Load(stateFile)
+	loadedCoord, err := state.NewCoordinator(stateFile)
 	if err != nil {
-		t.Fatalf("Load failed: %v", err)
+		t.Fatalf("NewCoordinator failed: %v", err)
 	}
+	wfState := loadedCoord.State()
 
 	if len(wfState.Messages) != 3 {
 		t.Fatalf("Expected 3 messages, got %d", len(wfState.Messages))
