@@ -100,6 +100,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/messages/{id}", s.handleAPIDeleteMessage)
 	mux.HandleFunc("GET /api/v1/models", s.handleAPIListModels)
 	mux.HandleFunc("GET /api/v1/compose", s.handleAPIComposeState)
@@ -1093,6 +1094,35 @@ func collectJJChanges(dir string) ([]apiDiffLine, string) {
 	}
 
 	return diffLines, strings.TrimSpace(string(rawDesc))
+}
+
+func collectJJFullDiff(dir string) string {
+	diffCmd := exec.Command("jj", "diff", "--git")
+	diffCmd.Dir = dir
+	rawDiff, errDiff := diffCmd.Output()
+	if errDiff != nil {
+		return ""
+	}
+	return string(rawDiff)
+}
+
+type apiFullDiffResponse struct {
+	Diff string `json:"diff"`
+}
+
+func (s *Server) handleAPIWorkspaceDiff(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	if !hasJJRepo(workspacePath) {
+		writeJSON(w, apiFullDiffResponse{})
+		return
+	}
+
+	diff := collectJJFullDiff(workspacePath)
+	writeJSON(w, apiFullDiffResponse{Diff: diff})
 }
 
 type apiEventEntry struct {
