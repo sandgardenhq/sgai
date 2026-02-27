@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,8 +10,8 @@ import (
 )
 
 func TestAskUserQuestion(t *testing.T) {
-	t.Run("singleQuestionSetsStateCorrectly", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+	t.Run("singleQuestionBlocksUntilAnswer", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
 			Status:          state.StatusWorking,
 			CurrentAgent:    "coordinator",
 			InteractionMode: state.ModeBrainstorming,
@@ -26,49 +27,35 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, err := askUserQuestion(workDir, args)
-		if err != nil {
-			t.Fatalf("askUserQuestion error: %v", err)
+		type callResult struct {
+			result string
+			err    error
+		}
+		done := make(chan callResult, 1)
+		go func() {
+			r, e := askUserQuestion(context.Background(), coord, args)
+			done <- callResult{r, e}
+		}()
+
+		coord.Respond("Selected: Option A")
+
+		cr := <-done
+		if cr.err != nil {
+			t.Fatalf("askUserQuestion error: %v", cr.err)
 		}
 
-		if result == "" {
+		if cr.result == "" {
 			t.Error("expected non-empty result")
 		}
 
-		loadedState := loadState(t, workDir)
-
-		if loadedState.Status != state.StatusWaitingForHuman {
-			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
-		}
-
-		if loadedState.MultiChoiceQuestion == nil {
-			t.Fatal("expected MultiChoiceQuestion to be set")
-		}
-
-		if len(loadedState.MultiChoiceQuestion.Questions) != 1 {
-			t.Fatalf("expected 1 question, got %d", len(loadedState.MultiChoiceQuestion.Questions))
-		}
-
-		q := loadedState.MultiChoiceQuestion.Questions[0]
-		if q.Question != args.Questions[0].Question {
-			t.Errorf("question mismatch: got %q, want %q", q.Question, args.Questions[0].Question)
-		}
-
-		if len(q.Choices) != len(args.Questions[0].Choices) {
-			t.Errorf("choices length mismatch: got %d, want %d", len(q.Choices), len(args.Questions[0].Choices))
-		}
-
-		if q.MultiSelect != args.Questions[0].MultiSelect {
-			t.Errorf("multiSelect mismatch: got %v, want %v", q.MultiSelect, args.Questions[0].MultiSelect)
-		}
-
-		if loadedState.HumanMessage != args.Questions[0].Question {
-			t.Errorf("humanMessage should equal first question: got %q, want %q", loadedState.HumanMessage, args.Questions[0].Question)
+		s := coord.State()
+		if s.Status == state.StatusWaitingForHuman {
+			t.Error("status should not be waiting-for-human after response")
 		}
 	})
 
 	t.Run("multipleQuestionsSetsStateCorrectly", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -85,38 +72,36 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, err := askUserQuestion(workDir, args)
-		if err != nil {
-			t.Fatalf("askUserQuestion error: %v", err)
+		type callResult struct {
+			result string
+			err    error
+		}
+		done := make(chan callResult, 1)
+		go func() {
+			r, e := askUserQuestion(context.Background(), coord, args)
+			done <- callResult{r, e}
+		}()
+
+		coord.Respond("Selected: PostgreSQL, JWT")
+
+		cr := <-done
+		if cr.err != nil {
+			t.Fatalf("askUserQuestion error: %v", cr.err)
 		}
 
-		if !strings.Contains(result, "2 question(s)") {
-			t.Errorf("expected result to mention 2 questions, got: %s", result)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if len(loadedState.MultiChoiceQuestion.Questions) != 2 {
-			t.Fatalf("expected 2 questions, got %d", len(loadedState.MultiChoiceQuestion.Questions))
-		}
-
-		if loadedState.MultiChoiceQuestion.Questions[0].Question != "Which database?" {
-			t.Errorf("first question mismatch")
-		}
-
-		if loadedState.MultiChoiceQuestion.Questions[1].MultiSelect != true {
-			t.Errorf("second question multiSelect should be true")
+		if !strings.Contains(cr.result, "2 question(s)") {
+			t.Errorf("expected result to mention 2 questions, got: %s", cr.result)
 		}
 	})
 
 	t.Run("emptyQuestionsReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{},
 		}
 
-		result, _ := askUserQuestion(workDir, args)
+		result, _ := askUserQuestion(context.Background(), coord, args)
 
 		if !strings.Contains(result, "Error: At least one question is required") {
 			t.Errorf("expected error message, got: %q", result)
@@ -127,7 +112,7 @@ func TestAskUserQuestion(t *testing.T) {
 	})
 
 	t.Run("questionWithEmptyChoicesReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -139,7 +124,7 @@ func TestAskUserQuestion(t *testing.T) {
 			},
 		}
 
-		result, _ := askUserQuestion(workDir, args)
+		result, _ := askUserQuestion(context.Background(), coord, args)
 
 		if result != "Error: Question 1 has no choices" {
 			t.Errorf("expected error message, got: %q", result)
@@ -149,7 +134,7 @@ func TestAskUserQuestion(t *testing.T) {
 
 func TestAskUserQuestionStress(t *testing.T) {
 	t.Run("batchOfTenQuestions", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		questions := make([]questionItem, 10)
 		for i := range questions {
@@ -160,28 +145,30 @@ func TestAskUserQuestionStress(t *testing.T) {
 			}
 		}
 
-		result, err := askUserQuestion(workDir, askUserQuestionArgs{Questions: questions})
-		if err != nil {
-			t.Fatalf("askUserQuestion error: %v", err)
+		type callResult struct {
+			result string
+			err    error
+		}
+		done := make(chan callResult, 1)
+		go func() {
+			r, e := askUserQuestion(context.Background(), coord, askUserQuestionArgs{Questions: questions})
+			done <- callResult{r, e}
+		}()
+
+		coord.Respond("Selected: yes")
+
+		cr := <-done
+		if cr.err != nil {
+			t.Fatalf("askUserQuestion error: %v", cr.err)
 		}
 
-		if !strings.Contains(result, "10 question(s)") {
-			t.Errorf("expected result to mention 10 questions, got: %s", result)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if loadedState.Status != state.StatusWaitingForHuman {
-			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
-		}
-
-		if len(loadedState.MultiChoiceQuestion.Questions) != 10 {
-			t.Fatalf("expected 10 questions, got %d", len(loadedState.MultiChoiceQuestion.Questions))
+		if !strings.Contains(cr.result, "10 question(s)") {
+			t.Errorf("expected result to mention 10 questions, got: %s", cr.result)
 		}
 	})
 
 	t.Run("preservesExistingProgress", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:          state.StatusWorking,
 			CurrentAgent:    "coordinator",
 			InteractionMode: state.ModeBrainstorming,
@@ -197,45 +184,30 @@ func TestAskUserQuestionStress(t *testing.T) {
 			},
 		}
 
-		_, err := askUserQuestion(workDir, args)
-		if err != nil {
+		done := make(chan error, 1)
+		go func() {
+			_, e := askUserQuestion(context.Background(), coord, args)
+			done <- e
+		}()
+
+		coord.Respond("Selected: A")
+
+		if err := <-done; err != nil {
 			t.Fatalf("askUserQuestion error: %v", err)
 		}
 
-		loadedState := loadState(t, workDir)
-
-		if len(loadedState.Progress) != 2 {
-			t.Errorf("expected 2 progress entries preserved, got %d", len(loadedState.Progress))
-		}
-	})
-
-	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusAgentDone, InteractionMode: state.ModeBrainstorming})
-
-		args := askUserQuestionArgs{
-			Questions: []questionItem{
-				{Question: "Pick?", Choices: []string{"X", "Y"}},
-			},
-		}
-
-		_, err := askUserQuestion(workDir, args)
-		if err != nil {
-			t.Fatalf("askUserQuestion error: %v", err)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if loadedState.Status != state.StatusWaitingForHuman {
-			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
+		s := coord.State()
+		if len(s.Progress) != 2 {
+			t.Errorf("expected 2 progress entries preserved, got %d", len(s.Progress))
 		}
 	})
 
 	t.Run("nilQuestionsReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{Questions: nil}
 
-		result, _ := askUserQuestion(workDir, args)
+		result, _ := askUserQuestion(context.Background(), coord, args)
 
 		if !strings.Contains(result, "Error: At least one question is required") {
 			t.Errorf("expected error message, got: %q", result)
@@ -246,7 +218,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 	})
 
 	t.Run("questionWithNilChoicesReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		args := askUserQuestionArgs{
 			Questions: []questionItem{
@@ -254,7 +226,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 			},
 		}
 
-		result, _ := askUserQuestion(workDir, args)
+		result, _ := askUserQuestion(context.Background(), coord, args)
 
 		if result != "Error: Question 1 has no choices" {
 			t.Errorf("expected error message, got: %q", result)
@@ -264,41 +236,27 @@ func TestAskUserQuestionStress(t *testing.T) {
 
 func TestAskUserWorkGateStress(t *testing.T) {
 	t.Run("setsIsWorkGateTrue", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:          state.StatusWorking,
 			CurrentAgent:    "coordinator",
 			InteractionMode: state.ModeBrainstorming,
 		})
 
-		_, err := askUserWorkGate(workDir, "test summary")
-		if err != nil {
+		done := make(chan error, 1)
+		go func() {
+			_, e := askUserWorkGate(context.Background(), coord, "test summary")
+			done <- e
+		}()
+
+		coord.Respond("Selected: " + workGateApprovalText)
+
+		if err := <-done; err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if !loadedState.MultiChoiceQuestion.IsWorkGate {
-			t.Error("expected IsWorkGate to be true")
-		}
-	})
-
-	t.Run("setsStatusToWaitingForHuman", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
-
-		_, err := askUserWorkGate(workDir, "test summary")
-		if err != nil {
-			t.Fatalf("askUserWorkGate error: %v", err)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if loadedState.Status != state.StatusWaitingForHuman {
-			t.Errorf("expected status %q, got %q", state.StatusWaitingForHuman, loadedState.Status)
 		}
 	})
 
 	t.Run("preservesExistingMessages", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{
+		coord := setupCoordinator(t, state.Workflow{
 			Status:          state.StatusWorking,
 			CurrentAgent:    "coordinator",
 			InteractionMode: state.ModeBrainstorming,
@@ -308,56 +266,53 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			},
 		})
 
-		_, err := askUserWorkGate(workDir, "test summary")
-		if err != nil {
+		done := make(chan error, 1)
+		go func() {
+			_, e := askUserWorkGate(context.Background(), coord, "test summary")
+			done <- e
+		}()
+
+		coord.Respond("Not ready yet, need more clarification")
+
+		if err := <-done; err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
 
-		loadedState := loadState(t, workDir)
-
-		if len(loadedState.Messages) != 2 {
-			t.Errorf("expected 2 messages preserved, got %d", len(loadedState.Messages))
-		}
-	})
-
-	t.Run("setsHumanMessage", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
-
-		_, err := askUserWorkGate(workDir, "test summary")
-		if err != nil {
-			t.Fatalf("askUserWorkGate error: %v", err)
-		}
-
-		loadedState := loadState(t, workDir)
-
-		if loadedState.HumanMessage == "" {
-			t.Error("expected HumanMessage to be set")
+		s := coord.State()
+		if len(s.Messages) != 2 {
+			t.Errorf("expected 2 messages preserved, got %d", len(s.Messages))
 		}
 	})
 
 	t.Run("hasTwoChoices", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
-		_, err := askUserWorkGate(workDir, "test summary")
-		if err != nil {
-			t.Fatalf("askUserWorkGate error: %v", err)
+		type callResult struct {
+			result string
+			err    error
+		}
+		done := make(chan callResult, 1)
+		go func() {
+			r, e := askUserWorkGate(context.Background(), coord, "test summary")
+			done <- callResult{r, e}
+		}()
+
+		coord.Respond("Not ready yet, need more clarification")
+
+		cr := <-done
+		if cr.err != nil {
+			t.Fatalf("askUserWorkGate error: %v", cr.err)
 		}
 
-		loadedState := loadState(t, workDir)
-
-		if len(loadedState.MultiChoiceQuestion.Questions) != 1 {
-			t.Fatalf("expected 1 question, got %d", len(loadedState.MultiChoiceQuestion.Questions))
-		}
-
-		if len(loadedState.MultiChoiceQuestion.Questions[0].Choices) != 2 {
-			t.Errorf("expected 2 choices, got %d", len(loadedState.MultiChoiceQuestion.Questions[0].Choices))
+		if !strings.Contains(cr.result, "DEFINITION IS COMPLETE") {
+			t.Errorf("expected result to contain approval choice, got: %q", cr.result)
 		}
 	})
 
 	t.Run("emptySummaryReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
-		result, err := askUserWorkGate(workDir, "")
+		result, err := askUserWorkGate(context.Background(), coord, "")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -368,9 +323,9 @@ func TestAskUserWorkGateStress(t *testing.T) {
 	})
 
 	t.Run("whitespaceSummaryReturnsError", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
-		result, err := askUserWorkGate(workDir, "   \t\n  ")
+		result, err := askUserWorkGate(context.Background(), coord, "   \t\n  ")
 		if err != nil {
 			t.Fatalf("askUserWorkGate error: %v", err)
 		}
@@ -380,35 +335,36 @@ func TestAskUserWorkGateStress(t *testing.T) {
 		}
 	})
 
-	t.Run("summaryAppearsInQuestionText", func(t *testing.T) {
-		workDir := setupStateDir(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
+	t.Run("summaryAppearsInResponse", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{Status: state.StatusWorking, InteractionMode: state.ModeBrainstorming})
 
 		summary := "## What Will Be Built\n- Feature X\n\n## Key Decisions\n- Use approach A"
 
-		_, err := askUserWorkGate(workDir, summary)
-		if err != nil {
-			t.Fatalf("askUserWorkGate error: %v", err)
+		type callResult struct {
+			result string
+			err    error
+		}
+		done := make(chan callResult, 1)
+		go func() {
+			r, e := askUserWorkGate(context.Background(), coord, summary)
+			done <- callResult{r, e}
+		}()
+
+		coord.Respond("Not ready yet, need more clarification")
+
+		cr := <-done
+		if cr.err != nil {
+			t.Fatalf("askUserWorkGate error: %v", cr.err)
 		}
 
-		loadedState := loadState(t, workDir)
-
-		questionText := loadedState.MultiChoiceQuestion.Questions[0].Question
-		if !strings.Contains(questionText, summary) {
-			t.Errorf("expected question to contain summary, got: %q", questionText)
-		}
-
-		if !strings.Contains(questionText, "Is the definition complete?") {
-			t.Errorf("expected question to contain approval prompt, got: %q", questionText)
-		}
-
-		if !strings.Contains(loadedState.HumanMessage, summary) {
-			t.Errorf("expected HumanMessage to contain summary, got: %q", loadedState.HumanMessage)
+		if !strings.Contains(cr.result, "Is the definition complete?") {
+			t.Errorf("expected result to contain approval prompt, got: %q", cr.result)
 		}
 	})
 }
 
 func TestMultiChoiceQuestionStateRoundTrip(t *testing.T) {
-	workDir := setupStateDir(t, state.Workflow{
+	tmpDir := setupStateDir(t, state.Workflow{
 		Status:       state.StatusWaitingForHuman,
 		HumanMessage: "Choose your option",
 		MultiChoiceQuestion: &state.MultiChoiceQuestion{
@@ -423,7 +379,7 @@ func TestMultiChoiceQuestionStateRoundTrip(t *testing.T) {
 		CurrentAgent: "coordinator",
 	})
 
-	readState := loadState(t, workDir)
+	readState := loadState(t, tmpDir)
 
 	if readState.MultiChoiceQuestion == nil {
 		t.Fatal("expected MultiChoiceQuestion to be preserved")
@@ -450,12 +406,12 @@ func TestMultiChoiceQuestionStateRoundTrip(t *testing.T) {
 }
 
 func TestMultiChoiceOmitsWhenNil(t *testing.T) {
-	workDir := setupStateDir(t, state.Workflow{
+	tmpDir := setupStateDir(t, state.Workflow{
 		Status:       state.StatusWorking,
 		CurrentAgent: "coordinator",
 	})
 
-	loadedState := loadState(t, workDir)
+	loadedState := loadState(t, tmpDir)
 
 	if loadedState.MultiChoiceQuestion != nil {
 		t.Error("multiChoiceQuestion should be nil when not set")

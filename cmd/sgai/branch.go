@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"io"
+
+	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 type workflowBranch interface {
@@ -16,4 +18,5 @@ type branchConfig struct {
 	workspacePath string
 	mcpURL        string
 	logWriter     io.Writer
+	coord         *state.Coordinator
 }

@@ -108,13 +108,13 @@ func TestSave_CreatesParentDirectories(t *testing.T) {
 		Task:   "test task",
 	}
 
-	if err := Save(nestedPath, workflow); err != nil {
-		t.Fatalf("Save() failed: %v", err)
+	if err := save(nestedPath, workflow); err != nil {
+		t.Fatalf("save() failed: %v", err)
 	}
 
-	loaded, err := Load(nestedPath)
+	loaded, err := load(nestedPath)
 	if err != nil {
-		t.Fatalf("Load() after Save() failed: %v", err)
+		t.Fatalf("load() after save() failed: %v", err)
 	}
 
 	if loaded.Status != workflow.Status {
@@ -403,10 +403,10 @@ func TestInteractionMode(t *testing.T) {
 		for _, mode := range []string{ModeSelfDrive, ModeBrainstorming, ModeBuilding, ModeRetrospective, ""} {
 			t.Run(mode, func(t *testing.T) {
 				wf := Workflow{InteractionMode: mode, Status: StatusWorking}
-				if errSave := Save(stPath, wf); errSave != nil {
+				if errSave := save(stPath, wf); errSave != nil {
 					t.Fatal(errSave)
 				}
-				loaded, errLoad := Load(stPath)
+				loaded, errLoad := load(stPath)
 				if errLoad != nil {
 					t.Fatal(errLoad)
 				}
@@ -443,18 +443,104 @@ func TestSave_ExistingDirectory(t *testing.T) {
 
 	workflow := Workflow{Status: "complete"}
 
-	if err := Save(statePath, workflow); err != nil {
-		t.Fatalf("Save() failed: %v", err)
+	if err := save(statePath, workflow); err != nil {
+		t.Fatalf("save() failed: %v", err)
 	}
 
-	loaded, err := Load(statePath)
+	loaded, err := load(statePath)
 	if err != nil {
-		t.Fatalf("Load() after Save() failed: %v", err)
+		t.Fatalf("load() after save() failed: %v", err)
 	}
 
 	if loaded.Status != "complete" {
 		t.Errorf("Status = %q; want %q", loaded.Status, "complete")
 	}
+}
+
+func TestCoordinatorOnUpdate(t *testing.T) {
+	t.Run("callbackFiredOnUpdateState", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, ".sgai", "state.json")
+
+		coord := NewCoordinatorEmpty(path)
+
+		var callCount int
+		coord.OnUpdate(func() { callCount++ })
+
+		if err := coord.UpdateState(func(wf *Workflow) { wf.Task = "work" }); err != nil {
+			t.Fatal(err)
+		}
+		if callCount != 1 {
+			t.Errorf("callCount = %d; want 1", callCount)
+		}
+
+		if err := coord.UpdateState(func(wf *Workflow) { wf.Task = "more work" }); err != nil {
+			t.Fatal(err)
+		}
+		if callCount != 2 {
+			t.Errorf("callCount = %d; want 2", callCount)
+		}
+	})
+
+	t.Run("noCallbackNoError", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, ".sgai", "state.json")
+
+		coord := NewCoordinatorEmpty(path)
+		if err := coord.UpdateState(func(wf *Workflow) { wf.Task = "work" }); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestNewCoordinatorWith(t *testing.T) {
+	t.Run("persistsStateToDisk", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, ".sgai", "state.json")
+
+		wf := Workflow{
+			Status:       StatusWorking,
+			CurrentAgent: "test-agent",
+			Task:         "doing things",
+		}
+		coord, err := NewCoordinatorWith(path, wf)
+		if err != nil {
+			t.Fatalf("NewCoordinatorWith() error: %v", err)
+		}
+
+		if coord.State().CurrentAgent != "test-agent" {
+			t.Errorf("CurrentAgent = %q; want %q", coord.State().CurrentAgent, "test-agent")
+		}
+
+		loaded, errLoad := load(path)
+		if errLoad != nil {
+			t.Fatalf("load() after NewCoordinatorWith() failed: %v", errLoad)
+		}
+		if loaded.CurrentAgent != "test-agent" {
+			t.Errorf("persisted CurrentAgent = %q; want %q", loaded.CurrentAgent, "test-agent")
+		}
+		if loaded.Status != StatusWorking {
+			t.Errorf("persisted Status = %q; want %q", loaded.Status, StatusWorking)
+		}
+	})
+
+	t.Run("createsParentDirectories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "nested", ".sgai", "state.json")
+
+		wf := Workflow{Status: StatusComplete}
+		if _, err := NewCoordinatorWith(path, wf); err != nil {
+			t.Fatalf("NewCoordinatorWith() should create parent dirs, got error: %v", err)
+		}
+
+		loaded, errLoad := load(path)
+		if errLoad != nil {
+			t.Fatalf("load() failed: %v", errLoad)
+		}
+		if loaded.Status != StatusComplete {
+			t.Errorf("Status = %q; want %q", loaded.Status, StatusComplete)
+		}
+	})
 }
 
 func TestProgressEntry_UnmarshalJSON_NewFormat(t *testing.T) {

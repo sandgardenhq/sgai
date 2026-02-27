@@ -84,11 +84,6 @@ export const api = {
         `/api/v1/workspaces/${encodeURIComponent(name)}/stop`,
         { method: "POST" },
       ),
-    reset: (name: string) =>
-      fetchJSON<ApiSessionActionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/reset`,
-        { method: "POST" },
-      ),
     respond: (name: string, request: ApiRespondRequest) =>
       fetchJSON<ApiRespondResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/respond`,

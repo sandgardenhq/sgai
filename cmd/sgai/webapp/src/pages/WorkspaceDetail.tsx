@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
@@ -253,7 +252,6 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isPinPending, startPinTransition] = useTransition();
   const [isEditorPending, startEditorTransition] = useTransition();
   const [isOpenCodePending, startOpenCodeTransition] = useTransition();
-  const [isResetPending, startResetTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
 
   const { workspaces, fetchStatus } = useFactoryState();
@@ -305,7 +303,6 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
-  const isInterrupted = detail ? (detail.status === "working" && !detail.running) : false;
 
   const [actionOutputOpen, setActionOutputOpen] = useState(false);
   const {
@@ -321,18 +318,6 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionOutputOpen(true);
     startActionRun(action.prompt, action.model);
   }, [startActionRun]);
-
-  const handleReset = () => {
-    if (!workspaceName) return;
-    setActionError(null);
-    startResetTransition(async () => {
-      try {
-        await api.workspaces.reset(workspaceName);
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Failed to reset session");
-      }
-    });
-  };
 
   useEffect(() => {
     if (!detail || !detail.isRoot) return;
@@ -767,23 +752,6 @@ export function WorkspaceDetail(): JSX.Element | null {
             hasForks={hasForks}
           />
 
-          {isInterrupted && (
-            <Alert className="mt-2 bg-slate-800 text-white border-slate-700 flex items-center justify-between gap-4">
-              <AlertDescription className="flex-1 text-white">
-                sgai was interrupted while working. Reset state to start fresh.
-              </AlertDescription>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="border-white/50 text-white bg-transparent hover:bg-white/10 hover:text-white shrink-0"
-                onClick={handleReset}
-                disabled={isResetPending}
-              >
-                Reset
-              </Button>
-            </Alert>
-          )}
         </div>
 
         <div className="pt-4">

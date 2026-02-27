@@ -358,7 +358,7 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
                           {entry.agent}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>{entry.agent}</TooltipContent>
+                      <TooltipContent>{entry.model ? `${entry.agent} | ${entry.model}` : entry.agent}</TooltipContent>
                     </Tooltip>
                     <span className="text-xs text-muted-foreground">
                       ({entry.elapsedTime})

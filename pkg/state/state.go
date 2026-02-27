@@ -184,32 +184,29 @@ type Message struct {
 	CreatedAt string `json:"createdAt,omitempty"` // ISO 8601 format (e.g., "2025-12-19T14:30:00Z")
 }
 
-// Load reads and parses workflow state from the given JSON file path.
-func Load(path string) (Workflow, error) {
+func load(path string) (Workflow, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Workflow{}, err
 	}
-	var state Workflow
-	if err := json.Unmarshal(data, &state); err != nil {
+	var wf Workflow
+	if err := json.Unmarshal(data, &wf); err != nil {
 		return Workflow{}, err
 	}
-	if state.VisitCounts == nil {
-		state.VisitCounts = make(map[string]int)
+	if wf.VisitCounts == nil {
+		wf.VisitCounts = make(map[string]int)
 	}
-	if state.ModelStatuses == nil {
-		state.ModelStatuses = make(map[string]string)
+	if wf.ModelStatuses == nil {
+		wf.ModelStatuses = make(map[string]string)
 	}
-	return state, nil
+	return wf, nil
 }
 
-// Save writes workflow state to the given path as formatted JSON.
-// It creates parent directories if they don't exist.
-func Save(path string, state Workflow) error {
+func save(path string, wf Workflow) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(state, "", "  ")
+	data, err := json.MarshalIndent(wf, "", "  ")
 	if err != nil {
 		return err
 	}

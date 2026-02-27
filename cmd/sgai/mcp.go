@@ -259,18 +259,14 @@ var (
 	schemaAskUserWorkGate  = mustSchema[askUserWorkGateArgs]()
 )
 
-func startMCPHTTPServer(workingDir string) (string, func(), error) {
+func startMCPHTTPServer(workingDir string, coord *state.Coordinator, dagAgents []string) (string, func(), error) {
 	listener, errListen := net.Listen("tcp", "127.0.0.1:0")
 	if errListen != nil {
 		return "", nil, fmt.Errorf("failed to listen on random port: %w", errListen)
 	}
 
-	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return buildMCPServer(workingDir, r)
-	}, nil)
-
 	serveMux := http.NewServeMux()
-	serveMux.Handle("/mcp", handler)
+	serveMux.Handle("/mcp", buildMCPHTTPHandler(workingDir, coord, dagAgents))
 
 	httpServer := &http.Server{Handler: serveMux}
 	go func() {
@@ -291,30 +287,39 @@ func startMCPHTTPServer(workingDir string) (string, func(), error) {
 	return url, closeFn, nil
 }
 
-func parseAgentIdentityHeader(r *http.Request) (name, model, variant string) {
+func parseAgentIdentityHeader(r *http.Request) string {
 	identity := r.Header.Get("X-Sgai-Agent-Identity")
 	if identity == "" {
-		return "coordinator", "", ""
+		return "coordinator"
 	}
-	parts := strings.SplitN(identity, "|", 3)
-	name = parts[0]
-	if len(parts) >= 2 {
-		model = parts[1]
-	}
-	if len(parts) >= 3 {
-		variant = parts[2]
-	}
+	name, _, _ := strings.Cut(identity, "|")
 	if name == "" {
-		name = "coordinator"
+		return "coordinator"
 	}
-	return name, model, variant
+	return name
 }
 
-func buildMCPServer(workingDir string, r *http.Request) *mcp.Server {
-	agentName, _, _ := parseAgentIdentityHeader(r)
+func resolveCallerAgent(headerAgent string, coord *state.Coordinator) string {
+	if headerAgent != "coordinator" {
+		return headerAgent
+	}
+	if currentAgent := coord.State().CurrentAgent; currentAgent != "" && currentAgent != "coordinator" {
+		return currentAgent
+	}
+	return "coordinator"
+}
+
+func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator, dagAgents []string) http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		return buildMCPServer(workingDir, r, coord, dagAgents)
+	}, nil)
+}
+
+func buildMCPServer(workingDir string, r *http.Request, coord *state.Coordinator, dagAgents []string) *mcp.Server {
+	agentName := resolveCallerAgent(parseAgentIdentityHeader(r), coord)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "sgai"}, nil)
-	mcpCtx := &mcpContext{workingDir: workingDir}
+	mcpCtx := &mcpContext{workingDir: workingDir, coord: coord, dagAgents: dagAgents, agentName: agentName}
 
 	registerCommonTools(server, mcpCtx, agentName)
 
@@ -364,7 +369,7 @@ func registerCommonTools(server *mcp.Server, mcpCtx *mcpContext, agentName strin
 	}, mcpCtx.checkOutboxHandler)
 }
 
-func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, workingDir string) {
+func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, _ string) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "peek_message_bus",
 		Description: "Check all messages in the system (both pending and read). Returns all messages in reverse chronological order (most recent first). Coordinator-only tool for monitoring inter-agent communication.",
@@ -383,10 +388,9 @@ func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, workingDir
 		InputSchema: schemaEmpty,
 	}, mcpCtx.projectTodoReadHandler)
 
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-	wfState, errLoad := state.Load(statePath)
-	if errLoad != nil && !os.IsNotExist(errLoad) {
-		log.Println("failed to load workflow state for interactive check:", errLoad)
+	var wfState state.Workflow
+	if mcpCtx.coord != nil {
+		wfState = mcpCtx.coord.State()
 	}
 
 	if wfState.ToolsAllowed() {
@@ -406,7 +410,12 @@ func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, workingDir
 
 type mcpContext struct {
 	workingDir string
+	coord      *state.Coordinator
+	dagAgents  []string
+	agentName  string
 }
+
+type agentCancelKey struct{}
 
 type emptyResult struct{}
 
@@ -430,8 +439,8 @@ func (c *mcpContext) findSnippetsHandler(_ context.Context, _ *mcp.CallToolReque
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := updateWorkflowState(c.workingDir, args)
+func (c *mcpContext) updateWorkflowStateHandler(ctx context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := updateWorkflowState(ctx, c.coord, c.agentName, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -441,7 +450,7 @@ func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallTo
 }
 
 func (c *mcpContext) sendMessageHandler(_ context.Context, _ *mcp.CallToolRequest, args sendMessageArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := sendMessage(c.workingDir, args.ToAgent, args.Body)
+	result, err := sendMessage(c.coord, c.dagAgents, c.agentName, args.ToAgent, args.Body)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -451,7 +460,7 @@ func (c *mcpContext) sendMessageHandler(_ context.Context, _ *mcp.CallToolReques
 }
 
 func (c *mcpContext) checkInboxHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := checkInbox(c.workingDir)
+	result, err := checkInbox(c.coord, c.agentName)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -461,7 +470,7 @@ func (c *mcpContext) checkInboxHandler(_ context.Context, _ *mcp.CallToolRequest
 }
 
 func (c *mcpContext) checkOutboxHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := checkOutbox(c.workingDir)
+	result, err := checkOutbox(c.coord, c.agentName)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -471,7 +480,7 @@ func (c *mcpContext) checkOutboxHandler(_ context.Context, _ *mcp.CallToolReques
 }
 
 func (c *mcpContext) peekMessageBusHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := peekMessageBus(c.workingDir)
+	result, err := peekMessageBus(c.coord)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -481,7 +490,7 @@ func (c *mcpContext) peekMessageBusHandler(_ context.Context, _ *mcp.CallToolReq
 }
 
 func (c *mcpContext) projectTodoWriteHandler(_ context.Context, _ *mcp.CallToolRequest, args projectTodoWriteArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := projectTodoWrite(c.workingDir, args.Todos)
+	result, err := projectTodoWrite(c.coord, args.Todos)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -491,7 +500,7 @@ func (c *mcpContext) projectTodoWriteHandler(_ context.Context, _ *mcp.CallToolR
 }
 
 func (c *mcpContext) projectTodoReadHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := projectTodoRead(c.workingDir)
+	result, err := projectTodoRead(c.coord)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -500,8 +509,8 @@ func (c *mcpContext) projectTodoReadHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) askUserQuestionHandler(_ context.Context, _ *mcp.CallToolRequest, args askUserQuestionArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := askUserQuestion(c.workingDir, args)
+func (c *mcpContext) askUserQuestionHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserQuestionArgs) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := askUserQuestion(ctx, c.coord, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -510,8 +519,8 @@ func (c *mcpContext) askUserQuestionHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) askUserWorkGateHandler(_ context.Context, _ *mcp.CallToolRequest, args askUserWorkGateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := askUserWorkGate(c.workingDir, args.Summary)
+func (c *mcpContext) askUserWorkGateHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserWorkGateArgs) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := askUserWorkGate(ctx, c.coord, args.Summary)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -520,18 +529,13 @@ func (c *mcpContext) askUserWorkGateHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
-func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
-		currentState = state.Workflow{
-			Status:   state.StatusWorking,
-			Progress: []state.ProgressEntry{},
-		}
+func askUserQuestion(ctx context.Context, coord *state.Coordinator, args askUserQuestionArgs) (string, error) {
+	if coord == nil {
+		return "Error: Questions are not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
-	if !currentState.ToolsAllowed() {
+	wfState := coord.State()
+	if !wfState.ToolsAllowed() {
 		return "Error: Questions are not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
@@ -554,15 +558,8 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		}
 	}
 
-	currentState.MultiChoiceQuestion = &state.MultiChoiceQuestion{
-		Questions: questions,
-	}
-	currentState.HumanMessage = args.Questions[0].Question
-	currentState.Status = state.StatusWaitingForHuman
-
-	if err := state.Save(statePath, currentState); err != nil {
-		return "", fmt.Errorf("failed to save state: %w", err)
-	}
+	question := &state.MultiChoiceQuestion{Questions: questions}
+	humanMessage := args.Questions[0].Question
 
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Presented %d question(s) to user:\n", len(args.Questions)))
@@ -571,31 +568,33 @@ func askUserQuestion(workingDir string, args askUserQuestionArgs) (string, error
 		result.WriteString(fmt.Sprintf("  Choices: %v\n", q.Choices))
 		result.WriteString(fmt.Sprintf("  MultiSelect: %v\n", q.MultiSelect))
 	}
-	return result.String(), nil
+	questionSummary := result.String()
+
+	answer, err := coord.AskAndWait(ctx, question, humanMessage)
+	if err != nil {
+		return "", fmt.Errorf("waiting for human response: %w", err)
+	}
+
+	return questionSummary + "\nHuman response: " + answer, nil
 }
 
-func askUserWorkGate(workingDir, summary string) (string, error) {
+func askUserWorkGate(ctx context.Context, coord *state.Coordinator, summary string) (string, error) {
 	if strings.TrimSpace(summary) == "" {
 		return "Error: A summary is required. You must compile a comprehensive summary (GOAL items, brainstorming decisions, task breakdown, validation criteria) before asking for work gate approval.", nil
 	}
 
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
-		currentState = state.Workflow{
-			Status:   state.StatusWorking,
-			Progress: []state.ProgressEntry{},
-		}
+	if coord == nil {
+		return "Error: Work gate is not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
-	if !currentState.ToolsAllowed() {
+	wfState := coord.State()
+	if !wfState.ToolsAllowed() {
 		return "Error: Work gate is not allowed in the current mode. The session is running without human interaction.", nil
 	}
 
 	questionText := summary + "\n\n---\n\nIs the definition complete? May I begin implementation?"
 
-	currentState.MultiChoiceQuestion = &state.MultiChoiceQuestion{
+	question := &state.MultiChoiceQuestion{
 		Questions: []state.QuestionItem{
 			{
 				Question:    questionText,
@@ -605,14 +604,13 @@ func askUserWorkGate(workingDir, summary string) (string, error) {
 		},
 		IsWorkGate: true,
 	}
-	currentState.HumanMessage = questionText
-	currentState.Status = state.StatusWaitingForHuman
 
-	if err := state.Save(statePath, currentState); err != nil {
-		return "", fmt.Errorf("failed to save state: %w", err)
+	answer, err := coord.AskAndWait(ctx, question, questionText)
+	if err != nil {
+		return "", fmt.Errorf("waiting for human response: %w", err)
 	}
 
-	return "Presented work gate question to user:\n\nQuestion: " + questionText + "\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false", nil
+	return "Presented work gate question to user:\n\nQuestion: " + questionText + "\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false\n\nHuman response: " + answer, nil
 }
 
 func findSkills(workingDir, name string) (string, error) {
@@ -904,165 +902,157 @@ func findSnippets(workingDir, language, query string) (string, error) {
 	return "", nil
 }
 
-func updateWorkflowState(workingDir string, args updateWorkflowStateArgs) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
+func updateWorkflowState(ctx context.Context, coord *state.Coordinator, callerAgent string, args updateWorkflowStateArgs) (string, error) {
+	var (
+		response        string
+		statusPreserved bool
+	)
 
-	currentState, err := state.Load(statePath)
-	if err != nil {
-		currentState = state.Workflow{
-			Status:   state.StatusWorking,
-			Progress: []state.ProgressEntry{},
+	if coord == nil {
+		return "Error: workflow coordinator not available.", nil
+	}
+
+	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
+		if currentState.Progress == nil {
+			currentState.Progress = []state.ProgressEntry{}
+		}
+
+		statusPreserved = state.IsHumanPending(currentState.Status)
+
+		if args.Status != "" && !statusPreserved {
+			status := strings.Trim(string(args.Status), "\"'")
+			if !slices.Contains(state.ValidStatuses, status) {
+				response = fmt.Sprintf("Error: Invalid status '%s'. Must be one of: %s", status, strings.Join(state.ValidStatuses, ", "))
+				return
+			}
+			currentState.Status = status
+		}
+
+		currentState.Task = args.Task
+
+		if args.AddProgress != "" {
+			entry := state.ProgressEntry{
+				Timestamp:   time.Now().Format(time.RFC3339),
+				Agent:       callerAgent,
+				Description: args.AddProgress,
+			}
+			currentState.Progress = append(currentState.Progress, entry)
+		}
+
+		if currentState.Status == state.StatusAgentDone || currentState.Status == state.StatusComplete {
+			pendingCount := countPendingTodos(*currentState, currentState.CurrentAgent)
+			if pendingCount > 0 {
+				response = fmt.Sprintf("Error: Cannot transition to '%s' with %d pending TODO items. Please complete all TODO items first.", currentState.Status, pendingCount)
+				return
+			}
+		}
+
+		if (currentState.Status == state.StatusComplete || currentState.Status == state.StatusAgentDone) && currentState.Task != "" {
+			currentState.Task = ""
+		}
+
+		if response == "" {
+			if statusPreserved {
+				response = fmt.Sprintf("Status is currently '%s'. Waiting for human response. Your task and progress notes were updated but status was preserved.\n", currentState.Status)
+			} else {
+				response = "State updated successfully.\n"
+			}
+			response += fmt.Sprintf("  Status: %s\n", currentState.Status)
+			if currentState.Task != "" {
+				response += fmt.Sprintf("  Current task: %s\n", currentState.Task)
+			}
+			if args.AddProgress != "" {
+				response += fmt.Sprintf("  Added progress note: %s\n", args.AddProgress)
+			}
+			response += fmt.Sprintf("  Total progress notes: %d", len(currentState.Progress))
+		}
+	})
+
+	if errUpdate != nil {
+		return "", fmt.Errorf("failed to save state: %w", errUpdate)
+	}
+
+	if response != "" && strings.HasPrefix(response, "Error:") {
+		return response, nil
+	}
+
+	currentState := coord.State()
+	if currentState.Status == state.StatusAgentDone {
+		if cancel, ok := ctx.Value(agentCancelKey{}).(context.CancelFunc); ok && cancel != nil {
+			coord.StartAgentDoneWatchdog(cancel)
 		}
 	}
-
-	if currentState.Progress == nil {
-		currentState.Progress = []state.ProgressEntry{}
-	}
-
-	statusPreserved := state.IsHumanPending(currentState.Status)
-
-	if args.Status != "" && !statusPreserved {
-		status := strings.Trim(string(args.Status), "\"'")
-		if !slices.Contains(state.ValidStatuses, status) {
-			return fmt.Sprintf("Error: Invalid status '%s'. Must be one of: %s", status, strings.Join(state.ValidStatuses, ", ")), nil
-		}
-		currentState.Status = status
-	}
-
-	currentState.Task = args.Task
-
-	if args.AddProgress != "" {
-		currentAgent := currentState.CurrentAgent
-		if currentAgent == "" {
-			currentAgent = "coordinator"
-		}
-		entry := state.ProgressEntry{
-			Timestamp:   time.Now().Format(time.RFC3339),
-			Agent:       currentAgent,
-			Description: args.AddProgress,
-		}
-		currentState.Progress = append(currentState.Progress, entry)
-	}
-
-	if currentState.Status == state.StatusAgentDone || currentState.Status == state.StatusComplete {
-		pendingCount := countPendingTodos(currentState, currentState.CurrentAgent)
-		if pendingCount > 0 {
-			return fmt.Sprintf("Error: Cannot transition to '%s' with %d pending TODO items. Please complete all TODO items first.", currentState.Status, pendingCount), nil
-		}
-	}
-
-	if (currentState.Status == state.StatusComplete || currentState.Status == state.StatusAgentDone) && currentState.Task != "" {
-		currentState.Task = ""
-	}
-
-	if err := state.Save(statePath, currentState); err != nil {
-		return "", fmt.Errorf("failed to save state: %w", err)
-	}
-
-	response := "State updated successfully.\n"
-	if statusPreserved {
-		response = fmt.Sprintf("Status is currently '%s'. Waiting for human response. Your task and progress notes were updated but status was preserved.\n", currentState.Status)
-	}
-	response += fmt.Sprintf("  Status: %s\n", currentState.Status)
-	if currentState.Task != "" {
-		response += fmt.Sprintf("  Current task: %s\n", currentState.Task)
-	}
-	if args.AddProgress != "" {
-		response += fmt.Sprintf("  Added progress note: %s\n", args.AddProgress)
-	}
-	response += fmt.Sprintf("  Total progress notes: %d", len(currentState.Progress))
 
 	return response, nil
 }
 
-func sendMessage(workingDir, toAgent, body string) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
+func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAgent, body string) (string, error) {
+	if coord == nil {
 		return "Error: Could not read state.json. Has the workflow been initialized?", nil
-	}
-
-	if currentState.Messages == nil {
-		currentState.Messages = []state.Message{}
-	}
-
-	currentAgent := currentState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "coordinator"
-	}
-
-	fromAgent := currentAgent
-	if currentState.CurrentModel != "" {
-		fromAgent = currentState.CurrentModel
-	}
-
-	if currentState.VisitCounts == nil {
-		currentState.VisitCounts = make(map[string]int)
-	}
-
-	knownAgents := make([]string, 0, len(currentState.VisitCounts))
-	for agent := range currentState.VisitCounts {
-		knownAgents = append(knownAgents, agent)
 	}
 
 	targetAgentName := extractAgentNameFromTarget(toAgent)
-	if !slices.Contains(knownAgents, targetAgentName) {
-		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(knownAgents, ", ")), nil
+	if !slices.Contains(dagAgents, targetAgentName) {
+		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(dagAgents, ", ")), nil
 	}
 
-	nextID := 1
-	for _, msg := range currentState.Messages {
-		if msg.ID >= nextID {
-			nextID = msg.ID + 1
+	var (
+		fromAgent string
+		result    string
+	)
+
+	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
+		if currentState.Messages == nil {
+			currentState.Messages = []state.Message{}
 		}
+
+		fromAgent = callerAgent
+		if currentState.CurrentModel != "" {
+			fromAgent = currentState.CurrentModel
+		}
+
+		nextID := 1
+		for _, msg := range currentState.Messages {
+			if msg.ID >= nextID {
+				nextID = msg.ID + 1
+			}
+		}
+
+		message := state.Message{
+			ID:        nextID,
+			FromAgent: fromAgent,
+			ToAgent:   toAgent,
+			Body:      body,
+			Read:      false,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+
+		currentState.Messages = append(currentState.Messages, message)
+
+		result = fmt.Sprintf("Message sent successfully to %s.\nFrom: %s\nTo: %s\nBody: %s", toAgent, fromAgent, toAgent, body)
+		if callerAgent != "coordinator" {
+			result += "\n\nIMPORTANT: To receive a response from the target agent, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). The target agent cannot run until you yield."
+		}
+	})
+
+	if errUpdate != nil {
+		return "", fmt.Errorf("failed to save state: %w", errUpdate)
 	}
 
-	message := state.Message{
-		ID:        nextID,
-		FromAgent: fromAgent,
-		ToAgent:   toAgent,
-		Body:      body,
-		Read:      false,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	currentState.Messages = append(currentState.Messages, message)
-
-	if err := state.Save(statePath, currentState); err != nil {
-		return "", fmt.Errorf("failed to save state: %w", err)
-	}
-
-	result := fmt.Sprintf("Message sent successfully to %s.\nFrom: %s\nTo: %s\nBody: %s", toAgent, fromAgent, toAgent, body)
-	if currentAgent != "coordinator" {
-		result += "\n\nIMPORTANT: To receive a response from the target agent, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). The target agent cannot run until you yield."
-	}
 	return result, nil
 }
 
-func checkInbox(workingDir string) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
+func checkInbox(coord *state.Coordinator, callerAgent string) (string, error) {
+	if coord == nil {
 		return "Error: Could not read state.json. Has the workflow been initialized?", nil
 	}
 
-	currentAgent := currentState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "coordinator"
-	}
-
-	currentModel := currentState.CurrentModel
-
-	readBy := currentAgent
-	if currentModel != "" {
-		readBy = currentModel
-	}
+	snapshot := coord.State()
+	currentModel := snapshot.CurrentModel
 
 	var unreadMessages []state.Message
-	for _, msg := range currentState.Messages {
-		if messageMatchesRecipient(msg, currentAgent, currentModel) && !msg.Read {
+	for _, msg := range snapshot.Messages {
+		if messageMatchesRecipient(msg, callerAgent, currentModel) && !msg.Read {
 			unreadMessages = append(unreadMessages, msg)
 		}
 	}
@@ -1072,16 +1062,17 @@ func checkInbox(workingDir string) (string, error) {
 	}
 
 	timestamp := time.Now().Format(time.RFC3339)
-	for i := range currentState.Messages {
-		if messageMatchesRecipient(currentState.Messages[i], currentAgent, currentModel) && !currentState.Messages[i].Read {
-			currentState.Messages[i].Read = true
-			currentState.Messages[i].ReadAt = timestamp
-			currentState.Messages[i].ReadBy = readBy
+	errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		for i := range wf.Messages {
+			if messageMatchesRecipient(wf.Messages[i], callerAgent, currentModel) && !wf.Messages[i].Read {
+				wf.Messages[i].Read = true
+				wf.Messages[i].ReadAt = timestamp
+				wf.Messages[i].ReadBy = callerAgent
+			}
 		}
-	}
-
-	if err := state.Save(statePath, currentState); err != nil {
-		return "", fmt.Errorf("failed to save state: %w", err)
+	})
+	if errUpdate != nil {
+		return "", fmt.Errorf("failed to save state: %w", errUpdate)
 	}
 
 	var result strings.Builder
@@ -1095,25 +1086,18 @@ func checkInbox(workingDir string) (string, error) {
 }
 
 //nolint:unparam // error is always nil by design - errors are handled by returning user-friendly messages
-func checkOutbox(workingDir string) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
+func checkOutbox(coord *state.Coordinator, callerAgent string) (string, error) {
+	if coord == nil {
 		return "Error: Could not read state.json. Has the workflow been initialized?", nil
 	}
 
-	currentAgent := currentState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "coordinator"
-	}
-
-	currentModel := currentState.CurrentModel
+	snapshot := coord.State()
+	currentModel := snapshot.CurrentModel
 
 	var unreadMessages []state.Message
 	var readMessages []state.Message
-	for _, msg := range currentState.Messages {
-		if messageMatchesSender(msg, currentAgent, currentModel) {
+	for _, msg := range snapshot.Messages {
+		if messageMatchesSender(msg, callerAgent, currentModel) {
 			if msg.Read {
 				readMessages = append(readMessages, msg)
 			} else {
@@ -1153,23 +1137,22 @@ func checkOutbox(workingDir string) (string, error) {
 }
 
 //nolint:unparam // error is always nil by design - errors are handled by returning user-friendly messages
-func peekMessageBus(workingDir string) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
+func peekMessageBus(coord *state.Coordinator) (string, error) {
+	if coord == nil {
 		return "Error: Could not read state.json. Has the workflow been initialized?", nil
 	}
 
-	if len(currentState.Messages) == 0 {
+	snapshot := coord.State()
+
+	if len(snapshot.Messages) == 0 {
 		return "No messages in the system.", nil
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Total messages: %d\n\n", len(currentState.Messages)))
+	result.WriteString(fmt.Sprintf("Total messages: %d\n\n", len(snapshot.Messages)))
 
-	for i := 0; i < len(currentState.Messages); i++ {
-		msg := currentState.Messages[i]
+	for i := 0; i < len(snapshot.Messages); i++ {
+		msg := snapshot.Messages[i]
 		result.WriteString(fmt.Sprintf("Message %d (ID: %d):\n", i+1, msg.ID))
 		result.WriteString(fmt.Sprintf("  From: %s\n", msg.FromAgent))
 		result.WriteString(fmt.Sprintf("  To: %s\n", msg.ToAgent))
@@ -1187,20 +1170,14 @@ func peekMessageBus(workingDir string) (string, error) {
 	return strings.TrimSpace(result.String()), nil
 }
 
-func projectTodoWrite(workingDir string, todos []state.TodoItem) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
-		currentState = state.Workflow{
-			Status:   state.StatusWorking,
-			Progress: []state.ProgressEntry{},
-		}
+func projectTodoWrite(coord *state.Coordinator, todos []state.TodoItem) (string, error) {
+	if coord == nil {
+		return "Error: workflow coordinator not available.", nil
 	}
 
-	currentState.ProjectTodos = todos
-
-	if err := state.Save(statePath, currentState); err != nil {
+	if err := coord.UpdateState(func(wf *state.Workflow) {
+		wf.ProjectTodos = todos
+	}); err != nil {
 		return "", fmt.Errorf("failed to save state: %w", err)
 	}
 
@@ -1226,15 +1203,11 @@ func formatTodoList(todos []state.TodoItem) string {
 }
 
 //nolint:unparam // error is always nil by design - errors are handled by returning "0 todos"
-func projectTodoRead(workingDir string) (string, error) {
-	statePath := filepath.Join(workingDir, ".sgai", "state.json")
-
-	currentState, err := state.Load(statePath)
-	if err != nil {
+func projectTodoRead(coord *state.Coordinator) (string, error) {
+	if coord == nil {
 		return "0 todos", nil
 	}
-
-	return formatTodoList(currentState.ProjectTodos), nil
+	return formatTodoList(coord.State().ProjectTodos), nil
 }
 
 func extractAgentNameFromTarget(target string) string {

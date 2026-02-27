@@ -5,7 +5,7 @@ import "context"
 type interactiveBranch struct{}
 
 func (b *interactiveBranch) run(ctx context.Context, cfg branchConfig) {
-	runWorkflow(ctx, []string{cfg.workspacePath}, cfg.mcpURL, cfg.logWriter)
+	runWorkflow(ctx, []string{cfg.workspacePath}, cfg.mcpURL, cfg.logWriter, cfg.coord)
 }
 
 func (b *interactiveBranch) promptSection() string {

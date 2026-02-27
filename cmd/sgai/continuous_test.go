@@ -243,8 +243,9 @@ func TestWatchForTrigger(t *testing.T) {
 			Status:   state.StatusComplete,
 			Messages: []state.Message{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoordSeed := state.NewCoordinatorWith(stateJSONPath, wfState)
+		if errCoordSeed != nil {
+			t.Fatal(errCoordSeed)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -258,7 +259,7 @@ func TestWatchForTrigger(t *testing.T) {
 			}
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, originalChecksum, 0, "")
+		trigger := watchForTrigger(ctx, dir, coord, originalChecksum, 0, "")
 		if trigger != triggerGoal {
 			t.Errorf("expected trigger %q, got %q", triggerGoal, trigger)
 		}
@@ -283,12 +284,13 @@ func TestWatchForTrigger(t *testing.T) {
 		}
 
 		stateJSONPath := filepath.Join(sgaiDir, "state.json")
-		wfState := state.Workflow{
+		initialState := state.Workflow{
 			Status:   state.StatusComplete,
 			Messages: []state.Message{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoordInit := state.NewCoordinatorWith(stateJSONPath, initialState)
+		if errCoordInit != nil {
+			t.Fatal(errCoordInit)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -296,19 +298,24 @@ func TestWatchForTrigger(t *testing.T) {
 
 		go func() {
 			time.Sleep(500 * time.Millisecond)
-			wfState.Messages = append(wfState.Messages, state.Message{
-				ID:        1,
-				FromAgent: "Human Partner",
-				ToAgent:   "coordinator",
-				Body:      "new steering instruction",
-				Read:      false,
-			})
-			if err := state.Save(stateJSONPath, wfState); err != nil {
-				t.Error(err)
+			steerState := state.Workflow{
+				Status: state.StatusComplete,
+				Messages: []state.Message{
+					{
+						ID:        1,
+						FromAgent: "Human Partner",
+						ToAgent:   "coordinator",
+						Body:      "new steering instruction",
+						Read:      false,
+					},
+				},
+			}
+			if _, errSave := state.NewCoordinatorWith(stateJSONPath, steerState); errSave != nil {
+				t.Error(errSave)
 			}
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, 0, "")
+		trigger := watchForTrigger(ctx, dir, coord, checksum, 0, "")
 		if trigger != triggerSteering {
 			t.Errorf("expected trigger %q, got %q", triggerSteering, trigger)
 		}
@@ -337,8 +344,9 @@ func TestWatchForTrigger(t *testing.T) {
 			Status:   state.StatusComplete,
 			Messages: []state.Message{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoordCancel := state.NewCoordinatorWith(stateJSONPath, wfState)
+		if errCoordCancel != nil {
+			t.Fatal(errCoordCancel)
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -347,7 +355,7 @@ func TestWatchForTrigger(t *testing.T) {
 			cancel()
 		}()
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, 0, "")
+		trigger := watchForTrigger(ctx, dir, coord, checksum, 0, "")
 		if trigger != triggerNone {
 			t.Errorf("expected trigger %q on cancel, got %q", triggerNone, trigger)
 		}
@@ -367,16 +375,14 @@ func TestRunContinuousModePromptObservability(t *testing.T) {
 		Messages: []state.Message{},
 		Progress: []state.ProgressEntry{},
 	}
-	if err := state.Save(stateJSONPath, wfState); err != nil {
-		t.Fatal(err)
+	coord, errCoord := state.NewCoordinatorWith(stateJSONPath, wfState)
+	if errCoord != nil {
+		t.Fatal(errCoord)
 	}
 
-	updateContinuousModeState(stateJSONPath, "Running continuous mode prompt...", "continuous-mode", "continuous mode prompt started")
+	updateContinuousModeState(coord, "Running continuous mode prompt...", "continuous-mode", "continuous mode prompt started")
 
-	loaded, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		t.Fatal(errLoad)
-	}
+	loaded := coord.State()
 
 	if loaded.Task != "Running continuous mode prompt..." {
 		t.Errorf("expected task 'Running continuous mode prompt...', got %q", loaded.Task)
@@ -450,16 +456,14 @@ func TestMarkMessageAsRead(t *testing.T) {
 			{ID: 2, FromAgent: "coordinator", ToAgent: "backend", Body: "build", Read: false},
 		},
 	}
-	if err := state.Save(stateJSONPath, wfState); err != nil {
-		t.Fatal(err)
+	coord, errCoord := state.NewCoordinatorWith(stateJSONPath, wfState)
+	if errCoord != nil {
+		t.Fatal(errCoord)
 	}
 
-	markMessageAsRead(stateJSONPath, 1)
+	markMessageAsRead(coord, 1)
 
-	loaded, err := state.Load(stateJSONPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	loaded := coord.State()
 
 	if !loaded.Messages[0].Read {
 		t.Error("message 1 should be marked as read")
@@ -487,16 +491,14 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 		Status:       state.StatusComplete,
 		CurrentAgent: "continuous-mode",
 	}
-	if err := state.Save(stateJSONPath, wfState); err != nil {
-		t.Fatal(err)
+	coord, errCoord := state.NewCoordinatorWith(stateJSONPath, wfState)
+	if errCoord != nil {
+		t.Fatal(errCoord)
 	}
 
-	resetWorkflowForNextCycle(stateJSONPath)
+	resetWorkflowForNextCycle(coord)
 
-	loaded, err := state.Load(stateJSONPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	loaded := coord.State()
 
 	if loaded.Status != state.StatusWorking {
 		t.Errorf("expected status 'working', got %q", loaded.Status)
@@ -677,15 +679,16 @@ func TestWatchForTriggerAutoDuration(t *testing.T) {
 			Status:   state.StatusComplete,
 			Messages: []state.Message{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoordAuto := state.NewCoordinatorWith(stateJSONPath, wfState)
+		if errCoordAuto != nil {
+			t.Fatal(errCoordAuto)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		t.Cleanup(cancel)
 
 		autoDuration := 100 * time.Millisecond
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, "")
+		trigger := watchForTrigger(ctx, dir, coord, checksum, autoDuration, "")
 		if trigger != triggerAuto {
 			t.Errorf("expected trigger %q, got %q", triggerAuto, trigger)
 		}
@@ -710,12 +713,13 @@ func TestWatchForTriggerAutoDuration(t *testing.T) {
 		}
 
 		stateJSONPath := filepath.Join(sgaiDir, "state.json")
-		wfState := state.Workflow{
+		wfState2 := state.Workflow{
 			Status:   state.StatusComplete,
 			Messages: []state.Message{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoordGoal := state.NewCoordinatorWith(stateJSONPath, wfState2)
+		if errCoordGoal != nil {
+			t.Fatal(errCoordGoal)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -730,7 +734,7 @@ func TestWatchForTriggerAutoDuration(t *testing.T) {
 		}()
 
 		autoDuration := 1 * time.Second
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, "")
+		trigger := watchForTrigger(ctx, dir, coord, checksum, autoDuration, "")
 		if trigger != triggerGoal {
 			t.Errorf("expected trigger %q, got %q", triggerGoal, trigger)
 		}

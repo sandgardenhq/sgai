@@ -86,6 +86,7 @@ export interface ApiWorkspacesResponse {
 
 export interface ApiAgentSequenceEntry {
   agent: string;
+  model: string;
   elapsedTime: string;
   isCurrent: boolean;
 }

@@ -33,8 +33,8 @@ const mockWorkspace: ApiWorkspaceEntry = {
   latestProgress: "Tests complete",
   humanMessage: "",
   agentSequence: [
-    { agent: "coordinator", elapsedTime: "30s", isCurrent: false },
-    { agent: "backend-developer", elapsedTime: "5m", isCurrent: true },
+    { agent: "coordinator", model: "anthropic/claude-opus-4-6 (max)", elapsedTime: "30s", isCurrent: false },
+    { agent: "backend-developer", model: "anthropic/claude-sonnet-4-6", elapsedTime: "5m", isCurrent: true },
   ],
   cost: {
     totalCost: 1.2345,

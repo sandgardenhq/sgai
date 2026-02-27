@@ -88,7 +88,7 @@ func (g *summaryGenerator) runGeneration(workspacePath string) {
 		return
 	}
 
-	saveSummaryIfNotManual(workspacePath, summary)
+	g.saveSummaryIfNotManual(workspacePath, summary)
 
 	g.server.notifyStateChange()
 }
@@ -158,16 +158,14 @@ func cleanSummaryOutput(raw string) string {
 	return trimmed
 }
 
-func saveSummaryIfNotManual(workspacePath, summary string) {
-	wfState, errLoad := state.Load(statePath(workspacePath))
-	if errLoad != nil {
+func (g *summaryGenerator) saveSummaryIfNotManual(workspacePath, summary string) {
+	coord := g.server.workspaceCoordinator(workspacePath)
+	if coord.State().SummaryManual {
 		return
 	}
-	if wfState.SummaryManual {
-		return
-	}
-	wfState.Summary = summary
-	if errSave := state.Save(statePath(workspacePath), wfState); errSave != nil {
-		log.Println("failed to save summary:", errSave)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Summary = summary
+	}); errUpdate != nil {
+		log.Println("failed to save summary:", errUpdate)
 	}
 }

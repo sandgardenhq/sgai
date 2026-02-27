@@ -754,15 +754,12 @@ func TestInteractionModePreservedOnInit(t *testing.T) {
 		original := state.Workflow{
 			InteractionMode: state.ModeBuilding,
 		}
-		if errSave := state.Save(stPath, original); errSave != nil {
-			t.Fatal(errSave)
+		coord, errCoordOrig := state.NewCoordinatorWith(stPath, original)
+		if errCoordOrig != nil {
+			t.Fatal(errCoordOrig)
 		}
 
-		loaded, errLoad := state.Load(stPath)
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
-
+		loaded := coord.State()
 		preservedMode := loaded.InteractionMode
 
 		newState := state.Workflow{
@@ -785,20 +782,18 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 			InteractionMode: state.ModeBuilding,
 			Status:          state.StatusWorking,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
-			t.Fatal(errSave)
+		coord := state.NewCoordinatorEmpty(stPath)
+		if errUpdate := coord.UpdateState(func(s *state.Workflow) { *s = wf }); errUpdate != nil {
+			t.Fatal(errUpdate)
 		}
 
-		unlockInteractiveForRetrospective(&wf, "retrospective", stPath, "test")
+		unlockInteractiveForRetrospective(&wf, "retrospective", coord, "test")
 
 		if wf.InteractionMode != state.ModeRetrospective {
 			t.Errorf("InteractionMode should be %q after retrospective unlock, got %q", state.ModeRetrospective, wf.InteractionMode)
 		}
 
-		loaded, errLoad := state.Load(stPath)
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
+		loaded := coord.State()
 		if loaded.InteractionMode != state.ModeRetrospective {
 			t.Errorf("InteractionMode should be %q on disk after retrospective unlock, got %q", state.ModeRetrospective, loaded.InteractionMode)
 		}
@@ -812,11 +807,12 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 			InteractionMode: state.ModeSelfDrive,
 			Status:          state.StatusWorking,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
-			t.Fatal(errSave)
+		coord := state.NewCoordinatorEmpty(stPath)
+		if errUpdate := coord.UpdateState(func(s *state.Workflow) { *s = wf }); errUpdate != nil {
+			t.Fatal(errUpdate)
 		}
 
-		unlockInteractiveForRetrospective(&wf, "retrospective", stPath, "test")
+		unlockInteractiveForRetrospective(&wf, "retrospective", coord, "test")
 
 		if wf.InteractionMode != state.ModeSelfDrive {
 			t.Errorf("InteractionMode should stay %q in self-drive mode, got %q", state.ModeSelfDrive, wf.InteractionMode)
@@ -831,11 +827,12 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 			InteractionMode: state.ModeBuilding,
 			Status:          state.StatusWorking,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
-			t.Fatal(errSave)
+		coord := state.NewCoordinatorEmpty(stPath)
+		if errUpdate := coord.UpdateState(func(s *state.Workflow) { *s = wf }); errUpdate != nil {
+			t.Fatal(errUpdate)
 		}
 
-		unlockInteractiveForRetrospective(&wf, "coordinator", stPath, "test")
+		unlockInteractiveForRetrospective(&wf, "coordinator", coord, "test")
 
 		if wf.InteractionMode != state.ModeBuilding {
 			t.Errorf("InteractionMode should stay %q for non-retrospective agents, got %q", state.ModeBuilding, wf.InteractionMode)
@@ -852,14 +849,12 @@ func TestInteractionModeRoundTrip(t *testing.T) {
 			InteractionMode: state.ModeBuilding,
 			Status:          state.StatusWorking,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
+		savedCoord, errSave := state.NewCoordinatorWith(stPath, wf)
+		if errSave != nil {
 			t.Fatal(errSave)
 		}
 
-		loaded, errLoad := state.Load(stPath)
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
+		loaded := savedCoord.State()
 		if loaded.InteractionMode != state.ModeBuilding {
 			t.Errorf("InteractionMode should be %q after round-trip, got %q", state.ModeBuilding, loaded.InteractionMode)
 		}
@@ -873,7 +868,7 @@ func TestInteractionModeRoundTrip(t *testing.T) {
 			InteractionMode: "",
 			Status:          state.StatusWorking,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
+		if _, errSave := state.NewCoordinatorWith(stPath, wf); errSave != nil {
 			t.Fatal(errSave)
 		}
 
@@ -964,14 +959,12 @@ func TestNonCoordinatorCannotCompleteWorkflow(t *testing.T) {
 			Status:          state.StatusComplete,
 			InteractionMode: state.ModeRetrospective,
 		}
-		if errSave := state.Save(stPath, wf); errSave != nil {
+		savedCoord, errSave := state.NewCoordinatorWith(stPath, wf)
+		if errSave != nil {
 			t.Fatal(errSave)
 		}
 
-		loaded, errLoad := state.Load(stPath)
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
+		loaded := savedCoord.State()
 
 		if loaded.Status != state.StatusComplete {
 			t.Fatalf("expected StatusComplete in state file, got %q", loaded.Status)
@@ -1001,17 +994,15 @@ func TestContinuousModePromptObservabilityAgentName(t *testing.T) {
 			Messages: []state.Message{},
 			Progress: []state.ProgressEntry{},
 		}
-		if err := state.Save(stateJSONPath, wfState); err != nil {
-			t.Fatal(err)
+		coord, errCoord := state.NewCoordinatorWith(stateJSONPath, wfState)
+		if errCoord != nil {
+			t.Fatal(errCoord)
 		}
 
 		const continuousModeAgentName = "continuous-mode"
-		updateContinuousModeState(stateJSONPath, "Running continuous mode prompt...", continuousModeAgentName, "started")
+		updateContinuousModeState(coord, "Running continuous mode prompt...", continuousModeAgentName, "started")
 
-		loaded, errLoad := state.Load(stateJSONPath)
-		if errLoad != nil {
-			t.Fatal(errLoad)
-		}
+		loaded := coord.State()
 
 		if loaded.CurrentAgent != continuousModeAgentName {
 			t.Errorf("expected CurrentAgent %q, got %q", continuousModeAgentName, loaded.CurrentAgent)

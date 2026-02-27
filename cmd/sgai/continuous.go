@@ -31,7 +31,7 @@ const (
 	continuousModePollInterval = 2 * time.Second
 )
 
-func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt string, mcpURL string, logWriter io.Writer) {
+func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
 	if len(args) < 1 {
 		log.Fatalln("usage: sgai <target_directory>")
 	}
@@ -44,18 +44,26 @@ func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt 
 	goalPath := filepath.Join(dir, "GOAL.md")
 	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
 
+	var coord *state.Coordinator
+
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		runWorkflow(ctx, args, mcpURL, logWriter)
+		runWorkflow(ctx, args, mcpURL, logWriter, sessionCoord)
+
+		var errCoord error
+		coord, errCoord = state.NewCoordinator(stateJSONPath)
+		if errCoord != nil {
+			coord = state.NewCoordinatorEmpty(stateJSONPath)
+		}
 
 		if ctx.Err() != nil {
 			return
 		}
 
-		runContinuousModePrompt(ctx, dir, continuousPrompt, mcpURL)
+		runContinuousModePrompt(ctx, dir, continuousPrompt, mcpURL, coord)
 
 		if ctx.Err() != nil {
 			return
@@ -69,34 +77,33 @@ func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt 
 
 		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
 
-		trigger := watchForTrigger(ctx, dir, stateJSONPath, checksum, autoDuration, cronExpr)
+		trigger := watchForTrigger(ctx, dir, coord, checksum, autoDuration, cronExpr)
 		if trigger == triggerNone {
 			return
 		}
 
+		freshCoord, errFresh := state.NewCoordinator(stateJSONPath)
+		if errFresh == nil {
+			coord = freshCoord
+		}
+
 		if trigger == triggerSteering {
-			wfState, errLoad := state.Load(stateJSONPath)
-			if errLoad != nil {
-				log.Println("failed to load state for steering message:", errLoad)
-				return
-			}
+			wfState := coord.State()
 			found, msg := hasHumanPartnerMessage(wfState.Messages)
 			if found && msg != nil {
 				if errPrepend := prependSteeringMessage(goalPath, msg.Body); errPrepend != nil {
 					log.Println("failed to prepend steering message:", errPrepend)
 				}
-				markMessageAsRead(stateJSONPath, msg.ID)
+				markMessageAsRead(coord, msg.ID)
 			}
 		}
 
-		resetWorkflowForNextCycle(stateJSONPath)
+		resetWorkflowForNextCycle(coord)
 	}
 }
 
-func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcpURL string) {
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
-
-	updateContinuousModeState(stateJSONPath, "Running continuous mode prompt...", "continuous-mode", "continuous mode prompt started")
+func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcpURL string, coord *state.Coordinator) {
+	updateContinuousModeState(coord, "Running continuous mode prompt...", "continuous-mode", "continuous mode prompt started")
 
 	for attempt := range continuousModeMaxRetries {
 		if ctx.Err() != nil {
@@ -113,19 +120,20 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 
 		if errRun := cmd.Run(); errRun != nil {
 			progressMsg := fmt.Sprintf("continuous mode prompt attempt %d/%d failed: %v", attempt+1, continuousModeMaxRetries, errRun)
-			updateContinuousModeProgress(stateJSONPath, progressMsg)
+			updateContinuousModeProgress(coord, progressMsg)
 			continue
 		}
 
-		updateContinuousModeProgress(stateJSONPath, "continuous mode prompt completed successfully")
+		updateContinuousModeProgress(coord, "continuous mode prompt completed successfully")
 		return
 	}
 
-	updateContinuousModeProgress(stateJSONPath, "continuous mode prompt failed after all retries, proceeding to watch loop")
+	updateContinuousModeProgress(coord, "continuous mode prompt failed after all retries, proceeding to watch loop")
 }
 
-func watchForTrigger(ctx context.Context, dir string, stateJSONPath string, lastChecksum string, autoDuration time.Duration, cronExpr string) triggerKind {
+func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, lastChecksum string, autoDuration time.Duration, cronExpr string) triggerKind {
 	goalPath := filepath.Join(dir, "GOAL.md")
+	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
 
 	var deadline time.Time
 	var deadlineTrigger triggerKind
@@ -161,10 +169,11 @@ func watchForTrigger(ctx context.Context, dir string, stateJSONPath string, last
 			return triggerGoal
 		}
 
-		wfState, errLoad := state.Load(stateJSONPath)
-		if errLoad != nil {
-			continue
+		freshCoord, errFresh := state.NewCoordinator(stateJSONPath)
+		if errFresh == nil {
+			coord = freshCoord
 		}
+		wfState := coord.State()
 		found, _ := hasHumanPartnerMessage(wfState.Messages)
 		if found {
 			return triggerSteering
@@ -229,66 +238,57 @@ func hasHumanPartnerMessage(messages []state.Message) (bool, *state.Message) {
 	return false, nil
 }
 
-func updateContinuousModeState(stateJSONPath, task, agent, progressMsg string) {
-	wfState, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		return
-	}
-	wfState.Task = task
-	wfState.CurrentAgent = agent
-	wfState.Progress = append(wfState.Progress, state.ProgressEntry{
-		Timestamp:   time.Now().UTC().Format(time.RFC3339),
-		Agent:       agent,
-		Description: progressMsg,
-	})
-	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
-		log.Println("failed to update continuous mode state:", errSave)
+func updateContinuousModeState(coord *state.Coordinator, task, agent, progressMsg string) {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Task = task
+		wf.CurrentAgent = agent
+		wf.Progress = append(wf.Progress, state.ProgressEntry{
+			Timestamp:   timestamp,
+			Agent:       agent,
+			Description: progressMsg,
+		})
+	}); errUpdate != nil {
+		log.Println("failed to update continuous mode state:", errUpdate)
 	}
 }
 
-func updateContinuousModeProgress(stateJSONPath, progressMsg string) {
-	wfState, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		return
-	}
-	wfState.Progress = append(wfState.Progress, state.ProgressEntry{
-		Timestamp:   time.Now().UTC().Format(time.RFC3339),
-		Agent:       "continuous-mode",
-		Description: progressMsg,
-	})
-	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
-		log.Println("failed to update continuous mode progress:", errSave)
+func updateContinuousModeProgress(coord *state.Coordinator, progressMsg string) {
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Progress = append(wf.Progress, state.ProgressEntry{
+			Timestamp:   timestamp,
+			Agent:       "continuous-mode",
+			Description: progressMsg,
+		})
+	}); errUpdate != nil {
+		log.Println("failed to update continuous mode progress:", errUpdate)
 	}
 }
 
-func markMessageAsRead(stateJSONPath string, messageID int) {
-	wfState, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		return
-	}
-	for i := range wfState.Messages {
-		if wfState.Messages[i].ID == messageID {
-			wfState.Messages[i].Read = true
-			wfState.Messages[i].ReadAt = time.Now().UTC().Format(time.RFC3339)
-			wfState.Messages[i].ReadBy = "continuous-mode"
-			break
+func markMessageAsRead(coord *state.Coordinator, messageID int) {
+	readAt := time.Now().UTC().Format(time.RFC3339)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		for i := range wf.Messages {
+			if wf.Messages[i].ID == messageID {
+				wf.Messages[i].Read = true
+				wf.Messages[i].ReadAt = readAt
+				wf.Messages[i].ReadBy = "continuous-mode"
+				break
+			}
 		}
-	}
-	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
-		log.Println("failed to mark message as read:", errSave)
+	}); errUpdate != nil {
+		log.Println("failed to mark message as read:", errUpdate)
 	}
 }
 
-func resetWorkflowForNextCycle(stateJSONPath string) {
-	wfState, errLoad := state.Load(stateJSONPath)
-	if errLoad != nil {
-		return
-	}
-	wfState.Status = state.StatusWorking
-	wfState.InteractionMode = state.ModeContinuous
-	wfState.CurrentAgent = "coordinator"
-	if errSave := state.Save(stateJSONPath, wfState); errSave != nil {
-		log.Println("failed to reset workflow for next cycle:", errSave)
+func resetWorkflowForNextCycle(coord *state.Coordinator) {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Status = state.StatusWorking
+		wf.InteractionMode = state.ModeContinuous
+		wf.CurrentAgent = "coordinator"
+	}); errUpdate != nil {
+		log.Println("failed to reset workflow for next cycle:", errUpdate)
 	}
 }
 
