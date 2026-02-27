@@ -222,8 +222,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const [isSteering, startSteerTransition] = useTransition();
   const [pmOpenError, setPmOpenError] = useState<string | null>(null);
   const [isPmOpenPending, startPmOpenTransition] = useTransition();
-  const [startAppError, setStartAppError] = useState<string | null>(null);
-  const [isStartAppPending, startStartAppTransition] = useTransition();
 
   const { workspaces } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
@@ -233,20 +231,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const modelStatuses = workspace?.modelStatuses;
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
-
-  const handleStartApplication = (event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!workspaceName || isStartAppPending) return;
-    setStartAppError(null);
-    startStartAppTransition(async () => {
-      try {
-        await api.workspaces.start(workspaceName, false);
-      } catch (err) {
-        setStartAppError(err instanceof Error ? err.message : "Failed to start application");
-      }
-    });
-  };
 
   const handleSteerSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -285,21 +269,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleStartApplication}
-          disabled={isStartAppPending}
-        >
-          Start Application
-        </Button>
-      </div>
-      {startAppError && (
-        <p className="text-sm text-destructive" role="alert">{startAppError}</p>
-      )}
-
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Steer Next Turn</CardTitle>

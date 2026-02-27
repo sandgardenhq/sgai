@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SessionTab } from "./SessionTab";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -173,34 +173,4 @@ describe("SessionTab", () => {
     }
   });
 
-  it("renders Start Application button", async () => {
-    renderSessionTab();
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Start Application" })).toBeDefined();
-    });
-  });
-
-  it("calls start API when Start Application button is clicked", async () => {
-    mockFetch.mockImplementation((input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("/start")) {
-        return Promise.resolve(new Response(JSON.stringify({ running: true, status: "working", message: "Started" })));
-      }
-      return Promise.resolve(new Response(JSON.stringify({})));
-    });
-
-    renderSessionTab();
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Start Application" })).toBeDefined();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Start Application" }));
-
-    await waitFor(() => {
-      const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
-      expect(calledUrls.some((url) => url.includes("/start"))).toBe(true);
-    });
-  });
 });
