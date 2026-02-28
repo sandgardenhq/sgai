@@ -32,7 +32,7 @@ There are TWO different `state.json` files in the system:
 
 ## SGAI_NOTES.md: Early and Persistent Writing
 
-**CRITICAL:** You MUST write to `.sgai/SGAI_NOTES.md` EARLY and REPEATEDLY throughout the retrospective. This file provides "factory health intelligence" to future sessions and the coordinator. It must be written incrementally so that partial analysis is preserved even if the retrospective is interrupted.
+**CRITICAL:** You MUST write to `.sgai/SGAI_NOTES.md` EARLY and REPEATEDLY throughout the retrospective. This file records **internal factory operational notes** — how the factory could operate better, known internal issues, and agent patterns. It is distinct from AGENTS.md, which contains project-level instructions. It must be written incrementally so that partial analysis is preserved even if the retrospective is interrupted.
 
 ### SGAI_NOTES.md Format
 
@@ -131,6 +131,13 @@ Read artifacts in THIS ORDER (priority matters — richest signal sources first)
 
 - [ ] Read `stdout.log` and `stderr.log` for build/test output signals
 
+#### 1e. Read AGENTS.md
+
+- [ ] Check if `AGENTS.md` exists in the repository root
+- [ ] If present: Read the full content and parse it into individual rules/instructions (each bullet point, code block, or section heading constitutes a "rule")
+- [ ] If missing: Record `AGENTS.md MISSING` as an artifact finding — this will trigger a creation proposal in Step 2.5
+- [ ] Note the file size (line count) for the size evaluation in Step 2.5
+
 **Session directory structure:**
 ```
 .sgai/retrospectives/<session-id>/
@@ -157,6 +164,7 @@ After reading all artifacts in Step 1, write a structured analysis summary to yo
    - **Quality**: At least 1 observation about reviewer feedback, test failures, or backtracks
    - **Knowledge gaps**: At least 1 observation about missing information, repeated mistakes, or tool misuse
    - **Process gaps**: At least 1 observation about missing skills, skill violations, or convention drift
+   - **AGENTS.md Health**: At least 1 observation about AGENTS.md existence, rule relevance, contradictions with session behavior, or file size/structure
 
 **If you cannot produce at least 1 observation per category:**
 - You MUST re-read the session artifacts more carefully
@@ -174,6 +182,7 @@ Analysis Summary:
 - Quality: Reviewer caught SQL formatting issues 3 times — suggests missing skill
 - Knowledge gaps: Agent asked about migration workflow mid-session — no skill exists for this
 - Process gaps: stpa-analyst.md was a 17-line stub that needed emergency expansion in-session
+- AGENTS.md Health: AGENTS.md present (53 lines), 2 rules appear stale (no React code was modified but 4 React-specific rules exist), no contradictions detected
 ```
 
 **After completing the analysis log, UPDATE `.sgai/SGAI_NOTES.md`** with the per-category observations:
@@ -209,11 +218,47 @@ Analyze the artifacts for these signal types:
 - [ ] **Skill violations** — Did agents ignore or misapply existing skills?
 - [ ] **Convention drift** — Were there style or convention inconsistencies that AGENTS.md should address?
 
+### Step 2.5: AGENTS.md Health Analysis
+
+**GATE: This step is MANDATORY. You may NOT skip it, even if other analysis steps produced sufficient findings.**
+
+Analyze AGENTS.md health across five dimensions:
+
+#### 2.5a. Existence Check
+- [ ] Is AGENTS.md present in the repository root?
+- [ ] If MISSING: Flag for creation proposal. During Step 3, you MUST propose creating AGENTS.md pre-populated with patterns observed from the session (style rules, conventions, recurring corrections the human made).
+
+#### 2.5b. Rule Extraction
+- [ ] Parse AGENTS.md into individual rules/instructions
+- [ ] Categorize each rule (style rule, build instruction, convention, terminology, etc.)
+- [ ] Count total rules and note logical groupings
+
+#### 2.5c. Contradiction Scan
+- [ ] Cross-reference each AGENTS.md rule against the session transcript behavior
+- [ ] **Direct contradictions**: Did the human explicitly ask for something that AGENTS.md forbids? (e.g., AGENTS.md says "no inline comments" but human asked agent to "add a comment here")
+- [ ] **Override patterns**: Did agents consistently ignore a rule without the human correcting them? This suggests the rule may be outdated.
+- [ ] **Implicit tensions**: Did the human's requests reveal preferences that conflict with existing rules, even if not directly?
+- [ ] For each finding, record: the rule, the contradicting evidence (session JSON file + approximate location), and whether the rule should be updated or removed
+
+#### 2.5d. Staleness Detection
+- [ ] Identify rules that reference tools, patterns, or technologies not used in the session
+- [ ] Identify rules that were never relevant to any agent's work during the session
+- [ ] Cross-reference with recent sessions (if `.sgai/SGAI_NOTES.md` exists, check for historical patterns)
+- [ ] A rule being "not relevant to this session" alone does NOT make it stale — it must show a pattern of irrelevance or reference something that no longer exists
+
+#### 2.5e. Size & Structure Evaluation
+- [ ] Count total lines in AGENTS.md
+- [ ] If over 100 lines: evaluate whether the file has become unwieldy and could benefit from restructuring
+- [ ] Identify logical groupings of rules (e.g., Go style rules, React conventions, test instructions, terminology)
+- [ ] If 3+ distinct groupings exist and the file exceeds 100 lines: propose splitting into separate files (e.g., `AGENTS-go.md`, `AGENTS-react.md`)
+- [ ] For any proposed split: describe which rules go into which file and provide the proposed filenames
+- [ ] Identify rules that could be removed entirely (redundant, superseded by skills, or outdated)
+
 ### Step 3: Generate Suggestions
 
-For each pattern identified in Step 2, produce a concrete suggestion. Each suggestion must have:
+For each pattern identified in Step 2 and Step 2.5, produce a concrete suggestion. Each suggestion must have:
 
-1. **Category** — One of: `new-skill`, `modify-skill`, `new-agent-prompt`, `modify-agent-prompt`, `update-agents-md`
+1. **Category** — One of: `new-skill`, `modify-skill`, `new-agent-prompt`, `modify-agent-prompt`, `update-agents-md`, `create-agents-md`, `restructure-agents-md`
 2. **Evidence** — The specific artifact and pattern that motivated it
 3. **Proposal** — What to create or change (be specific)
 4. **Rationale** — Why this improvement will help future sessions
@@ -257,13 +302,23 @@ Before presenting any suggestion, verify the target path:
 - A convention was established mid-session that should persist
 - Example: "Add rule: Go error variable names must use err prefix pattern (errClose, errRead)"
 
+**AGENTS.md-specific suggestion types (from Step 2.5):**
+
+| Trigger | Suggestion Type | What to Propose |
+|---------|----------------|-----------------|
+| AGENTS.md missing | `create-agents-md` | Create AGENTS.md pre-populated with observed session patterns. Extract style rules, conventions, and recurring human corrections into a structured initial file. |
+| Contradiction found | `update-agents-md` | Either update the contradicted rule to match the human's new preference, or remove it if clearly outdated. Always cite the session evidence. |
+| Stale rule found | `update-agents-md` | Propose removal of the stale rule with rationale explaining why it's no longer relevant. |
+| File too large | `restructure-agents-md` | Propose splitting AGENTS.md into multiple files. Specify which rules go where and provide proposed filenames. |
+| Override pattern found | `update-agents-md` | Propose either relaxing the rule or removing it, based on the pattern of agents/humans consistently ignoring it. |
+
 ### Step 4: Prioritize and Group
 
 - [ ] Sort suggestions by impact (high/medium/low)
 - [ ] Group suggestions into exactly 3 category buckets:
   - **Skills** — Categories `new-skill` and `modify-skill`
   - **Agent Prompts** — Categories `new-agent-prompt` and `modify-agent-prompt`
-  - **AGENTS.md** — Category `update-agents-md`
+  - **AGENTS.md** — Categories `update-agents-md`, `create-agents-md`, and `restructure-agents-md`
 - [ ] Discard suggestions that are too vague or not actionable
 - [ ] Limit to the top 10 most impactful suggestions (quality over quantity)
 
@@ -280,8 +335,8 @@ Before presenting any suggestion, verify the target path:
 
 1. You have read the session `state.json` (via `.sgai/retrospectives/<session-id>/state.json`, or the `.sgai/state.json` fallback) and recorded visit counts and message counts in your analysis log
 2. You have read at least 3 session JSON files (or all of them if fewer than 3 exist)
-3. You have completed the Step 1.5 Mandatory Analysis Log with observations in all 4 signal categories (efficiency, quality, knowledge gaps, process gaps)
-4. You have completed Steps 2-4 (Pattern Analysis, Generate Suggestions, Prioritize and Group)
+3. You have completed the Step 1.5 Mandatory Analysis Log with observations in all 5 signal categories (efficiency, quality, knowledge gaps, process gaps, AGENTS.md health)
+4. You have completed Steps 2-4 (Pattern Analysis, AGENTS.md Health Analysis, Generate Suggestions, Prioritize and Group)
 
 **If ALL prerequisites are met** and you genuinely have zero actionable suggestions after thorough analysis, send `RETRO_COMPLETE` and exit:
 
@@ -435,7 +490,8 @@ When adding to AGENTS.md:
 7. **No source code** — You do not modify Go, TypeScript, test files, or any application code. Period.
 8. **No `.sgai/` suggestions** — Never suggest changes targeting `.sgai/` paths (except `.sgai/SGAI_NOTES.md`). Always translate to `sgai/` overlay equivalents. The `.sgai/` directory is rebuilt from skeleton + overlay on every startup — changes there are lost.
 9. **Mandatory analysis log** — You MUST complete Step 1.5 before proceeding to Step 2. Skipping the analysis log is a skill violation.
-10. **SGAI_NOTES.md is incremental** — Write to `.sgai/SGAI_NOTES.md` early and often. Do NOT wait until the end. Preliminary findings must be written after Step 1a, updated after Step 1.5, updated after Step 3, and finalized after Step 6.
+10. **AGENTS.md analysis is mandatory** — Every retrospective MUST include Step 2.5 (AGENTS.md Health Analysis). Even if AGENTS.md looks fine, you must document that assessment. "AGENTS.md looks fine" is not acceptable without evidence of reading it.
+11. **SGAI_NOTES.md is incremental** — Write to `.sgai/SGAI_NOTES.md` early and often. Do NOT wait until the end. Preliminary findings must be written after Step 1a, updated after Step 1.5, updated after Step 3, and finalized after Step 6.
 
 ### Common Rationalizations to REJECT
 - "I'll suggest modifying `.sgai/agent/foo.md` directly" — NO. Always target `sgai/agent/foo.md` (overlay).
@@ -443,8 +499,9 @@ When adding to AGENTS.md:
 - "The `.sgai/` path is where the file currently lives" — Irrelevant. You READ from `.sgai/`, but SUGGEST and WRITE to `sgai/`.
 - "Everything looks clean, no need to dig deeper" — NO. Clean-looking sessions often have the most interesting buried patterns. Every session has patterns worth noting, even successful ones.
 - "The session was successful so there's nothing to improve" — NO. Success does not mean there are no improvement opportunities. Dig into the transcripts.
-- "I've read enough to conclude there are no suggestions" — NO, unless you have met ALL prerequisites for the No Suggestions Case (session `state.json` read via fallback logic, 3+ session JSONs read, analysis log complete with all 4 categories).
+- "I've read enough to conclude there are no suggestions" — NO, unless you have met ALL prerequisites for the No Suggestions Case (session `state.json` read via fallback logic, 3+ session JSONs read, analysis log complete with all 5 categories).
 - "I'll write SGAI_NOTES.md at the end" — NO. Write it EARLY (after Step 1a) and update it throughout. The whole point is that partial analysis is preserved if the retrospective is interrupted.
+- "AGENTS.md looks fine, I'll skip the health analysis" — NO. Step 2.5 is mandatory. You must analyze all 5 dimensions and document your findings even if AGENTS.md appears healthy.
 
 ## Checklist
 
@@ -453,9 +510,12 @@ Before marking done, verify:
 - [ ] Read session `state.json` FIRST (tried `.sgai/retrospectives/<session-id>/state.json`, fell back to `.sgai/state.json` if needed) and recorded visit counts + message counts
 - [ ] Wrote preliminary findings to `.sgai/SGAI_NOTES.md` immediately after Step 1a
 - [ ] Read ALL session JSON files (count: X out of Y total)
-- [ ] Completed Step 1.5 Mandatory Analysis Log with observations in all 4 categories
+- [ ] Completed Step 1.5 Mandatory Analysis Log with observations in all 5 categories
 - [ ] Updated `.sgai/SGAI_NOTES.md` after Step 1.5 with per-category observations
 - [ ] Read all session artifacts (GOAL.md, PM, session `state.json` via fallback logic, session JSONs, stdout.log, stderr.log)
+- [ ] Read AGENTS.md (or noted its absence) during Step 1e
+- [ ] Completed Step 2.5 (AGENTS.md Health Analysis) with all 5 dimensions checked
+- [ ] Included at least one AGENTS.md Health observation in the Step 1.5 analysis log
 - [ ] Identified patterns from at least 2 signal categories (efficiency, quality, knowledge, process)
 - [ ] Produced concrete suggestions with evidence, diffs, and rationale
 - [ ] Updated `.sgai/SGAI_NOTES.md` after Step 3 with suggestion list
