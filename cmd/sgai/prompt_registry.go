@@ -66,8 +66,9 @@ You are running in Building mode. The brainstorming and work-gate phases are com
 - During the retrospective, the system will re-enable human interaction tools automatically
 `
 
-const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify → run retrospective → complete
-- When delegated work is done, send a message to the retrospective agent to start analysis
+const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify → ask project-critic-council → run retrospective → complete
+- When delegated work is done, send a message to project-critic-council to verify all GOAL.md checkboxes are genuinely complete
+- After project-critic-council approves, send a message to the retrospective agent to start analysis
 `
 
 const flowSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`

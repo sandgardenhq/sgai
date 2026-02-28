@@ -887,7 +887,7 @@ func elicitPendingQuestion(ctx context.Context, session *mcp.ServerSession, srv 
 	}
 }
 
-func buildPendingQuestionSchema(_ interface{}) *jsonschema.Schema {
+func buildPendingQuestionSchema(_ any) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type: "object",
 		Properties: map[string]*jsonschema.Schema{
