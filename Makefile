@@ -25,7 +25,7 @@ deploy: build
 	killall -9 sgai-base
 
 absorb-sgai:
-	@find sgai/ -type f | grep -v 'sgai/README.md' | while read f; do \
+	@find sgai/ -type f ! -name 'README.md' ! -name '.DS_Store' | while read f; do \
 		mkdir -p "$$(dirname "cmd/sgai/skel/.sgai/$${f#sgai/}")" || true; \
 		mv -v "$$f" "cmd/sgai/skel/.sgai/$${f#sgai/}"; \
 	done
