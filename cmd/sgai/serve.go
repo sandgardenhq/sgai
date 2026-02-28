@@ -1711,31 +1711,6 @@ func normalizeForkName(name string) string {
 	return strings.ToLower(joined)
 }
 
-func writeOpenCodeScript(content string) (string, error) {
-	tmpFile, errTmp := os.CreateTemp("", "sgai-opencode-*.sh")
-	if errTmp != nil {
-		return "", errTmp
-	}
-
-	if _, errWrite := tmpFile.WriteString(content); errWrite != nil {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpFile.Name())
-		return "", errWrite
-	}
-
-	if errClose := tmpFile.Close(); errClose != nil {
-		_ = os.Remove(tmpFile.Name())
-		return "", errClose
-	}
-
-	if errChmod := os.Chmod(tmpFile.Name(), 0755); errChmod != nil {
-		_ = os.Remove(tmpFile.Name())
-		return "", errChmod
-	}
-
-	return tmpFile.Name(), nil
-}
-
 type snippetData struct {
 	Name        string
 	FileName    string

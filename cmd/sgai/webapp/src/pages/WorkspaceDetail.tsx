@@ -251,7 +251,6 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
   const [isPinPending, startPinTransition] = useTransition();
   const [isEditorPending, startEditorTransition] = useTransition();
-  const [isOpenCodePending, startOpenCodeTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
 
   const { workspaces, fetchStatus } = useFactoryState();
@@ -377,8 +376,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const showForkAction = !detail.isFork && !effectiveRunning;
   const showComposeGoalAction = !effectiveRunning;
   const showEditGoalAction = detail.hasSgai || Boolean(detail.goalContent?.trim());
-  const showOpenEditorAction = !effectiveRunning;
-  const showOpenOpencodeAction = effectiveRunning;
+  const showOpenEditorAction = true;
   const isActionDisabled = effectiveRunning || isStartStopPending || isSelfDrivePending;
 
   const handleStart = () => {
@@ -441,18 +439,6 @@ export function WorkspaceDetail(): JSX.Element | null {
         await api.workspaces.openEditor(workspaceName);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to open editor");
-      }
-    });
-  };
-
-  const handleOpenOpencode = () => {
-    if (!workspaceName) return;
-    setActionError(null);
-    startOpenCodeTransition(async () => {
-      try {
-        await api.workspaces.openOpencode(workspaceName);
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Failed to open OpenCode");
       }
     });
   };
@@ -529,17 +515,6 @@ export function WorkspaceDetail(): JSX.Element | null {
                       disabled={isEditorPending}
                     >
                       Open in Editor
-                    </Button>
-                  )}
-                  {showOpenOpencodeAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleOpenOpencode}
-                      disabled={isOpenCodePending}
-                    >
-                      Open in OpenCode
                     </Button>
                   )}
                   <Button
@@ -663,17 +638,6 @@ export function WorkspaceDetail(): JSX.Element | null {
                       disabled={isEditorPending}
                     >
                       Open in Editor
-                    </Button>
-                  )}
-                  {showOpenOpencodeAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleOpenOpencode}
-                      disabled={isOpenCodePending}
-                    >
-                      Open in OpenCode
                     </Button>
                   )}
                   <Button

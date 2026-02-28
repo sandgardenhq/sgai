@@ -197,14 +197,7 @@ describe("WorkspaceDetail", () => {
     expect(view.queryByRole("button", { name: "Fork" })).toBeNull();
     expect(view.queryByRole("button", { name: "Compose GOAL" })).toBeNull();
     expect(view.getByRole("button", { name: "Edit GOAL" })).toBeDefined();
-    expect(view.queryByRole("button", { name: "Open in Editor" })).toBeNull();
-  });
-
-  it("shows open in OpenCode when running", async () => {
-    const workspace = makeWorkspace({ running: true });
-    renderWorkspaceDetail("/workspaces/test-project/progress", [workspace]);
-
-    expect(await screen.findByRole("button", { name: "Open in OpenCode" })).toBeDefined();
+    expect(view.getByRole("button", { name: "Open in Editor" })).toBeDefined();
   });
 
   it("shows fork, open editor, and pin actions for root workspaces with forks", async () => {
@@ -234,18 +227,6 @@ describe("WorkspaceDetail", () => {
     expect(screen.queryByRole("button", { name: "Agents" })).toBeNull();
     expect(screen.getByRole("button", { name: "Pin" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Unpin" })).toBeNull();
-  });
-
-  it("shows open in OpenCode for running root workspaces with forks", async () => {
-    const rootRunning = makeWorkspace({
-      isRoot: true,
-      isFork: false,
-      running: true,
-      forks: [{ name: "test-project-fork", dir: "/tmp/test-project-fork", running: false, commitAhead: 0, commits: [] }],
-    });
-    renderWorkspaceDetail("/workspaces/test-project/forks", [rootRunning]);
-
-    expect(await screen.findByRole("button", { name: "Open in OpenCode" })).toBeDefined();
   });
 
   it("renders no-workspace state when hasSgai is false", async () => {
