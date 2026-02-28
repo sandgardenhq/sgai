@@ -23,7 +23,6 @@ import type {
   ApiSteerResponse,
   ApiTogglePinResponse,
   ApiOpenEditorResponse,
-  ApiOpenOpencodeResponse,
   ApiDeleteForkResponse,
   ApiUpdateSummaryResponse,
   ApiDiffResponse,
@@ -138,11 +137,6 @@ export const api = {
     openEditor: (name: string) =>
       fetchJSON<ApiOpenEditorResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/open-editor`,
-        { method: "POST" },
-      ),
-    openOpencode: (name: string) =>
-      fetchJSON<ApiOpenOpencodeResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/open-opencode`,
         { method: "POST" },
       ),
     openEditorGoal: (name: string) =>

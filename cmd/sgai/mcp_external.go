@@ -766,25 +766,6 @@ func registerEditorTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyExternalResult{}, err
 	})
 
-	type openOpencodeArgs struct {
-		Workspace string `json:"workspace" jsonschema:"The workspace name"`
-	}
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "open_opencode",
-		Description: "Open the workspace in OpenCode (terminal-based, localhost only).",
-		InputSchema: mustSchema[openOpencodeArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args openOpencodeArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
-		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
-		if err != nil {
-			return nil, emptyExternalResult{}, err
-		}
-		openResult, err := ctx.srv.openOpencodeService(workspacePath)
-		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
-		}
-		result, err := jsonResult(openResult)
-		return result, emptyExternalResult{}, err
-	})
 }
 
 func registerModelTools(server *mcp.Server, ctx *externalMCPContext) {

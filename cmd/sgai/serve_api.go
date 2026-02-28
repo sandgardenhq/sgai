@@ -96,7 +96,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/pin", s.handleAPITogglePin)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor", s.handleAPIOpenEditor)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
@@ -2386,83 +2385,6 @@ func (s *Server) handleAPIOpenEditor(w http.ResponseWriter, r *http.Request) {
 		Opened:  true,
 		Editor:  s.editorName,
 		Message: "opened in editor",
-	})
-}
-
-type apiOpenInOpenCodeResponse struct {
-	Opened  bool   `json:"opened"`
-	Message string `json:"message"`
-}
-
-func (s *Server) handleAPIOpenInOpenCode(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	if !isLocalRequest(r) {
-		http.Error(w, "opencode can only be opened from localhost", http.StatusForbidden)
-		return
-	}
-
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-	if sess == nil {
-		http.Error(w, "factory is not running", http.StatusConflict)
-		return
-	}
-	sess.mu.Lock()
-	running := sess.running
-	sess.mu.Unlock()
-	if !running {
-		http.Error(w, "factory is not running", http.StatusConflict)
-		return
-	}
-
-	wfState := s.workspaceCoordinator(workspacePath).State()
-	currentAgent := wfState.CurrentAgent
-	sessionID := wfState.SessionID
-
-	models := modelsForAgentFromGoal(workspacePath, currentAgent)
-	var model string
-	if len(models) > 0 {
-		model, _ = parseModelAndVariant(models[0])
-	}
-
-	interactive := "yes"
-	if wfState.InteractionMode == state.ModeSelfDrive {
-		interactive = "auto"
-	}
-
-	execPath, errExec := os.Executable()
-	if errExec != nil {
-		http.Error(w, "failed to resolve executable path", http.StatusInternalServerError)
-		return
-	}
-
-	opencodeCmd := fmt.Sprintf("opencode --session %q --agent %q", sessionID, currentAgent)
-	if model != "" {
-		opencodeCmd += fmt.Sprintf(" --model %q", model)
-	}
-	scriptContent := fmt.Sprintf("#!/bin/bash\ntrap 'rm -f \"$0\"' EXIT\ncd %q\nexport OPENCODE_CONFIG_DIR=.sgai\nexport SGAI_MCP_EXECUTABLE=%q\nexport SGAI_MCP_INTERACTIVE=%q\n%s\n",
-		workspacePath, execPath, interactive, opencodeCmd)
-
-	scriptPath, errScript := writeOpenCodeScript(scriptContent)
-	if errScript != nil {
-		http.Error(w, "failed to prepare opencode script", http.StatusInternalServerError)
-		return
-	}
-
-	if errOpen := openInTerminal(scriptPath); errOpen != nil {
-		_ = os.Remove(scriptPath)
-		http.Error(w, "failed to open terminal", http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, apiOpenInOpenCodeResponse{
-		Opened:  true,
-		Message: "opened in opencode",
 	})
 }
 
