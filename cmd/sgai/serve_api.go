@@ -126,6 +126,8 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/compose/templates", s.handleAPIComposeTemplates)
 	mux.HandleFunc("GET /api/v1/compose/preview", s.handleAPIComposePreview)
 	mux.HandleFunc("POST /api/v1/compose/draft", s.handleAPIComposeDraft)
+	mux.HandleFunc("GET /api/v1/chat/config", s.handleAPIChatConfig)
+	mux.HandleFunc("POST /api/v1/chat", s.handleAPIChat)
 }
 
 func (s *Server) handleSSEStream(w http.ResponseWriter, r *http.Request) {

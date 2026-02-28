@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 import { AppStateProvider } from "./contexts/AppStateProvider";
 import { ConnectionStatusBanner } from "./components/ConnectionStatusBanner";
 import { NotificationPermissionBar } from "./components/NotificationPermissionBar";
+import { ChatAssistant } from "./components/ChatAssistant";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useNotifications } from "./hooks/useNotifications";
 
@@ -18,6 +19,7 @@ export function App() {
             <Outlet />
           </main>
         </div>
+        <ChatAssistant />
       </TooltipProvider>
     </AppStateProvider>
   );
