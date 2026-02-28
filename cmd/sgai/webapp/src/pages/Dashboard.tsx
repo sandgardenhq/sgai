@@ -1,11 +1,21 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useTransition, type ReactNode } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import sgaiLogo from "@/assets/sgai-logo.svg";
 import {
   Sidebar,
@@ -19,10 +29,109 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Loader2, Inbox } from "lucide-react";
+import { Loader2, Inbox, Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { cn } from "@/lib/utils";
 import type { ApiWorkspaceEntry } from "@/lib/factory-state";
+
+interface DeleteWorkspaceDialogProps {
+  workspaceName: string;
+  workspaceDir: string;
+  isFork: boolean;
+  rootWorkspaceName?: string;
+  selectedName: string | undefined;
+}
+
+function DeleteWorkspaceDialog({
+  workspaceName,
+  workspaceDir,
+  isFork,
+  rootWorkspaceName,
+  selectedName,
+}: DeleteWorkspaceDialogProps) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const nameMatches = confirmText === workspaceName;
+
+  const handleDelete = useCallback(() => {
+    if (!nameMatches) return;
+    setDeleteError(null);
+    startDeleteTransition(async () => {
+      try {
+        if (isFork && rootWorkspaceName) {
+          await api.workspaces.deleteFork(rootWorkspaceName, workspaceDir);
+        } else {
+          await api.workspaces.deleteWorkspace(workspaceName);
+        }
+        setOpen(false);
+        if (selectedName === workspaceName) {
+          navigate("/");
+        }
+      } catch (err) {
+        setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
+      }
+    });
+  }, [nameMatches, isFork, rootWorkspaceName, workspaceDir, workspaceName, selectedName, navigate]);
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setConfirmText("");
+      setDeleteError(null);
+    }
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); }}
+          className="opacity-0 group-hover/row:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-destructive/20 transition-opacity shrink-0"
+          aria-label={`Delete ${workspaceName}`}
+        >
+          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete workspace</DialogTitle>
+          <DialogDescription>
+            Type &lsquo;{workspaceName}&rsquo; to confirm deletion. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={workspaceName}
+            disabled={isDeleting}
+            aria-label="Type workspace name to confirm"
+            autoFocus
+          />
+          {deleteError && (
+            <p className="text-sm text-destructive mt-2" role="alert">{deleteError}</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={!nameMatches || isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function WorkspaceTreeSkeleton() {
   return (
@@ -84,9 +193,11 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
     }
   }, [isSelected, hasForkSelected]);
 
+  const showDelete = !workspace.isRoot || !hasForks;
+
   return (
     <SidebarMenuItem className="mb-0.5">
-      <div className="flex items-center gap-0">
+      <div className="flex items-center gap-0 group/row">
         {hasForks ? (
           <button
             type="button"
@@ -128,6 +239,14 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
             <WorkspaceIndicators workspace={workspace} />
           </Link>
         </SidebarMenuButton>
+        {showDelete && (
+          <DeleteWorkspaceDialog
+            workspaceName={workspace.name}
+            workspaceDir={workspace.dir}
+            isFork={workspace.isFork}
+            selectedName={selectedName}
+          />
+        )}
       </div>
 
       {hasForks && expanded && (
@@ -137,10 +256,11 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
               const forkSelected = fork.name === selectedName;
               return (
                 <SidebarMenuItem key={fork.name}>
+                  <div className="flex items-center gap-0 group/row">
                   <SidebarMenuButton
                     asChild
                     isActive={forkSelected}
-                    className="relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
+                    className="flex-1 min-w-0 relative before:content-[''] before:absolute before:left-[-0.875rem] before:top-1/2 before:w-3.5 before:h-0.5 before:bg-border before:rounded-sm"
                   >
                     <Link to={`/workspaces/${encodeURIComponent(fork.name)}/progress`}>
                       <span className="flex-1 min-w-0 flex flex-col">
@@ -166,6 +286,14 @@ function WorkspaceTreeItem({ workspace, selectedName }: WorkspaceTreeItemProps) 
                       <WorkspaceIndicators workspace={fork} />
                     </Link>
                   </SidebarMenuButton>
+                  <DeleteWorkspaceDialog
+                    workspaceName={fork.name}
+                    workspaceDir={fork.dir}
+                    isFork
+                    rootWorkspaceName={workspace.name}
+                    selectedName={selectedName}
+                  />
+                  </div>
                 </SidebarMenuItem>
               );
             })}

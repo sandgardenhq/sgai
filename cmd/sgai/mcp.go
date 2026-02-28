@@ -562,11 +562,11 @@ func askUserQuestion(ctx context.Context, coord *state.Coordinator, args askUser
 	humanMessage := args.Questions[0].Question
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Presented %d question(s) to user:\n", len(args.Questions)))
+	fmt.Fprintf(&result, "Presented %d question(s) to user:\n", len(args.Questions))
 	for i, q := range args.Questions {
-		result.WriteString(fmt.Sprintf("\nQuestion %d: %s\n", i+1, q.Question))
-		result.WriteString(fmt.Sprintf("  Choices: %v\n", q.Choices))
-		result.WriteString(fmt.Sprintf("  MultiSelect: %v\n", q.MultiSelect))
+		fmt.Fprintf(&result, "\nQuestion %d: %s\n", i+1, q.Question)
+		fmt.Fprintf(&result, "  Choices: %v\n", q.Choices)
+		fmt.Fprintf(&result, "  MultiSelect: %v\n", q.MultiSelect)
 	}
 	questionSummary := result.String()
 
@@ -1076,10 +1076,10 @@ func checkInbox(coord *state.Coordinator, callerAgent string) (string, error) {
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("You have %d message(s):\n\n", len(unreadMessages)))
+	fmt.Fprintf(&result, "You have %d message(s):\n\n", len(unreadMessages))
 	for i := 0; i < len(unreadMessages); i++ {
 		msg := unreadMessages[i]
-		result.WriteString(fmt.Sprintf("Message %d:\n  From: %s\n  Body: %s\n\n", i+1, msg.FromAgent, msg.Body))
+		fmt.Fprintf(&result, "Message %d:\n  From: %s\n  Body: %s\n\n", i+1, msg.FromAgent, msg.Body)
 	}
 
 	return strings.TrimSpace(result.String()), nil
@@ -1113,23 +1113,23 @@ func checkOutbox(coord *state.Coordinator, callerAgent string) (string, error) {
 	var result strings.Builder
 
 	if len(unreadMessages) > 0 {
-		result.WriteString(fmt.Sprintf("Pending messages (%d):\n", len(unreadMessages)))
+		fmt.Fprintf(&result, "Pending messages (%d):\n", len(unreadMessages))
 		for i, msg := range unreadMessages {
 			subject := strings.Split(msg.Body, "\n")[0]
-			result.WriteString(fmt.Sprintf("  %d. To: %s | Subject: %s\n", i+1, msg.ToAgent, subject))
+			fmt.Fprintf(&result, "  %d. To: %s | Subject: %s\n", i+1, msg.ToAgent, subject)
 		}
 		result.WriteString("\n")
 	}
 
 	if len(readMessages) > 0 {
-		result.WriteString(fmt.Sprintf("Delivered messages (%d):\n", len(readMessages)))
+		fmt.Fprintf(&result, "Delivered messages (%d):\n", len(readMessages))
 		for i, msg := range readMessages {
 			subject := strings.Split(msg.Body, "\n")[0]
 			readStatus := "Unread"
 			if msg.ReadAt != "" {
 				readStatus = fmt.Sprintf("Read at %s", msg.ReadAt)
 			}
-			result.WriteString(fmt.Sprintf("  %d. To: %s | Subject: %s | %s\n", i+1, msg.ToAgent, subject, readStatus))
+			fmt.Fprintf(&result, "  %d. To: %s | Subject: %s | %s\n", i+1, msg.ToAgent, subject, readStatus)
 		}
 	}
 
@@ -1149,22 +1149,22 @@ func peekMessageBus(coord *state.Coordinator) (string, error) {
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Total messages: %d\n\n", len(snapshot.Messages)))
+	fmt.Fprintf(&result, "Total messages: %d\n\n", len(snapshot.Messages))
 
 	for i := 0; i < len(snapshot.Messages); i++ {
 		msg := snapshot.Messages[i]
-		result.WriteString(fmt.Sprintf("Message %d (ID: %d):\n", i+1, msg.ID))
-		result.WriteString(fmt.Sprintf("  From: %s\n", msg.FromAgent))
-		result.WriteString(fmt.Sprintf("  To: %s\n", msg.ToAgent))
+		fmt.Fprintf(&result, "Message %d (ID: %d):\n", i+1, msg.ID)
+		fmt.Fprintf(&result, "  From: %s\n", msg.FromAgent)
+		fmt.Fprintf(&result, "  To: %s\n", msg.ToAgent)
 		if msg.Read {
 			result.WriteString("  Status: read\n")
 			if msg.ReadAt != "" {
-				result.WriteString(fmt.Sprintf("  Read At: %s\n", msg.ReadAt))
+				fmt.Fprintf(&result, "  Read At: %s\n", msg.ReadAt)
 			}
 		} else {
 			result.WriteString("  Status: pending\n")
 		}
-		result.WriteString(fmt.Sprintf("  Body: %s\n\n", msg.Body))
+		fmt.Fprintf(&result, "  Body: %s\n\n", msg.Body)
 	}
 
 	return strings.TrimSpace(result.String()), nil
@@ -1193,10 +1193,10 @@ func formatTodoList(todos []state.TodoItem) string {
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("%d todos\n", nonCompletedCount))
+	fmt.Fprintf(&result, "%d todos\n", nonCompletedCount)
 	for _, todo := range todos {
 		symbol := todoStatusSymbol(todo.Status)
-		result.WriteString(fmt.Sprintf("→ %s %s (%s)\n", symbol, todo.Content, todo.Priority))
+		fmt.Fprintf(&result, "→ %s %s (%s)\n", symbol, todo.Content, todo.Priority)
 	}
 
 	return strings.TrimSuffix(result.String(), "\n")

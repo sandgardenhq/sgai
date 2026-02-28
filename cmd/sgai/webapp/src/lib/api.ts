@@ -24,6 +24,7 @@ import type {
   ApiTogglePinResponse,
   ApiOpenEditorResponse,
   ApiDeleteForkResponse,
+  ApiDeleteWorkspaceResponse,
   ApiUpdateSummaryResponse,
   ApiDiffResponse,
   ApiDeleteMessageResponse,
@@ -153,6 +154,11 @@ export const api = {
       fetchJSON<ApiDeleteForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/delete-fork`,
         { method: "POST", body: JSON.stringify({ forkDir, confirm: true }) },
+      ),
+    deleteWorkspace: (name: string) =>
+      fetchJSON<ApiDeleteWorkspaceResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/delete`,
+        { method: "POST", body: JSON.stringify({ confirm: true }) },
       ),
     updateSummary: (name: string, summary: string) =>
       fetchJSON<ApiUpdateSummaryResponse>(
