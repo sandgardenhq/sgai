@@ -317,10 +317,10 @@ describe("ForksTab", () => {
     );
 
     const createPRButtons = screen.getAllByRole("button", { name: "Create PR" });
-    expect(createPRButtons.length).toBe(2);
+    expect(createPRButtons.length).toBe(3);
 
     const syncButtons = screen.getAllByRole("button", { name: "Sync" });
-    expect(syncButtons.length).toBe(2);
+    expect(syncButtons.length).toBe(3);
   });
 
   it("chevron expand button is disabled when fork has no commits", () => {

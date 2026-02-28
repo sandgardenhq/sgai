@@ -94,7 +94,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/workflow.svg", s.handleAPIWorkflowSVG)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/description", s.handleAPIUpdateDescription)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/pin", s.handleAPITogglePin)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor", s.handleAPIOpenEditor)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-opencode", s.handleAPIOpenInOpenCode)
@@ -1067,7 +1066,7 @@ func (s *Server) collectJJChangesCached(dir string) jjChangesResult {
 }
 
 func collectJJChanges(dir string) ([]apiDiffLine, string) {
-	statCmd := exec.Command("jj", "diff", "--stat")
+	statCmd := exec.Command("jj", "diff", "--from", "default@", "--stat")
 	statCmd.Dir = dir
 	rawStat, errStat := statCmd.Output()
 	if errStat != nil {
@@ -1097,7 +1096,7 @@ func collectJJChanges(dir string) ([]apiDiffLine, string) {
 }
 
 func collectJJFullDiff(dir string) string {
-	diffCmd := exec.Command("jj", "diff", "--git")
+	diffCmd := exec.Command("jj", "diff", "--from", "default@", "--git")
 	diffCmd.Dir = dir
 	rawDiff, errDiff := diffCmd.Output()
 	if errDiff != nil {
@@ -2332,42 +2331,6 @@ func findSteerInsertPosition(messages []state.Message) int {
 		}
 	}
 	return 0
-}
-
-type apiUpdateDescriptionRequest struct {
-	Description string `json:"description"`
-}
-
-type apiUpdateDescriptionResponse struct {
-	Updated     bool   `json:"updated"`
-	Description string `json:"description"`
-}
-
-func (s *Server) handleAPIUpdateDescription(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiUpdateDescriptionRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	cmd := exec.Command("jj", "desc", "-m", req.Description)
-	cmd.Dir = workspacePath
-	if output, errCmd := cmd.CombinedOutput(); errCmd != nil {
-		http.Error(w, fmt.Sprintf("failed to update description: %s", output), http.StatusInternalServerError)
-		return
-	}
-
-	s.notifyStateChange()
-
-	writeJSON(w, apiUpdateDescriptionResponse{
-		Updated:     true,
-		Description: req.Description,
-	})
 }
 
 type apiTogglePinResponse struct {

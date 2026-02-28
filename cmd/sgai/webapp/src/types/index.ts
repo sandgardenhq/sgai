@@ -480,15 +480,6 @@ export interface ApiUpdateGoalResponse {
   workspace: string;
 }
 
-export interface ApiUpdateDescriptionRequest {
-  description: string;
-}
-
-export interface ApiUpdateDescriptionResponse {
-  updated: boolean;
-  description: string;
-}
-
 export interface ApiSteerRequest {
   message: string;
 }

@@ -95,9 +95,6 @@ describe("ChangesTab", () => {
     const workspace = makeWorkspace({ changes: statData });
     renderChangesTab([workspace]);
 
-    const descriptionInput = screen.getByRole("textbox", { name: "Commit Description" }) as HTMLInputElement;
-    expect(descriptionInput.value).toBe("Add new feature");
-    expect(screen.getByRole("button", { name: "Update" })).toBeDefined();
     expect(screen.getByText("Diff Stat")).toBeDefined();
     expect(screen.getByText((content) => content.includes("serve.go") && content.includes("+++++"))).toBeDefined();
   });

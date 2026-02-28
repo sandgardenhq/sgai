@@ -300,6 +300,9 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		if previousAgent != "" && previousAgent != currentAgent {
 			fmt.Println("["+paddedsgai+"]", previousAgent, "->", currentAgent)
 			wfState.Todos = []state.TodoItem{}
+			if errOverlay := applyLayerFolderOverlay(dir); errOverlay != nil {
+				log.Println("failed to apply overlay on agent transition:", errOverlay)
+			}
 		}
 		previousAgent = currentAgent
 
@@ -339,6 +342,9 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			if previousAgent != "" && previousAgent != currentAgent {
 				fmt.Println("["+paddedsgai+"]", previousAgent, "->", currentAgent)
 				wfState.Todos = []state.TodoItem{}
+				if errOverlay := applyLayerFolderOverlay(dir); errOverlay != nil {
+					log.Println("failed to apply overlay on agent transition:", errOverlay)
+				}
 			}
 			previousAgent = currentAgent
 

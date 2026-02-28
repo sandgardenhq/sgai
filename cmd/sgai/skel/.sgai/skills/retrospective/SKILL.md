@@ -30,6 +30,50 @@ There are TWO different `state.json` files in the system:
 - If it does not exist or is unreadable, fall back to `.sgai/state.json` (always present)
 - Document which file you actually read in your analysis log
 
+## SGAI_NOTES.md: Early and Persistent Writing
+
+**CRITICAL:** You MUST write to `.sgai/SGAI_NOTES.md` EARLY and REPEATEDLY throughout the retrospective. This file provides "factory health intelligence" to future sessions and the coordinator. It must be written incrementally so that partial analysis is preserved even if the retrospective is interrupted.
+
+### SGAI_NOTES.md Format
+
+Always APPEND (not replace) a new dated section to `.sgai/SGAI_NOTES.md`:
+
+```markdown
+## Factory Health Notes (YYYY-MM-DD)
+
+### Status
+[in-progress | complete]
+
+### Known Issues
+- [issue descriptions from this session]
+
+### Agent Patterns
+- [patterns observed across agents]
+
+### Efficiency Suggestions
+- [suggestions for improving factory efficiency]
+```
+
+### When to Write SGAI_NOTES.md
+
+Write to `.sgai/SGAI_NOTES.md` at these specific moments — do NOT wait until the end:
+
+1. **After Step 1a** (reading state.json): Write a "Status: in-progress" note with visit counts and message count
+2. **After Step 1.5** (Mandatory Analysis Log): Update the note with per-category observations
+3. **After Step 3** (Generate Suggestions): Update the note with the suggestion list
+4. **After Step 6** (Apply Approved Changes): Update the note with "Status: complete" and final summary
+
+**If the retrospective is interrupted between steps, the most recently written state persists in SGAI_NOTES.md.**
+
+### How to Read Existing SGAI_NOTES.md
+
+Before writing, always read the current `.sgai/SGAI_NOTES.md` to append without overwriting prior sessions:
+```
+1. Read .sgai/SGAI_NOTES.md (it may or may not exist)
+2. If it exists, append your new dated section
+3. If it does not exist, create it with just your new dated section
+```
+
 ## Process
 
 ### Step 1: Artifact Discovery
@@ -46,6 +90,23 @@ Read artifacts in THIS ORDER (priority matters — richest signal sources first)
   - Agent sequence (order of agent execution)
   - Progress notes from each agent
   - **If BOTH `.sgai/retrospectives/<session-id>/state.json` AND `.sgai/state.json` are missing or unreadable, STOP and report this in your analysis log — do NOT proceed to Step 2 without acknowledging this gap**
+- [ ] **WRITE SGAI_NOTES.md NOW** — After reading state.json, write preliminary findings to `.sgai/SGAI_NOTES.md` with format:
+  ```markdown
+  ## Factory Health Notes (YYYY-MM-DD)
+
+  ### Status
+  in-progress
+
+  ### Known Issues
+  - [Any obvious issues seen in state.json so far]
+
+  ### Agent Patterns
+  - Visit counts: [agent: N visits, ...]
+  - Message count: [N total inter-agent messages]
+
+  ### Efficiency Suggestions
+  - [Preliminary thoughts, to be refined]
+  ```
 
 #### 1b. Read Goal and Project Management artifacts
 
@@ -115,6 +176,15 @@ Analysis Summary:
 - Process gaps: stpa-analyst.md was a 17-line stub that needed emergency expansion in-session
 ```
 
+**After completing the analysis log, UPDATE `.sgai/SGAI_NOTES.md`** with the per-category observations:
+```markdown
+### Agent Patterns
+- [Updated with observations from analysis log]
+
+### Known Issues
+- [Updated with quality and process gap observations]
+```
+
 ### Step 2: Pattern Analysis
 
 Analyze the artifacts for these signal types:
@@ -148,6 +218,12 @@ For each pattern identified in Step 2, produce a concrete suggestion. Each sugge
 3. **Proposal** — What to create or change (be specific)
 4. **Rationale** — Why this improvement will help future sessions
 5. **Diff Preview** — For suggestions that modify existing files, include the unified diff showing what will change (read the file first, then compute the diff). For new files, show the proposed content.
+
+**After generating suggestions, UPDATE `.sgai/SGAI_NOTES.md`** with the suggestion list:
+```markdown
+### Efficiency Suggestions
+- [List of suggestions from Step 3, even before human approval]
+```
 
 #### Path Validation Rule
 
@@ -340,6 +416,10 @@ When adding to AGENTS.md:
 
 ### Step 7: Completion
 
+- [ ] **FINAL SGAI_NOTES.md UPDATE**: Write a "Status: complete" update to `.sgai/SGAI_NOTES.md` with:
+  - Total approved changes applied
+  - Summary of each approved change
+  - Any issues encountered during application
 - [ ] Verify all approved changes were written successfully
 - [ ] Summarize what was changed in the workflow state progress log
 - [ ] Set status to `agent-done`
@@ -355,6 +435,7 @@ When adding to AGENTS.md:
 7. **No source code** — You do not modify Go, TypeScript, test files, or any application code. Period.
 8. **No `.sgai/` suggestions** — Never suggest changes targeting `.sgai/` paths (except `.sgai/SGAI_NOTES.md`). Always translate to `sgai/` overlay equivalents. The `.sgai/` directory is rebuilt from skeleton + overlay on every startup — changes there are lost.
 9. **Mandatory analysis log** — You MUST complete Step 1.5 before proceeding to Step 2. Skipping the analysis log is a skill violation.
+10. **SGAI_NOTES.md is incremental** — Write to `.sgai/SGAI_NOTES.md` early and often. Do NOT wait until the end. Preliminary findings must be written after Step 1a, updated after Step 1.5, updated after Step 3, and finalized after Step 6.
 
 ### Common Rationalizations to REJECT
 - "I'll suggest modifying `.sgai/agent/foo.md` directly" — NO. Always target `sgai/agent/foo.md` (overlay).
@@ -363,21 +444,26 @@ When adding to AGENTS.md:
 - "Everything looks clean, no need to dig deeper" — NO. Clean-looking sessions often have the most interesting buried patterns. Every session has patterns worth noting, even successful ones.
 - "The session was successful so there's nothing to improve" — NO. Success does not mean there are no improvement opportunities. Dig into the transcripts.
 - "I've read enough to conclude there are no suggestions" — NO, unless you have met ALL prerequisites for the No Suggestions Case (session `state.json` read via fallback logic, 3+ session JSONs read, analysis log complete with all 4 categories).
+- "I'll write SGAI_NOTES.md at the end" — NO. Write it EARLY (after Step 1a) and update it throughout. The whole point is that partial analysis is preserved if the retrospective is interrupted.
 
 ## Checklist
 
 Before marking done, verify:
 
 - [ ] Read session `state.json` FIRST (tried `.sgai/retrospectives/<session-id>/state.json`, fell back to `.sgai/state.json` if needed) and recorded visit counts + message counts
+- [ ] Wrote preliminary findings to `.sgai/SGAI_NOTES.md` immediately after Step 1a
 - [ ] Read ALL session JSON files (count: X out of Y total)
 - [ ] Completed Step 1.5 Mandatory Analysis Log with observations in all 4 categories
+- [ ] Updated `.sgai/SGAI_NOTES.md` after Step 1.5 with per-category observations
 - [ ] Read all session artifacts (GOAL.md, PM, session `state.json` via fallback logic, session JSONs, stdout.log, stderr.log)
 - [ ] Identified patterns from at least 2 signal categories (efficiency, quality, knowledge, process)
 - [ ] Produced concrete suggestions with evidence, diffs, and rationale
+- [ ] Updated `.sgai/SGAI_NOTES.md` after Step 3 with suggestion list
 - [ ] Grouped suggestions into category buckets (Skills, Agent Prompts, AGENTS.md)
 - [ ] Sent at least one `RETRO_QUESTION [MULTI-SELECT]:` message per non-empty category to the coordinator (or `RETRO_COMPLETE` if zero suggestions)
 - [ ] Applied only individually-approved changes; skipped all rejected changes
 - [ ] Applied changes to correct locations (sgai/ overlay or AGENTS.md)
+- [ ] Updated `.sgai/SGAI_NOTES.md` with "Status: complete" after Step 6
 - [ ] Set workflow state to agent-done
 - [ ] After EVERY sgai_send_message() call, immediately called sgai_update_workflow_state({status: "agent-done"}) and stopped
 - [ ] Never called check_inbox or check_outbox between sending a message and yielding

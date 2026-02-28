@@ -17,6 +17,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { PromptHistory } from "@/components/PromptHistory";
+import { ActionBar } from "@/pages/tabs/SessionTab";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
@@ -480,9 +481,17 @@ export function ForksTab({ workspaceName, actions, onActionClick }: ForksTabProp
   }
 
   const forks = workspace.forks ?? [];
+  const isAnyForkRunning = forks.some((fork) => fork.running);
 
   return (
     <div className="space-y-4">
+      {actions && actions.length > 0 && (
+        <ActionBar
+          actions={actions}
+          isRunning={isAnyForkRunning}
+          onActionClick={(action) => onActionClick?.(action, workspaceName)}
+        />
+      )}
       {forks.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground italic">
           <p>No forks yet. Create a fork to start work.</p>

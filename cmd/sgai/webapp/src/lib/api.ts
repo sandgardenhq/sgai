@@ -21,7 +21,6 @@ import type {
   ApiAdhocResponse,
   ApiModelsResponse,
   ApiSteerResponse,
-  ApiUpdateDescriptionResponse,
   ApiTogglePinResponse,
   ApiOpenEditorResponse,
   ApiOpenOpencodeResponse,
@@ -130,11 +129,6 @@ export const api = {
       fetchJSON<ApiSteerResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/steer`,
         { method: "POST", body: JSON.stringify({ message }) },
-      ),
-    updateDescription: (name: string, description: string) =>
-      fetchJSON<ApiUpdateDescriptionResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/description`,
-        { method: "POST", body: JSON.stringify({ description }) },
       ),
     togglePin: (name: string) =>
       fetchJSON<ApiTogglePinResponse>(

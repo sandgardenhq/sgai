@@ -58,7 +58,7 @@ export function LogTab({ workspaceName }: LogTabProps) {
   }
 
   return (
-    <ScrollArea ref={scrollRef} className="max-h-[calc(100vh-16rem)] bg-muted/20 rounded-lg p-3">
+    <ScrollArea ref={scrollRef} className="max-h-[calc(100vh-16rem)] bg-muted/20 rounded-lg p-3 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
       <div id="log-lines">
         {lines.map((line, index) => (
           <LogLine key={index} line={line} />

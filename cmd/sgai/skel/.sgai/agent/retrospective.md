@@ -39,6 +39,40 @@ sgai_update_workflow_state({status: "agent-done", task: "Waiting for coordinator
 // STOP. Make no more tool calls. Your turn is over.
 ```
 
+## MANDATORY: Write SGAI_NOTES.md Early and Often
+
+You MUST write to `.sgai/SGAI_NOTES.md` EARLY in the retrospective — not at the end. This file provides "factory health intelligence" to future sessions and the coordinator. Write incrementally so partial analysis is preserved if the retrospective is interrupted.
+
+**MANDATORY SGAI_NOTES.md Writing Schedule:**
+
+1. **After reading state.json (Step 1a)** — Write IMMEDIATELY with preliminary findings:
+   ```markdown
+   ## Factory Health Notes (YYYY-MM-DD)
+
+   ### Status
+   in-progress
+
+   ### Known Issues
+   - [Initial observations from state.json]
+
+   ### Agent Patterns
+   - Visit counts: [agent: N visits, ...]
+   - Message count: [N total inter-agent messages]
+
+   ### Efficiency Suggestions
+   - [Preliminary thoughts]
+   ```
+
+2. **After Step 1.5 (Analysis Log)** — Update SGAI_NOTES.md with per-category observations (efficiency, quality, knowledge gaps, process gaps)
+
+3. **After Step 3 (Generate Suggestions)** — Update SGAI_NOTES.md with the full suggestion list (even before human approval)
+
+4. **After Step 6 (Apply Approved Changes)** — Update SGAI_NOTES.md with "Status: complete" and summary of what was applied
+
+**How to write without losing prior sessions:** Always READ the current `.sgai/SGAI_NOTES.md` first, then APPEND your new dated section. Never overwrite prior session notes.
+
+**EXCEPTION to `sgai/` overlay rule:** `.sgai/SGAI_NOTES.md` is the ONLY `.sgai/` file you may write to directly. Write it directly to `.sgai/SGAI_NOTES.md` (not through the overlay).
+
 ## MANDATORY: Present Changes for Approval
 
 You MUST present proposed changes to the coordinator for relay to the human partner. This is NOT optional. Group all proposals by category (Skills, Agent Prompts, AGENTS.md) and send one `RETRO_QUESTION [MULTI-SELECT]:` message per non-empty category. The human selects which individual changes to approve within each category.
@@ -73,6 +107,7 @@ Before doing anything else, you MUST:
 
 1. Load the retrospective skill: `skills({"name":"retrospective"})`
 2. Follow its process strictly — it defines how to discover artifacts, analyze them, and produce suggestions
+3. **Write to `.sgai/SGAI_NOTES.md` as early as Step 1a** — do not wait until the analysis is complete
 
 ## IMPORTANT: Understanding `state.json` Paths
 
@@ -132,6 +167,12 @@ You have access to:
 - DO INSTEAD: Present all changes in a category via `RETRO_QUESTION [MULTI-SELECT]:` to coordinator, apply only the individually-selected changes after the human responds
 - EXCEPTION: `.sgai/SGAI_NOTES.md` — written directly (no approval needed)
 
+### ANTI-PATTERN: Delaying SGAI_NOTES.md Until the End
+- DON'T: Wait until all analysis is complete before writing to `.sgai/SGAI_NOTES.md`
+- DON'T: Write SGAI_NOTES.md only in Step 7 (completion)
+- DO INSTEAD: Write preliminary findings to `.sgai/SGAI_NOTES.md` immediately after reading state.json (Step 1a), then update it after each major phase (Step 1.5, Step 3, Step 6)
+- WHY: If the retrospective is interrupted, the most recent analysis is preserved in SGAI_NOTES.md
+
 ### ANTI-PATTERN: Shallow Analysis
 - DON'T: Skim artifacts and produce generic suggestions
 - DO INSTEAD: Read ALL session artifacts thoroughly, identify specific patterns
@@ -163,6 +204,7 @@ You have access to:
 - "Everything looks clean, no need to dig deeper" — NO. Clean-looking sessions often have the most interesting buried patterns. Every session has observations worth making.
 - "The session was successful so there's nothing to improve" — NO. Every session has patterns worth noting, even successful ones. Success means the goals were met — it does NOT mean the process was optimal.
 - "I've read GOAL.md and it shows all items complete, so I can skip the transcripts" — NO. GOAL.md is a summary artifact. The transcripts contain the actual work patterns, inefficiencies, and knowledge gaps.
+- "I'll write SGAI_NOTES.md at the end" — NO. Write it EARLY (after Step 1a) and update it throughout. The whole point is that partial analysis is preserved if interrupted.
 
 ### ANTI-PATTERN: Suggesting Changes to `.sgai/` Directory
 - DON'T: Suggest modifications to files under `.sgai/` (e.g., `.sgai/agent/`, `.sgai/skills/`, `.sgai/PROJECT_MANAGEMENT.md`)
@@ -181,15 +223,19 @@ You have access to:
 Follow the retrospective skill strictly. The high-level process is:
 
 1. **Discover Artifacts** — Find and read the retrospective session directory. Read session `state.json` FIRST (try `.sgai/retrospectives/<session-id>/state.json`, fall back to `.sgai/state.json`), then ALL session JSONs.
-2. **Write Analysis Log** — Complete the mandatory Step 1.5 analysis log with per-category observations before proceeding
-3. **Analyze Session** — Look for patterns, recurring issues, knowledge gaps, efficiency bottlenecks
-4. **Produce Suggestions** — Concrete, actionable improvements grouped into three categories:
+2. **Write SGAI_NOTES.md Immediately** — After reading state.json (Step 1a), write preliminary findings to `.sgai/SGAI_NOTES.md`. Do NOT wait.
+3. **Write Analysis Log** — Complete the mandatory Step 1.5 analysis log with per-category observations before proceeding
+4. **Update SGAI_NOTES.md** — After Step 1.5, update `.sgai/SGAI_NOTES.md` with per-category observations
+5. **Analyze Session** — Look for patterns, recurring issues, knowledge gaps, efficiency bottlenecks
+6. **Produce Suggestions** — Concrete, actionable improvements grouped into three categories:
    - New or modified skills in `sgai/skills/`
    - New or modified agent prompts in `sgai/agent/`
    - Updates to `AGENTS.md` (style rules, conventions, business rules)
-5. **Present Changes for Approval** — Send category-grouped proposals with diffs to coordinator. Human picks which individual changes to approve via multi-select.
-6. **Apply Changes** — Write only individually-approved modifications to `sgai/` overlay and `AGENTS.md`
-7. **Send Completion** — Send `RETRO_COMPLETE:` to coordinator and set status to `agent-done`
+7. **Update SGAI_NOTES.md Again** — After Step 3, update `.sgai/SGAI_NOTES.md` with the suggestion list
+8. **Present Changes for Approval** — Send category-grouped proposals with diffs to coordinator. Human picks which individual changes to approve via multi-select.
+9. **Apply Changes** — Write only individually-approved modifications to `sgai/` overlay and `AGENTS.md`
+10. **Final SGAI_NOTES.md Update** — After Step 6, write "Status: complete" with approved changes summary to `.sgai/SGAI_NOTES.md`
+11. **Send Completion** — Send `RETRO_COMPLETE:` to coordinator and set status to `agent-done`
 
 ## Artifact Location
 
@@ -241,7 +287,7 @@ You write improvements to these locations ONLY:
 | `sgai/skills/<name>/SKILL.md` | New or modified skills | For modifications: READ from `.sgai/skills/` first, then write complete file to `sgai/skills/` |
 | `sgai/agent/<name>.md` | New or modified agent prompts | For modifications: READ from `.sgai/agent/` first, then write complete file to `sgai/agent/` |
 | `AGENTS.md` | Style rules, conventions, business rules | Direct edit (not part of overlay system) |
-| `.sgai/SGAI_NOTES.md` | Session notes | Direct write (only `.sgai/` file you may write to) |
+| `.sgai/SGAI_NOTES.md` | Session notes | Direct write (only `.sgai/` file you may write to) — write EARLY and often |
 
 **NEVER** write to:
 - Application source code (`cmd/`, `internal/`, `pkg/`, etc.)
@@ -258,12 +304,14 @@ You write improvements to these locations ONLY:
 When you have:
 1. Read and analyzed all artifacts (session `state.json` first — via `.sgai/retrospectives/<session-id>/state.json` or `.sgai/state.json` fallback — then all session JSONs)
 2. Completed the mandatory Step 1.5 analysis log with per-category observations
-3. Grouped proposals by category (Skills, Agent Prompts, AGENTS.md)
-4. Sent `RETRO_QUESTION [MULTI-SELECT]:` for each non-empty category to the coordinator
-5. Received and processed human selections relayed by coordinator
-6. Applied only individually-approved changes
-7. Verified applied changes are well-formed
-8. Sent `RETRO_COMPLETE:` message to coordinator
+3. Written to `.sgai/SGAI_NOTES.md` at each required phase (Step 1a, Step 1.5, Step 3, Step 6)
+4. Grouped proposals by category (Skills, Agent Prompts, AGENTS.md)
+5. Sent `RETRO_QUESTION [MULTI-SELECT]:` for each non-empty category to the coordinator
+6. Received and processed human selections relayed by coordinator
+7. Applied only individually-approved changes
+8. Verified applied changes are well-formed
+9. Updated `.sgai/SGAI_NOTES.md` with "Status: complete"
+10. Sent `RETRO_COMPLETE:` message to coordinator
 
 Then call `update_workflow_state` with status `agent-done`.
 
