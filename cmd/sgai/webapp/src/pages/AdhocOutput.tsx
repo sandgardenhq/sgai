@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { PromptHistory } from "@/components/PromptHistory";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 
@@ -25,7 +25,6 @@ export function AdhocOutput(): JSX.Element {
     startRun,
     stopRun,
     handleSubmit,
-    handleKeyDown,
     outputRef,
     promptHistory,
     selectFromHistory,
@@ -88,15 +87,12 @@ export function AdhocOutput(): JSX.Element {
                 disabled={isRunning}
               />
             </div>
-            <Textarea
-              id="adhoc-prompt"
+            <MarkdownEditor
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Enter your prompt..."
-              rows={6}
-              className="resize-y"
+              onChange={(v) => setPrompt(v ?? "")}
+              defaultHeight={250}
               disabled={isRunning}
+              placeholder="Enter your prompt..."
             />
           </div>
         </div>

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
 import { ArrowLeft, Save, Loader2, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
@@ -122,12 +122,10 @@ export function EditGoal(): JSX.Element {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="goal-content">GOAL.md Content</Label>
-          <Textarea
-            id="goal-content"
+          <MarkdownEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={20}
-            className="resize-y font-mono text-sm"
+            onChange={(v) => setContent(v ?? "")}
+            defaultHeight={500}
             disabled={isSaving || saveSuccess}
           />
         </div>

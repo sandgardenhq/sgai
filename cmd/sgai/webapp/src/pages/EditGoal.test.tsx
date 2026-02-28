@@ -1,8 +1,25 @@
-import { describe, test, expect, afterEach, spyOn } from "bun:test";
+import { describe, test, expect, afterEach, spyOn, mock } from "bun:test";
+import React from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { EditGoal } from "./EditGoal";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      "aria-label": "GOAL.md Content",
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder,
+      "data-testid": "markdown-editor",
+    }),
+}));
 
 const mockGoalContent = "---\ntitle: My Project\n---\n\n# My Project\n\nBuild something great";
 
@@ -49,7 +66,7 @@ describe("EditGoal", () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  test("renders heading and textarea after load", async () => {
+  test("renders heading and editor after load", async () => {
     fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });

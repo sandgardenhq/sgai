@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WizardLayout } from "@/components/WizardLayout";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { useComposeWizard } from "@/hooks/useComposeWizard";
 import { MissingWorkspaceNotice } from "@/components/MissingWorkspaceNotice";
 
@@ -28,8 +28,8 @@ export function WizardStep1() {
   }
 
   const handleDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setWizardData((prev) => ({ ...prev, description: e.target.value }));
+    (value: string | undefined) => {
+      setWizardData((prev) => ({ ...prev, description: value ?? "" }));
     },
     [setWizardData],
   );
@@ -70,13 +70,11 @@ export function WizardStep1() {
 
         <div className="space-y-2">
           <Label htmlFor="description">Project Description</Label>
-          <Textarea
-            id="description"
+          <MarkdownEditor
             value={wizardData.description}
             onChange={handleDescriptionChange}
+            defaultHeight={300}
             placeholder="Example: Build a web application that manages user profiles with authentication, dashboard, and REST API endpoints."
-            rows={8}
-            className="resize-y"
           />
         </div>
       </div>
