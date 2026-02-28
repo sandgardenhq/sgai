@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
@@ -28,7 +27,7 @@ export function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps)
   if (actions.length === 0) return null;
 
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto" role="toolbar" aria-label="Action buttons">
+    <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Action buttons">
       {actions.map((action) => (
         <Tooltip key={`${action.name}-${action.model}`}>
           <TooltipTrigger asChild>
@@ -175,19 +174,17 @@ function TodoList({ todos, emptyMessage }: { todos: ApiTodoEntry[]; emptyMessage
   }
 
   return (
-    <ScrollArea className="max-h-[300px]">
-      <ul className="space-y-1.5">
-        {todos.map((todo) => (
-          <li key={`${todo.id}-${todo.content}-${todo.status}-${todo.priority}`} className="flex items-start gap-2 text-sm">
-            <TodoStatusIcon status={todo.status} />
-            <span className="flex-1">
-              {todo.content}
-              <span className="text-xs text-muted-foreground ml-1">({todo.priority})</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </ScrollArea>
+    <ul className="space-y-1.5">
+      {todos.map((todo) => (
+        <li key={`${todo.id}-${todo.content}-${todo.status}-${todo.priority}`} className="flex items-start gap-2 text-sm">
+          <TodoStatusIcon status={todo.status} />
+          <span className="flex-1">
+            {todo.content}
+            <span className="text-xs text-muted-foreground ml-1">({todo.priority})</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -232,10 +229,8 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
 
-  const handleSteerSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitSteer = () => {
     if (!workspaceName || !steerMessage.trim()) return;
-
     setSteerError(null);
     setSteerSuccess(false);
     startSteerTransition(async () => {
@@ -251,6 +246,18 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
         setSteerError(err instanceof Error ? err.message : "Failed to submit steering message");
       }
     });
+  };
+
+  const handleSteerSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    submitSteer();
+  };
+
+  const handleSteerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      submitSteer();
+    }
   };
 
   const handleOpenProjectManagement = (event: MouseEvent<HTMLButtonElement>) => {
@@ -276,11 +283,11 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
         <CardContent>
           <form onSubmit={handleSteerSubmit} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="steer-message">Instruction</Label>
               <Textarea
                 id="steer-message"
                 value={steerMessage}
                 onChange={(event) => setSteerMessage(event.target.value)}
+                onKeyDown={handleSteerKeyDown}
                 placeholder="Enter re-steering instruction..."
                 rows={4}
                 className="resize-y"

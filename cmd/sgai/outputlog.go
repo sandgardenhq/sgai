@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	outputBufferSize = 30
+	outputBufferSize = 100
 )
 
 type logLine struct {

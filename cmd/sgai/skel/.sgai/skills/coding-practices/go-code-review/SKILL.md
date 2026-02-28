@@ -440,6 +440,66 @@ for _, task := range tasks {
 wg.Wait()
 ```
 
+## Dead Code Detection
+
+### Bare Blocks
+
+- [ ] No unnecessary bare blocks `{ ... }` wrapping code without if/for/switch
+- [ ] Bare blocks often indicate leftover code from refactoring
+- [ ] Check for extra indentation levels that could be removed
+
+```go
+// BAD - bare block adds unnecessary indentation
+msg := buildFlowMessage()
+{
+    multiModelSection := processMultiModel()
+    // ... 30+ lines
+}
+
+// GOOD - flatten the code
+msg := buildFlowMessage()
+multiModelSection := processMultiModel()
+// ... (unindented)
+```
+
+### Unused Code
+
+- [ ] No unused imports (run `goimports -w .`)
+- [ ] No unused variables (compiler will error)
+- [ ] No unreachable code after return/panic/continue
+- [ ] No functions only called from tests (unless test-only with build tag)
+
+### Leftover References
+
+- [ ] No references to removed files (e.g., `response.txt` after file-based transport removal)
+- [ ] No calls to removed functions
+- [ ] No references to deprecated fields
+
+### Unreachable Code
+
+- [ ] No code after `return`, `panic`, `break` in loops (unless in defer)
+- [ ] No dead branches in if-else after condition simplification
+- [ ] No commented-out code blocks (delete, don't leave)
+
+```go
+// BAD - unreachable code after return
+func foo() {
+    return
+    fmt.Println("this never runs")  // dead code
+}
+
+// GOOD - remove unreachable code
+func foo() {
+    return
+}
+```
+
+### Variable Scope
+
+- [ ] No variables that could be moved to tighter scope
+- [ ] No shadowing of outer variables unintentionally
+- [ ] Loop variables don't leak outside loop (use for-range copy or explicit variable)
+
 ## Quick Checklist
 
 For fast reviews, check these critical items:
@@ -455,6 +515,7 @@ For fast reviews, check these critical items:
 9. **Interfaces** - At consumer, not producer
 10. **Modern idioms** - Uses slices/maps packages where applicable
 11. **Switch statements** - Use switch for multi-way conditionals
+12. **Dead code** - No bare blocks, unreachable code, or leftover references
 
 ## Review Output Format
 
