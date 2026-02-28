@@ -893,6 +893,9 @@ func workspaceDagAgents(workspacePath string) []string {
 	if errFlow != nil {
 		return nil
 	}
+	if retrospectiveEnabled(metadata) {
+		flowDag.injectRetrospectiveEdge()
+	}
 	return flowDag.allAgents()
 }
 

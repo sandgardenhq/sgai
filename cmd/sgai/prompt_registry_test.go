@@ -110,6 +110,18 @@ func TestComposePromptCoordinatorPlanOnlyForCoordinator(t *testing.T) {
 	}
 }
 
+func TestBuildingModeCoordinatorIncludesProjectCriticCouncil(t *testing.T) {
+	modeSection, coordPlan := modeSectionForMode(state.ModeBuilding)
+	msg := composePrompt(promptOptions{
+		agent:           "coordinator",
+		modeSection:     modeSection,
+		coordinatorPlan: coordPlan,
+	})
+	if !strings.Contains(msg, "project-critic-council") {
+		t.Error("building mode coordinator plan should instruct asking project-critic-council before completing")
+	}
+}
+
 func TestModeSectionForMode(t *testing.T) {
 	t.Run("selfDriveReturnsCorrectSections", func(t *testing.T) {
 		modeSection, coordPlan := modeSectionForMode(state.ModeSelfDrive)

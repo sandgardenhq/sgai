@@ -1138,3 +1138,44 @@ func TestInjectCurrentAgentStyle(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkspaceDagAgentsIncludesRetrospectiveWhenEnabled(t *testing.T) {
+	workspacePath := t.TempDir()
+	goalContent := `---
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+---
+
+- [ ] some task
+`
+	if err := os.WriteFile(filepath.Join(workspacePath, "GOAL.md"), []byte(goalContent), 0644); err != nil {
+		t.Fatalf("failed to write GOAL.md: %v", err)
+	}
+
+	agents := workspaceDagAgents(workspacePath)
+
+	if !slices.Contains(agents, "retrospective") {
+		t.Errorf("workspaceDagAgents should include retrospective when retrospective is enabled (default), got: %v", agents)
+	}
+}
+
+func TestWorkspaceDagAgentsExcludesRetrospectiveWhenDisabled(t *testing.T) {
+	workspacePath := t.TempDir()
+	goalContent := `---
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+retrospective: "no"
+---
+
+- [ ] some task
+`
+	if err := os.WriteFile(filepath.Join(workspacePath, "GOAL.md"), []byte(goalContent), 0644); err != nil {
+		t.Fatalf("failed to write GOAL.md: %v", err)
+	}
+
+	agents := workspaceDagAgents(workspacePath)
+
+	if slices.Contains(agents, "retrospective") {
+		t.Errorf("workspaceDagAgents should NOT include retrospective when retrospective is disabled, got: %v", agents)
+	}
+}
