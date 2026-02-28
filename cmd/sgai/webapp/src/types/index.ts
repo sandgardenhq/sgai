@@ -456,6 +456,11 @@ export interface ApiDeleteForkResponse {
   message: string;
 }
 
+export interface ApiDeleteWorkspaceResponse {
+  deleted: boolean;
+  message: string;
+}
+
 export interface ApiRenameRequest {
   name: string;
 }

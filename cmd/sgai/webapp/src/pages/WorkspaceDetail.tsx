@@ -5,6 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
@@ -251,6 +262,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
   const [isPinPending, startPinTransition] = useTransition();
   const [isEditorPending, startEditorTransition] = useTransition();
+  const [isDeletePending, startDeleteTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
 
   const { workspaces, fetchStatus } = useFactoryState();
@@ -439,6 +451,29 @@ export function WorkspaceDetail(): JSX.Element | null {
         await api.workspaces.openEditor(workspaceName);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to open editor");
+      }
+    });
+  };
+
+  const rootWorkspaceName = detail.isFork
+    ? workspaces.find((ws) => ws.forks?.some((f) => f.name === workspaceName))?.name
+    : undefined;
+
+  const showDeleteAction = !effectiveRunning && !isForkedRoot;
+
+  const handleDelete = () => {
+    if (!workspaceName) return;
+    setActionError(null);
+    startDeleteTransition(async () => {
+      try {
+        if (detail.isFork && rootWorkspaceName) {
+          await api.workspaces.deleteFork(rootWorkspaceName, detail.dir);
+        } else {
+          await api.workspaces.deleteWorkspace(workspaceName);
+        }
+        navigate("/");
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Failed to delete workspace");
       }
     });
   };
@@ -674,6 +709,38 @@ export function WorkspaceDetail(): JSX.Element | null {
                   >
                     {detail.pinned ? "Unpin" : "Pin"}
                   </Button>
+                  {showDeleteAction && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={isDeletePending}
+                        >
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete workspace</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to permanently delete &lsquo;{detail.name}&rsquo;? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDelete}
+                            disabled={isDeletePending}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </>
               )}
           </div>

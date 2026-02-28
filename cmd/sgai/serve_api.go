@@ -84,6 +84,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
+	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete", s.handleAPIDeleteWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/goal", s.handleAPIGetGoal)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
@@ -937,6 +938,11 @@ func (s *Server) handleAPICreateWorkspace(w http.ResponseWriter, r *http.Request
 
 	s.invalidateWorkspaceScanCache()
 
+	s.mu.Lock()
+	s.pinnedDirs[workspacePath] = true
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(apiCreateWorkspaceResponse{
@@ -1753,6 +1759,12 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 
 	s.invalidateWorkspaceScanCache()
 	s.classifyCache.delete(workspacePath)
+
+	s.mu.Lock()
+	s.pinnedDirs[forkPath] = true
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
 	s.notifyStateChange()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1839,6 +1851,56 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		Deleted: true,
 		Message: "fork deleted successfully",
 	})
+}
+
+type apiDeleteWorkspaceRequest struct {
+	Confirm bool `json:"confirm"`
+}
+
+type apiDeleteWorkspaceResponse struct {
+	Deleted bool   `json:"deleted"`
+	Message string `json:"message"`
+}
+
+func (s *Server) handleAPIDeleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	var req apiDeleteWorkspaceRequest
+	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	kind := s.classifyWorkspaceCached(workspacePath)
+	if kind == workspaceRoot {
+		http.Error(w, "cannot delete a root workspace that has forks", http.StatusBadRequest)
+		return
+	}
+	if kind == workspaceFork {
+		http.Error(w, "use delete-fork to delete fork workspaces", http.StatusBadRequest)
+		return
+	}
+
+	if !req.Confirm {
+		http.Error(w, "confirmation required to delete workspace", http.StatusBadRequest)
+		return
+	}
+
+	if _, errStat := os.Stat(workspacePath); errStat != nil {
+		http.Error(w, "workspace directory not found", http.StatusNotFound)
+		return
+	}
+
+	result, errDelete := s.deleteWorkspaceService(workspacePath)
+	if errDelete != nil {
+		http.Error(w, errDelete.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, apiDeleteWorkspaceResponse(result))
 }
 
 type apiRenameRequest struct {

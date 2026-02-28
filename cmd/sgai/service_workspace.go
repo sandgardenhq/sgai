@@ -38,6 +38,11 @@ func (s *Server) createWorkspaceService(name string) (createWorkspaceResult, err
 
 	s.invalidateWorkspaceScanCache()
 
+	s.mu.Lock()
+	s.pinnedDirs[workspacePath] = true
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
 	return createWorkspaceResult{Name: name, Dir: workspacePath}, nil
 }
 
@@ -85,6 +90,12 @@ func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspace
 
 	s.invalidateWorkspaceScanCache()
 	s.classifyCache.delete(workspacePath)
+
+	s.mu.Lock()
+	s.pinnedDirs[forkPath] = true
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
 	s.notifyStateChange()
 
 	return forkWorkspaceResult{
@@ -283,6 +294,32 @@ func (s *Server) togglePinService(workspacePath string) (togglePinResult, error)
 	s.notifyStateChange()
 
 	return togglePinResult{Pinned: s.isPinned(workspacePath), Message: "pin toggled"}, nil
+}
+
+type deleteWorkspaceResult struct {
+	Deleted bool
+	Message string
+}
+
+func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceResult, error) {
+	s.stopSession(workspacePath)
+
+	if errRemove := os.RemoveAll(workspacePath); errRemove != nil {
+		return deleteWorkspaceResult{}, fmt.Errorf("failed to remove workspace directory: %w", errRemove)
+	}
+
+	s.mu.Lock()
+	delete(s.pinnedDirs, workspacePath)
+	delete(s.sessions, workspacePath)
+	delete(s.everStartedDirs, workspacePath)
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
+	s.invalidateWorkspaceScanCache()
+	s.classifyCache.delete(workspacePath)
+	s.notifyStateChange()
+
+	return deleteWorkspaceResult{Deleted: true, Message: "workspace deleted successfully"}, nil
 }
 
 type deleteMessageResult struct {
