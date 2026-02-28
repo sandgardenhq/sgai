@@ -8,6 +8,7 @@ import type {
 } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkFrontmatter from "remark-frontmatter";
 import rehypeRaw from "rehype-raw";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +98,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 
   return (
     <div className={cn("space-y-3 text-sm", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={components}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]} rehypePlugins={[rehypeRaw]} components={components}>
         {content}
       </ReactMarkdown>
     </div>

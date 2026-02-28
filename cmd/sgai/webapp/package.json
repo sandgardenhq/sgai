@@ -11,6 +11,7 @@
     "test:e2e:parity": "bunx playwright test e2e/parity/"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.575.0",
@@ -20,6 +21,7 @@
     "react-markdown": "^10.1.0",
     "react-router": "^7.6.2",
     "rehype-raw": "^7.0.0",
+    "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.0",
     "tailwind-merge": "^3.4.0",
     "tw-animate-css": "^1.4.0"

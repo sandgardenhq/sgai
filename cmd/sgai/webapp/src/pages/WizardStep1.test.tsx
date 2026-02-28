@@ -1,8 +1,25 @@
-import { describe, test, expect, afterEach, beforeEach, spyOn } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach, spyOn, mock } from "bun:test";
+import React from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WizardStep1 } from "./WizardStep1";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      role: "textbox",
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder,
+      "data-testid": "markdown-editor",
+    }),
+}));
 
 const mockComposeState = {
   workspace: "test-ws",
@@ -91,7 +108,7 @@ describe("WizardStep1", () => {
     expect(screen.getByText("Step 1: Project Description")).toBeTruthy();
   });
 
-  test("renders textarea with server description", async () => {
+  test("renders editor with server description", async () => {
     fetchSpy = mockFetchSequence([mockComposeState, mockPreview]);
 
     await act(async () => {

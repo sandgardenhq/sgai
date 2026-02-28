@@ -172,3 +172,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+.monaco-placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.5;
+  font-style: italic;
+}

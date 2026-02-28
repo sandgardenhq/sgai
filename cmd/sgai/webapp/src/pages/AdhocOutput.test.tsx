@@ -1,8 +1,25 @@
-import { describe, test, expect, afterEach, beforeEach, spyOn } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach, spyOn, mock } from "bun:test";
+import React from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { AdhocOutput } from "./AdhocOutput";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      "aria-label": "Prompt",
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder,
+      "data-testid": "markdown-editor",
+    }),
+}));
 
 function renderPage(workspace = "test-ws", entry?: string) {
   const initialEntry = entry ?? `/workspaces/${workspace}/adhoc`;
@@ -50,7 +67,7 @@ describe("AdhocOutput", () => {
     expect(screen.getByLabelText("Model")).toBeTruthy();
   });
 
-  test("renders prompt textarea", () => {
+  test("renders prompt editor", () => {
     fetchSpy = spyOn(globalThis, "fetch").mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" }), { status: 200, headers: { "Content-Type": "application/json" } })),
     );
@@ -111,11 +128,7 @@ describe("AdhocOutput", () => {
   });
 
   test("shows running state during execution (R-18)", async () => {
-    let callCount = 0;
     fetchSpy = spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request, init?: RequestInit) => {
-      callCount++;
-      // First call is the adhocStatus GET on mount — return not running
-      // Subsequent POST call is the actual run
       if (init?.method === "POST") {
         return Promise.resolve(
           new Response(JSON.stringify({ running: true, output: "", message: "ad-hoc prompt started" }), {

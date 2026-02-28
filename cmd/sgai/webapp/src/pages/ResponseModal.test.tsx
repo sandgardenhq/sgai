@@ -1,9 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import React from "react";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { ResponseModal } from "./ResponseModal";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder ?? "Type your custom response here...",
+      "data-testid": "markdown-editor",
+    }),
+}));
 
 const pendingQuestion: ApiPendingQuestionResponse = {
   questionId: "modal-q-123",

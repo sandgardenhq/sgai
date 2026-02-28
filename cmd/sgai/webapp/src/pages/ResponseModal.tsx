@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -129,14 +129,15 @@ export function ResponseModal({
                 <Label htmlFor="modal-other" className="font-semibold text-sm">
                   Other (additional comments or alternative answer):
                 </Label>
-                <Textarea
-                  id="modal-other"
-                  value={otherText}
-                  onChange={(e) => setOtherText(e.target.value)}
-                  placeholder="Type your custom response here..."
-                  rows={3}
-                  className="mt-2"
-                />
+                <div className="mt-2">
+                  <MarkdownEditor
+                    value={otherText}
+                    onChange={(v) => setOtherText(v ?? "")}
+                    defaultHeight={200}
+                    minHeight={150}
+                    placeholder="Type your custom response here..."
+                  />
+                </div>
               </div>
 
               <ResponseContext
