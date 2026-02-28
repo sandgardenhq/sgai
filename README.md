@@ -150,6 +150,76 @@ Sgai extracts reusable skills and code snippets from completed sessions — your
 
 ---
 
+## Drive Sgai from Your AI Harness
+
+Sgai exposes two integration paths for AI agents and harnesses — MCP tools and HTTP skills — so Claude Code, Codex, or any MCP-capable assistant can orchestrate Sgai programmatically.
+
+### MCP Interface
+
+When you run `sgai serve`, the MCP endpoint is available on the same port as the web UI:
+
+```
+sgai serve listening on http://127.0.0.1:8080
+```
+
+The MCP endpoint is at `/mcp/external` on the main server. Connect any MCP-capable harness to it:
+
+```bash
+npx mcporter list --http-url http://127.0.0.1:8080/mcp/external --allow-http
+```
+
+**Configure in [OpenCode](https://opencode.ai/docs/mcp-servers/):**
+
+```jsonc
+// opencode.jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "sgai": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8080/mcp/external"
+    }
+  }
+}
+```
+
+Replace `8080` with the actual port if you use a custom `--listen-addr`.
+
+35+ tools mirror the full web UI — workspace lifecycle, session control, human interaction, monitoring, knowledge, compose, and adhoc. Key tools:
+
+| Tool | What it does |
+|------|-------------|
+| `list_workspaces` | Discover all workspaces and their status |
+| `start_session` | Launch an agent session (with optional auto-drive mode) |
+| `respond_to_question` | Answer a pending agent question |
+| `wait_for_question` | Block until an agent needs human input (MCP elicitation) |
+
+### Skills / HTTP API
+
+Sgai also ships a set of [agentskills.io](https://agentskills.io/specification)-conformant skills for harnesses that prefer plain HTTP.
+
+**Entrypoint:** [`docs/sgai-skills/using-sgai/SKILL.md`](docs/sgai-skills/using-sgai/SKILL.md)
+
+The core pattern is a cyclical probe/poll/act loop:
+
+```
+LOOP:
+  1. PROBE  → GET /api/v1/state          # Discover workspaces + status
+  2. CHECK  → pendingQuestion != null?   # Does any workspace need input?
+  3. ACT    → start, steer, or respond   # Take action based on state
+  4. WAIT   → poll again after delay
+```
+
+Example probe:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/state | jq '.workspaces[0].pendingQuestion'
+```
+
+Full reference in [`docs/sgai-skills/`](docs/sgai-skills/) — seven sub-skills covering workspace-management, session-control, human-interaction, monitoring, knowledge, compose, and adhoc.
+
+---
+
 ## What Happens to Your Code?
 
 * Agents operate inside your local repository
