@@ -2,25 +2,25 @@
   "actions": [
     {
       "name": "Create PR",
-      "model": "anthropic/claude-opus-4-6 (max)",
+      "model": "anthropic/claude-opus-4-6",
       "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
       "description": "Create a draft pull request from current changes"
     },
     {
       "name": "Upstream Sync",
-      "model": "anthropic/claude-opus-4-6 (max)",
+      "model": "anthropic/claude-opus-4-6",
       "prompt": "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
       "description": "Fetch and rebase against upstream main branch"
     },
     {
       "name": "Absorb Overlay Directory",
-      "model": "anthropic/claude-opus-4-6 (max)",
+      "model": "anthropic/claude-haiku-4-5",
       "prompt": "run bash(`make absorb-sgai`)",
       "description": "Absorb sgai/ into cmd/sgai/skel/.sgai/"
     },
     {
       "name": "Deploy",
-      "model": "anthropic/claude-opus-4-6 (max)",
+      "model": "anthropic/claude-haiku-4-5",
       "prompt": "run bash(`make deploy`)",
       "description": "Deploy the current build"
     }
