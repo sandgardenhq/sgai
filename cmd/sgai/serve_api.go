@@ -484,7 +484,7 @@ func (s *Server) spaMiddleware(mux *http.ServeMux) http.Handler {
 }
 
 func isAPIRoute(urlPath string) bool {
-	return strings.HasPrefix(urlPath, "/api/")
+	return strings.HasPrefix(urlPath, "/api/") || strings.HasPrefix(urlPath, "/mcp/")
 }
 
 func isStaticAsset(urlPath string) bool {
