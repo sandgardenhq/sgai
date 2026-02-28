@@ -1949,6 +1949,8 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	rootDir := getRootWorkspacePath(workspacePath)
+
 	oldName := filepath.Base(workspacePath)
 	parentDir := filepath.Dir(workspacePath)
 	newPath := filepath.Join(parentDir, newName)
@@ -1980,8 +1982,36 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 		delete(s.everStartedDirs, workspacePath)
 		s.everStartedDirs[newPath] = true
 	}
+	pinReKeyed := s.pinnedDirs[workspacePath]
+	if pinReKeyed {
+		delete(s.pinnedDirs, workspacePath)
+		s.pinnedDirs[newPath] = true
+	}
+	if existing, ok := s.adhocStates[workspacePath]; ok {
+		delete(s.adhocStates, workspacePath)
+		s.adhocStates[newPath] = existing
+	}
 	s.mu.Unlock()
 
+	s.composerSessionsMu.Lock()
+	if existing, ok := s.composerSessions[workspacePath]; ok {
+		delete(s.composerSessions, workspacePath)
+		s.composerSessions[newPath] = existing
+	}
+	s.composerSessionsMu.Unlock()
+
+	s.classifyCache.delete(workspacePath)
+	s.classifyCache.delete(newPath)
+	if rootDir != "" {
+		s.classifyCache.delete(rootDir)
+		s.bookmarkCache.delete(rootDir)
+	}
+
+	if pinReKeyed {
+		if errSave := s.savePinnedProjects(); errSave != nil {
+			log.Printf("failed to persist re-keyed pins after rename: %v", errSave)
+		}
+	}
 	s.invalidateWorkspaceScanCache()
 	s.notifyStateChange()
 
