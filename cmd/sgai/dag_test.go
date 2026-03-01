@@ -726,7 +726,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	dir := t.TempDir()
 
 	t.Run("selfDriveIncludesSelfDriveInstructions", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive, "some-flow")
 		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
 			t.Error("self-drive message should contain SELF-DRIVE MODE ACTIVE")
 		}
@@ -745,7 +745,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("interactiveModeIncludesAskQuestions", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBrainstorming)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBrainstorming, "some-flow")
 		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
 			t.Error("interactive message should contain ASK ME QUESTIONS prompt")
 		}
@@ -755,7 +755,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("selfDriveNonCoordinator", func(t *testing.T) {
-		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeSelfDrive)
+		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeSelfDrive, "some-flow")
 		if !strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
 			t.Error("self-drive message for non-coordinator should contain SELF-DRIVE MODE ACTIVE")
 		}
@@ -771,7 +771,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("selfDriveCoordinatorIncludesDelegation", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeSelfDrive, "some-flow")
 		if !strings.Contains(msg, "delegate work to specialized agents") {
 			t.Error("self-drive coordinator message should contain delegation instructions")
 		}
@@ -781,7 +781,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("buildingModeIncludesBuildingInstructions", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding, "some-flow")
 		if !strings.Contains(msg, "BUILDING MODE ACTIVE") {
 			t.Error("building mode message should contain BUILDING MODE ACTIVE")
 		}
@@ -797,7 +797,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("buildingModeCoordinatorIncludesRetrospective", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding)
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding, "some-flow")
 		if !strings.Contains(msg, "run retrospective") {
 			t.Error("building mode coordinator message should mention running retrospective")
 		}
@@ -807,7 +807,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("buildingModeNonCoordinator", func(t *testing.T) {
-		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeBuilding)
+		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeBuilding, "some-flow")
 		if !strings.Contains(msg, "BUILDING MODE ACTIVE") {
 			t.Error("building mode for non-coordinator should contain BUILDING MODE ACTIVE")
 		}
@@ -817,7 +817,7 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 	})
 
 	t.Run("emptyModeDefaultsToInteractive", func(t *testing.T) {
-		msg := buildFlowMessage(d, "coordinator", visits, dir, "")
+		msg := buildFlowMessage(d, "coordinator", visits, dir, "", "some-flow")
 		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
 			t.Error("empty mode message should contain interactive prompt")
 		}
@@ -826,6 +826,205 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 		}
 		if strings.Contains(msg, "BUILDING MODE ACTIVE") {
 			t.Error("empty mode message should not contain building instructions")
+		}
+	})
+}
+
+func TestParseFlowAuto(t *testing.T) {
+	d, err := parseFlow("auto", "")
+	if err != nil {
+		t.Fatalf("parseFlow with auto spec failed: %v", err)
+	}
+
+	if len(d.Nodes) != 3 {
+		t.Errorf("expected 3 nodes (coordinator, general-purpose, project-critic-council), got %d", len(d.Nodes))
+	}
+
+	if len(d.EntryNodes) != 1 || d.EntryNodes[0] != "coordinator" {
+		t.Errorf("expected coordinator to be the only entry node, got %v", d.EntryNodes)
+	}
+
+	coordNode := d.Nodes["coordinator"]
+	if !slices.Contains(coordNode.Successors, "general-purpose") {
+		t.Errorf("coordinator should have general-purpose as successor, got: %v", coordNode.Successors)
+	}
+
+	if !d.isTerminal("general-purpose") {
+		t.Error("general-purpose should be a terminal node")
+	}
+}
+
+func TestParseFlowAutoMatchesEmpty(t *testing.T) {
+	dagAuto, errAuto := parseFlow("auto", "")
+	if errAuto != nil {
+		t.Fatalf("parseFlow(auto) failed: %v", errAuto)
+	}
+
+	dagEmpty, errEmpty := parseFlow("", "")
+	if errEmpty != nil {
+		t.Fatalf("parseFlow(empty) failed: %v", errEmpty)
+	}
+
+	autoAgents := dagAuto.allAgents()
+	emptyAgents := dagEmpty.allAgents()
+	if !slices.Equal(autoAgents, emptyAgents) {
+		t.Errorf("auto and empty should produce the same agents, got auto=%v, empty=%v", autoAgents, emptyAgents)
+	}
+}
+
+func TestIsAutoFlowSpec(t *testing.T) {
+	cases := []struct {
+		name string
+		spec string
+		want bool
+	}{
+		{"empty", "", true},
+		{"auto", "auto", true},
+		{"explicitFlow", "coordinator -> planner", false},
+		{"digraph", "digraph G {}", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isAutoFlowSpec(tc.spec); got != tc.want {
+				t.Errorf("isAutoFlowSpec(%q) = %v; want %v", tc.spec, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuildFlowMessageAutoFlowNudge(t *testing.T) {
+	d, err := parseFlow("", "")
+	if err != nil {
+		t.Fatalf("parseFlow failed: %v", err)
+	}
+
+	visits := map[string]int{"coordinator": 0, "general-purpose": 0, "project-critic-council": 0}
+	dir := t.TempDir()
+
+	t.Run("coordinatorWithEmptyFlowGetsNudge", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding, "")
+		if !strings.Contains(msg, "auto-flow-mode") {
+			t.Error("coordinator with empty flow should get auto-flow-mode nudge")
+		}
+		if !strings.Contains(msg, "CRITICAL") {
+			t.Error("nudge should contain CRITICAL marker")
+		}
+	})
+
+	t.Run("coordinatorWithAutoFlowGetsNudge", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding, "auto")
+		if !strings.Contains(msg, "auto-flow-mode") {
+			t.Error("coordinator with auto flow should get auto-flow-mode nudge")
+		}
+	})
+
+	t.Run("coordinatorWithExplicitFlowNoNudge", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeBuilding, "coordinator -> planner")
+		if strings.Contains(msg, "auto-flow-mode") {
+			t.Error("coordinator with explicit flow should NOT get auto-flow-mode nudge")
+		}
+	})
+
+	t.Run("nonCoordinatorWithEmptyFlowNoNudge", func(t *testing.T) {
+		msg := buildFlowMessage(d, "general-purpose", visits, dir, state.ModeBuilding, "")
+		if strings.Contains(msg, "auto-flow-mode") {
+			t.Error("non-coordinator agents should NOT get auto-flow-mode nudge")
+		}
+	})
+}
+
+func TestRebuildDAG(t *testing.T) {
+	t.Run("returnsCorrectDAG", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "planner -> coder"}
+		visitCounts := make(map[string]int)
+		d, agents, longest, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err != nil {
+			t.Fatalf("rebuildDAG failed: %v", err)
+		}
+		if !slices.Contains(agents, "planner") {
+			t.Error("agents should contain planner")
+		}
+		if !slices.Contains(agents, "coder") {
+			t.Error("agents should contain coder")
+		}
+		if !slices.Contains(agents, "coordinator") {
+			t.Error("agents should contain coordinator")
+		}
+		if _, exists := d.Nodes["planner"]; !exists {
+			t.Error("DAG should contain planner node")
+		}
+		if _, exists := d.Nodes["coder"]; !exists {
+			t.Error("DAG should contain coder node")
+		}
+		if longest < len("coordinator") {
+			t.Errorf("longestNameLen should be at least %d, got %d", len("coordinator"), longest)
+		}
+	})
+
+	t.Run("newAgentsGetZeroVisitCounts", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "planner -> coder"}
+		visitCounts := map[string]int{"coordinator": 3}
+		_, _, _, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err != nil {
+			t.Fatalf("rebuildDAG failed: %v", err)
+		}
+		if visitCounts["planner"] != 0 {
+			t.Errorf("new agent planner should have 0 visits, got %d", visitCounts["planner"])
+		}
+		if visitCounts["coder"] != 0 {
+			t.Errorf("new agent coder should have 0 visits, got %d", visitCounts["coder"])
+		}
+	})
+
+	t.Run("existingVisitCountsPreserved", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "planner -> coder"}
+		visitCounts := map[string]int{"coordinator": 5, "planner": 2}
+		_, _, _, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err != nil {
+			t.Fatalf("rebuildDAG failed: %v", err)
+		}
+		if visitCounts["coordinator"] != 5 {
+			t.Errorf("existing coordinator visits should be 5, got %d", visitCounts["coordinator"])
+		}
+		if visitCounts["planner"] != 2 {
+			t.Errorf("existing planner visits should be 2, got %d", visitCounts["planner"])
+		}
+	})
+
+	t.Run("invalidFlowReturnsError", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "digraph INVALID {{{"}
+		visitCounts := make(map[string]int)
+		_, _, _, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err == nil {
+			t.Error("rebuildDAG should return error for invalid flow")
+		}
+	})
+
+	t.Run("retrospectiveInjectedWhenEnabled", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "planner -> coder", Retrospective: "yes"}
+		visitCounts := make(map[string]int)
+		d, agents, _, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err != nil {
+			t.Fatalf("rebuildDAG failed: %v", err)
+		}
+		if _, exists := d.Nodes["retrospective"]; !exists {
+			t.Error("DAG should contain retrospective node when enabled")
+		}
+		if !slices.Contains(agents, "retrospective") {
+			t.Error("agents should contain retrospective when enabled")
+		}
+	})
+
+	t.Run("retrospectiveNotInjectedWhenDisabled", func(t *testing.T) {
+		metadata := GoalMetadata{Flow: "planner -> coder", Retrospective: "no"}
+		visitCounts := make(map[string]int)
+		d, _, _, err := rebuildDAG(&metadata, t.TempDir(), visitCounts)
+		if err != nil {
+			t.Fatalf("rebuildDAG failed: %v", err)
+		}
+		if _, exists := d.Nodes["retrospective"]; exists {
+			t.Error("DAG should not contain retrospective node when disabled")
 		}
 	})
 }

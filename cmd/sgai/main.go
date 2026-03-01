@@ -138,17 +138,10 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		log.Fatalln("failed to apply custom MCPs:", err)
 	}
 
-	flowDag, err := parseFlow(metadata.Flow, dir)
-	if err != nil {
-		log.Fatalln("failed to parse flow:", err)
+	flowDag, allAgents, longestNameLen, errRebuild := rebuildDAG(&metadata, dir, make(map[string]int))
+	if errRebuild != nil {
+		log.Fatalln("failed to build DAG:", errRebuild)
 	}
-
-	if retrospectiveEnabled(metadata) {
-		flowDag.injectRetrospectiveEdge()
-	}
-
-	ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
-	ensureImplicitRetrospectiveModel(flowDag, &metadata)
 
 	if err := validateModels(metadata.Models); err != nil {
 		log.Fatalln(err)
@@ -172,18 +165,7 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 		log.Fatalln("failed to compute GOAL.md checksum:", err)
 	}
 
-	dagAgents := flowDag.allAgents()
-	var allAgents []string
-	if slices.Contains(dagAgents, "coordinator") {
-		allAgents = dagAgents
-	} else {
-		allAgents = append([]string{"coordinator"}, dagAgents...)
-	}
 	workspaceName := filepath.Base(dir)
-	longestNameLen := len("sgai")
-	for _, agent := range allAgents {
-		longestNameLen = max(longestNameLen, len(agent))
-	}
 	paddedsgai := workspaceName + "][" + "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
@@ -312,6 +294,13 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 			return
 		}
+		newDag, _, newLongest, errRebuild := rebuildDAG(&metadata, dir, wfState.VisitCounts)
+		if errRebuild != nil {
+			log.Println("failed to rebuild DAG:", errRebuild, "- keeping old DAG")
+		} else {
+			flowDag = newDag
+			longestNameLen = newLongest
+		}
 		unlockInteractiveForRetrospective(&wfState, currentAgent, coord, paddedsgai)
 		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, coord, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
 		if wfState.Status == state.StatusComplete {
@@ -365,6 +354,13 @@ func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io
 			if errReloadGoalMetadata != nil {
 				log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 				return
+			}
+			newDag, _, newLongest, errRebuild := rebuildDAG(&metadata, dir, wfState.VisitCounts)
+			if errRebuild != nil {
+				log.Println("failed to rebuild DAG:", errRebuild, "- keeping old DAG")
+			} else {
+				flowDag = newDag
+				longestNameLen = newLongest
 			}
 			unlockInteractiveForRetrospective(&wfState, currentAgent, coord, paddedsgai)
 			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, coord, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
@@ -714,7 +710,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		}
 		args = append(args, "--title", title)
 
-		msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
+		msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode, metadata.Flow)
 
 		multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
 		if multiModelSection != "" {
@@ -1220,6 +1216,37 @@ func fetchValidModels() (map[string]bool, error) {
 	}
 
 	return validModels, nil
+}
+
+func rebuildDAG(metadata *GoalMetadata, dir string, visitCounts map[string]int) (*dag, []string, int, error) {
+	newDag, errParse := parseFlow(metadata.Flow, dir)
+	if errParse != nil {
+		return nil, nil, 0, errParse
+	}
+
+	if retrospectiveEnabled(*metadata) {
+		newDag.injectRetrospectiveEdge()
+	}
+	ensureImplicitProjectCriticCouncilModel(newDag, metadata)
+	ensureImplicitRetrospectiveModel(newDag, metadata)
+
+	dagAgents := newDag.allAgents()
+	var allAgents []string
+	if slices.Contains(dagAgents, "coordinator") {
+		allAgents = dagAgents
+	} else {
+		allAgents = append([]string{"coordinator"}, dagAgents...)
+	}
+
+	longestNameLen := len("sgai")
+	for _, agent := range allAgents {
+		if _, exists := visitCounts[agent]; !exists {
+			visitCounts[agent] = 0
+		}
+		longestNameLen = max(longestNameLen, len(agent))
+	}
+
+	return newDag, allAgents, longestNameLen, nil
 }
 
 // tryReloadGoalMetadata attempts to reload GOAL.md frontmatter from disk.
