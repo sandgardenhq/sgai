@@ -294,6 +294,18 @@ export function MarkdownEditor({
         run: (ed) => insertLink(ed),
       });
 
+      editor.addAction({
+        id: "select-all",
+        label: "Select All",
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA],
+        run: (ed) => {
+          const model = ed.getModel();
+          if (model) {
+            ed.setSelection(model.getFullModelRange());
+          }
+        },
+      });
+
       if (placeholder && !value) {
         const model = editor.getModel();
         if (model) {

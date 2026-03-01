@@ -6,11 +6,100 @@ import type {
   TdHTMLAttributes,
   ThHTMLAttributes,
 } from "react";
+import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkFrontmatter from "remark-frontmatter";
 import rehypeRaw from "rehype-raw";
+import { parse as parseYaml } from "yaml";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
+
+function extractFrontmatter(content: string): {
+  frontmatter: Record<string, unknown> | null;
+  body: string;
+} {
+  const match = FRONTMATTER_RE.exec(content);
+  if (!match) {
+    return { frontmatter: null, body: content };
+  }
+  try {
+    const parsed = parseYaml(match[1]);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        frontmatter: parsed as Record<string, unknown>,
+        body: content.slice(match[0].length),
+      };
+    }
+  } catch {
+    // invalid YAML, skip table rendering
+  }
+  return { frontmatter: null, body: content };
+}
+
+function isSimpleValue(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    !value.includes("\n") &&
+    value.length < 80
+  ) || typeof value === "number" || typeof value === "boolean";
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+function FrontmatterTable({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data);
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <Table data-testid="frontmatter-table">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-[140px]">Key</TableHead>
+          <TableHead>Value</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {entries.map(([key, value]) => (
+          <TableRow key={key}>
+            <TableCell className="font-medium align-top">{key}</TableCell>
+            <TableCell className="whitespace-normal break-words">
+              {isSimpleValue(value) ? (
+                <span>{formatValue(value)}</span>
+              ) : (
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs bg-muted/30 rounded p-2 m-0 overflow-x-auto">
+                  {formatValue(value)}
+                </pre>
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
 
 interface MarkdownContentProps {
   content: string;
@@ -18,6 +107,8 @@ interface MarkdownContentProps {
 }
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
+  const { frontmatter, body } = useMemo(() => extractFrontmatter(content), [content]);
+
   const components = {
     h1: (props: HTMLAttributes<HTMLHeadingElement>) => (
       <h1 className="text-2xl font-semibold mt-4 mb-2" {...props} />
@@ -98,8 +189,9 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 
   return (
     <div className={cn("space-y-3 text-sm", className)}>
+      {frontmatter ? <FrontmatterTable data={frontmatter} /> : null}
       <ReactMarkdown remarkPlugins={[remarkGfm, remarkFrontmatter]} rehypePlugins={[rehypeRaw]} components={components}>
-        {content}
+        {body}
       </ReactMarkdown>
     </div>
   );
