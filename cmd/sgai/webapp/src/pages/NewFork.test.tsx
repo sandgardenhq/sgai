@@ -21,6 +21,7 @@ function renderPage(workspace = "root-ws") {
       <TooltipProvider>
         <Routes>
           <Route path="workspaces/:name/fork/new" element={<NewFork />} />
+          <Route path="workspaces/:name/goal/edit" element={<div>Edit Goal</div>} />
           <Route path="workspaces/:name" element={<div>Workspace Detail</div>} />
         </Routes>
       </TooltipProvider>
@@ -78,7 +79,7 @@ describe("NewFork", () => {
     await act(async () => { fireEvent.click(button); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
-    expect(screen.getByText("Workspace Detail")).toBeTruthy();
+    expect(screen.getByText("Edit Goal")).toBeTruthy();
   });
 
   test("shows error on conflict", async () => {

@@ -26,7 +26,7 @@ export function NewFork() {
 
       try {
         const result = await api.workspaces.fork(workspaceName, trimmed);
-        navigate(`/workspaces/${encodeURIComponent(result.name)}`);
+        navigate(`/workspaces/${encodeURIComponent(result.name)}/goal/edit`);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.message);
