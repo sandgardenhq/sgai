@@ -67,6 +67,9 @@ const RenameFork = lazy(() =>
 const EditGoal = lazy(() =>
   import("./pages/EditGoal").then((m) => ({ default: m.EditGoal })),
 );
+const CreateTask = lazy(() =>
+  import("./pages/CreateTask").then((m) => ({ default: m.CreateTask })),
+);
 const AdhocOutput = lazy(() =>
   import("./pages/AdhocOutput").then((m) => ({ default: m.AdhocOutput })),
 );
@@ -165,6 +168,10 @@ export const router = createBrowserRouter([
         element: withSuspense(RenameFork),
       },
       {
+        path: "workspaces/:name/create-task",
+        element: withDashboardSuspense(DashboardWithCreateTask),
+      },
+      {
         path: "workspaces/:name/goal/edit",
         element: withSuspense(EditGoal),
       },
@@ -244,4 +251,8 @@ function DashboardWithEmpty() {
 
 function DashboardWithWorkspace() {
   return <Dashboard><WorkspaceDetail /></Dashboard>;
+}
+
+function DashboardWithCreateTask() {
+  return <Dashboard><CreateTask /></Dashboard>;
 }

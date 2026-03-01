@@ -101,10 +101,6 @@ export function EditGoal(): JSX.Element {
       </Link>
 
       <h1 className="text-2xl font-semibold mb-2">Edit GOAL.md</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Edit the GOAL.md content for <span className="font-medium text-foreground">{workspaceName}</span>.
-      </p>
-
       {saveSuccess ? (
         <Alert className="mb-4 border-primary/50 bg-primary/5 text-primary">
           <CheckCircle2 className="h-4 w-4" />
@@ -121,7 +117,6 @@ export function EditGoal(): JSX.Element {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="goal-content">GOAL.md Content</Label>
           <MarkdownEditor
             value={content}
             onChange={(v) => setContent(v ?? "")}

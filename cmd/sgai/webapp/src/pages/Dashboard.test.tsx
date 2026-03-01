@@ -5,6 +5,7 @@ import { Dashboard } from "./Dashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { FactoryStateSnapshot } from "@/lib/factory-state";
 import { useFactoryState as _realUseFactoryState } from "@/lib/factory-state";
+import { createMockWorkspace, createMockFork } from "@/test/factories";
 
 const savedExports = {
   useFactoryState: _realUseFactoryState,
@@ -27,52 +28,44 @@ afterAll(() => {
 });
 
 const workspacesData: FactoryStateSnapshot["workspaces"] = [
-  {
+  createMockWorkspace({
     name: "project-alpha",
     dir: "/home/user/project-alpha",
     running: true,
     needsInput: false,
     inProgress: true,
-    pinned: false,
     isRoot: true,
     status: "Running",
     hasSgai: true,
     forks: [
-      {
+      createMockFork({
         name: "project-alpha-fork1",
         dir: "/home/user/project-alpha-fork1",
-        running: false,
         needsInput: true,
         inProgress: true,
-        pinned: false,
-        commitAhead: 0,
-        commits: [],
-      },
+        goalDescription: "Implement user authentication with OAuth2",
+      }),
     ],
-  },
-  {
+  }),
+  createMockWorkspace({
     name: "project-alpha-fork1",
     dir: "/home/user/project-alpha-fork1",
-    running: false,
     needsInput: true,
     inProgress: true,
-    pinned: false,
     isRoot: false,
     isFork: true,
     status: "Needs Input",
     hasSgai: true,
-  },
-  {
+    goalDescription: "Implement user authentication with OAuth2",
+  }),
+  createMockWorkspace({
     name: "project-beta",
     dir: "/home/user/project-beta",
-    running: false,
-    needsInput: false,
-    inProgress: false,
     pinned: true,
     isRoot: true,
     status: "Stopped",
     hasSgai: true,
-  },
+  }),
 ];
 
 function LocationDisplay() {
@@ -124,7 +117,7 @@ describe("Dashboard", () => {
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("renders workspace tree when data loads", async () => {
+  it("renders promoted forks and standalone workspaces when data loads", async () => {
     mockFactoryState = {
       workspaces: workspacesData,
       fetchStatus: "idle",
@@ -133,25 +126,81 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Implement user authentication with OAuth2").length).toBeGreaterThan(0);
     });
 
     expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
   });
 
-  it("renders forks under root workspace", async () => {
+  it("shows goalDescription for promoted forks instead of directory name", async () => {
     mockFactoryState = {
       workspaces: workspacesData,
       fetchStatus: "idle",
       lastFetchedAt: Date.now(),
     };
-    renderDashboard("/workspaces/project-alpha/progress");
+    renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Implement user authentication with OAuth2").length).toBeGreaterThan(0);
     });
+  });
 
-    expect(screen.getAllByText("project-alpha-fork1").length).toBeGreaterThan(0);
+  it("shows New task button for root repos in forked mode", async () => {
+    mockFactoryState = {
+      workspaces: workspacesData,
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("New task").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("renders forks as top-level items in forked mode", async () => {
+    mockFactoryState = {
+      workspaces: workspacesData,
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      const sidebar = document.querySelector("[data-sidebar='sidebar']");
+      expect(sidebar).toBeTruthy();
+
+      const links = sidebar!.querySelectorAll("a[href*='project-alpha-fork1']");
+      expect(links.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("falls back to fork name when goalDescription is absent", async () => {
+    const dataWithoutGoalDesc: FactoryStateSnapshot["workspaces"] = [
+      createMockWorkspace({
+        name: "project-gamma",
+        dir: "/home/user/project-gamma",
+        isRoot: true,
+        status: "Stopped",
+        hasSgai: true,
+        forks: [
+          createMockFork({
+            name: "happy-blue-3a2e",
+            dir: "/home/user/happy-blue-3a2e",
+          }),
+        ],
+      }),
+    ];
+    mockFactoryState = {
+      workspaces: dataWithoutGoalDesc,
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("happy-blue-3a2e").length).toBeGreaterThan(0);
+    });
   });
 
   it("renders in-progress section for running workspaces", async () => {
@@ -163,16 +212,9 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      const inProgressSection = document.querySelector(".mb-3.pb-2.border-b");
+      expect(inProgressSection).not.toBeNull();
     });
-
-    const inProgressSection = document.querySelector(".mb-3.pb-2.border-b");
-    expect(inProgressSection).not.toBeNull();
-
-    const links = inProgressSection!.querySelectorAll("a");
-    const linkNames = Array.from(links).map((a) => a.textContent?.trim());
-    expect(linkNames).toContain("project-alpha");
-    expect(linkNames).toContain("project-alpha-fork1");
   });
 
   it("renders workspace indicators (pinned, running, needs input)", async () => {
@@ -184,7 +226,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
     });
 
     const runningIndicators = document.querySelectorAll('[title="Running"]');
@@ -207,7 +249,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
     });
 
     const inProgressIndicators = document.querySelectorAll('[title="In progress"]');
@@ -295,7 +337,7 @@ describe("Dashboard", () => {
     const { rerender } = renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
     });
 
     act(() => {
@@ -337,7 +379,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
     });
 
     const inboxButtons = screen.getAllByRole("button", {
@@ -364,7 +406,7 @@ describe("Dashboard", () => {
     const { rerender } = renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
     });
 
     act(() => {
@@ -393,6 +435,49 @@ describe("Dashboard", () => {
 
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBe(0);
-    expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
+  });
+
+  it("renders standalone workspaces normally (without forks)", async () => {
+    const standaloneData: FactoryStateSnapshot["workspaces"] = [
+      createMockWorkspace({
+        name: "standalone-repo",
+        dir: "/home/user/standalone-repo",
+        isRoot: true,
+        status: "Stopped",
+        hasSgai: true,
+        summary: "A standalone project",
+      }),
+    ];
+    mockFactoryState = {
+      workspaces: standaloneData,
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("standalone-repo").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("A standalone project").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows goalDescription in in-progress section for forked workspaces", async () => {
+    mockFactoryState = {
+      workspaces: workspacesData,
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      const inProgressSection = document.querySelector(".mb-3.pb-2.border-b");
+      expect(inProgressSection).not.toBeNull();
+
+      const links = inProgressSection!.querySelectorAll("a");
+      const linkTexts = Array.from(links).map((a) => a.textContent?.trim());
+      const hasGoalDesc = linkTexts.some((t) => t?.includes("Implement user authentication with OAuth2"));
+      expect(hasGoalDesc).toBe(true);
+    });
   });
 });

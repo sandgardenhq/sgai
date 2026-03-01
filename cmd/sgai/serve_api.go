@@ -83,6 +83,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/start", s.handleAPIStartSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
+	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork-with-goal", s.handleAPIForkWithGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete", s.handleAPIDeleteWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
@@ -433,15 +434,16 @@ func (s *Server) collectForksForAPIFromGroups(rootDir string, groups []workspace
 				commits := convertJJCommitsForAPI(s.runJJLogForForkCached(bookmark, fork.Directory))
 				wfState := s.loadWorkspaceState(fork.Directory)
 				forks[i] = apiForkEntry{
-					Name:        fork.DirName,
-					Dir:         fork.Directory,
-					Running:     fork.Running,
-					NeedsInput:  wfState.NeedsHumanInput(),
-					InProgress:  fork.InProgress,
-					Pinned:      fork.Pinned,
-					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
-					Commits:     commits,
-					Summary:     wfState.Summary,
+					Name:            fork.DirName,
+					Dir:             fork.Directory,
+					Running:         fork.Running,
+					NeedsInput:      wfState.NeedsHumanInput(),
+					InProgress:      fork.InProgress,
+					Pinned:          fork.Pinned,
+					CommitAhead:     s.countForkCommitsAheadCached(bookmark, fork.Directory),
+					Commits:         commits,
+					Summary:         wfState.Summary,
+					GoalDescription: readGoalDescription(fork.Directory),
 				}
 			})
 		}
@@ -1160,15 +1162,16 @@ type apiForkCommit struct {
 }
 
 type apiForkEntry struct {
-	Name        string          `json:"name"`
-	Dir         string          `json:"dir"`
-	Running     bool            `json:"running"`
-	NeedsInput  bool            `json:"needsInput"`
-	InProgress  bool            `json:"inProgress"`
-	Pinned      bool            `json:"pinned"`
-	CommitAhead int             `json:"commitAhead"`
-	Commits     []apiForkCommit `json:"commits"`
-	Summary     string          `json:"summary,omitempty"`
+	Name            string          `json:"name"`
+	Dir             string          `json:"dir"`
+	Running         bool            `json:"running"`
+	NeedsInput      bool            `json:"needsInput"`
+	InProgress      bool            `json:"inProgress"`
+	Pinned          bool            `json:"pinned"`
+	CommitAhead     int             `json:"commitAhead"`
+	Commits         []apiForkCommit `json:"commits"`
+	Summary         string          `json:"summary,omitempty"`
+	GoalDescription string          `json:"goalDescription,omitempty"`
 }
 
 func convertJJCommitsForAPI(commits []jjCommit) []apiForkCommit {
@@ -1774,6 +1777,51 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 		Dir:    forkPath,
 		Parent: filepath.Base(workspacePath),
 	}); err != nil {
+		log.Println("failed to encode json response:", err)
+	}
+}
+
+type apiForkWithGoalRequest struct {
+	Content string `json:"content"`
+}
+
+type apiForkWithGoalResponse struct {
+	Name   string `json:"name"`
+	Dir    string `json:"dir"`
+	Parent string `json:"parent"`
+}
+
+func (s *Server) handleAPIForkWithGoal(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	if s.classifyWorkspaceCached(workspacePath) == workspaceFork {
+		http.Error(w, "forks cannot create new forks", http.StatusBadRequest)
+		return
+	}
+
+	var req apiForkWithGoalRequest
+	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Content) == "" {
+		http.Error(w, "content cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	result, errFork := s.forkWithGoalService(workspacePath, req.Content)
+	if errFork != nil {
+		http.Error(w, errFork.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(apiForkWithGoalResponse(result)); err != nil {
 		log.Println("failed to encode json response:", err)
 	}
 }

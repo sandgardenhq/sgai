@@ -16,6 +16,7 @@ import type {
   ApiComposeDraftResponse,
   ApiComposeSaveResponse,
   ApiForkResponse,
+  ApiForkWithGoalResponse,
   ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
@@ -95,6 +96,11 @@ export const api = {
       fetchJSON<ApiForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork`,
         { method: "POST", body: JSON.stringify({ name: forkName }) },
+      ),
+    forkWithGoal: (name: string, content: string) =>
+      fetchJSON<ApiForkWithGoalResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/fork-with-goal`,
+        { method: "POST", body: JSON.stringify({ content }) },
       ),
     rename: (name: string, newName: string) =>
       fetchJSON<ApiRenameResponse>(

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -103,6 +104,74 @@ func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspace
 		Dir:       forkPath,
 		Parent:    filepath.Base(workspacePath),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+type forkWithGoalResult struct {
+	Name   string
+	Dir    string
+	Parent string
+}
+
+func (s *Server) forkWithGoalService(workspacePath, goalContent string) (forkWithGoalResult, error) {
+	if s.classifyWorkspaceCached(workspacePath) == workspaceFork {
+		return forkWithGoalResult{}, fmt.Errorf("forks cannot create new forks")
+	}
+
+	name := generateRandomForkName()
+	if errMsg := validateWorkspaceName(name); errMsg != "" {
+		return forkWithGoalResult{}, fmt.Errorf("%s", errMsg)
+	}
+
+	parentDir := filepath.Dir(workspacePath)
+	forkPath := filepath.Join(parentDir, name)
+	if _, errStat := os.Stat(forkPath); errStat == nil {
+		return forkWithGoalResult{}, fmt.Errorf("a directory with this name already exists")
+	} else if !os.IsNotExist(errStat) {
+		return forkWithGoalResult{}, fmt.Errorf("failed to check workspace path")
+	}
+
+	cmd := exec.Command("jj", "workspace", "add", forkPath)
+	cmd.Dir = workspacePath
+	output, errFork := cmd.CombinedOutput()
+	if errFork != nil {
+		return forkWithGoalResult{}, fmt.Errorf("failed to fork workspace: %v: %s", errFork, output)
+	}
+
+	if errSkel := unpackSkeleton(forkPath); errSkel != nil {
+		return forkWithGoalResult{}, fmt.Errorf("failed to unpack skeleton: %w", errSkel)
+	}
+	if errExclude := addGitExclude(forkPath); errExclude != nil {
+		return forkWithGoalResult{}, fmt.Errorf("failed to add git exclude: %w", errExclude)
+	}
+
+	goalPath := filepath.Join(forkPath, "GOAL.md")
+	if errWrite := os.WriteFile(goalPath, []byte(goalContent), 0644); errWrite != nil {
+		return forkWithGoalResult{}, fmt.Errorf("failed to write GOAL.md: %w", errWrite)
+	}
+
+	description := goalDescriptionFromContent(goalContent)
+	coord := s.workspaceCoordinator(forkPath)
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		wf.Summary = description
+	}); errUpdate != nil {
+		return forkWithGoalResult{}, fmt.Errorf("failed to save fork state: %w", errUpdate)
+	}
+
+	s.invalidateWorkspaceScanCache()
+	s.classifyCache.delete(workspacePath)
+
+	s.mu.Lock()
+	s.pinnedDirs[forkPath] = true
+	s.mu.Unlock()
+	_ = s.savePinnedProjects()
+
+	s.notifyStateChange()
+
+	return forkWithGoalResult{
+		Name:   name,
+		Dir:    forkPath,
+		Parent: filepath.Base(workspacePath),
 	}, nil
 }
 
@@ -377,7 +446,7 @@ func (s *Server) deleteMessageService(workspacePath string, messageID int) (dele
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		for i, msg := range wf.Messages {
 			if msg.ID == messageID {
-				wf.Messages = append(wf.Messages[:i], wf.Messages[i+1:]...)
+				wf.Messages = slices.Delete(wf.Messages, i, i+1)
 				break
 			}
 		}

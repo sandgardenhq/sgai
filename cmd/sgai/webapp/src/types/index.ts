@@ -64,6 +64,7 @@ export interface ApiWorkspaceEntry {
   humanMessage: string;
   summary?: string;
   summaryManual?: boolean;
+  goalDescription?: string;
   agentSequence: ApiAgentSequenceEntry[];
   cost: ApiSessionCost;
   modelStatuses?: ApiModelStatusEntry[];
@@ -352,6 +353,12 @@ export interface ApiForkCommit {
   description: string;
 }
 
+export interface WorkspaceIndicatorData {
+  running: boolean;
+  needsInput: boolean;
+  pinned: boolean;
+}
+
 export interface ApiForkEntry {
   name: string;
   dir: string;
@@ -361,6 +368,7 @@ export interface ApiForkEntry {
   pinned: boolean;
   commitAhead: number;
   summary?: string;
+  goalDescription?: string;
   commits: ApiForkCommit[];
 }
 
@@ -446,6 +454,16 @@ export interface ApiForkRequest {
 }
 
 export interface ApiForkResponse {
+  name: string;
+  dir: string;
+  parent: string;
+}
+
+export interface ApiForkWithGoalRequest {
+  content: string;
+}
+
+export interface ApiForkWithGoalResponse {
   name: string;
   dir: string;
   parent: string;

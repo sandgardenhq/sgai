@@ -359,6 +359,7 @@ export function MarkdownEditor({
       className="border rounded-md overflow-hidden"
       style={{ minHeight: `${minHeight}px`, resize: "vertical", overflow: "auto" }}
       data-testid="markdown-editor"
+      data-value={value}
     >
       <div
         ref={modeBarRef}
