@@ -88,7 +88,7 @@ func parseFlow(flowSpec string, dir string) (*dag, error) {
 	var dotContent string
 
 	switch {
-	case flowSpec == "":
+	case isAutoFlowSpec(flowSpec):
 		dotContent = "digraph G {\n\"coordinator\" -> \"general-purpose\"\n}"
 	case strings.HasPrefix(flowSpec, "digraph"):
 		dotContent = flowSpec
@@ -333,7 +333,7 @@ func buildMultiModelSection(currentModel string, models map[string]any, currentA
 	return sb.String()
 }
 
-func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string) string {
+func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string, flowSpec string) string {
 	predecessors := d.getPredecessors(currentAgent)
 	predecessorsStr := strings.Join(predecessors, ", ")
 	if predecessorsStr == "" {
@@ -393,5 +393,20 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 		msg += snippetNudge
 	}
 
+	if currentAgent == "coordinator" && isAutoFlowSpec(flowSpec) {
+		msg += autoFlowNudge
+	}
+
 	return msg
 }
+
+func isAutoFlowSpec(flowSpec string) bool {
+	return flowSpec == "" || flowSpec == "auto"
+}
+
+const autoFlowNudge = `
+CRITICAL: The GOAL.md has no explicit agent flow configured (flow is empty or "auto").
+You MUST use the ` + "`auto-flow-mode`" + ` skill to survey available agents, analyze the workspace,
+select and pair appropriate agents, and update GOAL.md with the flow configuration.
+Call skills({"name":"auto-flow-mode"}) IMMEDIATELY.
+`
