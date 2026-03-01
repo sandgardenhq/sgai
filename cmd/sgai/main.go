@@ -867,7 +867,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 					}); errUpdate != nil {
 						log.Fatalln("failed to save state:", errUpdate)
 					}
-					output, errScript := runCompletionGateScript(cfg.dir, metadata.CompletionGateScript)
+					output, errScript := runCompletionGateScript(ctx, cfg.dir, metadata.CompletionGateScript)
 					if errScript != nil {
 						fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
 						newState.Status = state.StatusWorking
@@ -1326,14 +1326,26 @@ func hasPendingMessages(s *state.Workflow, coord *state.Coordinator, paddedsgai 
 	return false
 }
 
-func runCompletionGateScript(dir, script string) (string, error) {
-	cmd := exec.Command("sh", "-c", script)
+func runCompletionGateScript(ctx context.Context, dir, script string) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", "-c", script)
 	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(output), err
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	errStart := cmd.Start()
+	if errStart != nil {
+		return "", errStart
 	}
-	return string(output), nil
+
+	processExited := make(chan struct{})
+	go terminateProcessGroupOnCancel(ctx, cmd, processExited)
+
+	errWait := cmd.Wait()
+	close(processExited)
+	return buf.String(), errWait
 }
 
 func formatCompletionGateScriptFailureMessage(script, output string) string {

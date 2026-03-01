@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRunCompletionGateScript(t *testing.T) {
@@ -48,7 +50,7 @@ func TestRunCompletionGateScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := runCompletionGateScript(t.TempDir(), tt.script)
+			output, err := runCompletionGateScript(context.Background(), t.TempDir(), tt.script)
 
 			if tt.expectError && err == nil {
 				t.Error("expected error, got nil")
@@ -61,6 +63,44 @@ func TestRunCompletionGateScript(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunCompletionGateScriptContextCancellation(t *testing.T) {
+	t.Run("cancelledContextTerminatesScript", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+
+		start := time.Now()
+		_, err := runCompletionGateScript(ctx, t.TempDir(), "sleep 30")
+		elapsed := time.Since(start)
+
+		if err == nil {
+			t.Error("expected error from cancelled context, got nil")
+		}
+		if elapsed > 5*time.Second {
+			t.Errorf("script took %v to terminate, expected fast cancellation", elapsed)
+		}
+	})
+
+	t.Run("timeoutContextTerminatesScript", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		t.Cleanup(cancel)
+
+		start := time.Now()
+		_, err := runCompletionGateScript(ctx, t.TempDir(), "sleep 30")
+		elapsed := time.Since(start)
+
+		if err == nil {
+			t.Error("expected error from timed-out context, got nil")
+		}
+		if elapsed > 5*time.Second {
+			t.Errorf("script took %v to terminate, expected fast timeout", elapsed)
+		}
+	})
 }
 
 func TestFormatCompletionGateScriptFailureMessage(t *testing.T) {
