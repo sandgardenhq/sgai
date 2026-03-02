@@ -232,11 +232,26 @@ You stay in control.
 
 ## Contributing
 
-Sgai accepts improvements as specifications inside `GOALS/`.
+Contributions happen through specifications, not code.
 
-1. Create `GOALS/YYYY_MM_DD_feature_name.md`
-2. Describe desired behavior and success criteria
-3. Submit a PR
+**Why specification files instead of code?**
+
+sgai uses configurable AI engines under the hood, but it's the opinionated experience layer. Specifications are translated into implementation by AI. Source code is generated output, not the source of truth. Contributing specs means:
+
+- We discuss *what* to build, not *how* to build it
+- Conversations lead to better outcomes than isolated code changes
+- Maintainers can validate proposals against the current implementation
+
+**How to contribute:**
+
+1. Create a spec file in `GOALS/` following the naming convention:
+   `YYYY_MM_DD_summarized_name.md` (e.g., `2025_12_23_add_parallel_execution.md`)
+
+2. Submit a PR with your spec proposal
+
+3. Maintainers will discuss the proposal and, if accepted, run the specification against the current implementation to validate
+
+All are welcome. Questions? Open an issue.
 
 See the [GOALS directory](https://github.com/sandgardenhq/sgai/tree/main/GOALS) for examples.
 
