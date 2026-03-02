@@ -1382,6 +1382,13 @@ func (s *Server) pinnedFilePath() string {
 	return filepath.Join(s.pinnedConfigDir, "pinned.json")
 }
 
+func resolveSymlinks(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
+}
+
 func (s *Server) loadPinnedProjects() error {
 	data, errRead := os.ReadFile(s.pinnedFilePath())
 	if errRead != nil {
@@ -1397,7 +1404,7 @@ func (s *Server) loadPinnedProjects() error {
 	existing := make(map[string]bool, len(dirs))
 	for _, d := range dirs {
 		if _, errStat := os.Stat(d); errStat == nil {
-			existing[d] = true
+			existing[resolveSymlinks(d)] = true
 		}
 	}
 	s.mu.Lock()
@@ -1428,17 +1435,19 @@ func (s *Server) savePinnedProjects() error {
 }
 
 func (s *Server) isPinned(dir string) bool {
+	canonical := resolveSymlinks(dir)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.pinnedDirs[dir]
+	return s.pinnedDirs[canonical]
 }
 
 func (s *Server) togglePin(dir string) error {
+	canonical := resolveSymlinks(dir)
 	s.mu.Lock()
-	if s.pinnedDirs[dir] {
-		delete(s.pinnedDirs, dir)
+	if s.pinnedDirs[canonical] {
+		delete(s.pinnedDirs, canonical)
 	} else {
-		s.pinnedDirs[dir] = true
+		s.pinnedDirs[canonical] = true
 	}
 	s.mu.Unlock()
 	return s.savePinnedProjects()

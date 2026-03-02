@@ -939,7 +939,7 @@ func (s *Server) handleAPICreateWorkspace(w http.ResponseWriter, r *http.Request
 	s.invalidateWorkspaceScanCache()
 
 	s.mu.Lock()
-	s.pinnedDirs[workspacePath] = true
+	s.pinnedDirs[resolveSymlinks(workspacePath)] = true
 	s.mu.Unlock()
 	_ = s.savePinnedProjects()
 
@@ -1761,7 +1761,7 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 	s.classifyCache.delete(workspacePath)
 
 	s.mu.Lock()
-	s.pinnedDirs[forkPath] = true
+	s.pinnedDirs[resolveSymlinks(forkPath)] = true
 	s.mu.Unlock()
 	_ = s.savePinnedProjects()
 
@@ -1973,6 +1973,9 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 		log.Println("jj workspace rename failed:", errJJ, string(output))
 	}
 
+	canonicalOld := resolveSymlinks(workspacePath)
+	canonicalNew := resolveSymlinks(newPath)
+
 	s.mu.Lock()
 	if sess, ok := s.sessions[workspacePath]; ok {
 		delete(s.sessions, workspacePath)
@@ -1982,10 +1985,10 @@ func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request
 		delete(s.everStartedDirs, workspacePath)
 		s.everStartedDirs[newPath] = true
 	}
-	pinReKeyed := s.pinnedDirs[workspacePath]
+	pinReKeyed := s.pinnedDirs[canonicalOld]
 	if pinReKeyed {
-		delete(s.pinnedDirs, workspacePath)
-		s.pinnedDirs[newPath] = true
+		delete(s.pinnedDirs, canonicalOld)
+		s.pinnedDirs[canonicalNew] = true
 	}
 	if existing, ok := s.adhocStates[workspacePath]; ok {
 		delete(s.adhocStates, workspacePath)

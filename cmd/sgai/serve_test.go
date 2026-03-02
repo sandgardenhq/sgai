@@ -679,6 +679,8 @@ func TestLoadPinnedProjects(t *testing.T) {
 		configDir := t.TempDir()
 		dirA := t.TempDir()
 		dirB := t.TempDir()
+		canonicalA := resolveSymlinks(dirA)
+		canonicalB := resolveSymlinks(dirB)
 		data, _ := json.Marshal([]string{dirA, dirB})
 		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); err != nil {
 			t.Fatal(err)
@@ -693,11 +695,11 @@ func TestLoadPinnedProjects(t *testing.T) {
 		if len(srv.pinnedDirs) != 2 {
 			t.Fatalf("pinnedDirs should have 2 entries; got %d", len(srv.pinnedDirs))
 		}
-		if !srv.pinnedDirs[dirA] {
-			t.Errorf("expected %s to be pinned", dirA)
+		if !srv.pinnedDirs[canonicalA] {
+			t.Errorf("expected %s to be pinned", canonicalA)
 		}
-		if !srv.pinnedDirs[dirB] {
-			t.Errorf("expected %s to be pinned", dirB)
+		if !srv.pinnedDirs[canonicalB] {
+			t.Errorf("expected %s to be pinned", canonicalB)
 		}
 	})
 
@@ -718,6 +720,7 @@ func TestLoadPinnedProjects(t *testing.T) {
 	t.Run("prunesNonexistentDirectories", func(t *testing.T) {
 		configDir := t.TempDir()
 		realDir := t.TempDir()
+		canonicalDir := resolveSymlinks(realDir)
 		data, _ := json.Marshal([]string{realDir, "/nonexistent/path/that/does/not/exist"})
 		if err := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); err != nil {
 			t.Fatal(err)
@@ -732,8 +735,8 @@ func TestLoadPinnedProjects(t *testing.T) {
 		if len(srv.pinnedDirs) != 1 {
 			t.Fatalf("pinnedDirs should have 1 entry; got %d", len(srv.pinnedDirs))
 		}
-		if !srv.pinnedDirs[realDir] {
-			t.Errorf("expected %s to be pinned", realDir)
+		if !srv.pinnedDirs[canonicalDir] {
+			t.Errorf("expected %s to be pinned", canonicalDir)
 		}
 		diskData, err := os.ReadFile(filepath.Join(configDir, "pinned.json"))
 		if err != nil {
@@ -746,8 +749,8 @@ func TestLoadPinnedProjects(t *testing.T) {
 		if len(diskDirs) != 1 {
 			t.Fatalf("pinned.json on disk should have 1 entry; got %d", len(diskDirs))
 		}
-		if diskDirs[0] != realDir {
-			t.Errorf("pinned.json on disk should contain %s; got %s", realDir, diskDirs[0])
+		if diskDirs[0] != canonicalDir {
+			t.Errorf("pinned.json on disk should contain %s; got %s", canonicalDir, diskDirs[0])
 		}
 	})
 }
@@ -856,6 +859,139 @@ func TestTogglePin(t *testing.T) {
 			t.Error("pinned project should persist across server instances")
 		}
 	})
+}
+
+func TestPinnedProjectsSurviveSymlinkRestart(t *testing.T) {
+	realDir := t.TempDir()
+	symlinkParent := t.TempDir()
+	symlinkPath := filepath.Join(symlinkParent, "link")
+	if err := os.Symlink(realDir, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	workspaceName := "my-workspace"
+	workspaceUnderReal := filepath.Join(realDir, workspaceName)
+	if err := os.MkdirAll(workspaceUnderReal, 0o755); err != nil {
+		t.Fatalf("failed to create workspace dir: %v", err)
+	}
+	createsgaiDir(t, workspaceUnderReal)
+
+	configDir := filepath.Join(t.TempDir(), "sgai")
+	workspaceViaSymlink := filepath.Join(symlinkPath, workspaceName)
+
+	t.Run("pinViaSymlinkLoadViaReal", func(t *testing.T) {
+		srv1 := NewServerWithConfig(symlinkPath, "")
+		srv1.pinnedConfigDir = configDir
+		srv1.pinnedDirs = make(map[string]bool)
+
+		pinnedPath := filepath.Join(srv1.rootDir, workspaceName)
+		if errToggle := srv1.togglePin(pinnedPath); errToggle != nil {
+			t.Fatalf("togglePin() unexpected error: %v", errToggle)
+		}
+
+		srv2 := NewServerWithConfig(realDir, "")
+		srv2.pinnedConfigDir = configDir
+		srv2.pinnedDirs = make(map[string]bool)
+		if errLoad := srv2.loadPinnedProjects(); errLoad != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", errLoad)
+		}
+
+		canonicalWorkspace := filepath.Join(srv2.rootDir, workspaceName)
+		if !srv2.isPinned(canonicalWorkspace) {
+			t.Errorf("workspace pinned via symlink (%s) should remain pinned when loaded via real path (%s)",
+				workspaceViaSymlink, canonicalWorkspace)
+		}
+	})
+
+	t.Run("pinViaRealLoadViaSymlink", func(t *testing.T) {
+		configDir2 := filepath.Join(t.TempDir(), "sgai")
+
+		srv1 := NewServerWithConfig(realDir, "")
+		srv1.pinnedConfigDir = configDir2
+		srv1.pinnedDirs = make(map[string]bool)
+
+		pinnedPath := filepath.Join(srv1.rootDir, workspaceName)
+		if errToggle := srv1.togglePin(pinnedPath); errToggle != nil {
+			t.Fatalf("togglePin() unexpected error: %v", errToggle)
+		}
+
+		srv2 := NewServerWithConfig(symlinkPath, "")
+		srv2.pinnedConfigDir = configDir2
+		srv2.pinnedDirs = make(map[string]bool)
+		if errLoad := srv2.loadPinnedProjects(); errLoad != nil {
+			t.Fatalf("loadPinnedProjects() unexpected error: %v", errLoad)
+		}
+
+		canonicalWorkspace := filepath.Join(srv2.rootDir, workspaceName)
+		if !srv2.isPinned(canonicalWorkspace) {
+			t.Errorf("workspace pinned via real path should remain pinned when loaded via symlink path (%s)",
+				canonicalWorkspace)
+		}
+	})
+}
+
+func TestTogglePinResolvesSymlinks(t *testing.T) {
+	realDir := t.TempDir()
+	symlinkParent := t.TempDir()
+	symlinkPath := filepath.Join(symlinkParent, "link")
+	if err := os.Symlink(realDir, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	configDir := filepath.Join(t.TempDir(), "sgai")
+	srv := &Server{
+		pinnedDirs:      make(map[string]bool),
+		pinnedConfigDir: configDir,
+	}
+
+	if errToggle := srv.togglePin(symlinkPath); errToggle != nil {
+		t.Fatalf("togglePin() unexpected error: %v", errToggle)
+	}
+
+	if !srv.isPinned(realDir) {
+		t.Error("pinning via symlink should be queryable via real path")
+	}
+	if !srv.isPinned(symlinkPath) {
+		t.Error("pinning via symlink should be queryable via symlink path")
+	}
+}
+
+func TestLoadPinnedProjectsResolvesSymlinks(t *testing.T) {
+	realDir := t.TempDir()
+	symlinkParent := t.TempDir()
+	symlinkPath := filepath.Join(symlinkParent, "link")
+	if err := os.Symlink(realDir, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	realResolved, err := filepath.EvalSymlinks(realDir)
+	if err != nil {
+		t.Fatalf("failed to resolve real dir: %v", err)
+	}
+
+	configDir := filepath.Join(t.TempDir(), "sgai")
+	data, _ := json.Marshal([]string{symlinkPath})
+	if errDir := os.MkdirAll(configDir, 0o755); errDir != nil {
+		t.Fatal(errDir)
+	}
+	if errWrite := os.WriteFile(filepath.Join(configDir, "pinned.json"), data, 0o644); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+
+	srv := &Server{
+		pinnedDirs:      make(map[string]bool),
+		pinnedConfigDir: configDir,
+	}
+	if errLoad := srv.loadPinnedProjects(); errLoad != nil {
+		t.Fatalf("loadPinnedProjects() unexpected error: %v", errLoad)
+	}
+
+	if !srv.isPinned(realResolved) {
+		t.Errorf("loadPinnedProjects should resolve symlinks: expected %s to be pinned", realResolved)
+	}
+	if !srv.isPinned(symlinkPath) {
+		t.Errorf("isPinned should resolve symlinks: querying with symlink path %s should return true", symlinkPath)
+	}
 }
 
 func writeStateFile(t *testing.T, dir, status string) {
