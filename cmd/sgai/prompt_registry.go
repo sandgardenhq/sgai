@@ -69,6 +69,24 @@ You are running in Building mode. The brainstorming and work-gate phases are com
 const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify → ask project-critic-council → run retrospective → complete
 - When delegated work is done, send a message to project-critic-council to verify all GOAL.md checkboxes are genuinely complete
 - After project-critic-council approves, send a message to the retrospective agent to start analysis
+- IMPORTANT: The retrospective step is MANDATORY. You MUST send a message to the retrospective agent and wait for RETRO_COMPLETE before marking complete
+- Do NOT mark status:complete until the retrospective has finished
+`
+
+const flowSectionRetrospectiveMode = `# RETROSPECTIVE MODE ACTIVE
+You are running in Retrospective mode. The building phase is complete.
+- Human interaction tools (ask_user_question) are re-enabled
+- If you are the retrospective agent: analyze session artifacts and send RETRO_QUESTION messages to coordinator
+- If you are the coordinator: you MUST relay RETRO_QUESTION messages to the human using ask_user_question, then send the human's answer back to the retrospective agent
+- Do NOT skip the retrospective - it is a mandatory step
+`
+
+const flowSectionRetrospectiveModeCoordinator = `- You are in the RETRO_QUESTION relay phase
+- Check your inbox for messages from the retrospective agent
+- When you see RETRO_QUESTION: messages, relay them to the human using ask_user_question
+- Send the human's actual response back to the retrospective agent
+- When you see RETRO_COMPLETE: messages, proceed to mark the workflow as complete
+- Do NOT mark complete until RETRO_COMPLETE is received
 `
 
 const flowSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`
@@ -158,6 +176,8 @@ func modeSectionForMode(interactionMode string) (modeSection, coordinatorPlan st
 		return flowSectionContinuousMode, flowSectionContinuousModeCoordinator
 	case state.ModeBuilding:
 		return flowSectionBuildingMode, flowSectionBuildingModeCoordinator
+	case state.ModeRetrospective:
+		return flowSectionRetrospectiveMode, flowSectionRetrospectiveModeCoordinator
 	default:
 		return flowSectionBrainstormingMode, ""
 	}

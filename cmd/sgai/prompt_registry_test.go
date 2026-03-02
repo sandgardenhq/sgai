@@ -13,6 +13,7 @@ func TestComposePromptSharedSectionsInAllModes(t *testing.T) {
 		state.ModeBuilding,
 		state.ModeSelfDrive,
 		state.ModeContinuous,
+		state.ModeRetrospective,
 	}
 
 	sharedSections := []string{
@@ -84,6 +85,18 @@ func TestComposePromptModeSectionInjected(t *testing.T) {
 		})
 		if !strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
 			t.Error("brainstorming mode should inject ASK ME QUESTIONS BEFORE BUILDING")
+		}
+	})
+
+	t.Run("retrospectiveInjectsRetrospectiveMode", func(t *testing.T) {
+		modeSection, coordPlan := modeSectionForMode(state.ModeRetrospective)
+		msg := composePrompt(promptOptions{
+			agent:           "coordinator",
+			modeSection:     modeSection,
+			coordinatorPlan: coordPlan,
+		})
+		if !strings.Contains(msg, "RETROSPECTIVE MODE ACTIVE") {
+			t.Error("retrospective mode should inject RETROSPECTIVE MODE ACTIVE")
 		}
 	})
 }
@@ -160,6 +173,16 @@ func TestModeSectionForMode(t *testing.T) {
 		}
 		if coordPlan != "" {
 			t.Errorf("expected empty coordinator plan for brainstorming, got %q", coordPlan)
+		}
+	})
+
+	t.Run("retrospectiveReturnsCorrectSections", func(t *testing.T) {
+		modeSection, coordPlan := modeSectionForMode(state.ModeRetrospective)
+		if modeSection != flowSectionRetrospectiveMode {
+			t.Errorf("expected flowSectionRetrospectiveMode, got different section")
+		}
+		if coordPlan != flowSectionRetrospectiveModeCoordinator {
+			t.Errorf("expected flowSectionRetrospectiveModeCoordinator, got different plan")
 		}
 	})
 }

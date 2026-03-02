@@ -828,6 +828,42 @@ func TestBuildFlowMessageSelfDriveMode(t *testing.T) {
 			t.Error("empty mode message should not contain building instructions")
 		}
 	})
+
+	t.Run("retrospectiveModeIncludesRetrospectiveInstructions", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeRetrospective)
+		if !strings.Contains(msg, "RETROSPECTIVE MODE ACTIVE") {
+			t.Error("retrospective mode message should contain RETROSPECTIVE MODE ACTIVE")
+		}
+		if strings.Contains(msg, "SELF-DRIVE MODE ACTIVE") {
+			t.Error("retrospective mode message should not contain SELF-DRIVE MODE ACTIVE")
+		}
+		if strings.Contains(msg, "BUILDING MODE ACTIVE") {
+			t.Error("retrospective mode message should not contain BUILDING MODE ACTIVE")
+		}
+		if strings.Contains(msg, "ASK ME QUESTIONS BEFORE BUILDING") {
+			t.Error("retrospective mode message should not contain brainstorming prompt")
+		}
+	})
+
+	t.Run("retrospectiveModeCoordinatorIncludesRelayInstructions", func(t *testing.T) {
+		msg := buildFlowMessage(d, "coordinator", visits, dir, state.ModeRetrospective)
+		if !strings.Contains(msg, "RETRO_QUESTION relay phase") {
+			t.Error("retrospective mode coordinator message should contain RETRO_QUESTION relay instructions")
+		}
+		if !strings.Contains(msg, "RETRO_COMPLETE") {
+			t.Error("retrospective mode coordinator message should mention RETRO_COMPLETE")
+		}
+	})
+
+	t.Run("retrospectiveModeNonCoordinator", func(t *testing.T) {
+		msg := buildFlowMessage(d, "planner", visits, dir, state.ModeRetrospective)
+		if !strings.Contains(msg, "RETROSPECTIVE MODE ACTIVE") {
+			t.Error("retrospective mode for non-coordinator should contain RETROSPECTIVE MODE ACTIVE")
+		}
+		if strings.Contains(msg, "RETRO_QUESTION relay phase") {
+			t.Error("retrospective mode for non-coordinator should not contain coordinator relay instructions")
+		}
+	})
 }
 
 func truncateForTest(s string) string {
