@@ -25,7 +25,8 @@ export const Workbench: Plugin = async ({ directory }) => {
         url: process.env.SGAI_MCP_URL,
         headers: {
           "X-SGAI-Agent-Identity": process.env.SGAI_AGENT_IDENTITY || ""
-        }
+        },
+        timeout: 43200000
       };
     },
     // Tools are now provided by the MCP server configured above
