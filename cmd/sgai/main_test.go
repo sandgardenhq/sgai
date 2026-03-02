@@ -799,7 +799,7 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 		}
 	})
 
-	t.Run("selfDriveStaysSelfDrive", func(t *testing.T) {
+	t.Run("selfDriveTransitionsToRetrospective", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		stPath := filepath.Join(tmpDir, "state.json")
 
@@ -814,8 +814,48 @@ func TestUnlockInteractiveForRetrospective(t *testing.T) {
 
 		unlockInteractiveForRetrospective(&wf, "retrospective", coord, "test")
 
-		if wf.InteractionMode != state.ModeSelfDrive {
-			t.Errorf("InteractionMode should stay %q in self-drive mode, got %q", state.ModeSelfDrive, wf.InteractionMode)
+		if wf.InteractionMode != state.ModeRetrospective {
+			t.Errorf("InteractionMode should transition to %q from self-drive, got %q", state.ModeRetrospective, wf.InteractionMode)
+		}
+	})
+
+	t.Run("alreadyRetrospectiveNoTransition", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		stPath := filepath.Join(tmpDir, "state.json")
+
+		wf := state.Workflow{
+			InteractionMode: state.ModeRetrospective,
+			Status:          state.StatusWorking,
+		}
+		coord := state.NewCoordinatorEmpty(stPath)
+		if errUpdate := coord.UpdateState(func(s *state.Workflow) { *s = wf }); errUpdate != nil {
+			t.Fatal(errUpdate)
+		}
+
+		unlockInteractiveForRetrospective(&wf, "retrospective", coord, "test")
+
+		if wf.InteractionMode != state.ModeRetrospective {
+			t.Errorf("InteractionMode should stay %q, got %q", state.ModeRetrospective, wf.InteractionMode)
+		}
+	})
+
+	t.Run("brainstormingTransitionsToRetrospective", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		stPath := filepath.Join(tmpDir, "state.json")
+
+		wf := state.Workflow{
+			InteractionMode: state.ModeBrainstorming,
+			Status:          state.StatusWorking,
+		}
+		coord := state.NewCoordinatorEmpty(stPath)
+		if errUpdate := coord.UpdateState(func(s *state.Workflow) { *s = wf }); errUpdate != nil {
+			t.Fatal(errUpdate)
+		}
+
+		unlockInteractiveForRetrospective(&wf, "retrospective", coord, "test")
+
+		if wf.InteractionMode != state.ModeRetrospective {
+			t.Errorf("InteractionMode should transition to %q, got %q", state.ModeRetrospective, wf.InteractionMode)
 		}
 	})
 

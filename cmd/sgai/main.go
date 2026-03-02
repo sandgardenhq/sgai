@@ -402,7 +402,7 @@ func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent str
 	if currentAgent != "retrospective" {
 		return
 	}
-	if wfState.InteractionMode != state.ModeBuilding {
+	if wfState.InteractionMode == state.ModeRetrospective {
 		return
 	}
 	wfState.InteractionMode = state.ModeRetrospective

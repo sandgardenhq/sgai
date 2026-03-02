@@ -3,7 +3,7 @@
     {
       "name": "Create PR",
       "model": "anthropic/claude-opus-4-6",
-      "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
+      "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me. REMEMBER: 'GOALS' must never be the used commit message or PR title prefix",
       "description": "Create a draft pull request from current changes"
     },
     {
