@@ -39,7 +39,7 @@ func (s *Server) createWorkspaceService(name string) (createWorkspaceResult, err
 	s.invalidateWorkspaceScanCache()
 
 	s.mu.Lock()
-	s.pinnedDirs[workspacePath] = true
+	s.pinnedDirs[resolveSymlinks(workspacePath)] = true
 	s.mu.Unlock()
 	_ = s.savePinnedProjects()
 
@@ -92,7 +92,7 @@ func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspace
 	s.classifyCache.delete(workspacePath)
 
 	s.mu.Lock()
-	s.pinnedDirs[forkPath] = true
+	s.pinnedDirs[resolveSymlinks(forkPath)] = true
 	s.mu.Unlock()
 	_ = s.savePinnedProjects()
 
@@ -203,6 +203,9 @@ func (s *Server) renameWorkspaceService(workspacePath, newName string) (renameWo
 		return renameWorkspaceResult{}, fmt.Errorf("jj workspace rename failed: %v: %s", errJJ, output)
 	}
 
+	canonicalOld := resolveSymlinks(workspacePath)
+	canonicalNew := resolveSymlinks(newPath)
+
 	s.mu.Lock()
 	if existing, ok := s.sessions[workspacePath]; ok {
 		delete(s.sessions, workspacePath)
@@ -212,10 +215,10 @@ func (s *Server) renameWorkspaceService(workspacePath, newName string) (renameWo
 		delete(s.everStartedDirs, workspacePath)
 		s.everStartedDirs[newPath] = true
 	}
-	pinReKeyed := s.pinnedDirs[workspacePath]
+	pinReKeyed := s.pinnedDirs[canonicalOld]
 	if pinReKeyed {
-		delete(s.pinnedDirs, workspacePath)
-		s.pinnedDirs[newPath] = true
+		delete(s.pinnedDirs, canonicalOld)
+		s.pinnedDirs[canonicalNew] = true
 	}
 	if existing, ok := s.adhocStates[workspacePath]; ok {
 		delete(s.adhocStates, workspacePath)
@@ -339,7 +342,7 @@ func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceRe
 	}
 
 	s.mu.Lock()
-	delete(s.pinnedDirs, workspacePath)
+	delete(s.pinnedDirs, resolveSymlinks(workspacePath))
 	delete(s.sessions, workspacePath)
 	delete(s.everStartedDirs, workspacePath)
 	s.mu.Unlock()
