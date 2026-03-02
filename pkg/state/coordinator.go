@@ -108,6 +108,8 @@ func (c *Coordinator) UpdateState(fn func(*Workflow)) error {
 // AskAndWait sets the question state on the workflow, saves it, and blocks until
 // the human partner answers via Respond or the context is cancelled.
 // After the answer arrives, it clears the waiting state before returning.
+// On context cancellation, the question state is preserved so the UI
+// notification (⚠) remains visible for the human partner.
 // It returns the human's answer string or a context error.
 func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuestion, humanMessage string) (string, error) {
 	if err := c.UpdateState(func(wf *Workflow) {
@@ -117,29 +119,33 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 	}); err != nil {
 		return "", fmt.Errorf("saving question state: %w", err)
 	}
+	log.Println("askandwait: question state set, status changed to waiting-for-human")
 
-	clearWaiting := func() {
-		if err := c.UpdateState(func(wf *Workflow) {
-			wf.MultiChoiceQuestion = nil
-			wf.HumanMessage = ""
-			if IsHumanPending(wf.Status) {
-				wf.Status = StatusWorking
-			}
-		}); err != nil {
-			log.Println("failed to clear waiting state:", err)
-		}
-	}
-
+	log.Println("askandwait: blocking for human answer")
 	var answer string
 	select {
 	case <-ctx.Done():
-		clearWaiting()
+		log.Println("askandwait: context cancelled:", ctx.Err())
 		return "", ctx.Err()
 	case answer = <-c.answerCh:
+		log.Println("askandwait: answer received from human")
 	}
 
-	clearWaiting()
+	c.clearWaitingState()
 	return answer, nil
+}
+
+func (c *Coordinator) clearWaitingState() {
+	log.Println("askandwait: clearing waiting state")
+	if err := c.UpdateState(func(wf *Workflow) {
+		wf.MultiChoiceQuestion = nil
+		wf.HumanMessage = ""
+		if IsHumanPending(wf.Status) {
+			wf.Status = StatusWorking
+		}
+	}); err != nil {
+		log.Println("failed to clear waiting state:", err)
+	}
 }
 
 // Respond delivers the human's answer to the blocked AskAndWait call.
@@ -148,7 +154,9 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 func (c *Coordinator) Respond(answer string) {
 	select {
 	case c.answerCh <- answer:
+		log.Println("askandwait: response delivered to waiting caller")
 	default:
+		log.Println("askandwait: response dropped, no active waiter")
 	}
 }
 

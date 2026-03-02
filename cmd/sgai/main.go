@@ -899,12 +899,23 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			return newState
 
 		case state.StatusWaitingForHuman:
+			if newState.MultiChoiceQuestion != nil || newState.HumanMessage != "" {
+				log.Println("agent", cfg.agent, "has pending question after timeout, preserving state for notification")
+				if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
+					*wf = newState
+				}); errUpdate != nil {
+					log.Fatalln("failed to save state:", errUpdate)
+				}
+				wfState = newState
+				wfState.Status = state.StatusWorking
+				continue
+			}
 			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
 				*wf = newState
 			}); errUpdate != nil {
 				log.Fatalln("failed to save state:", errUpdate)
 			}
-			fmt.Println("["+cfg.paddedsgai+"]", "unexpected waiting-for-human status after blocking call; re-running...")
+			fmt.Println("["+cfg.paddedsgai+"]", "waiting-for-human status without pending question; re-running...")
 			wfState = newState
 			wfState.Status = state.StatusWorking
 			continue
