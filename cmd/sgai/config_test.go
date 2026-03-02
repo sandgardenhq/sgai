@@ -331,18 +331,106 @@ func setupOpencodeConfig(t *testing.T, dir string) {
 	}
 }
 
-func readOpencodeConfig(t *testing.T, dir string) opencodeConfig {
+type testOpencodeConfig struct {
+	Schema string                     `json:"$schema"`
+	MCP    map[string]json.RawMessage `json:"mcp"`
+}
+
+func readOpencodeConfig(t *testing.T, dir string) testOpencodeConfig {
 	t.Helper()
 	opencodePath := filepath.Join(dir, ".sgai", "opencode.jsonc")
 	data, err := os.ReadFile(opencodePath)
 	if err != nil {
 		t.Fatalf("reading opencode.jsonc: %v", err)
 	}
-	var oc opencodeConfig
+	var oc testOpencodeConfig
 	if err := json.Unmarshal(data, &oc); err != nil {
 		t.Fatalf("parsing opencode.jsonc: %v", err)
 	}
 	return oc
+}
+
+func TestApplyCustomMCPsPreservesAllFields(t *testing.T) {
+	dir := t.TempDir()
+	sgaiDir := filepath.Join(dir, ".sgai")
+	if err := os.MkdirAll(sgaiDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	originalContent := `{
+	"$schema": "https://opencode.ai/config.json",
+	"model": "anthropic/claude-opus-4-6",
+	"mcp": {
+		"playwright": {
+			"type": "local",
+			"command": ["npx", "@playwright/mcp@latest"]
+		}
+	},
+	"permission": {
+		"doom_loop": "deny",
+		"external_directory": "deny"
+	},
+	"experimental": {
+		"mcp_timeout": 43200000
+	}
+}`
+	opencodePath := filepath.Join(sgaiDir, "opencode.jsonc")
+	if err := os.WriteFile(opencodePath, []byte(originalContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	config := &projectConfig{
+		MCP: map[string]json.RawMessage{
+			"my-custom": json.RawMessage(`{"type":"local","command":["npx","my-tool"]}`),
+		},
+	}
+
+	if err := applyCustomMCPs(dir, config); err != nil {
+		t.Fatalf("applyCustomMCPs() = %v; want nil", err)
+	}
+
+	data, err := os.ReadFile(opencodePath)
+	if err != nil {
+		t.Fatalf("reading opencode.jsonc: %v", err)
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("parsing opencode.jsonc: %v", err)
+	}
+
+	for _, field := range []string{"$schema", "model", "mcp", "permission", "experimental"} {
+		if _, exists := raw[field]; !exists {
+			t.Errorf("field %q was dropped after applyCustomMCPs", field)
+		}
+	}
+
+	var experimental map[string]json.RawMessage
+	if err := json.Unmarshal(raw["experimental"], &experimental); err != nil {
+		t.Fatalf("parsing experimental: %v", err)
+	}
+	if _, exists := experimental["mcp_timeout"]; !exists {
+		t.Error("experimental.mcp_timeout was dropped")
+	}
+
+	var permission map[string]json.RawMessage
+	if err := json.Unmarshal(raw["permission"], &permission); err != nil {
+		t.Fatalf("parsing permission: %v", err)
+	}
+	if _, exists := permission["doom_loop"]; !exists {
+		t.Error("permission.doom_loop was dropped")
+	}
+
+	var mcp map[string]json.RawMessage
+	if err := json.Unmarshal(raw["mcp"], &mcp); err != nil {
+		t.Fatalf("parsing mcp: %v", err)
+	}
+	if _, exists := mcp["my-custom"]; !exists {
+		t.Error("new MCP 'my-custom' was not added")
+	}
+	if _, exists := mcp["playwright"]; !exists {
+		t.Error("existing MCP 'playwright' was dropped")
+	}
 }
 
 func TestLoadProjectConfigWithActions(t *testing.T) {

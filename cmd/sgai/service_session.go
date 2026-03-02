@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -120,11 +121,14 @@ func (s *Server) respondService(workspacePath, questionID, answer string, select
 		SelectedChoices: selectedChoices,
 	}
 
+	wsName := filepath.Base(workspacePath)
 	coord := s.sessionCoordinator(workspacePath)
 	if coord != nil {
+		log.Println("respond-service:", wsName, "delivering via session coordinator")
 		return s.respondViaCoordinatorService(coord, req)
 	}
 
+	log.Println("respond-service:", wsName, "no session coordinator found, falling back to legacy path")
 	return s.respondLegacyService(workspacePath, req)
 }
 
@@ -132,11 +136,13 @@ func (s *Server) respondViaCoordinatorService(coord *state.Coordinator, req apiR
 	wfState := coord.State()
 
 	if !wfState.NeedsHumanInput() {
+		log.Println("respond-service: coordinator path rejected, no pending question, status:", wfState.Status)
 		return respondResult{}, fmt.Errorf("no pending question")
 	}
 
 	currentID := generateQuestionID(wfState)
 	if req.QuestionID != currentID {
+		log.Println("respond-service: coordinator path rejected, question expired, got:", req.QuestionID, "want:", currentID)
 		return respondResult{}, fmt.Errorf("question expired")
 	}
 
@@ -165,15 +171,19 @@ func (s *Server) respondViaCoordinatorService(coord *state.Coordinator, req apiR
 }
 
 func (s *Server) respondLegacyService(workspacePath string, req apiRespondRequest) (respondResult, error) {
+	wsName := filepath.Base(workspacePath)
+	log.Println("respond-service:", wsName, "using legacy path (no channel delivery, state-only update)")
 	coord := s.workspaceCoordinator(workspacePath)
 	wfState := coord.State()
 
 	if !wfState.NeedsHumanInput() {
+		log.Println("respond-service:", wsName, "legacy path rejected, no pending question, status:", wfState.Status)
 		return respondResult{}, fmt.Errorf("no pending question in legacy path")
 	}
 
 	currentID := generateQuestionID(wfState)
 	if req.QuestionID != currentID {
+		log.Println("respond-service:", wsName, "legacy path rejected, question expired")
 		return respondResult{}, fmt.Errorf("question expired")
 	}
 

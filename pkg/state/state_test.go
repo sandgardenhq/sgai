@@ -1,10 +1,13 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestWorkflow_UnmarshalJSON_NewFormat(t *testing.T) {
@@ -539,6 +542,170 @@ func TestNewCoordinatorWith(t *testing.T) {
 		}
 		if loaded.Status != StatusComplete {
 			t.Errorf("Status = %q; want %q", loaded.Status, StatusComplete)
+		}
+	})
+}
+
+func waitForStatus(t *testing.T, coord *Coordinator, want string) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		if coord.State().Status == want {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for status %q, got %q", want, coord.State().Status)
+		default:
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
+
+func TestAskAndWaitPreservesStateOnContextCancel(t *testing.T) {
+	t.Run("contextCancelKeepsWaitingForHumanState", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Pick one", Choices: []string{"A", "B"}},
+			},
+		}
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := coord.AskAndWait(ctx, question, "Pick one")
+			errCh <- err
+		}()
+
+		waitForStatus(t, coord, StatusWaitingForHuman)
+
+		cancel()
+
+		err = <-errCh
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+
+		afterState := coord.State()
+		if afterState.Status != StatusWaitingForHuman {
+			t.Errorf("status should remain waiting-for-human after context cancel, got %q", afterState.Status)
+		}
+		if afterState.MultiChoiceQuestion == nil {
+			t.Error("question should persist after context cancel")
+		}
+		if afterState.HumanMessage != "Pick one" {
+			t.Errorf("humanMessage should persist after context cancel, got %q", afterState.HumanMessage)
+		}
+	})
+
+	t.Run("respondClearsStateNormally", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Pick one", Choices: []string{"A", "B"}},
+			},
+		}
+
+		type result struct {
+			answer string
+			err    error
+		}
+		done := make(chan result, 1)
+		go func() {
+			a, e := coord.AskAndWait(context.Background(), question, "Pick one")
+			done <- result{a, e}
+		}()
+
+		waitForStatus(t, coord, StatusWaitingForHuman)
+		coord.Respond("A")
+
+		r := <-done
+		if r.err != nil {
+			t.Fatalf("unexpected error: %v", r.err)
+		}
+		if r.answer != "A" {
+			t.Errorf("expected answer 'A', got %q", r.answer)
+		}
+
+		afterState := coord.State()
+		if afterState.Status == StatusWaitingForHuman {
+			t.Error("status should not be waiting-for-human after successful response")
+		}
+		if afterState.MultiChoiceQuestion != nil {
+			t.Error("question should be cleared after successful response")
+		}
+	})
+
+	t.Run("lateResponseAvailableOnNextAskAndWait", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Pick one", Choices: []string{"A", "B"}},
+			},
+		}
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := coord.AskAndWait(ctx, question, "Pick one")
+			errCh <- err
+		}()
+
+		waitForStatus(t, coord, StatusWaitingForHuman)
+		cancel()
+		<-errCh
+
+		coord.Respond("A")
+
+		type result struct {
+			answer string
+			err    error
+		}
+		done := make(chan result, 1)
+		go func() {
+			a, e := coord.AskAndWait(context.Background(), question, "Pick one")
+			done <- result{a, e}
+		}()
+
+		r := <-done
+		if r.err != nil {
+			t.Fatalf("unexpected error: %v", r.err)
+		}
+		if r.answer != "A" {
+			t.Errorf("expected late answer 'A', got %q", r.answer)
 		}
 	})
 }

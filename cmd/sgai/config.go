@@ -129,27 +129,34 @@ func applyCustomMCPs(dir string, config *projectConfig) error {
 		return fmt.Errorf("reading opencode.jsonc: %w", err)
 	}
 
-	var oc opencodeConfig
+	var oc map[string]json.RawMessage
 	if err := json.Unmarshal(data, &oc); err != nil {
 		return fmt.Errorf("parsing opencode.jsonc: %w", err)
 	}
 
-	if oc.MCP == nil {
-		oc.MCP = make(map[string]json.RawMessage)
+	mcpSection, err := extractMCPSection(oc)
+	if err != nil {
+		return fmt.Errorf("extracting mcp section: %w", err)
 	}
 
 	var added bool
 	for name, value := range config.MCP {
-		if _, exists := oc.MCP[name]; exists {
+		if _, exists := mcpSection[name]; exists {
 			continue
 		}
-		oc.MCP[name] = value
+		mcpSection[name] = value
 		added = true
 	}
 
 	if !added {
 		return nil
 	}
+
+	mcpRaw, err := json.Marshal(mcpSection)
+	if err != nil {
+		return fmt.Errorf("encoding mcp section: %w", err)
+	}
+	oc["mcp"] = mcpRaw
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -165,7 +172,14 @@ func applyCustomMCPs(dir string, config *projectConfig) error {
 	return nil
 }
 
-type opencodeConfig struct {
-	Schema string                     `json:"$schema"`
-	MCP    map[string]json.RawMessage `json:"mcp"`
+func extractMCPSection(oc map[string]json.RawMessage) (map[string]json.RawMessage, error) {
+	raw, exists := oc["mcp"]
+	if !exists {
+		return make(map[string]json.RawMessage), nil
+	}
+	var mcpSection map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &mcpSection); err != nil {
+		return nil, err
+	}
+	return mcpSection, nil
 }
