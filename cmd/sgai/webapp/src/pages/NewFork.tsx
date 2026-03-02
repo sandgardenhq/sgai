@@ -1,47 +1,68 @@
-import { useCallback, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useState, useCallback, useEffect, useTransition } from "react";
+import { useNavigate, useParams, Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
+import { stripFrontmatter } from "@/lib/markdown-utils";
+import { useForkTemplate } from "@/hooks/useForkTemplate";
 import { ArrowLeft, GitFork, Loader2 } from "lucide-react";
-import { Link } from "react-router";
 
 export function NewFork() {
   const { name: workspaceName = "" } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const [forkName, setForkName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const templateContent = useForkTemplate(workspaceName);
+  const [content, setContent] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, startSubmitTransition] = useTransition();
+
+  useEffect(() => {
+    if (templateContent) {
+      setContent(templateContent);
+    }
+  }, [templateContent]);
+
+  const bodyText = stripFrontmatter(content).trim();
+  const isBodyEmpty = bodyText.length === 0;
+
+  const handleContentChange = useCallback((value: string | undefined) => {
+    const newValue = value ?? "";
+    setContent(newValue);
+    const newBody = stripFrontmatter(newValue).trim();
+    if (newBody.length > 0) {
+      setValidationError(null);
+    }
+  }, []);
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
-      const trimmed = forkName.trim();
-      if (!trimmed || isSubmitting || !workspaceName) return;
-
-      setIsSubmitting(true);
-      setError(null);
-
-      try {
-        const result = await api.workspaces.fork(workspaceName, trimmed);
-        navigate(`/workspaces/${encodeURIComponent(result.name)}/goal/edit`);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.message);
-        } else {
-          setError("Failed to create fork");
-        }
-      } finally {
-        setIsSubmitting(false);
+      if (isBodyEmpty) {
+        setValidationError("Please write a goal description");
+        return;
       }
+      if (isSubmitting || !workspaceName) return;
+      setValidationError(null);
+      setSubmitError(null);
+      startSubmitTransition(async () => {
+        try {
+          const result = await api.workspaces.fork(workspaceName, content);
+          navigate(`/workspaces/${encodeURIComponent(result.name)}/progress`);
+        } catch (err) {
+          if (err instanceof ApiError) {
+            setSubmitError(err.message);
+          } else {
+            setSubmitError("Failed to create fork");
+          }
+        }
+      });
     },
-    [forkName, isSubmitting, workspaceName, navigate],
+    [isBodyEmpty, isSubmitting, workspaceName, content, navigate],
   );
 
   return (
-    <div className="max-w-lg mx-auto py-8">
+    <div className="max-w-2xl mx-auto py-8">
       <Link
         to={`/workspaces/${encodeURIComponent(workspaceName)}`}
         className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6"
@@ -52,34 +73,37 @@ export function NewFork() {
 
       <h1 className="text-2xl font-semibold mb-2">Fork Workspace</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Create a fork of <span className="font-medium text-foreground">{workspaceName}</span> to work on changes independently.
+        Write a GOAL.md for the new fork of{" "}
+        <span className="font-medium text-foreground">{workspaceName}</span>.
+        The fork name will be generated automatically.
       </p>
 
-      {error ? (
+      {submitError ? (
         <Alert className="mb-4 border-destructive/50 text-destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{submitError}</AlertDescription>
         </Alert>
       ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="fork-name">Fork Name</Label>
-          <Input
-            id="fork-name"
-            value={forkName}
-            onChange={(e) => setForkName(e.target.value)}
-            placeholder="my-feature-branch"
-            autoFocus
-            disabled={isSubmitting}
-          />
-          <p className="text-xs text-muted-foreground">
-            Use lowercase letters, numbers, and hyphens only.
+        <MarkdownEditor
+          value={content}
+          onChange={handleContentChange}
+          minHeight={200}
+          defaultHeight={300}
+          disabled={isSubmitting}
+          placeholder="Describe the goal for this fork..."
+          workspaceName={workspaceName}
+        />
+
+        {validationError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {validationError}
           </p>
-        </div>
+        ) : null}
 
         <Button
           type="submit"
-          disabled={isSubmitting || !forkName.trim()}
+          disabled={isSubmitting || isBodyEmpty}
           className="w-full"
         >
           {isSubmitting ? (

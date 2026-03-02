@@ -272,27 +272,6 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyExternalResult{}, err
 	})
 
-	type updateSummaryArgs struct {
-		Workspace string `json:"workspace" jsonschema:"The workspace name"`
-		Summary   string `json:"summary" jsonschema:"The summary text"`
-	}
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "update_summary",
-		Description: "Update the summary for a workspace.",
-		InputSchema: mustSchema[updateSummaryArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args updateSummaryArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
-		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
-		if err != nil {
-			return nil, emptyExternalResult{}, err
-		}
-		updateResult, err := ctx.srv.updateSummaryService(workspacePath, args.Summary)
-		if err != nil {
-			return nil, emptyExternalResult{}, err
-		}
-		result, err := jsonResult(updateResult)
-		return result, emptyExternalResult{}, err
-	})
-
 	type togglePinArgs struct {
 		Workspace string `json:"workspace" jsonschema:"The workspace name"`
 	}

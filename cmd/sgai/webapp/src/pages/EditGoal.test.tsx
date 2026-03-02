@@ -84,13 +84,12 @@ describe("EditGoal", () => {
     expect(textarea.value).toBe(mockGoalContent);
   });
 
-  test("renders save and cancel buttons", async () => {
+  test("renders save button", async () => {
     fetchSpy = mockFetchSequence([mockGoalResponse]);
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
     expect(screen.getByText("Save GOAL.md")).toBeTruthy();
-    expect(screen.getByText("Cancel")).toBeTruthy();
   });
 
   test("renders back link", async () => {
@@ -98,7 +97,7 @@ describe("EditGoal", () => {
     await act(async () => { renderPage(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
-    expect(screen.getByText("Back to test-ws")).toBeTruthy();
+    expect(screen.getByLabelText("Back to test-ws")).toBeTruthy();
   });
 
   test("saves and shows success message", async () => {

@@ -16,6 +16,7 @@ import type {
   ApiComposeDraftResponse,
   ApiComposeSaveResponse,
   ApiForkResponse,
+  ApiForkTemplateResponse,
   ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
@@ -25,7 +26,6 @@ import type {
   ApiOpenEditorResponse,
   ApiDeleteForkResponse,
   ApiDeleteWorkspaceResponse,
-  ApiUpdateSummaryResponse,
   ApiDiffResponse,
   ApiDeleteMessageResponse,
 } from "../types";
@@ -91,10 +91,10 @@ export const api = {
           body: JSON.stringify(request),
         },
       ),
-    fork: (name: string, forkName: string) =>
+    fork: (name: string, goalContent: string) =>
       fetchJSON<ApiForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork`,
-        { method: "POST", body: JSON.stringify({ name: forkName }) },
+        { method: "POST", body: JSON.stringify({ goalContent }) },
       ),
     rename: (name: string, newName: string) =>
       fetchJSON<ApiRenameResponse>(
@@ -160,11 +160,6 @@ export const api = {
         `/api/v1/workspaces/${encodeURIComponent(name)}/delete`,
         { method: "POST", body: JSON.stringify({ confirm: true }) },
       ),
-    updateSummary: (name: string, summary: string) =>
-      fetchJSON<ApiUpdateSummaryResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/summary`,
-        { method: "PUT", body: JSON.stringify({ summary }) },
-      ),
     getDiff: (name: string) =>
       fetchJSON<ApiDiffResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
@@ -173,6 +168,10 @@ export const api = {
       fetchJSON<ApiDeleteMessageResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/messages/${messageId}`,
         { method: "DELETE" },
+      ),
+    forkTemplate: (name: string) =>
+      fetchJSON<ApiForkTemplateResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/fork-template`,
       ),
   },
 

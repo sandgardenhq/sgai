@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -87,8 +88,8 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete", s.handleAPIDeleteWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/goal", s.handleAPIGetGoal)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/fork-template", s.handleAPIForkTemplate)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
-	mux.HandleFunc("PUT /api/v1/workspaces/{name}/summary", s.handleAPIUpdateSummary)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStatus)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhoc)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
@@ -165,6 +166,7 @@ type apiWorkspaceFullState struct {
 	CurrentModel    string                      `json:"currentModel"`
 	Task            string                      `json:"task"`
 	GoalContent     string                      `json:"goalContent"`
+	Description     string                      `json:"description"`
 	RawGoalContent  string                      `json:"rawGoalContent"`
 	FullGoalContent string                      `json:"fullGoalContent"`
 	PMContent       string                      `json:"pmContent"`
@@ -173,8 +175,6 @@ type apiWorkspaceFullState struct {
 	TotalExecTime   string                      `json:"totalExecTime"`
 	LatestProgress  string                      `json:"latestProgress"`
 	HumanMessage    string                      `json:"humanMessage"`
-	Summary         string                      `json:"summary,omitempty"`
-	SummaryManual   bool                        `json:"summaryManual,omitempty"`
 	AgentSequence   []apiAgentSequenceEntry     `json:"agentSequence"`
 	Cost            state.SessionCost           `json:"cost"`
 	ModelStatuses   []apiModelStatusEntry       `json:"modelStatuses,omitempty"`
@@ -352,6 +352,11 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		}
 	}
 
+	description := extractGoalDescription(fullGoalContent)
+	if description == "" {
+		description = ws.DirName
+	}
+
 	full := apiWorkspaceFullState{
 		Name:            ws.DirName,
 		Dir:             ws.Directory,
@@ -372,6 +377,7 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		CurrentModel:    resolveCurrentModel(ws.Directory, wfState),
 		Task:            wfState.Task,
 		GoalContent:     goalContent,
+		Description:     description,
 		RawGoalContent:  rawGoalContent,
 		FullGoalContent: fullGoalContent,
 		PMContent:       pmContent,
@@ -380,8 +386,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		TotalExecTime:   totalExecTime,
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		HumanMessage:    wfState.HumanMessage,
-		Summary:         wfState.Summary,
-		SummaryManual:   wfState.SummaryManual,
 		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
 		ModelStatuses:   modelStatuses,
@@ -432,6 +436,12 @@ func (s *Server) collectForksForAPIFromGroups(rootDir string, groups []workspace
 			wg.Go(func() {
 				commits := convertJJCommitsForAPI(s.runJJLogForForkCached(bookmark, fork.Directory))
 				wfState := s.loadWorkspaceState(fork.Directory)
+				description := fork.DirName
+				if goalData, errGoal := os.ReadFile(filepath.Join(fork.Directory, "GOAL.md")); errGoal == nil {
+					if extracted := extractGoalDescription(string(goalData)); extracted != "" {
+						description = extracted
+					}
+				}
 				forks[i] = apiForkEntry{
 					Name:        fork.DirName,
 					Dir:         fork.Directory,
@@ -441,7 +451,7 @@ func (s *Server) collectForksForAPIFromGroups(rootDir string, groups []workspace
 					Pinned:      fork.Pinned,
 					CommitAhead: s.countForkCommitsAheadCached(bookmark, fork.Directory),
 					Commits:     commits,
-					Summary:     wfState.Summary,
+					Description: description,
 				}
 			})
 		}
@@ -912,43 +922,22 @@ func (s *Server) handleAPICreateWorkspace(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if errMsg := validateWorkspaceName(req.Name); errMsg != "" {
-		http.Error(w, errMsg, http.StatusBadRequest)
+	result, errCreate := s.createWorkspaceService(req.Name)
+	if errCreate != nil {
+		statusCode := http.StatusInternalServerError
+		switch {
+		case errors.Is(errCreate, errDirectoryExists):
+			statusCode = http.StatusConflict
+		case errors.Is(errCreate, errWorkspaceNameInvalid):
+			statusCode = http.StatusBadRequest
+		}
+		http.Error(w, errCreate.Error(), statusCode)
 		return
 	}
-
-	workspacePath := filepath.Join(s.rootDir, req.Name)
-	if _, errStat := os.Stat(workspacePath); errStat == nil {
-		http.Error(w, "a directory with this name already exists", http.StatusConflict)
-		return
-	} else if !os.IsNotExist(errStat) {
-		http.Error(w, "failed to check workspace path", http.StatusInternalServerError)
-		return
-	}
-
-	if errMkdir := os.MkdirAll(workspacePath, 0755); errMkdir != nil {
-		http.Error(w, "failed to create workspace directory", http.StatusInternalServerError)
-		return
-	}
-
-	if errInit := initializeWorkspace(workspacePath); errInit != nil {
-		http.Error(w, "failed to initialize workspace", http.StatusInternalServerError)
-		return
-	}
-
-	s.invalidateWorkspaceScanCache()
-
-	s.mu.Lock()
-	s.pinnedDirs[resolveSymlinks(workspacePath)] = true
-	s.mu.Unlock()
-	_ = s.savePinnedProjects()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(apiCreateWorkspaceResponse{
-		Name: req.Name,
-		Dir:  workspacePath,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(apiCreateWorkspaceResponse(result)); err != nil {
 		log.Println("failed to encode json response:", err)
 	}
 }
@@ -1168,7 +1157,7 @@ type apiForkEntry struct {
 	Pinned      bool            `json:"pinned"`
 	CommitAhead int             `json:"commitAhead"`
 	Commits     []apiForkCommit `json:"commits"`
-	Summary     string          `json:"summary,omitempty"`
+	Description string          `json:"description"`
 }
 
 func convertJJCommitsForAPI(commits []jjCommit) []apiForkCommit {
@@ -1696,7 +1685,7 @@ func (s *Server) handleAPIComposeDraft(w http.ResponseWriter, r *http.Request) {
 }
 
 type apiForkRequest struct {
-	Name string `json:"name"`
+	GoalContent string `json:"goalContent"`
 }
 
 type apiForkResponse struct {
@@ -1712,68 +1701,30 @@ func (s *Server) handleAPIForkWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if s.classifyWorkspaceCached(workspacePath) == workspaceFork {
-		http.Error(w, "forks cannot create new forks", http.StatusBadRequest)
-		return
-	}
-
 	var req apiForkRequest
 	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	name := normalizeForkName(req.Name)
-	if errMsg := validateWorkspaceName(name); errMsg != "" {
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return
-	}
-
-	parentDir := filepath.Dir(workspacePath)
-	forkPath := filepath.Join(parentDir, name)
-	if _, errStat := os.Stat(forkPath); errStat == nil {
-		http.Error(w, "a directory with this name already exists", http.StatusConflict)
-		return
-	} else if !os.IsNotExist(errStat) {
-		http.Error(w, "failed to check workspace path", http.StatusInternalServerError)
-		return
-	}
-
-	cmd := exec.Command("jj", "workspace", "add", forkPath)
-	cmd.Dir = workspacePath
-	output, errFork := cmd.CombinedOutput()
+	result, errFork := s.forkWorkspaceService(workspacePath, req.GoalContent)
 	if errFork != nil {
-		http.Error(w, fmt.Sprintf("failed to fork workspace: %v: %s", errFork, output), http.StatusInternalServerError)
+		statusCode := http.StatusInternalServerError
+		switch {
+		case errors.Is(errFork, errForkOfFork):
+			statusCode = http.StatusBadRequest
+		case errors.Is(errFork, errGoalContentEmpty):
+			statusCode = http.StatusBadRequest
+		case errors.Is(errFork, errDirectoryExists):
+			statusCode = http.StatusConflict
+		}
+		http.Error(w, errFork.Error(), statusCode)
 		return
 	}
-
-	if errSkel := unpackSkeleton(forkPath); errSkel != nil {
-		log.Println("failed to unpack skeleton for fork:", errSkel)
-	}
-	if errExclude := addGitExclude(forkPath); errExclude != nil {
-		log.Println("failed to add git exclude for fork:", errExclude)
-	}
-	if errGoal := writeGoalExample(forkPath); errGoal != nil {
-		log.Println("failed to create GOAL.md for fork:", errGoal)
-	}
-
-	s.invalidateWorkspaceScanCache()
-	s.classifyCache.delete(workspacePath)
-
-	s.mu.Lock()
-	s.pinnedDirs[resolveSymlinks(forkPath)] = true
-	s.mu.Unlock()
-	_ = s.savePinnedProjects()
-
-	s.notifyStateChange()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(apiForkResponse{
-		Name:   name,
-		Dir:    forkPath,
-		Parent: filepath.Base(workspacePath),
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(apiForkResponse(result)); err != nil {
 		log.Println("failed to encode json response:", err)
 	}
 }
@@ -2044,6 +1995,77 @@ func (s *Server) handleAPIGetGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, apiGoalResponse{Content: string(data)})
 }
 
+type apiForkTemplateResponse struct {
+	Content string `json:"content"`
+}
+
+func (s *Server) handleAPIForkTemplate(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	if s.classifyWorkspaceCached(workspacePath) != workspaceRoot {
+		http.Error(w, "workspace is not a root workspace", http.StatusBadRequest)
+		return
+	}
+
+	content := s.resolveForkTemplateContent(workspacePath)
+	writeJSON(w, apiForkTemplateResponse{Content: content})
+}
+
+func (s *Server) resolveForkTemplateContent(rootDir string) string {
+	groups, errScan := s.scanWorkspaceGroups()
+	if errScan != nil {
+		return goalExampleContent
+	}
+
+	for _, grp := range groups {
+		if grp.Root.Directory != rootDir {
+			continue
+		}
+		if len(grp.Forks) == 0 {
+			return goalExampleContent
+		}
+		content := readNewestForkGoal(grp.Forks)
+		if content != "" {
+			return content
+		}
+		return goalExampleContent
+	}
+	return goalExampleContent
+}
+
+func readNewestForkGoal(forks []workspaceInfo) string {
+	type forkWithTime struct {
+		dir     string
+		modTime time.Time
+	}
+	candidates := make([]forkWithTime, 0, len(forks))
+	for _, fork := range forks {
+		goalPath := filepath.Join(fork.Directory, "GOAL.md")
+		info, errStat := os.Stat(goalPath)
+		if errStat != nil {
+			continue
+		}
+		candidates = append(candidates, forkWithTime{dir: fork.Directory, modTime: info.ModTime()})
+	}
+	slices.SortFunc(candidates, func(a, b forkWithTime) int {
+		return b.modTime.Compare(a.modTime)
+	})
+	for _, c := range candidates {
+		data, errRead := os.ReadFile(filepath.Join(c.dir, "GOAL.md"))
+		if errRead != nil {
+			continue
+		}
+		content := string(data)
+		if strings.TrimSpace(content) != "" {
+			return content
+		}
+	}
+	return ""
+}
+
 type apiUpdateGoalRequest struct {
 	Content string `json:"content"`
 }
@@ -2085,49 +2107,6 @@ func (s *Server) handleAPIUpdateGoal(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, apiUpdateGoalResponse{
 		Updated:   true,
 		Workspace: filepath.Base(workspacePath),
-	})
-}
-
-type apiUpdateSummaryRequest struct {
-	Summary string `json:"summary"`
-}
-
-type apiUpdateSummaryResponse struct {
-	Updated   bool   `json:"updated"`
-	Summary   string `json:"summary"`
-	Workspace string `json:"workspace"`
-}
-
-func (s *Server) handleAPIUpdateSummary(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiUpdateSummaryRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	coord := s.workspaceCoordinator(workspacePath)
-	summary := strings.TrimSpace(req.Summary)
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.Summary = summary
-		wf.SummaryManual = true
-	}); errUpdate != nil {
-		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
-		return
-	}
-
-	workspaceName := filepath.Base(workspacePath)
-	s.notifyStateChange()
-
-	writeJSON(w, apiUpdateSummaryResponse{
-		Updated:   true,
-		Summary:   summary,
-		Workspace: workspaceName,
 	})
 }
 

@@ -51,7 +51,7 @@ func TestForkWorkspacePinsByDefault(t *testing.T) {
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
 
-	body := strings.NewReader(`{"name":"pinned-fork"}`)
+	body := strings.NewReader(`{"goalContent":"Build a pinned fork"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()

@@ -13,15 +13,14 @@ import (
 )
 
 type workspaceStateSnapshot struct {
-	modTime             time.Time
-	status              string
-	needsInput          bool
-	progressLen         int
-	todosHash           string
-	messagesHash        string
-	goalModTime         time.Time
-	goalHash            string
-	summaryGenTriggered bool
+	modTime      time.Time
+	status       string
+	needsInput   bool
+	progressLen  int
+	todosHash    string
+	messagesHash string
+	goalModTime  time.Time
+	goalHash     string
 }
 
 func (s *Server) startStateWatcher() {
@@ -97,22 +96,11 @@ func (s *Server) checkWorkspaceState(dir string, snapshots map[string]workspaceS
 	current := buildStateSnapshot(info.ModTime(), wfState, goalInfo)
 
 	if !hasPrev {
-		if s.summaryGen != nil && wfState.Summary == "" && !wfState.SummaryManual {
-			current.summaryGenTriggered = true
-			s.summaryGen.trigger(dir)
-		}
 		snapshots[dir] = current
 		return
 	}
 
 	s.emitStateChangeEvents(dir, prev, current)
-
-	if s.summaryGen != nil && wfState.Summary == "" && !wfState.SummaryManual && !prev.summaryGenTriggered {
-		current.summaryGenTriggered = true
-		s.summaryGen.trigger(dir)
-	} else if prev.summaryGenTriggered {
-		current.summaryGenTriggered = true
-	}
 
 	snapshots[dir] = current
 }
@@ -133,17 +121,13 @@ func buildStateSnapshot(modTime time.Time, wfState state.Workflow, goalInfo os.F
 	return snapshot
 }
 
-func (s *Server) emitStateChangeEvents(workspacePath string, prev, current workspaceStateSnapshot) {
+func (s *Server) emitStateChangeEvents(_ string, prev, current workspaceStateSnapshot) {
 	changed := prev.status != current.status ||
 		prev.needsInput != current.needsInput ||
 		current.progressLen > prev.progressLen ||
 		prev.todosHash != current.todosHash ||
 		prev.messagesHash != current.messagesHash ||
 		prev.goalHash != current.goalHash
-
-	if prev.goalHash != current.goalHash && s.summaryGen != nil {
-		s.summaryGen.trigger(workspacePath)
-	}
 
 	if changed {
 		s.notifyStateChange()

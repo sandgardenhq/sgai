@@ -53,6 +53,102 @@ func setupM6ForkWorkspace(t *testing.T) (string, string, *Server) {
 	return rootDir, forkPath, srv
 }
 
+func TestGenerateRandomForkName(t *testing.T) {
+	t.Run("matchesExpectedPattern", func(t *testing.T) {
+		const allowedSuffixChars = "0123456789aeiou"
+		isLowercaseAlpha := func(s string) bool {
+			for _, ch := range s {
+				if ch < 'a' || ch > 'z' {
+					return false
+				}
+			}
+			return len(s) > 0
+		}
+		for range 100 {
+			name := generateRandomForkName()
+			parts := strings.SplitN(name, "-", 3)
+			if len(parts) != 3 {
+				t.Fatalf("name %q does not have 3 dash-separated parts", name)
+			}
+			if !isLowercaseAlpha(parts[0]) {
+				t.Errorf("adjective %q is not lowercase alpha", parts[0])
+			}
+			if !isLowercaseAlpha(parts[1]) {
+				t.Errorf("color %q is not lowercase alpha", parts[1])
+			}
+			if len(parts[2]) != 4 {
+				t.Errorf("suffix %q should be 4 characters", parts[2])
+			}
+			for _, ch := range parts[2] {
+				if !strings.ContainsRune(allowedSuffixChars, ch) {
+					t.Errorf("suffix character %q not in allowed set", string(ch))
+				}
+			}
+		}
+	})
+
+	t.Run("passesWorkspaceNameValidation", func(t *testing.T) {
+		for range 50 {
+			name := generateRandomForkName()
+			if errMsg := validateWorkspaceName(name); errMsg != "" {
+				t.Errorf("generated name %q failed validation: %s", name, errMsg)
+			}
+		}
+	})
+
+	t.Run("producesVariety", func(t *testing.T) {
+		seen := make(map[string]bool)
+		for range 50 {
+			seen[generateRandomForkName()] = true
+		}
+		if len(seen) < 40 {
+			t.Errorf("expected at least 40 unique names out of 50, got %d", len(seen))
+		}
+	})
+}
+
+func TestGoalContentBodyIsEmpty(t *testing.T) {
+	t.Run("emptyString", func(t *testing.T) {
+		if !goalContentBodyIsEmpty("") {
+			t.Error("empty string should be considered empty")
+		}
+	})
+
+	t.Run("whitespaceOnly", func(t *testing.T) {
+		if !goalContentBodyIsEmpty("   \n\t  ") {
+			t.Error("whitespace-only should be considered empty")
+		}
+	})
+
+	t.Run("frontmatterOnly", func(t *testing.T) {
+		content := "---\nflow: |\n  a -> b\n---\n"
+		if !goalContentBodyIsEmpty(content) {
+			t.Error("frontmatter-only content should be considered empty")
+		}
+	})
+
+	t.Run("frontmatterWithWhitespaceBody", func(t *testing.T) {
+		content := "---\nflow: |\n  a -> b\n---\n   \n  \n"
+		if !goalContentBodyIsEmpty(content) {
+			t.Error("frontmatter with whitespace body should be considered empty")
+		}
+	})
+
+	t.Run("contentWithBody", func(t *testing.T) {
+		content := "Build a web app"
+		if goalContentBodyIsEmpty(content) {
+			t.Error("content with body text should not be considered empty")
+		}
+	})
+
+	t.Run("frontmatterWithBody", func(t *testing.T) {
+		content := "---\nflow: |\n  a -> b\n---\nBuild a web app"
+		if goalContentBodyIsEmpty(content) {
+			t.Error("frontmatter with body should not be considered empty")
+		}
+	})
+}
+
 func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("successfulFork", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
@@ -60,7 +156,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
-		body := strings.NewReader(`{"name":"my-fork"}`)
+		body := strings.NewReader(`{"goalContent":"Build a web app with authentication"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -74,21 +170,73 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if result.Name != "my-fork" {
-			t.Errorf("name = %q; want %q", result.Name, "my-fork")
+		if result.Name == "" {
+			t.Error("name should be auto-generated, not empty")
 		}
 		if result.Parent != "root-workspace" {
 			t.Errorf("parent = %q; want %q", result.Parent, "root-workspace")
 		}
+		if result.CreatedAt == "" {
+			t.Error("createdAt should not be empty")
+		}
 	})
 
-	t.Run("rejectsInvalidName", func(t *testing.T) {
+	t.Run("writesGoalContent", func(t *testing.T) {
+		rootDir, _, srv := setupM6TestWorkspace(t)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		goalText := "Build a REST API for user management"
+		body := strings.NewReader(`{"goalContent":"` + goalText + `"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusCreated {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusCreated, resp.Body.String())
+		}
+
+		var result apiForkResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		goalPath := filepath.Join(rootDir, result.Name, "GOAL.md")
+		content, errRead := os.ReadFile(goalPath)
+		if errRead != nil {
+			t.Fatalf("failed to read GOAL.md: %v", errRead)
+		}
+		if string(content) != goalText {
+			t.Errorf("GOAL.md content = %q; want %q", string(content), goalText)
+		}
+	})
+
+	t.Run("rejectsEmptyGoalContent", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
-		body := strings.NewReader(`{"name":""}`)
+		body := strings.NewReader(`{"goalContent":""}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusBadRequest, resp.Body.String())
+		}
+	})
+
+	t.Run("rejectsFrontmatterOnlyGoalContent", func(t *testing.T) {
+		_, _, srv := setupM6TestWorkspace(t)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"goalContent":"---\nflow: |\n  a -> b\n---\n"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -106,7 +254,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
-		body := strings.NewReader(`{"name":"sub-fork"}`)
+		body := strings.NewReader(`{"goalContent":"Build something"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/fork", body)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -117,35 +265,13 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		}
 	})
 
-	t.Run("conflictsWithExistingDir", func(t *testing.T) {
-		rootDir, _, srv := setupM6TestWorkspace(t)
-
-		existingDir := filepath.Join(rootDir, "existing-fork")
-		if err := os.MkdirAll(existingDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"existing-fork"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusConflict {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusConflict)
-		}
-	})
-
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
-		body := strings.NewReader(`{"name":"my-fork"}`)
+		body := strings.NewReader(`{"goalContent":"Build something"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/nonexistent/fork", body)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -156,13 +282,13 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		}
 	})
 
-	t.Run("idempotentSameName", func(t *testing.T) {
-		rootDir, _, srv := setupM6TestWorkspace(t)
+	t.Run("autoGeneratesUniqueName", func(t *testing.T) {
+		_, _, srv := setupM6TestWorkspace(t)
 
 		mux := http.NewServeMux()
 		srv.registerAPIRoutes(mux)
 
-		body := strings.NewReader(`{"name":"new-fork"}`)
+		body := strings.NewReader(`{"goalContent":"First goal"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
 		req.Header.Set("Content-Type", "application/json")
 		resp := httptest.NewRecorder()
@@ -172,18 +298,28 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 			t.Fatalf("first call: status = %d; want %d; body = %s", resp.Code, http.StatusCreated, resp.Body.String())
 		}
 
-		if _, err := os.Stat(filepath.Join(rootDir, "new-fork")); err != nil {
-			t.Fatalf("fork directory should exist: %v", err)
+		var result1 apiForkResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result1); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		body2 := strings.NewReader(`{"name":"new-fork"}`)
+		body2 := strings.NewReader(`{"goalContent":"Second goal"}`)
 		req2 := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body2)
 		req2.Header.Set("Content-Type", "application/json")
 		resp2 := httptest.NewRecorder()
 		mux.ServeHTTP(resp2, req2)
 
-		if resp2.Code != http.StatusConflict {
-			t.Fatalf("second call: status = %d; want %d (conflict for existing dir)", resp2.Code, http.StatusConflict)
+		if resp2.Code != http.StatusCreated {
+			t.Fatalf("second call: status = %d; want %d; body = %s", resp2.Code, http.StatusCreated, resp2.Body.String())
+		}
+
+		var result2 apiForkResponse
+		if err := json.NewDecoder(resp2.Body).Decode(&result2); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		if result1.Name == result2.Name {
+			t.Errorf("two forks should have different auto-generated names, both got %q", result1.Name)
 		}
 	})
 }

@@ -250,8 +250,6 @@ type Server struct {
 	composerSessionsMu sync.Mutex
 	composerSessions   map[string]*composerSession
 
-	summaryGen *summaryGenerator
-
 	workspaceScanFlight singleflight[string, []workspaceGroup]
 	workspaceScanCache  *ttlCache[string, []workspaceGroup]
 	classifyFlight      singleflight[string, workspaceKind]
@@ -588,7 +586,6 @@ func cmdServe(args []string) {
 
 	srv := NewServer(rootDir)
 	srv.shutdownCtx = ctx
-	srv.summaryGen = newSummaryGenerator(ctx, srv)
 	if err := srv.loadPinnedProjects(); err != nil {
 		log.Println("warning: failed to load pinned projects:", err)
 	}
@@ -612,7 +609,6 @@ func cmdServe(args []string) {
 	}()
 
 	startMenuBar(ctx, baseURL, srv, stop)
-	srv.summaryGen.stop()
 	if errClose := httpServer.Close(); errClose != nil {
 		log.Println("http server close:", errClose)
 	}
@@ -1405,6 +1401,8 @@ func (s *Server) loadPinnedProjects() error {
 	for _, d := range dirs {
 		if _, errStat := os.Stat(d); errStat == nil {
 			existing[resolveSymlinks(d)] = true
+		} else {
+			log.Println("pruning stale pinned path:", d)
 		}
 	}
 	s.mu.Lock()
@@ -1420,6 +1418,9 @@ func (s *Server) savePinnedProjects() error {
 	s.mu.Lock()
 	dirs := slices.Collect(maps.Keys(s.pinnedDirs))
 	s.mu.Unlock()
+	if dirs == nil {
+		dirs = []string{}
+	}
 	slices.Sort(dirs)
 	if errDir := os.MkdirAll(s.pinnedConfigDir, 0o755); errDir != nil {
 		return fmt.Errorf("creating pin config directory: %w", errDir)
