@@ -33,7 +33,7 @@ DO NOT proceed with evaluation until you have read BOTH files.
 
 ## Mandatory Preliminary Research Phase To Be Executed By The FrontMan Only
 
-**This phase MUST complete BEFORE the Council Protocol (Steps 0-4) begins.**
+**This phase MUST complete BEFORE the Council Protocol (Steps 0-5) begins.**
 
 After reading GOAL.md and .sgai/PROJECT_MANAGEMENT.md per the First Actions above, execute this phase to gather quality evidence from reviewer agents.
 
@@ -75,7 +75,7 @@ Verify that all requested reviewer agents responded:
 
 ### Step P6: Proceed to Conclave
 
-Only NOW proceed to the Council Protocol (Steps 0-4) below. Use the collected quality reports as additional evidence during the Evaluation and Aggregation steps.
+Only NOW proceed to the Council Protocol (Steps 0-5) below. Use the collected quality reports as additional evidence during the Evaluation and Aggregation steps.
 
 ---
 
@@ -115,16 +115,18 @@ You are running as one of multiple models within this agent. Check the "Multi-Mo
 
 ### Roles
 
-- **FrontMan:** the first entry in GOAL.md frontmatter `models["project-critic-council"]` list.
-- **Sibling:** every other model in the `models["project-critic-council"]` list.
+- **FrontMan:** the first entry in GOAL.md frontmatter `models["project-critic-council"]` list. Drives the process, sends Aggregation.
+- **Sibling:** every model that is neither FrontMan nor MinorityReport.
+- **MinorityReport:** the last entry in GOAL.md frontmatter `models["project-critic-council"]` list. **Only activates when 3+ models are configured** (with fewer, this model acts as a regular Sibling). Its mandate: question the emerging consensus, surface overlooked risks, and challenge assumptions — grounded in evidence from the codebase, GOAL.md, and test results. Not contrarian for its own sake.
 
-### Steps (0–4)
+### Steps (0–5)
 
 0. The coordinator asks the Project Critic Council to evaluate and deliver to the FrontMan; on receipt, read GOAL.md and set FrontMan to the first entry in the frontmatter `models["project-critic-council"]` list.
-1. The FrontMan asks all siblings to evaluate.
-2. Siblings (including the FrontMan) exchange exactly one Influence message with each other.
-3. Each model sends exactly one Evaluation message to the FrontMan (after influence).
-4. The FrontMan sends a single Aggregation message back to the coordinator.
+1. The FrontMan asks all siblings (and MinorityReport, if active) to evaluate.
+2. Siblings (including the FrontMan and MinorityReport) exchange exactly one Influence message with each other.
+3. Each Sibling (and the FrontMan) sends exactly one Evaluation message to the FrontMan (after influence). **MinorityReport does NOT evaluate in this step** — it observes the evaluations.
+4. **MinorityReport Dissent** (only when 3+ models): The MinorityReport reads all Step 3 Evaluations, then sends its Dissent Evaluation to the FrontMan using the MinorityReport Dissent template. **Skip this step entirely when fewer than 3 models are configured.**
+5. The FrontMan sends a single Aggregation message back to the coordinator.
 
 ### Message Constraints
 
@@ -133,6 +135,7 @@ You are running as one of multiple models within this agent. Check the "Multi-Mo
 - Verdict values are limited to **Pass / Concern / Block**.
 - Peer references are allowed **only** in the Influence template.
 - Evaluations are written **after** influence (no pre-influence evaluation).
+- MinorityReport Dissent sections must be **3–6 bullet points** each.
 
 ### Templates
 
@@ -164,7 +167,27 @@ Risks
 Verdict
 - Pass | Concern | Block
 
-#### Aggregation (Step 4, FrontMan Only)
+#### MinorityReport Dissent (Step 4, MinorityReport Only)
+
+Majority Position Summary
+- ... (summarize the consensus from Step 3 evaluations)
+
+Challenges to Consensus
+- ... (specific points where the majority may be wrong or incomplete)
+
+Evidence Gaps
+- ... (what evidence was NOT checked, what tests were NOT run)
+
+Alternative Interpretations
+- ... (different ways to read the same evidence)
+
+Overlooked Risks
+- ... (risks the majority dismissed or didn't consider)
+
+Dissent Verdict
+- Pass | Concern | Block
+
+#### Aggregation (Step 5, FrontMan Only)
 
 Summary
 - ...
@@ -187,7 +210,7 @@ Verdict
 
 1. Read GOAL.md and .sgai/PROJECT_MANAGEMENT.md.
 2. **Reference quality reports** collected during the Preliminary Research Phase as evidence. Include reviewer findings in your analysis.
-3. Follow the Council Protocol steps 0–4 exactly.
+3. Follow the Council Protocol steps 0–5 exactly.
 4. Use the Evaluation template to assess all checked items.
 5. Only the FrontMan sends the Aggregation to the coordinator.
 
