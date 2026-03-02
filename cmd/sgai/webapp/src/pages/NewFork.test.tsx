@@ -1,8 +1,24 @@
-import { describe, test, expect, afterEach, spyOn } from "bun:test";
+import { describe, test, expect, afterEach, spyOn, mock } from "bun:test";
+import React from "react";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { NewFork } from "./NewFork";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      "data-testid": "markdown-editor",
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder,
+    }),
+}));
 
 function mockFetch(data: unknown, status = 200) {
   return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
@@ -15,6 +31,21 @@ function mockFetch(data: unknown, status = 200) {
   );
 }
 
+function mockForkTemplateFetch() {
+  return spyOn(globalThis, "fetch").mockImplementation((input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("fork-template")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ content: "" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+    return Promise.resolve(new Response("Not Found", { status: 404 }));
+  });
+}
+
 function renderPage(workspace = "root-ws") {
   return render(
     <MemoryRouter initialEntries={[`/workspaces/${workspace}/fork/new`]}>
@@ -22,6 +53,7 @@ function renderPage(workspace = "root-ws") {
         <Routes>
           <Route path="workspaces/:name/fork/new" element={<NewFork />} />
           <Route path="workspaces/:name/goal/edit" element={<div>Edit Goal</div>} />
+          <Route path="workspaces/:name/progress" element={<div>Workspace Progress</div>} />
           <Route path="workspaces/:name" element={<div>Workspace Detail</div>} />
         </Routes>
       </TooltipProvider>
@@ -35,82 +67,106 @@ describe("NewFork", () => {
   afterEach(() => { cleanup(); fetchSpy?.mockRestore(); });
 
   test("renders page heading", () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage();
     expect(screen.getByText("Fork Workspace")).toBeTruthy();
   });
 
   test("renders parent workspace name in description", () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage("my-root");
     expect(screen.getByText("my-root")).toBeTruthy();
   });
 
-  test("renders fork name input", () => {
+  test("renders goal content editor", () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage();
-    expect(screen.getByLabelText("Fork Name")).toBeTruthy();
+    expect(screen.getByTestId("markdown-editor")).toBeTruthy();
   });
 
   test("renders back link to parent workspace", () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage("my-root");
     expect(screen.getByText("Back to my-root")).toBeTruthy();
   });
 
-  test("disables button when fork name is empty", () => {
+  test("disables button when goal content is empty", () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage();
     const button = screen.getByText("Create Fork").closest("button");
     expect(button?.disabled).toBe(true);
   });
 
-  test("enables button when fork name entered", async () => {
+  test("enables button when goal content entered", async () => {
+    fetchSpy = mockForkTemplateFetch();
     renderPage();
-    const input = screen.getByLabelText("Fork Name");
-    await act(async () => { fireEvent.change(input, { target: { value: "my-fork" } }); });
+    const editor = screen.getByTestId("markdown-editor");
+    await act(async () => { fireEvent.change(editor, { target: { value: "My goal content" } }); });
     const button = screen.getByText("Create Fork").closest("button");
     expect(button?.disabled).toBe(false);
   });
 
-  test("submits fork and navigates on success", async () => {
-    fetchSpy = mockFetch({ name: "my-fork", dir: "/tmp/my-fork", parent: "root-ws" });
+  test("submits fork with goal content and navigates on success", async () => {
+    fetchSpy = mockFetch({ name: "happy-blue-a1e2", dir: "/tmp/happy-blue-a1e2", parent: "root-ws" });
     renderPage();
 
-    const input = screen.getByLabelText("Fork Name");
-    await act(async () => { fireEvent.change(input, { target: { value: "my-fork" } }); });
+    const editor = screen.getByTestId("markdown-editor");
+    await act(async () => { fireEvent.change(editor, { target: { value: "Build a feature" } }); });
 
     const button = screen.getByText("Create Fork").closest("button")!;
     await act(async () => { fireEvent.click(button); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
-    expect(screen.getByText("Edit Goal")).toBeTruthy();
+    expect(screen.getByText("Workspace Progress")).toBeTruthy();
   });
 
-  test("shows error on conflict", async () => {
+  test("shows error on API failure", async () => {
     fetchSpy = spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-      Promise.resolve(new Response("a directory with this name already exists", { status: 409 })),
+      Promise.resolve(new Response("goal content cannot be empty", { status: 400 })),
     );
     renderPage();
 
-    const input = screen.getByLabelText("Fork Name");
-    await act(async () => { fireEvent.change(input, { target: { value: "existing" } }); });
+    const editor = screen.getByTestId("markdown-editor");
+    await act(async () => { fireEvent.change(editor, { target: { value: "Some content" } }); });
 
     const button = screen.getByText("Create Fork").closest("button")!;
     await act(async () => { fireEvent.click(button); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
-    expect(screen.getByText("a directory with this name already exists")).toBeTruthy();
+    expect(screen.getByText("goal content cannot be empty")).toBeTruthy();
+  });
+
+  test("shows validation error when submitting empty content", async () => {
+    fetchSpy = mockForkTemplateFetch();
+    renderPage();
+
+    const form = document.querySelector("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    expect(screen.getByText("Please write a goal description")).toBeTruthy();
   });
 
   test("disables button during submission (R-18)", async () => {
+    let resolvePending!: (value: Response) => void;
     fetchSpy = spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-      new Promise(() => {}),
+      new Promise<Response>((resolve) => { resolvePending = resolve; }),
     );
     renderPage();
 
-    const input = screen.getByLabelText("Fork Name");
-    await act(async () => { fireEvent.change(input, { target: { value: "test" } }); });
+    const editor = screen.getByTestId("markdown-editor");
+    await act(async () => { fireEvent.change(editor, { target: { value: "Test goal" } }); });
 
     const button = screen.getByText("Create Fork").closest("button")!;
     await act(async () => { fireEvent.click(button); });
 
     expect(screen.getByText("Creating Fork...")).toBeTruthy();
     expect(button.disabled).toBe(true);
+
+    await act(async () => {
+      resolvePending(new Response(JSON.stringify({ name: "x", dir: "/tmp/x", parent: "root-ws" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
   });
 });

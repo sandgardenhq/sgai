@@ -1,9 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import React from "react";
 import { cleanup, render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WorkspaceDetail } from "./WorkspaceDetail";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiWorkspaceEntry } from "@/types";
+
+mock.module("@monaco-editor/react", () => ({
+  default: () => null,
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
+    React.createElement("textarea", {
+      "data-testid": "markdown-editor",
+      value: props.value,
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
+      disabled: props.disabled,
+      placeholder: props.placeholder,
+    }),
+}));
 
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
@@ -200,7 +216,7 @@ describe("WorkspaceDetail", () => {
     expect(view.getByRole("button", { name: "Open in Editor" })).toBeDefined();
   });
 
-  it("shows fork, open editor, and pin actions for root workspaces with forks", async () => {
+  it("shows inline editor, open editor, and pin actions for root workspaces with forks", async () => {
     const rootWithForks = makeWorkspace({
       isRoot: true,
       isFork: false,
@@ -213,7 +229,8 @@ describe("WorkspaceDetail", () => {
       expect(screen.getByText("test-project")).toBeDefined();
     });
 
-    expect(screen.getByRole("button", { name: "Fork" })).toBeDefined();
+    expect(screen.getByText("New Task")).toBeDefined();
+    expect(screen.getByRole("button", { name: /Create Fork/i })).toBeDefined();
     const openEditorButtons = screen.getAllByRole("button", { name: "Open in Editor" });
     expect(openEditorButtons.length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("button", { name: "Respond" })).toBeNull();

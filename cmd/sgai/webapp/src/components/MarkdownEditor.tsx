@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type * as MonacoTypes from "monaco-editor";
+import { api } from "@/lib/api";
+import type { Agent, ApiModelEntry } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -36,6 +38,8 @@ interface MarkdownEditorProps {
   defaultHeight?: number;
   disabled?: boolean;
   placeholder?: string;
+  workspaceName?: string;
+  fillHeight?: boolean;
 }
 
 type IStandaloneCodeEditor = MonacoTypes.editor.IStandaloneCodeEditor;
@@ -239,15 +243,22 @@ export function MarkdownEditor({
   defaultHeight,
   disabled = false,
   placeholder,
+  workspaceName,
+  fillHeight = false,
 }: MarkdownEditorProps) {
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof MonacoTypes | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const modeBarRef = useRef<HTMLDivElement>(null);
+  const completionDisposableRef = useRef<MonacoTypes.IDisposable | null>(null);
+  const agentsRef = useRef<Agent[]>([]);
+  const modelsRef = useRef<ApiModelEntry[]>([]);
 
   const baseHeight = defaultHeight ?? minHeight;
   const [editorHeight, setEditorHeight] = useState(baseHeight);
   const [mode, setMode] = useState<"write" | "preview">("write");
+  const [monacoReady, setMonacoReady] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -258,8 +269,8 @@ export function MarkdownEditor({
       const modeBar = modeBarRef.current;
       const toolbarHeight = toolbar ? toolbar.offsetHeight : 0;
       const modeBarHeight = modeBar ? modeBar.offsetHeight : 0;
-      const newHeight = container.clientHeight - toolbarHeight - modeBarHeight;
-      setEditorHeight(Math.max(newHeight, minHeight));
+      const available = container.clientHeight - toolbarHeight - modeBarHeight;
+      setEditorHeight(Math.max(available, minHeight));
     });
 
     observer.observe(container);
@@ -267,11 +278,32 @@ export function MarkdownEditor({
     return () => {
       observer.disconnect();
     };
-  }, [minHeight]);
+  }, [minHeight, fillHeight]);
+
+  useEffect(() => {
+    if (!workspaceName) return;
+    let cancelled = false;
+
+    Promise.all([
+      api.agents.list(workspaceName),
+      api.models.list(workspaceName),
+    ]).then(
+      ([agentsResult, modelsResult]) => {
+        if (cancelled) return;
+        agentsRef.current = agentsResult.agents ?? [];
+        modelsRef.current = modelsResult.models ?? [];
+      },
+      () => {},
+    );
+
+    return () => { cancelled = true; };
+  }, [workspaceName]);
 
   const handleMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
+      monacoRef.current = monaco;
+      setMonacoReady(true);
 
       editor.addAction({
         id: "markdown-bold",
@@ -306,9 +338,9 @@ export function MarkdownEditor({
         },
       });
 
-      if (placeholder && !value) {
+      if (placeholder) {
         const model = editor.getModel();
-        if (model) {
+        if (model && !model.getValue()) {
           const decorations = [
             {
               range: {
@@ -341,8 +373,110 @@ export function MarkdownEditor({
         }
       }
     },
-    [placeholder, value],
+    [placeholder],
   );
+
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!workspaceName || !monaco || !monacoReady) return;
+
+    completionDisposableRef.current?.dispose();
+    completionDisposableRef.current = monaco.languages.registerCompletionItemProvider("markdown", {
+      triggerCharacters: ['"', "'", " ", ":"],
+      provideCompletionItems: (model, position) => {
+        const content = model.getValue();
+        const lines = content.split("\n");
+
+        const firstLineIsFrontmatter = lines[0]?.trim() === "---";
+        if (!firstLineIsFrontmatter) return { suggestions: [] };
+
+        let closingIndex = -1;
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i]?.trim() === "---") {
+            closingIndex = i;
+            break;
+          }
+        }
+        if (closingIndex === -1) return { suggestions: [] };
+
+        const lineIndex = position.lineNumber - 1;
+        if (lineIndex <= 0 || lineIndex >= closingIndex) return { suggestions: [] };
+
+        let currentSection = "";
+        for (let i = lineIndex; i >= 1; i--) {
+          const line = lines[i] ?? "";
+          const sectionMatch = line.match(/^(\w[\w-]*):/);
+          if (sectionMatch) {
+            currentSection = sectionMatch[1] ?? "";
+            break;
+          }
+        }
+
+        const currentLine = lines[lineIndex] ?? "";
+        const textBeforeCursor = currentLine.substring(0, position.column - 1);
+
+        const quoteMatch = textBeforeCursor.match(/["'][^"']*$/);
+        const replaceStart = quoteMatch
+          ? position.column - quoteMatch[0].length
+          : position.column;
+        const range: MonacoTypes.IRange = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: replaceStart,
+          endColumn: position.column,
+        };
+
+        const suggestions: MonacoTypes.languages.CompletionItem[] = [];
+
+        if (currentSection === "flow") {
+          for (const agent of agentsRef.current) {
+            suggestions.push({
+              label: `"${agent.name}"`,
+              kind: monaco.languages.CompletionItemKind.Value,
+              detail: agent.description,
+              insertText: `"${agent.name}"`,
+              filterText: agent.name,
+              range,
+            });
+          }
+        } else if (currentSection === "models") {
+          const colonPos = textBeforeCursor.indexOf(":");
+          const isAfterColon = colonPos >= 0 && position.column - 1 > colonPos;
+
+          if (isAfterColon) {
+            for (const m of modelsRef.current) {
+              suggestions.push({
+                label: `"${m.id}"`,
+                kind: monaco.languages.CompletionItemKind.Variable,
+                detail: m.name,
+                insertText: `"${m.id}"`,
+                filterText: m.id,
+                range,
+              });
+            }
+          } else {
+            for (const agent of agentsRef.current) {
+              suggestions.push({
+                label: `"${agent.name}"`,
+                kind: monaco.languages.CompletionItemKind.Value,
+                detail: agent.description,
+                insertText: `"${agent.name}":`,
+                filterText: agent.name,
+                range,
+              });
+            }
+          }
+        }
+
+        return { suggestions };
+      },
+    });
+
+    return () => {
+      completionDisposableRef.current?.dispose();
+      completionDisposableRef.current = null;
+    };
+  }, [workspaceName, monacoReady]);
 
   const handleToolbarAction = useCallback(
     (action: (editor: IStandaloneCodeEditor) => void) => {
@@ -356,8 +490,8 @@ export function MarkdownEditor({
   return (
     <div
       ref={containerRef}
-      className="border rounded-md overflow-hidden"
-      style={{ minHeight: `${minHeight}px`, resize: "vertical", overflow: "auto" }}
+      className={fillHeight ? "flex flex-col h-full overflow-hidden" : "border rounded-md"}
+      style={fillHeight ? undefined : { minHeight: `${minHeight}px`, resize: "vertical", overflow: "hidden" }}
       data-testid="markdown-editor"
     >
       <div

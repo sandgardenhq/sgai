@@ -18,7 +18,9 @@ models:
   "skill-writer": "anthropic/claude-opus-4-6 (max)"
 ---
 
-One or two paragraphs explaining what you want to do
+# Title of your Goal
+
+One or two paragraphs explaining what you want to do.
 
 - [ ] a list of verifiable checks to help agents to communicate their progress
   - [ ] they can even be nested

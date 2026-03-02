@@ -43,6 +43,7 @@ export interface ApiWorkspaceEntry {
   pinned: boolean;
   isRoot: boolean;
   isFork: boolean;
+  description: string;
   status: string;
   badgeClass: string;
   badgeText: string;
@@ -62,8 +63,6 @@ export interface ApiWorkspaceEntry {
   totalExecTime: string;
   latestProgress: string;
   humanMessage: string;
-  summary?: string;
-  summaryManual?: boolean;
   agentSequence: ApiAgentSequenceEntry[];
   cost: ApiSessionCost;
   modelStatuses?: ApiModelStatusEntry[];
@@ -359,8 +358,8 @@ export interface ApiForkEntry {
   needsInput: boolean;
   inProgress: boolean;
   pinned: boolean;
+  description: string;
   commitAhead: number;
-  summary?: string;
   commits: ApiForkCommit[];
 }
 
@@ -442,7 +441,7 @@ export interface ApiComposeSaveResponse {
 // M6: Workspace Management Types
 
 export interface ApiForkRequest {
-  name: string;
+  goalContent: string;
 }
 
 export interface ApiForkResponse {
@@ -469,11 +468,6 @@ export interface ApiRenameResponse {
   name: string;
   oldName: string;
   dir: string;
-}
-
-export interface ApiUpdateSummaryResponse {
-  updated: boolean;
-  workspace: string;
 }
 
 export interface ApiUpdateGoalRequest {
@@ -520,5 +514,9 @@ export interface ApiAdhocResponse {
   running: boolean;
   output: string;
   message: string;
+}
+
+export interface ApiForkTemplateResponse {
+  content: string;
 }
 

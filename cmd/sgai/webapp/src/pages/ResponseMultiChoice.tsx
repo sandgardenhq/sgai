@@ -132,11 +132,7 @@ export function ResponseMultiChoice() {
               <p className="text-base font-semibold" data-testid="workspace-name">
                 {workspaceDetail.name}
               </p>
-              {workspaceDetail.summary && (
-                <p className="text-sm text-muted-foreground" data-testid="workspace-summary">
-                  {workspaceDetail.summary}
-                </p>
-              )}
+
             </div>
           )}
           <Badge variant="secondary" className="w-fit">

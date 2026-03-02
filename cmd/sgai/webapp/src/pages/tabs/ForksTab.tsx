@@ -186,25 +186,12 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="font-medium text-sm truncate max-w-[180px] cursor-default shrink-0">
-                {fork.name}
+              <span className="font-medium text-sm truncate flex-1 min-w-0 cursor-default">
+                {fork.description || fork.name}
               </span>
             </TooltipTrigger>
             <TooltipContent>{fork.name}</TooltipContent>
           </Tooltip>
-
-          {fork.summary ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-xs text-muted-foreground truncate flex-1 min-w-0 cursor-default">
-                  {fork.summary}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">{fork.summary}</TooltipContent>
-            </Tooltip>
-          ) : (
-            <span className="flex-1 min-w-0" />
-          )}
 
           <div className="flex items-center gap-1 shrink-0">
             <Tooltip>

@@ -97,8 +97,6 @@ function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspace
     changes: { description: "", diffLines: [] },
     commits: [],
     log: [],
-    summary: "A brief summary of the test project",
-    summaryManual: false,
     pendingQuestion: pendingQuestion,
     ...overrides,
   };
@@ -450,27 +448,4 @@ describe("ResponseMultiChoice", () => {
     expect(screen.getByTestId("workspace-name").textContent).toBe("test-project");
   });
 
-  it("displays workspace summary when present", async () => {
-    renderResponse();
-
-    await waitFor(() => {
-      expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);
-    });
-
-    expect(screen.getByTestId("workspace-summary")).toBeDefined();
-    expect(screen.getByTestId("workspace-summary").textContent).toBe(
-      "A brief summary of the test project",
-    );
-  });
-
-  it("hides workspace summary when not present", async () => {
-    renderResponse(makeWorkspace({ summary: undefined }));
-
-    await waitFor(() => {
-      expect(screen.getAllByText("Response Required").length).toBeGreaterThan(0);
-    });
-
-    expect(screen.getByTestId("workspace-name")).toBeDefined();
-    expect(screen.queryByTestId("workspace-summary")).toBeNull();
-  });
 });

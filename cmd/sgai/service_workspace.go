@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +14,36 @@ import (
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
+var (
+	errForkOfFork           = errors.New("forks cannot create new forks")
+	errGoalContentEmpty     = errors.New("GOAL.md must have content describing the goal")
+	errDirectoryExists      = errors.New("a directory with this name already exists")
+	errWorkspaceNameInvalid = errors.New("workspace name is invalid")
+)
+
+func generateRandomForkName() string {
+	adjectives := [20]string{
+		"bold", "swift", "calm", "keen", "warm",
+		"cool", "soft", "firm", "pure", "wild",
+		"deep", "tall", "fair", "vast", "slim",
+		"rich", "free", "rare", "true", "wise",
+	}
+	colors := [15]string{
+		"red", "blue", "green", "gold", "gray",
+		"teal", "pink", "jade", "ruby", "sage",
+		"plum", "mint", "onyx", "navy", "lime",
+	}
+	const suffixChars = "0123456789aeiou"
+
+	adjective := adjectives[rand.IntN(len(adjectives))]
+	color := colors[rand.IntN(len(colors))]
+	suffix := make([]byte, 4)
+	for i := range suffix {
+		suffix[i] = suffixChars[rand.IntN(len(suffixChars))]
+	}
+	return adjective + "-" + color + "-" + string(suffix)
+}
+
 type createWorkspaceResult struct {
 	Name string
 	Dir  string
@@ -18,22 +51,22 @@ type createWorkspaceResult struct {
 
 func (s *Server) createWorkspaceService(name string) (createWorkspaceResult, error) {
 	if errMsg := validateWorkspaceName(name); errMsg != "" {
-		return createWorkspaceResult{}, fmt.Errorf("%s", errMsg)
+		return createWorkspaceResult{}, fmt.Errorf("%w: %s", errWorkspaceNameInvalid, errMsg)
 	}
 
 	workspacePath := filepath.Join(s.rootDir, name)
 	if _, errStat := os.Stat(workspacePath); errStat == nil {
-		return createWorkspaceResult{}, fmt.Errorf("a directory with this name already exists")
+		return createWorkspaceResult{}, errDirectoryExists
 	} else if !os.IsNotExist(errStat) {
-		return createWorkspaceResult{}, fmt.Errorf("failed to check workspace path")
+		return createWorkspaceResult{}, fmt.Errorf("failed to check workspace path: %w", errStat)
 	}
 
 	if errMkdir := os.MkdirAll(workspacePath, 0755); errMkdir != nil {
-		return createWorkspaceResult{}, fmt.Errorf("failed to create workspace directory")
+		return createWorkspaceResult{}, fmt.Errorf("failed to create workspace directory: %w", errMkdir)
 	}
 
 	if errInit := initializeWorkspace(workspacePath); errInit != nil {
-		return createWorkspaceResult{}, fmt.Errorf("failed to initialize workspace")
+		return createWorkspaceResult{}, fmt.Errorf("failed to initialize workspace: %w", errInit)
 	}
 
 	s.invalidateWorkspaceScanCache()
@@ -41,7 +74,9 @@ func (s *Server) createWorkspaceService(name string) (createWorkspaceResult, err
 	s.mu.Lock()
 	s.pinnedDirs[resolveSymlinks(workspacePath)] = true
 	s.mu.Unlock()
-	_ = s.savePinnedProjects()
+	if errSave := s.savePinnedProjects(); errSave != nil {
+		log.Println("failed to persist pins:", errSave)
+	}
 
 	return createWorkspaceResult{Name: name, Dir: workspacePath}, nil
 }
@@ -53,22 +88,22 @@ type forkWorkspaceResult struct {
 	CreatedAt string
 }
 
-func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspaceResult, error) {
+func (s *Server) forkWorkspaceService(workspacePath, goalContent string) (forkWorkspaceResult, error) {
 	if s.classifyWorkspaceCached(workspacePath) == workspaceFork {
-		return forkWorkspaceResult{}, fmt.Errorf("forks cannot create new forks")
+		return forkWorkspaceResult{}, errForkOfFork
 	}
 
-	normalized := normalizeForkName(name)
-	if errMsg := validateWorkspaceName(normalized); errMsg != "" {
-		return forkWorkspaceResult{}, fmt.Errorf("%s", errMsg)
+	if goalContentBodyIsEmpty(goalContent) {
+		return forkWorkspaceResult{}, errGoalContentEmpty
 	}
 
+	name := generateRandomForkName()
 	parentDir := filepath.Dir(workspacePath)
-	forkPath := filepath.Join(parentDir, normalized)
+	forkPath := filepath.Join(parentDir, name)
 	if _, errStat := os.Stat(forkPath); errStat == nil {
-		return forkWorkspaceResult{}, fmt.Errorf("a directory with this name already exists")
+		return forkWorkspaceResult{}, errDirectoryExists
 	} else if !os.IsNotExist(errStat) {
-		return forkWorkspaceResult{}, fmt.Errorf("failed to check workspace path")
+		return forkWorkspaceResult{}, fmt.Errorf("failed to check workspace path: %w", errStat)
 	}
 
 	cmd := exec.Command("jj", "workspace", "add", forkPath)
@@ -84,7 +119,7 @@ func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspace
 	if errExclude := addGitExclude(forkPath); errExclude != nil {
 		return forkWorkspaceResult{}, fmt.Errorf("failed to add git exclude: %w", errExclude)
 	}
-	if errGoal := writeGoalExample(forkPath); errGoal != nil {
+	if errGoal := writeGoalContent(forkPath, goalContent); errGoal != nil {
 		return forkWorkspaceResult{}, fmt.Errorf("failed to create GOAL.md: %w", errGoal)
 	}
 
@@ -94,16 +129,28 @@ func (s *Server) forkWorkspaceService(workspacePath, name string) (forkWorkspace
 	s.mu.Lock()
 	s.pinnedDirs[resolveSymlinks(forkPath)] = true
 	s.mu.Unlock()
-	_ = s.savePinnedProjects()
+	if errSave := s.savePinnedProjects(); errSave != nil {
+		log.Println("failed to persist pins:", errSave)
+	}
 
 	s.notifyStateChange()
 
 	return forkWorkspaceResult{
-		Name:      normalized,
+		Name:      name,
 		Dir:       forkPath,
 		Parent:    filepath.Base(workspacePath),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+func goalContentBodyIsEmpty(goalContent string) bool {
+	body := stripFrontmatter(goalContent)
+	return strings.TrimSpace(body) == ""
+}
+
+func writeGoalContent(dir, content string) error {
+	goalPath := filepath.Join(dir, "GOAL.md")
+	return os.WriteFile(goalPath, []byte(content), 0644)
 }
 
 type deleteForkResult struct {
@@ -287,32 +334,6 @@ func (s *Server) updateGoalService(workspacePath, content string) (updateGoalRes
 	return updateGoalResult{Updated: true, Workspace: filepath.Base(workspacePath)}, nil
 }
 
-type updateSummaryResult struct {
-	Updated   bool
-	Summary   string
-	Workspace string
-}
-
-func (s *Server) updateSummaryService(workspacePath, summary string) (updateSummaryResult, error) {
-	coord := s.workspaceCoordinator(workspacePath)
-	trimmed := strings.TrimSpace(summary)
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.Summary = trimmed
-		wf.SummaryManual = true
-	}); errUpdate != nil {
-		return updateSummaryResult{}, fmt.Errorf("failed to save workspace state: %w", errUpdate)
-	}
-
-	s.notifyStateChange()
-
-	return updateSummaryResult{
-		Updated:   true,
-		Summary:   trimmed,
-		Workspace: filepath.Base(workspacePath),
-	}, nil
-}
-
 type togglePinResult struct {
 	Pinned  bool
 	Message string
@@ -346,7 +367,9 @@ func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceRe
 	delete(s.sessions, workspacePath)
 	delete(s.everStartedDirs, workspacePath)
 	s.mu.Unlock()
-	_ = s.savePinnedProjects()
+	if errSave := s.savePinnedProjects(); errSave != nil {
+		log.Println("failed to persist pins:", errSave)
+	}
 
 	s.invalidateWorkspaceScanCache()
 	s.classifyCache.delete(workspacePath)

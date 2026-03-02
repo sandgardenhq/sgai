@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
-import { ArrowLeft, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Check } from "lucide-react";
 import { Link } from "react-router";
 
 export function EditGoal(): JSX.Element {
@@ -80,69 +79,64 @@ export function EditGoal(): JSX.Element {
     }
   }, [workspaceName, isSaving, content, navigate]);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSave]);
+
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto py-8 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-64 w-full" />
+      <div className="fixed inset-0 z-[60] flex flex-col bg-background">
+        <div className="flex items-center gap-3 px-4 py-2 border-b bg-background">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-5 w-32" />
+          <div className="ml-auto">
+            <Skeleton className="h-8 w-24" />
+          </div>
+        </div>
+        <div className="flex-1 p-4">
+          <Skeleton className="h-full w-full" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
-      <Link
-        to={`/workspaces/${encodeURIComponent(workspaceName)}`}
-        className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6"
-      >
-        <ArrowLeft className="h-3 w-3" />
-        Back to {workspaceName}
-      </Link>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background">
+      <div className="flex items-center gap-3 px-4 py-2 border-b bg-background shrink-0">
+        <Link
+          to={`/workspaces/${encodeURIComponent(workspaceName)}`}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+          aria-label={`Back to ${workspaceName}`}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <span className="text-sm font-medium">Edit GOAL.md</span>
 
-      <h1 className="text-2xl font-semibold mb-2">Edit GOAL.md</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Edit the GOAL.md content for <span className="font-medium text-foreground">{workspaceName}</span>.
-      </p>
+        {error ? (
+          <Alert className="py-1 px-3 border-destructive/50 text-destructive flex items-center gap-2 h-8">
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-      {saveSuccess ? (
-        <Alert className="mb-4 border-primary/50 bg-primary/5 text-primary">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Saved!</AlertTitle>
-          <AlertDescription>Redirecting to workspace...</AlertDescription>
-        </Alert>
-      ) : null}
-
-      {error ? (
-        <Alert className="mb-4 border-destructive/50 text-destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="goal-content">GOAL.md Content</Label>
-          <MarkdownEditor
-            value={content}
-            onChange={(v) => setContent(v ?? "")}
-            defaultHeight={500}
-            disabled={isSaving || saveSuccess}
-          />
-        </div>
-
-        <div className="flex justify-end gap-2">
+        <div className="ml-auto">
           <Button
-            variant="outline"
-            onClick={() => navigate(`/workspaces/${encodeURIComponent(workspaceName)}`)}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
+            size="sm"
             onClick={handleSave}
             disabled={isSaving || saveSuccess || !content.trim()}
           >
-            {isSaving ? (
+            {saveSuccess ? (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Saved!
+              </>
+            ) : isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
@@ -155,6 +149,16 @@ export function EditGoal(): JSX.Element {
             )}
           </Button>
         </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <MarkdownEditor
+          value={content}
+          onChange={(v) => setContent(v ?? "")}
+          disabled={isSaving || saveSuccess}
+          workspaceName={workspaceName}
+          fillHeight
+        />
       </div>
     </div>
   );

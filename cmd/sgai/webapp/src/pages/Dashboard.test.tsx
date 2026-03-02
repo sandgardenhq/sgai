@@ -35,8 +35,10 @@ const workspacesData: FactoryStateSnapshot["workspaces"] = [
     inProgress: true,
     pinned: false,
     isRoot: true,
+    description: "Build the alpha project with all features",
     status: "Running",
     hasSgai: true,
+    rawGoalContent: "Build the alpha project with all features",
     forks: [
       {
         name: "project-alpha-fork1",
@@ -45,8 +47,10 @@ const workspacesData: FactoryStateSnapshot["workspaces"] = [
         needsInput: true,
         inProgress: true,
         pinned: false,
+        description: "Fix authentication bug in the login flow",
         commitAhead: 0,
         commits: [],
+        summary: "Fix authentication bug",
       },
     ],
   },
@@ -59,8 +63,10 @@ const workspacesData: FactoryStateSnapshot["workspaces"] = [
     pinned: false,
     isRoot: false,
     isFork: true,
+    description: "Fix authentication bug in the login flow",
     status: "Needs Input",
     hasSgai: true,
+    rawGoalContent: "Fix authentication bug in the login flow",
   },
   {
     name: "project-beta",
@@ -70,8 +76,10 @@ const workspacesData: FactoryStateSnapshot["workspaces"] = [
     inProgress: false,
     pinned: true,
     isRoot: true,
+    description: "Beta project for testing integrations",
     status: "Stopped",
     hasSgai: true,
+    rawGoalContent: "Beta project for testing integrations",
   },
 ];
 
@@ -136,7 +144,7 @@ describe("Dashboard", () => {
       expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getAllByText("project-beta").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Beta project for testing integrations").length).toBeGreaterThan(0);
   });
 
   it("renders forks under root workspace", async () => {
@@ -151,7 +159,7 @@ describe("Dashboard", () => {
       expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getAllByText("project-alpha-fork1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Fix authentication bug in the login flow").length).toBeGreaterThan(0);
   });
 
   it("renders in-progress section for running workspaces", async () => {
@@ -163,16 +171,16 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
     });
 
-    const inProgressSection = document.querySelector(".mb-3.pb-2.border-b");
+    const inProgressSection = screen.getByRole("region", { name: /in progress/i });
     expect(inProgressSection).not.toBeNull();
 
-    const links = inProgressSection!.querySelectorAll("a");
-    const linkNames = Array.from(links).map((a) => a.textContent?.trim());
-    expect(linkNames).toContain("project-alpha");
-    expect(linkNames).toContain("project-alpha-fork1");
+    const links = inProgressSection.querySelectorAll("a");
+    const linkTexts = Array.from(links).map((a) => a.textContent?.trim());
+    expect(linkTexts.some((t) => t?.includes("Build the alpha project"))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes("Fix authentication bug in the login flow"))).toBe(true);
   });
 
   it("renders workspace indicators (pinned, running, needs input)", async () => {
@@ -184,7 +192,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
     });
 
     const runningIndicators = document.querySelectorAll('[title="Running"]');
@@ -207,7 +215,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
     });
 
     const inProgressIndicators = document.querySelectorAll('[title="In progress"]');
@@ -337,7 +345,7 @@ describe("Dashboard", () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
     });
 
     const inboxButtons = screen.getAllByRole("button", {
@@ -355,6 +363,37 @@ describe("Dashboard", () => {
     });
   });
 
+  it("shows directory name for root repos with forks instead of description", async () => {
+    mockFactoryState = {
+      workspaces: workspacesData.map((w) => ({ ...w, running: false, inProgress: false })),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+    });
+
+    const sidebarMenu = document.querySelectorAll("[data-sidebar='menu']");
+    const treeTexts = Array.from(sidebarMenu).map((el) => el.textContent);
+    const hasDirectoryName = treeTexts.some((t) => t?.includes("project-alpha"));
+    expect(hasDirectoryName).toBe(true);
+  });
+
+  it("shows description for standalone root repos without forks", async () => {
+    mockFactoryState = {
+      workspaces: workspacesData.map((w) => ({ ...w, running: false, inProgress: false })),
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Beta project for testing integrations").length).toBeGreaterThan(0);
+    });
+  });
+
   it("does not show skeleton during factory state refresh (stale-while-revalidate)", async () => {
     mockFactoryState = {
       workspaces: workspacesData,
@@ -364,7 +403,7 @@ describe("Dashboard", () => {
     const { rerender } = renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
     });
 
     act(() => {
@@ -393,6 +432,6 @@ describe("Dashboard", () => {
 
     const skeletons = document.querySelectorAll("[data-slot='skeleton']");
     expect(skeletons.length).toBe(0);
-    expect(screen.getAllByText("project-alpha").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Build the alpha project with all features").length).toBeGreaterThan(0);
   });
 });

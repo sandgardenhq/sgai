@@ -1054,6 +1054,64 @@ func TestBuildWorkspaceFullStateFields(t *testing.T) {
 			t.Errorf("agentSequence[0].agent = %q; want %q", result.AgentSequence[0].Agent, "coord")
 		}
 	})
+
+	t.Run("descriptionFallsToDirNameWhenNoGoalMd", func(t *testing.T) {
+		rootDir := t.TempDir()
+		workspace := filepath.Join(rootDir, "my-workspace")
+		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+			t.Fatal(errMkdir)
+		}
+		createsgaiDir(t, workspace)
+
+		srv := NewServer(rootDir)
+		ws := workspaceInfo{Directory: workspace, DirName: "my-workspace"}
+		result := srv.buildWorkspaceFullState(ws, nil)
+
+		if result.Description != "my-workspace" {
+			t.Errorf("description = %q; want %q when no GOAL.md present", result.Description, "my-workspace")
+		}
+	})
+
+	t.Run("descriptionUsesGoalMdWhenPresent", func(t *testing.T) {
+		rootDir := t.TempDir()
+		workspace := filepath.Join(rootDir, "my-workspace")
+		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+			t.Fatal(errMkdir)
+		}
+		createsgaiDir(t, workspace)
+		goalContent := "# My Great Project\n\nSome details here.\n"
+		if errWrite := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+
+		srv := NewServer(rootDir)
+		ws := workspaceInfo{Directory: workspace, DirName: "my-workspace"}
+		result := srv.buildWorkspaceFullState(ws, nil)
+
+		if result.Description != "My Great Project" {
+			t.Errorf("description = %q; want %q when GOAL.md has heading", result.Description, "My Great Project")
+		}
+	})
+
+	t.Run("descriptionFallsToDirNameWhenGoalMdIsEmpty", func(t *testing.T) {
+		rootDir := t.TempDir()
+		workspace := filepath.Join(rootDir, "empty-goal-ws")
+		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
+			t.Fatal(errMkdir)
+		}
+		createsgaiDir(t, workspace)
+		if errWrite := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte("---\nkey: val\n---\n"), 0644); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+
+		srv := NewServer(rootDir)
+		ws := workspaceInfo{Directory: workspace, DirName: "empty-goal-ws"}
+		result := srv.buildWorkspaceFullState(ws, nil)
+
+		if result.Description != "empty-goal-ws" {
+			t.Errorf("description = %q; want %q when GOAL.md has only frontmatter", result.Description, "empty-goal-ws")
+		}
+	})
 }
 
 func TestHandleAPIStateSignalBrokerEdgeCases(t *testing.T) {
