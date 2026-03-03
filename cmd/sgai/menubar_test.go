@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -255,6 +257,26 @@ func TestFormatMenuItemLabel(t *testing.T) {
 			item: menuBarItem{name: "my-workspace"},
 			want: "my-workspace",
 		},
+		{
+			name: "descriptionOverridesName",
+			item: menuBarItem{name: "my-workspace", description: "My Goal Title", needsInput: true},
+			want: "\u26A0 My Goal Title (Needs Input)",
+		},
+		{
+			name: "descriptionUsedWhenStopped",
+			item: menuBarItem{name: "my-workspace", description: "My Goal Title", stopped: true},
+			want: "\u25A0 My Goal Title (Stopped)",
+		},
+		{
+			name: "descriptionUsedWhenPinned",
+			item: menuBarItem{name: "my-workspace", description: "My Goal Title", pinned: true},
+			want: "\u25CB My Goal Title",
+		},
+		{
+			name: "emptyDescriptionFallsBackToName",
+			item: menuBarItem{name: "my-workspace", description: "", pinned: true},
+			want: "\u25CB my-workspace",
+		},
 	}
 
 	for _, tc := range cases {
@@ -265,6 +287,46 @@ func TestFormatMenuItemLabel(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGoalDescription(t *testing.T) {
+	t.Run("withGoalFile", func(t *testing.T) {
+		dir := t.TempDir()
+		goalContent := "# My Project Goal\n\n- [ ] Task 1\n"
+		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		got := goalDescription(dir, "fallback-name")
+		if got != "My Project Goal" {
+			t.Errorf("goalDescription() = %q; want %q", got, "My Project Goal")
+		}
+	})
+
+	t.Run("withoutGoalFile", func(t *testing.T) {
+		dir := t.TempDir()
+		got := goalDescription(dir, "fallback-name")
+		if got != "fallback-name" {
+			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
+		}
+	})
+
+	t.Run("emptyGoalFile", func(t *testing.T) {
+		dir := t.TempDir()
+		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(""), 0644); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		got := goalDescription(dir, "fallback-name")
+		if got != "fallback-name" {
+			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
+		}
+	})
+
+	t.Run("emptyDirectory", func(t *testing.T) {
+		got := goalDescription("", "fallback-name")
+		if got != "fallback-name" {
+			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
+		}
+	})
 }
 
 func TestWorkspaceURL(t *testing.T) {
@@ -394,6 +456,26 @@ func TestToMenuBarItem(t *testing.T) {
 		}
 		if got.stopped {
 			t.Error("expected stopped = false (running overrides)")
+		}
+	})
+
+	t.Run("withGoalDescription", func(t *testing.T) {
+		dir := t.TempDir()
+		goalContent := "# My Cool Project\n\n- [ ] Task 1\n"
+		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
+			t.Fatal(errWrite)
+		}
+		w := workspaceInfo{
+			Directory: dir,
+			DirName:   "my-cool-project",
+			Running:   false,
+		}
+		got := toMenuBarItem(w)
+		if got.name != "my-cool-project" {
+			t.Errorf("name = %q; want %q", got.name, "my-cool-project")
+		}
+		if got.description != "My Cool Project" {
+			t.Errorf("description = %q; want %q", got.description, "My Cool Project")
 		}
 	})
 

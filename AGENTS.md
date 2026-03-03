@@ -51,3 +51,5 @@ You must use the skill `run-long-running-processes-in-tmux`
 # Safe Assumptions
 
 "OpenCode" (aka `opencode`) is always installed and available.
+
+When implementing new features that handle external input, interact with the filesystem, or manage concurrent operations, the coordinator should consider invoking the stpa-analyst to identify unsafe control actions and loss scenarios before implementation begins.

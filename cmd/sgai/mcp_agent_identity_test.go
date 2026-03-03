@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +29,7 @@ func TestBuildMCPServerUsesCoordinatorCurrentAgentAsFallback(t *testing.T) {
 			t.Fatal("expected non-nil server")
 		}
 
-		result, err := updateWorkflowState(context.Background(), coord, resolveCallerAgent("coordinator", coord), updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, resolveCallerAgent("coordinator", coord), updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "doing backend work",
 			AddProgress: "wrote some code",
@@ -74,7 +73,7 @@ func TestBuildMCPServerUsesCoordinatorCurrentAgentAsFallback(t *testing.T) {
 
 		agentName := parseAgentIdentityHeader(req)
 
-		result, err := updateWorkflowState(context.Background(), coord, agentName, updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, agentName, updateWorkflowStateArgs{
 			Status:      "working",
 			AddProgress: "reviewed code",
 		})

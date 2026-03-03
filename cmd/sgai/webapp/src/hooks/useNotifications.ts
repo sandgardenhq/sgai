@@ -2,8 +2,14 @@ import { useEffect, useRef } from "react";
 import { useFactoryState } from "../lib/factory-state";
 import type { ApiWorkspaceEntry } from "../lib/factory-state";
 
+interface NeedsInputEntry {
+  name: string;
+  needsInput: boolean;
+  forks?: NeedsInputEntry[];
+}
+
 function collectNeedsInput(
-  workspaces: ApiWorkspaceEntry[],
+  workspaces: NeedsInputEntry[],
   out: Map<string, boolean>,
 ): void {
   for (const ws of workspaces) {

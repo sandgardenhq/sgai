@@ -5,9 +5,26 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
+
+func waitForPendingQuestion(t *testing.T, coord *state.Coordinator) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	for {
+		if coord.State().Status == state.StatusWaitingForHuman {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for waiting-for-human status")
+		default:
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+}
 
 func TestAskUserQuestion(t *testing.T) {
 	t.Run("singleQuestionBlocksUntilAnswer", func(t *testing.T) {
@@ -37,6 +54,7 @@ func TestAskUserQuestion(t *testing.T) {
 			done <- callResult{r, e}
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Selected: Option A")
 
 		cr := <-done
@@ -82,6 +100,7 @@ func TestAskUserQuestion(t *testing.T) {
 			done <- callResult{r, e}
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Selected: PostgreSQL, JWT")
 
 		cr := <-done
@@ -155,6 +174,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 			done <- callResult{r, e}
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Selected: yes")
 
 		cr := <-done
@@ -190,6 +210,7 @@ func TestAskUserQuestionStress(t *testing.T) {
 			done <- e
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Selected: A")
 
 		if err := <-done; err != nil {
@@ -248,6 +269,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			done <- e
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Selected: " + workGateApprovalText)
 
 		if err := <-done; err != nil {
@@ -272,6 +294,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			done <- e
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Not ready yet, need more clarification")
 
 		if err := <-done; err != nil {
@@ -297,6 +320,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			done <- callResult{r, e}
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Not ready yet, need more clarification")
 
 		cr := <-done
@@ -350,6 +374,7 @@ func TestAskUserWorkGateStress(t *testing.T) {
 			done <- callResult{r, e}
 		}()
 
+		waitForPendingQuestion(t, coord)
 		coord.Respond("Not ready yet, need more clarification")
 
 		cr := <-done

@@ -16,6 +16,12 @@ linters:
     - canonicalheader
     - dupl
     - revive
+    - gocyclo
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
 
 run:
   timeout: 5m

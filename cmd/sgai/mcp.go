@@ -415,8 +415,6 @@ type mcpContext struct {
 	agentName  string
 }
 
-type agentCancelKey struct{}
-
 type emptyResult struct{}
 
 func (c *mcpContext) findSkillsHandler(_ context.Context, _ *mcp.CallToolRequest, args findSkillsArgs) (*mcp.CallToolResult, emptyResult, error) {
@@ -439,8 +437,8 @@ func (c *mcpContext) findSnippetsHandler(_ context.Context, _ *mcp.CallToolReque
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) updateWorkflowStateHandler(ctx context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := updateWorkflowState(ctx, c.coord, c.agentName, args)
+func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
+	result, err := updateWorkflowState(c.coord, c.agentName, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -616,132 +614,152 @@ func askUserWorkGate(ctx context.Context, coord *state.Coordinator, summary stri
 func findSkills(workingDir, name string) (string, error) {
 	skillsDir := filepath.Join(workingDir, ".sgai", "skills")
 
-	getAllSkillFiles := func(dir string) ([]string, error) {
-		var files []string
-		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if !d.IsDir() && d.Name() == "SKILL.md" {
-				files = append(files, path)
-			}
-			return nil
-		})
-		return files, err
-	}
-
-	skillFiles, err := getAllSkillFiles(skillsDir)
+	skillFiles, err := collectSkillFiles(skillsDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to access skills: %w", err)
 	}
 
-	skillDisplayName := func(frontmatter map[string]string, relName string) string {
-		if n := frontmatter["name"]; n != "" {
-			return n
-		}
-		return filepath.Base(relName)
-	}
-
-	skillSteeringMessage := func(name, desc string) string {
-		return fmt.Sprintf(
-			"Found skill '%s': %s. Use the 'skill({\"name\":%q})' to load its full content.",
-			name, desc, name,
-		)
-	}
-
 	if name == "" {
-		var skills []string
-		for _, file := range skillFiles {
-			content, err := os.ReadFile(file)
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			relName, _ := filepath.Rel(skillsDir, file)
-			relName = strings.TrimSuffix(relName, "/SKILL.md")
-			desc := frontmatter["description"]
-			if desc == "" {
-				desc = "No description"
-			}
-			skills = append(skills, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
-		}
-		return strings.Join(skills, "\n"), nil
+		return listAllSkills(skillsDir, skillFiles)
 	}
 
+	if result, found := findSkillByExactMatch(skillsDir, skillFiles, name); found {
+		return result, nil
+	}
+
+	if result := findSkillsByPrefix(skillsDir, skillFiles, name); result != "" {
+		return result, nil
+	}
+
+	if result := findSkillsByBasename(skillsDir, skillFiles, name); result != "" {
+		return result, nil
+	}
+
+	return findSkillsByFuzzyMatch(skillsDir, skillFiles, name)
+}
+
+func collectSkillFiles(skillsDir string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(skillsDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && d.Name() == "SKILL.md" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
+}
+
+func skillDisplayName(frontmatter map[string]string, relName string) string {
+	if n := frontmatter["name"]; n != "" {
+		return n
+	}
+	return filepath.Base(relName)
+}
+
+func skillSteeringMessage(name, desc string) string {
+	return fmt.Sprintf(
+		"Found skill '%s': %s. Use the 'skill({\"name\":%q})' to load its full content.",
+		name, desc, name,
+	)
+}
+
+func skillRelName(skillsDir, file string) string {
+	relName, _ := filepath.Rel(skillsDir, file)
+	return strings.TrimSuffix(relName, "/SKILL.md")
+}
+
+func skillDesc(frontmatter map[string]string) string {
+	desc := frontmatter["description"]
+	if desc == "" {
+		return "No description"
+	}
+	return desc
+}
+
+func listAllSkills(skillsDir string, skillFiles []string) (string, error) {
+	var skills []string
 	for _, file := range skillFiles {
-		relName, _ := filepath.Rel(skillsDir, file)
-		relName = strings.TrimSuffix(relName, "/SKILL.md")
-		if relName == name {
-			content, err := os.ReadFile(file)
-			if err != nil {
-				return "", err
-			}
-			frontmatter := parseFrontmatterMap(content)
-			displayName := skillDisplayName(frontmatter, relName)
-			desc := frontmatter["description"]
-			if desc == "" {
-				desc = "No description"
-			}
-			return skillSteeringMessage(displayName, desc), nil
+		content, err := os.ReadFile(file)
+		if err != nil {
+			continue
 		}
+		frontmatter := parseFrontmatterMap(content)
+		relName := skillRelName(skillsDir, file)
+		skills = append(skills, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), skillDesc(frontmatter)))
 	}
+	return strings.Join(skills, "\n"), nil
+}
 
-	var prefixMatches []string
+func findSkillByExactMatch(skillsDir string, skillFiles []string, name string) (string, bool) {
 	for _, file := range skillFiles {
-		relName, _ := filepath.Rel(skillsDir, file)
-		relName = strings.TrimSuffix(relName, "/SKILL.md")
-		if strings.HasPrefix(relName, name) && relName != name {
-			content, err := os.ReadFile(file)
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			desc := frontmatter["description"]
-			if desc == "" {
-				desc = "No description"
-			}
-			prefixMatches = append(prefixMatches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
+		relName := skillRelName(skillsDir, file)
+		if relName != name {
+			continue
 		}
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return "", false
+		}
+		frontmatter := parseFrontmatterMap(content)
+		return skillSteeringMessage(skillDisplayName(frontmatter, relName), skillDesc(frontmatter)), true
 	}
-	if len(prefixMatches) > 0 {
-		return strings.Join(prefixMatches, "\n"), nil
-	}
+	return "", false
+}
 
-	var basenameMatches []struct {
-		name string
-		desc string
-	}
+func findSkillsByPrefix(skillsDir string, skillFiles []string, name string) string {
+	var matches []string
 	for _, file := range skillFiles {
-		relName, _ := filepath.Rel(skillsDir, file)
-		relName = strings.TrimSuffix(relName, "/SKILL.md")
-		basename := filepath.Base(relName)
-		if basename == name {
-			content, err := os.ReadFile(file)
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			desc := frontmatter["description"]
-			if desc == "" {
-				desc = "No description"
-			}
-			basenameMatches = append(basenameMatches, struct {
-				name string
-				desc string
-			}{skillDisplayName(frontmatter, relName), desc})
+		relName := skillRelName(skillsDir, file)
+		if !strings.HasPrefix(relName, name) || relName == name {
+			continue
 		}
-	}
-	if len(basenameMatches) == 1 {
-		return skillSteeringMessage(basenameMatches[0].name, basenameMatches[0].desc), nil
-	}
-	if len(basenameMatches) > 1 {
-		var matches []string
-		for _, m := range basenameMatches {
-			matches = append(matches, fmt.Sprintf("%s: %s", m.name, m.desc))
+		content, err := os.ReadFile(file)
+		if err != nil {
+			continue
 		}
-		return strings.Join(matches, "\n"), nil
+		frontmatter := parseFrontmatterMap(content)
+		matches = append(matches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), skillDesc(frontmatter)))
 	}
+	return strings.Join(matches, "\n")
+}
 
+type skillMatchEntry struct {
+	name string
+	desc string
+}
+
+func findSkillsByBasename(skillsDir string, skillFiles []string, name string) string {
+	var matches []skillMatchEntry
+	for _, file := range skillFiles {
+		relName := skillRelName(skillsDir, file)
+		if filepath.Base(relName) != name {
+			continue
+		}
+		content, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		frontmatter := parseFrontmatterMap(content)
+		matches = append(matches, skillMatchEntry{skillDisplayName(frontmatter, relName), skillDesc(frontmatter)})
+	}
+	if len(matches) == 1 {
+		return skillSteeringMessage(matches[0].name, matches[0].desc)
+	}
+	if len(matches) > 1 {
+		var results []string
+		for _, m := range matches {
+			results = append(results, fmt.Sprintf("%s: %s", m.name, m.desc))
+		}
+		return strings.Join(results, "\n")
+	}
+	return ""
+}
+
+func findSkillsByFuzzyMatch(skillsDir string, skillFiles []string, name string) (string, error) {
+	nameLower := strings.ToLower(name)
 	var matches []string
 	for _, file := range skillFiles {
 		content, err := os.ReadFile(file)
@@ -750,18 +768,11 @@ func findSkills(workingDir, name string) (string, error) {
 		}
 		frontmatter := parseFrontmatterMap(content)
 		contentLower := strings.ToLower(string(content))
-		nameLower := strings.ToLower(name)
-
 		if strings.Contains(strings.ToLower(frontmatter["name"]), nameLower) ||
 			strings.Contains(strings.ToLower(frontmatter["description"]), nameLower) ||
 			strings.Contains(contentLower, nameLower) {
-			relName, _ := filepath.Rel(skillsDir, file)
-			relName = strings.TrimSuffix(relName, "/SKILL.md")
-			desc := frontmatter["description"]
-			if desc == "" {
-				desc = "No description"
-			}
-			matches = append(matches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), desc))
+			relName := skillRelName(skillsDir, file)
+			matches = append(matches, fmt.Sprintf("%s: %s", skillDisplayName(frontmatter, relName), skillDesc(frontmatter)))
 		}
 	}
 	return strings.Join(matches, "\n"), nil
@@ -775,134 +786,145 @@ func findSkills(workingDir, name string) (string, error) {
 func findSnippets(workingDir, language, query string) (string, error) {
 	snippetsDir := filepath.Join(workingDir, ".sgai", "snippets")
 
-	if language == "" && query == "" {
-		entries, err := os.ReadDir(snippetsDir)
-		if err != nil {
-			return "", nil
-		}
-		var languages []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				languages = append(languages, entry.Name())
-			}
-		}
-		return strings.Join(languages, "\n"), nil
+	if language == "" {
+		return listSnippetLanguages(snippetsDir)
 	}
 
-	if language != "" && query == "" {
-		langDir := filepath.Join(snippetsDir, language)
-		entries, err := os.ReadDir(langDir)
-		if err != nil {
-			return "", nil
+	langDir := filepath.Join(snippetsDir, language)
+	entries, err := os.ReadDir(langDir)
+	if err != nil {
+		return "", nil
+	}
+
+	if query == "" {
+		return listSnippetsForLanguage(langDir, entries)
+	}
+
+	return searchSnippets(langDir, entries, query)
+}
+
+func listSnippetLanguages(snippetsDir string) (string, error) {
+	entries, err := os.ReadDir(snippetsDir)
+	if err != nil {
+		return "", nil
+	}
+	var languages []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			languages = append(languages, entry.Name())
 		}
-		var snippets []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+	}
+	return strings.Join(languages, "\n"), nil
+}
+
+func listSnippetsForLanguage(langDir string, entries []os.DirEntry) (string, error) {
+	var snippets []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		frontmatter := parseFrontmatterMap(content)
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		desc := frontmatter["description"]
+		if desc == "" {
+			desc = "No description"
+		}
+		snippets = append(snippets, fmt.Sprintf("%s: %s", name, desc))
+	}
+	return strings.Join(snippets, "\n"), nil
+}
+
+func searchSnippets(langDir string, entries []os.DirEntry, query string) (string, error) {
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		if strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name())) == query {
+			return string(content), nil
+		}
+	}
+
+	if result := findSnippetsByNameContains(langDir, entries, query); result != "" {
+		return result, nil
+	}
+
+	return findSnippetsByFuzzyMatch(langDir, entries, query)
+}
+
+type snippetMatch struct {
+	name    string
+	content string
+	desc    string
+}
+
+func findSnippetsByNameContains(langDir string, entries []os.DirEntry, query string) string {
+	var matches []snippetMatch
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		if !strings.Contains(name, query) || name == query {
+			continue
+		}
+		frontmatter := parseFrontmatterMap(content)
+		desc := frontmatter["description"]
+		if desc == "" {
+			desc = "No description"
+		}
+		matches = append(matches, snippetMatch{name, string(content), desc})
+	}
+	if len(matches) == 1 {
+		return matches[0].content
+	}
+	if len(matches) > 1 {
+		var results []string
+		for _, m := range matches {
+			results = append(results, fmt.Sprintf("%s: %s", m.name, m.desc))
+		}
+		return strings.Join(results, "\n")
+	}
+	return ""
+}
+
+func findSnippetsByFuzzyMatch(langDir string, entries []os.DirEntry, query string) (string, error) {
+	queryLower := strings.ToLower(query)
+	var matches []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		frontmatter := parseFrontmatterMap(content)
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		if strings.Contains(strings.ToLower(name), queryLower) ||
+			strings.Contains(strings.ToLower(frontmatter["description"]), queryLower) {
 			desc := frontmatter["description"]
 			if desc == "" {
 				desc = "No description"
 			}
-			snippets = append(snippets, fmt.Sprintf("%s: %s", name, desc))
+			matches = append(matches, fmt.Sprintf("%s: %s", name, desc))
 		}
-		return strings.Join(snippets, "\n"), nil
 	}
-
-	if language != "" && query != "" {
-		langDir := filepath.Join(snippetsDir, language)
-		entries, err := os.ReadDir(langDir)
-		if err != nil {
-			return "", nil
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-			if name == query {
-				return string(content), nil
-			}
-		}
-
-		var prefixMatches []struct {
-			name    string
-			content string
-			desc    string
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-			if strings.Contains(name, query) && name != query {
-				desc := frontmatter["description"]
-				if desc == "" {
-					desc = "No description"
-				}
-				prefixMatches = append(prefixMatches, struct {
-					name    string
-					content string
-					desc    string
-				}{name, string(content), desc})
-			}
-		}
-		if len(prefixMatches) == 1 {
-			return prefixMatches[0].content, nil
-		}
-		if len(prefixMatches) > 1 {
-			var matches []string
-			for _, m := range prefixMatches {
-				matches = append(matches, fmt.Sprintf("%s: %s", m.name, m.desc))
-			}
-			return strings.Join(matches, "\n"), nil
-		}
-
-		var matches []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			content, err := os.ReadFile(filepath.Join(langDir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			frontmatter := parseFrontmatterMap(content)
-			queryLower := strings.ToLower(query)
-			name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-
-			if strings.Contains(strings.ToLower(name), queryLower) ||
-				strings.Contains(strings.ToLower(frontmatter["description"]), queryLower) {
-				desc := frontmatter["description"]
-				if desc == "" {
-					desc = "No description"
-				}
-				matches = append(matches, fmt.Sprintf("%s: %s", name, desc))
-			}
-		}
-		return strings.Join(matches, "\n"), nil
-	}
-
-	return "", nil
+	return strings.Join(matches, "\n"), nil
 }
 
-func updateWorkflowState(ctx context.Context, coord *state.Coordinator, callerAgent string, args updateWorkflowStateArgs) (string, error) {
+func updateWorkflowState(coord *state.Coordinator, callerAgent string, args updateWorkflowStateArgs) (string, error) {
 	var (
 		response        string
 		statusPreserved bool
@@ -978,9 +1000,7 @@ func updateWorkflowState(ctx context.Context, coord *state.Coordinator, callerAg
 
 	currentState := coord.State()
 	if currentState.Status == state.StatusAgentDone {
-		if cancel, ok := ctx.Value(agentCancelKey{}).(context.CancelFunc); ok && cancel != nil {
-			coord.StartAgentDoneWatchdog(cancel)
-		}
+		coord.StartAgentDoneWatchdog(coord.GetAgentCancel())
 	}
 
 	return response, nil
