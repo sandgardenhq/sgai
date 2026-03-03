@@ -20,6 +20,8 @@ type Listener = () => void;
 const POLL_INTERVAL_MS = 3000;
 const SLOW_POLL_INTERVAL_MS = 10000;
 const SSE_CONNECT_TIMEOUT_MS = 5000;
+const SSE_BASE_BACKOFF_MS = 1000;
+const SSE_MAX_BACKOFF_MS = 30000;
 
 function createFactoryStateStore() {
   let snapshot: FactoryStateSnapshot = {
@@ -32,6 +34,8 @@ function createFactoryStateStore() {
   let pollTimerId: ReturnType<typeof setTimeout> | null = null;
   let sseSource: EventSource | null = null;
   let sseTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let sseReconnectTimerId: ReturnType<typeof setTimeout> | null = null;
+  let sseReconnectAttempts = 0;
   let sseConnected = false;
   let isFetching = false;
   let isDestroyed = false;
@@ -100,6 +104,24 @@ function createFactoryStateStore() {
     }
   }
 
+  function sseBackoffDelay(): number {
+    return Math.min(SSE_BASE_BACKOFF_MS * Math.pow(2, sseReconnectAttempts), SSE_MAX_BACKOFF_MS);
+  }
+
+  function scheduleSSEReconnect() {
+    if (isDestroyed) return;
+    if (sseReconnectTimerId !== null) {
+      clearTimeout(sseReconnectTimerId);
+      sseReconnectTimerId = null;
+    }
+    const delay = sseBackoffDelay();
+    sseReconnectAttempts++;
+    sseReconnectTimerId = setTimeout(() => {
+      sseReconnectTimerId = null;
+      connectSSESignal();
+    }, delay);
+  }
+
   function connectSSESignal() {
     if (sseSource !== null || isDestroyed) return;
 
@@ -110,11 +132,13 @@ function createFactoryStateStore() {
       if (!sseConnected && sseSource !== null) {
         sseSource.close();
         sseSource = null;
+        scheduleSSEReconnect();
       }
     }, SSE_CONNECT_TIMEOUT_MS);
 
     sseSource.onopen = () => {
       sseConnected = true;
+      sseReconnectAttempts = 0;
       if (sseTimeoutId !== null) {
         clearTimeout(sseTimeoutId);
         sseTimeoutId = null;
@@ -131,6 +155,7 @@ function createFactoryStateStore() {
         sseTimeoutId = null;
       }
       sseConnected = false;
+      scheduleSSEReconnect();
     };
 
     sseSource.addEventListener("reload", () => {
@@ -165,6 +190,11 @@ function createFactoryStateStore() {
     if (sseTimeoutId !== null) {
       clearTimeout(sseTimeoutId);
       sseTimeoutId = null;
+    }
+
+    if (sseReconnectTimerId !== null) {
+      clearTimeout(sseReconnectTimerId);
+      sseReconnectTimerId = null;
     }
 
     if (sseSource !== null) {

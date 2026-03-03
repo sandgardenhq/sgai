@@ -546,16 +546,16 @@ func TestNewCoordinatorWith(t *testing.T) {
 	})
 }
 
-func waitForStatus(t *testing.T, coord *Coordinator, want string) {
+func waitForWaitingForHuman(t *testing.T, coord *Coordinator) {
 	t.Helper()
 	deadline := time.After(2 * time.Second)
 	for {
-		if coord.State().Status == want {
+		if coord.State().Status == StatusWaitingForHuman {
 			return
 		}
 		select {
 		case <-deadline:
-			t.Fatalf("timed out waiting for status %q, got %q", want, coord.State().Status)
+			t.Fatalf("timed out waiting for waiting-for-human status, got %q", coord.State().Status)
 		default:
 			time.Sleep(5 * time.Millisecond)
 		}
@@ -589,7 +589,7 @@ func TestAskAndWaitPreservesStateOnContextCancel(t *testing.T) {
 			errCh <- err
 		}()
 
-		waitForStatus(t, coord, StatusWaitingForHuman)
+		waitForWaitingForHuman(t, coord)
 
 		cancel()
 
@@ -638,7 +638,7 @@ func TestAskAndWaitPreservesStateOnContextCancel(t *testing.T) {
 			done <- result{a, e}
 		}()
 
-		waitForStatus(t, coord, StatusWaitingForHuman)
+		waitForWaitingForHuman(t, coord)
 		coord.Respond("A")
 
 		r := <-done
@@ -684,7 +684,7 @@ func TestAskAndWaitPreservesStateOnContextCancel(t *testing.T) {
 			errCh <- err
 		}()
 
-		waitForStatus(t, coord, StatusWaitingForHuman)
+		waitForWaitingForHuman(t, coord)
 		cancel()
 		<-errCh
 
@@ -706,6 +706,401 @@ func TestAskAndWaitPreservesStateOnContextCancel(t *testing.T) {
 		}
 		if r.answer != "A" {
 			t.Errorf("expected late answer 'A', got %q", r.answer)
+		}
+	})
+
+	t.Run("firstRespondWinsAfterTimeout", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Pick one", Choices: []string{"A", "B"}},
+			},
+		}
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := coord.AskAndWait(ctx, question, "Pick one")
+			errCh <- err
+		}()
+
+		waitForWaitingForHuman(t, coord)
+		cancel()
+		<-errCh
+
+		coord.Respond("A")
+		coord.Respond("B")
+
+		type result struct {
+			answer string
+			err    error
+		}
+		done := make(chan result, 1)
+		go func() {
+			a, e := coord.AskAndWait(context.Background(), question, "Pick one")
+			done <- result{a, e}
+		}()
+
+		r := <-done
+		if r.err != nil {
+			t.Fatalf("unexpected error: %v", r.err)
+		}
+		if r.answer != "A" {
+			t.Errorf("expected first answer 'A' to win (channel-in-channel buffering), got %q", r.answer)
+		}
+	})
+}
+
+func TestMCPTimeoutSurvival(t *testing.T) {
+	t.Run("questionStatePreservedAfterMCPTimeout", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Which option?", Choices: []string{"A", "B"}},
+			},
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := coord.AskAndWait(ctx, question, "Which option?")
+			errCh <- err
+		}()
+
+		waitForWaitingForHuman(t, coord)
+		cancel()
+		if err := <-errCh; !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled from MCP timeout simulation, got %v", err)
+		}
+
+		afterTimeout := coord.State()
+		if afterTimeout.Status != StatusWaitingForHuman {
+			t.Errorf("status should remain waiting-for-human after MCP timeout, got %q", afterTimeout.Status)
+		}
+		if afterTimeout.MultiChoiceQuestion == nil {
+			t.Error("question should persist after MCP timeout so UI can display it")
+		}
+	})
+
+	t.Run("humanAnswerAfterMCPTimeoutDeliveredOnRetry", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Which option?", Choices: []string{"A", "B"}},
+			},
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := coord.AskAndWait(ctx, question, "Which option?")
+			errCh <- err
+		}()
+
+		waitForWaitingForHuman(t, coord)
+		cancel()
+		<-errCh
+
+		coord.Respond("A")
+
+		type result struct {
+			answer string
+			err    error
+		}
+		done := make(chan result, 1)
+		go func() {
+			a, e := coord.AskAndWait(context.Background(), question, "Which option?")
+			done <- result{a, e}
+		}()
+
+		r := <-done
+		if r.err != nil {
+			t.Fatalf("unexpected error on retry: %v", r.err)
+		}
+		if r.answer != "A" {
+			t.Errorf("expected buffered answer 'A' after timeout, got %q", r.answer)
+		}
+	})
+
+	t.Run("humanAnswerArrivesAfterRetryStarts", func(t *testing.T) {
+		simulateTimeoutThenRetry(t, "B")
+	})
+}
+
+func simulateTimeoutThenRetry(t *testing.T, expectedAnswer string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".sgai", "state.json")
+
+	coord, err := NewCoordinatorWith(path, Workflow{
+		Status:          StatusWorking,
+		InteractionMode: ModeBrainstorming,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	question := &MultiChoiceQuestion{
+		Questions: []QuestionItem{
+			{Question: "Pick one", Choices: []string{"A", "B"}},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := coord.AskAndWait(ctx, question, "Pick one")
+		errCh <- err
+	}()
+
+	waitForWaitingForHuman(t, coord)
+	cancel()
+	<-errCh
+
+	type result struct {
+		answer string
+		err    error
+	}
+	done := make(chan result, 1)
+	go func() {
+		a, e := coord.AskAndWait(context.Background(), question, "Pick one")
+		done <- result{a, e}
+	}()
+
+	waitForWaitingForHuman(t, coord)
+	coord.Respond(expectedAnswer)
+
+	r := <-done
+	if r.err != nil {
+		t.Fatalf("unexpected error: %v", r.err)
+	}
+	if r.answer != expectedAnswer {
+		t.Errorf("expected answer %q, got %q", expectedAnswer, r.answer)
+	}
+}
+
+func TestAskAndWaitChannelInChannelIsolation(t *testing.T) {
+	t.Run("sequentialCallsDoNotShareState", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+
+		coord, err := NewCoordinatorWith(path, Workflow{
+			Status:          StatusWorking,
+			InteractionMode: ModeBrainstorming,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		question := &MultiChoiceQuestion{
+			Questions: []QuestionItem{
+				{Question: "Pick one", Choices: []string{"A", "B"}},
+			},
+		}
+
+		for i, expected := range []string{"first", "second", "third"} {
+			type result struct {
+				answer string
+				err    error
+			}
+			done := make(chan result, 1)
+			go func() {
+				a, e := coord.AskAndWait(context.Background(), question, "Pick one")
+				done <- result{a, e}
+			}()
+
+			waitForWaitingForHuman(t, coord)
+			coord.Respond(expected)
+
+			r := <-done
+			if r.err != nil {
+				t.Fatalf("call %d: unexpected error: %v", i, r.err)
+			}
+			if r.answer != expected {
+				t.Errorf("call %d: expected answer %q, got %q", i, expected, r.answer)
+			}
+
+			afterState := coord.State()
+			if afterState.Status == StatusWaitingForHuman {
+				t.Errorf("call %d: status should not be waiting-for-human after response", i)
+			}
+		}
+	})
+
+	t.Run("timeoutThenRetryDoesNotMixAnswers", func(t *testing.T) {
+		simulateTimeoutThenRetry(t, "correct-answer")
+	})
+}
+
+func TestAgentCancelWatchdog(t *testing.T) {
+	t.Run("setAndGetAgentCancel", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		var cancelled bool
+		cancel := func() { cancelled = true }
+		coord.SetAgentCancel(cancel)
+
+		got := coord.GetAgentCancel()
+		if got == nil {
+			t.Fatal("expected non-nil cancel func after SetAgentCancel")
+		}
+		got()
+		if !cancelled {
+			t.Error("expected cancel func to be callable via GetAgentCancel")
+		}
+	})
+
+	t.Run("getAgentCancelReturnsNilBeforeSet", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		if coord.GetAgentCancel() != nil {
+			t.Error("expected nil cancel func before SetAgentCancel")
+		}
+	})
+
+	t.Run("resetClearsAgentCancel", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		coord.SetAgentCancel(func() {})
+		coord.ResetAgentDoneWatchdog()
+
+		if coord.GetAgentCancel() != nil {
+			t.Error("expected nil cancel func after ResetAgentDoneWatchdog")
+		}
+	})
+
+	t.Run("watchdogFiresOnStartAgentDoneWatchdog", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		cancelled := make(chan struct{})
+		cancel := func() { close(cancelled) }
+
+		coord.mu.Lock()
+		coord.doneTimer = time.AfterFunc(50*time.Millisecond, cancel)
+		coord.mu.Unlock()
+
+		select {
+		case <-cancelled:
+		case <-time.After(2 * time.Second):
+			t.Fatal("watchdog did not fire within deadline")
+		}
+	})
+
+	t.Run("stopCancelsPendingTimer", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		fired := make(chan struct{}, 1)
+		cancel := func() { fired <- struct{}{} }
+		coord.SetAgentCancel(cancel)
+
+		coord.mu.Lock()
+		coord.doneTimer = time.AfterFunc(50*time.Millisecond, cancel)
+		coord.mu.Unlock()
+
+		coord.Stop()
+
+		select {
+		case <-fired:
+			t.Error("watchdog should not have fired after Stop()")
+		case <-time.After(200 * time.Millisecond):
+		}
+	})
+
+	t.Run("resetAllowsWatchdogToStartOnSubsequentAgentRun", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		coord.SetAgentCancel(func() {})
+		coord.StartAgentDoneWatchdog(coord.GetAgentCancel())
+
+		if !coord.IsShuttingDown() {
+			t.Error("expected IsShuttingDown true after first StartAgentDoneWatchdog")
+		}
+
+		coord.ResetAgentDoneWatchdog()
+
+		if coord.IsShuttingDown() {
+			t.Error("expected IsShuttingDown false after ResetAgentDoneWatchdog")
+		}
+
+		coord.SetAgentCancel(func() {})
+		coord.StartAgentDoneWatchdog(coord.GetAgentCancel())
+
+		if !coord.IsShuttingDown() {
+			t.Error("expected IsShuttingDown true after second StartAgentDoneWatchdog following Reset")
+		}
+		coord.Stop()
+	})
+
+	t.Run("startWatchdogWithNilCancelIsNoOp", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		coord.StartAgentDoneWatchdog(nil)
+
+		if coord.IsShuttingDown() {
+			t.Error("IsShuttingDown should be false after StartAgentDoneWatchdog(nil)")
+		}
+	})
+
+	t.Run("setAgentCancelConcurrentAccess", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".sgai", "state.json")
+		coord := NewCoordinatorEmpty(path)
+
+		done := make(chan struct{})
+		for range 10 {
+			go func() {
+				coord.SetAgentCancel(func() {})
+				_ = coord.GetAgentCancel()
+				done <- struct{}{}
+			}()
+		}
+		for range 10 {
+			<-done
 		}
 	})
 }

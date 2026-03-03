@@ -335,12 +335,51 @@ function useTheme() {
 - Test user interactions, not internal state
 - Mock at the network layer, not the component layer
 
-### Accessibility
-- Use semantic HTML elements
-- Include proper ARIA attributes when needed
-- Ensure keyboard navigation works
-- Test with screen readers when possible
-- Manage focus appropriately (especially in modals/dialogs)
+---
+
+## Accessibility Checklist
+
+Before marking any work as complete, verify accessibility compliance:
+
+### Semantic HTML
+- [ ] Use semantic HTML elements (`<header>`, `<nav>`, `<main>`, `<article>`, `<section>`, `<footer>`) instead of `<div>` for layout
+- [ ] Use `<button>` for actions, `<a>` for navigation — never use `<div>` or `<span>` with click handlers
+- [ ] Use proper heading hierarchy (`<h1>` → `<h2>` → `<h3>`) — never skip levels
+
+### Focus Management
+- [ ] All interactive elements are keyboard accessible (can reach with Tab, activate with Enter/Space)
+- [ ] Focus order is logical and matches visual order
+- [ ] Focus indicator is visible (not removed with `outline: none` without replacement)
+- [ ] Modals/dialogs trap focus and return focus to trigger on close
+- [ ] Focus is managed appropriately after navigation
+
+### ARIA Attributes
+- [ ] `aria-label` used on icon-only buttons
+- [ ] `aria-labelledby` or `aria-label` used on regions (nav, main, etc.)
+- [ ] `aria-expanded` used on collapsible elements
+- [ ] `aria-selected` used on selectable items in lists/tabs
+- [ ] `aria-current` used to indicate current page/item in navigation
+- [ ] `role` attribute used correctly when semantic HTML isn't sufficient
+- [ ] Dynamic content changes announced with `aria-live` regions
+
+### Color & Contrast
+- [ ] Text meets WCAG AA contrast ratio (4.5:1 for normal text, 3:1 for large text)
+- [ ] Color is not the only way information is conveyed (use icons + text, or text labels)
+- [ ] Interactive element states (hover, focus, active) have sufficient contrast
+
+### Screen Reader Testing
+- [ ] Form inputs have associated `<label>` elements (or `aria-label`/`aria-labelledby`)
+- [ ] Error messages are programmatically associated with form fields (`aria-describedby`)
+- [ ] Tables have proper headers (`<th>` with `scope` attribute)
+- [ ] Images have alt text (or `alt=""` for decorative images)
+- [ ] Content is readable when styles are disabled
+
+### Interactive Elements
+- [ ] All buttons have accessible names
+- [ ] Links have descriptive text (not "click here" or empty)
+- [ ] Dropdowns/selects are keyboard navigable
+- [ ] Sortable tables indicate sort state with `aria-sort`
+- [ ] Tooltips are keyboard accessible
 
 ---
 

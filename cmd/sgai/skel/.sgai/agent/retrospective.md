@@ -6,6 +6,7 @@ permission:
     "*": deny
     "*/sgai/*": allow
     "*/AGENTS.md": allow
+    "*/.sgai/SGAI_NOTES.md": allow
   doom_loop: deny
   external_directory: deny
   question: deny

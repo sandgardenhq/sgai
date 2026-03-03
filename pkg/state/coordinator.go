@@ -13,17 +13,19 @@ const agentDoneWatchdogTimeout = time.Minute
 // Coordinator manages workflow state in memory with blocking ask/answer delivery
 // and a soft-stop watchdog for agent-done transitions.
 //
-// It wraps a Workflow with channels for direct answer delivery (no file I/O),
-// a save path for retrospective persistence, and a sync.Once-guarded timer
-// that cancels the context one minute after agent-done is called.
+// It wraps a Workflow with per-question response channels for direct answer
+// delivery (no file I/O), a save path for retrospective persistence, and a
+// sync.Once-guarded timer that cancels the context one minute after agent-done
+// is called.
 type Coordinator struct {
-	mu       sync.Mutex
-	wf       Workflow
-	answerCh chan string
-	savePath string
+	mu                sync.Mutex
+	wf                Workflow
+	currentResponseCh chan string
+	savePath          string
 
-	doneOnce  sync.Once
-	doneTimer *time.Timer
+	doneOnce    sync.Once
+	doneTimer   *time.Timer
+	agentCancel context.CancelFunc
 
 	onUpdate func()
 }
@@ -38,7 +40,6 @@ func NewCoordinator(path string) (*Coordinator, error) {
 	}
 	return &Coordinator{
 		wf:       wf,
-		answerCh: make(chan string, 1),
 		savePath: path,
 	}, nil
 }
@@ -52,7 +53,6 @@ func NewCoordinatorEmpty(path string) *Coordinator {
 			Progress: []ProgressEntry{},
 			Messages: []Message{},
 		},
-		answerCh: make(chan string, 1),
 		savePath: path,
 	}
 }
@@ -63,7 +63,6 @@ func NewCoordinatorEmpty(path string) *Coordinator {
 func NewCoordinatorWith(path string, wf Workflow) (*Coordinator, error) {
 	c := &Coordinator{
 		wf:       wf,
-		answerCh: make(chan string, 1),
 		savePath: path,
 	}
 	if err := save(path, wf); err != nil {
@@ -109,14 +108,52 @@ func (c *Coordinator) UpdateState(fn func(*Workflow)) error {
 // the human partner answers via Respond or the context is cancelled.
 // After the answer arrives, it clears the waiting state before returning.
 // On context cancellation, the question state is preserved so the UI
-// notification (⚠) remains visible for the human partner.
+// notification (⚠) remains visible for the human partner, and the response
+// channel is kept alive so a subsequent call can immediately collect a buffered
+// answer.
 // It returns the human's answer string or a context error.
+//
+// Each call creates its own response channel (channel-in-channel pattern) so
+// that concurrent or sequential calls never share state and MCP tool timeouts
+// do not corrupt pending question channels. If the previous call timed out and
+// the human has already answered (buffered in the existing channel), the answer
+// is collected immediately without blocking.
 func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuestion, humanMessage string) (string, error) {
+	c.mu.Lock()
+	existingCh := c.currentResponseCh
+	c.mu.Unlock()
+
+	if existingCh != nil {
+		select {
+		case buffered := <-existingCh:
+			log.Println("askandwait: collected buffered answer from previous call")
+			c.mu.Lock()
+			if c.currentResponseCh == existingCh {
+				c.currentResponseCh = nil
+			}
+			c.mu.Unlock()
+			c.clearWaitingState()
+			return buffered, nil
+		default:
+		}
+	}
+
+	responseCh := make(chan string, 1)
+
+	c.mu.Lock()
+	c.currentResponseCh = responseCh
+	c.mu.Unlock()
+
 	if err := c.UpdateState(func(wf *Workflow) {
 		wf.MultiChoiceQuestion = question
 		wf.HumanMessage = humanMessage
 		wf.Status = StatusWaitingForHuman
 	}); err != nil {
+		c.mu.Lock()
+		if c.currentResponseCh == responseCh {
+			c.currentResponseCh = nil
+		}
+		c.mu.Unlock()
 		return "", fmt.Errorf("saving question state: %w", err)
 	}
 	log.Println("askandwait: question state set, status changed to waiting-for-human")
@@ -127,9 +164,15 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 	case <-ctx.Done():
 		log.Println("askandwait: context cancelled:", ctx.Err())
 		return "", ctx.Err()
-	case answer = <-c.answerCh:
+	case answer = <-responseCh:
 		log.Println("askandwait: answer received from human")
 	}
+
+	c.mu.Lock()
+	if c.currentResponseCh == responseCh {
+		c.currentResponseCh = nil
+	}
+	c.mu.Unlock()
 
 	c.clearWaitingState()
 	return answer, nil
@@ -150,24 +193,68 @@ func (c *Coordinator) clearWaitingState() {
 
 // Respond delivers the human's answer to the blocked AskAndWait call.
 // The state is cleared by AskAndWait after it receives the answer.
-// Respond does not block.
+// Respond does not block. If no AskAndWait is currently waiting, the answer
+// is silently discarded.
 func (c *Coordinator) Respond(answer string) {
-	select {
-	case c.answerCh <- answer:
-		log.Println("askandwait: response delivered to waiting caller")
-	default:
-		log.Println("askandwait: response dropped, no active waiter")
+	c.mu.Lock()
+	responseCh := c.currentResponseCh
+	c.mu.Unlock()
+
+	if responseCh == nil {
+		log.Println("askandwait: no pending question, discarding response")
+		return
 	}
+
+	select {
+	case responseCh <- answer:
+		log.Println("askandwait: response queued for delivery")
+	default:
+		log.Println("askandwait: response channel full, response discarded")
+	}
+}
+
+// SetAgentCancel stores the cancel function for the current agent run.
+// It is called before each agent subprocess is launched so the watchdog can
+// terminate that specific run if it hangs after setting status:agent-done.
+func (c *Coordinator) SetAgentCancel(cancel context.CancelFunc) {
+	c.mu.Lock()
+	c.agentCancel = cancel
+	c.mu.Unlock()
+}
+
+// GetAgentCancel returns the cancel function for the current agent run.
+// Returns nil if none has been set or after ResetAgentDoneWatchdog clears it.
+func (c *Coordinator) GetAgentCancel() context.CancelFunc {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.agentCancel
+}
+
+// ResetAgentDoneWatchdog prepares the watchdog for a fresh agent run.
+// It stops any pending timer, clears the stored cancel function, and resets
+// the sync.Once so the watchdog can fire again on the next agent-done.
+func (c *Coordinator) ResetAgentDoneWatchdog() {
+	c.mu.Lock()
+	if c.doneTimer != nil {
+		c.doneTimer.Stop()
+		c.doneTimer = nil
+	}
+	c.agentCancel = nil
+	c.doneOnce = sync.Once{}
+	c.mu.Unlock()
 }
 
 // StartAgentDoneWatchdog starts a one-minute timer that calls cancel once.
 // Repeated calls are silently ignored via sync.Once.
 func (c *Coordinator) StartAgentDoneWatchdog(cancel context.CancelFunc) {
+	if cancel == nil {
+		return
+	}
+	c.mu.Lock()
 	c.doneOnce.Do(func() {
-		c.mu.Lock()
 		c.doneTimer = time.AfterFunc(agentDoneWatchdogTimeout, cancel)
-		c.mu.Unlock()
 	})
+	c.mu.Unlock()
 }
 
 // IsShuttingDown reports whether the agent-done watchdog has been started.

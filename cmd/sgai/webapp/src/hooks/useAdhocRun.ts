@@ -140,6 +140,14 @@ export function useAdhocRun({
     };
   }, [stopPolling]);
 
+  // reset running state when workspace changes
+  useEffect(() => {
+    stopPolling();
+    setIsRunning(false);
+    setOutput("");
+    setRunError(null);
+  }, [workspaceName, stopPolling]);
+
   // auto-scroll output
   useEffect(() => {
     if (outputRef.current) {

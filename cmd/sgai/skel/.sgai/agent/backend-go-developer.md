@@ -146,7 +146,143 @@ if err != nil {
 - Protect shared state with sync primitives
 - Prefer channels for coordination
 
-### Interfaces
+### Advanced Concurrency Patterns
+
+**WaitGroups for Multiple Goroutines:**
+```go
+import "sync"
+
+func processItems(items []Item) error {
+    var wg sync.WaitGroup
+    errCh := make(chan error, len(items))
+
+    for _, item := range items {
+        wg.Add(1)
+        go func(i Item) {
+            defer wg.Done()
+            if err := process(i); err != errCh <- err {
+                // handle channel send error
+            }
+        }(item)
+    }
+
+    wg.Wait()
+    close(errCh)
+
+    for err := range errCh {
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+**Context for Cancellation:**
+```go
+func longRunningTask(ctx context.Context) error {
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+            // do work
+        }
+    }
+}
+
+func main() {
+    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+    defer cancel()
+
+    if err := longRunningTask(ctx); err != nil {
+        // handle timeout or cancellation
+    }
+}
+```
+
+**Mutex vs RWMutex:**
+```go
+type SafeMap struct {
+    mu   sync.RWMutex
+    data map[string]Value
+}
+
+func (m *SafeMap) Get(key string) (Value, bool) {
+    m.mu.RLock()
+    defer m.mu.RUnlock()
+    val, ok := m.data[key]
+    return val, ok
+}
+
+func (m *SafeMap) Set(key string, val Value) {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    m.data[key] = val
+}
+```
+
+**Once for One-Time Initialization:**
+```go
+var (
+    instance *Service
+    once     sync.Once
+)
+
+func GetService() *Service {
+    once.Do(func() {
+        instance = &Service{}
+    })
+    return instance
+}
+```
+
+**Pool for Resource Reuse:**
+```go
+func workerPool() {
+    pool := sync.Pool{
+        New: func() interface{} {
+            return make([]byte, 1024)
+        },
+    }
+
+    buf := pool.Get().([]byte)
+    defer pool.Put(buf)
+
+    // use buffer
+}
+```
+
+**Atomic Operations:**
+```go
+import "sync/atomic"
+
+type Counter struct {
+    value int64
+}
+
+func (c *Counter) Increment() {
+    atomic.AddInt64(&c.value, 1)
+}
+
+func (c *Counter) Value() int64 {
+    return atomic.LoadInt64(&c.value)
+}
+```
+
+**Select with Default (Non-Blocking):**
+```go
+select {
+case msg := <-ch:
+    // handle message
+default:
+    // no message available, continue without blocking
+}
+```
+
+---
+
+## Interfaces
 
 **Design principles:**
 - Define interfaces at point of use (consumer), not implementation
@@ -171,7 +307,9 @@ type Thinger interface { Thing() bool }
 func NewThinger() Thinger { return &defaultThinger{} }
 ```
 
-### Slices and Maps
+---
+
+## Slices and Maps
 
 **Empty slices:**
 ```go
@@ -259,7 +397,9 @@ func GetUser(id string) (User, error) {
 - Easy to make typos in key names
 - Hard to track what fields are actually used
 
-### Documentation
+---
+
+## Documentation
 
 **Doc comments:**
 - All exported names need doc comments

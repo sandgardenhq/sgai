@@ -6,6 +6,7 @@ permission:
     "*": deny
     "*/GOAL.md": allow
     "*/.sgai/PROJECT_MANAGEMENT.md": allow
+    "*/.sgai/SGAI_NOTES.md": allow
   doom_loop: deny
   external_directory: deny
   todowrite: deny

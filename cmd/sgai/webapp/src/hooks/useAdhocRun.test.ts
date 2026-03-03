@@ -138,4 +138,197 @@ describe("useAdhocRun", () => {
     );
     expect(modelCalls.length).toBe(0);
   });
+
+  describe("workspace switching resets running state", () => {
+    it("clears output when workspaceName changes to one with no active run", async () => {
+      mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+        const url = input.toString();
+        if (url.includes("/api/v1/models")) {
+          return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+        }
+        if (url.includes("/adhoc")) {
+          if (init?.method === "POST") {
+            return Promise.resolve(new Response(JSON.stringify({ running: false, output: "run output", message: "" })));
+          }
+          if (url.includes("/ws1/")) {
+            return Promise.resolve(new Response(JSON.stringify({ running: false, output: "ws1 output", message: "" })));
+          }
+          return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+        }
+        return Promise.resolve(new Response("{}"));
+      });
+
+      const { result, rerender } = renderHook(({ ws }: { ws: string }) =>
+        useAdhocRun({ workspaceName: ws, skipModelsFetch: true }),
+        { initialProps: { ws: "ws1" } },
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      act(() => {
+        result.current.setSelectedModel("model-a");
+      });
+
+      await act(async () => {
+        result.current.startRun("test prompt", "model-a");
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.output).toBe("run output");
+
+      rerender({ ws: "ws2" });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.output).toBe("");
+      expect(result.current.isRunning).toBe(false);
+      expect(result.current.runError).toBeNull();
+    });
+
+    it("resets isRunning to false when workspaceName changes to one with no active run", async () => {
+      let postCallCount = 0;
+      mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+        const url = input.toString();
+        if (url.includes("/api/v1/models")) {
+          return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+        }
+        if (url.includes("/adhoc")) {
+          if (init?.method === "POST") {
+            postCallCount++;
+            return Promise.resolve(new Response(JSON.stringify({ running: true, output: "", message: "" })));
+          }
+          if (url.includes("/ws1/")) {
+            return Promise.resolve(new Response(JSON.stringify({ running: true, output: "", message: "" })));
+          }
+          return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+        }
+        return Promise.resolve(new Response("{}"));
+      });
+
+      const { result, rerender } = renderHook(({ ws }: { ws: string }) =>
+        useAdhocRun({ workspaceName: ws, skipModelsFetch: true }),
+        { initialProps: { ws: "ws1" } },
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      act(() => {
+        result.current.setSelectedModel("model-a");
+      });
+
+      await act(async () => {
+        result.current.startRun("test prompt", "model-a");
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.isRunning).toBe(true);
+
+      rerender({ ws: "ws2" });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.isRunning).toBe(false);
+    });
+
+    it("clears runError when workspaceName changes", async () => {
+      mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+        const url = input.toString();
+        if (url.includes("/api/v1/models")) {
+          return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+        }
+        if (url.includes("/adhoc")) {
+          if (init?.method === "POST") {
+            return Promise.resolve(new Response("Internal Server Error", { status: 500 }));
+          }
+          return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+        }
+        return Promise.resolve(new Response("{}"));
+      });
+
+      const { result, rerender } = renderHook(({ ws }: { ws: string }) =>
+        useAdhocRun({ workspaceName: ws, skipModelsFetch: true }),
+        { initialProps: { ws: "ws1" } },
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      act(() => {
+        result.current.setSelectedModel("model-a");
+      });
+
+      await act(async () => {
+        result.current.startRun("test prompt", "model-a");
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.runError).not.toBeNull();
+
+      rerender({ ws: "ws2" });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.runError).toBeNull();
+    });
+
+    it("does not carry output from ws1 to ws2 after switching", async () => {
+      mockFetch.mockImplementation((input: string | URL | Request, init?: RequestInit) => {
+        const url = input.toString();
+        if (url.includes("/api/v1/models")) {
+          return Promise.resolve(new Response(JSON.stringify(modelsResponse)));
+        }
+        if (url.includes("/adhoc")) {
+          if (init?.method === "POST") {
+            return Promise.resolve(new Response(JSON.stringify({ running: false, output: "ws1 run output", message: "" })));
+          }
+          if (url.includes("/ws2/")) {
+            return Promise.resolve(new Response(JSON.stringify({ running: false, output: "", message: "" })));
+          }
+          return Promise.resolve(new Response(JSON.stringify({ running: false, output: "ws1 status output", message: "" })));
+        }
+        return Promise.resolve(new Response("{}"));
+      });
+
+      const { result, rerender } = renderHook(({ ws }: { ws: string }) =>
+        useAdhocRun({ workspaceName: ws, skipModelsFetch: true }),
+        { initialProps: { ws: "ws1" } },
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      act(() => {
+        result.current.setSelectedModel("model-a");
+      });
+
+      await act(async () => {
+        result.current.startRun("test prompt", "model-a");
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      const ws1Output = result.current.output;
+      expect(ws1Output).toBeTruthy();
+
+      rerender({ ws: "ws2" });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(result.current.output).toBe("");
+      expect(result.current.isRunning).toBe(false);
+    });
+  });
 });

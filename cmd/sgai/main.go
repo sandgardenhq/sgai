@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -91,311 +90,13 @@ Examples:
 // mcpURL is the HTTP URL of the MCP server for this workflow.
 // logWriter, when non-nil, receives a copy of the agent output for the web UI log tab.
 // sessionCoord is the coordinator already managing state for this session; pass nil when starting standalone.
-func runWorkflow(ctx context.Context, args []string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
-	flagSet := flag.NewFlagSet("sgai", flag.ExitOnError)
-	freshFlag := flagSet.Bool("fresh", false, "force a fresh start (delete state.json and PROJECT_MANAGEMENT.md)")
-	flagSet.Parse(args) //nolint:errcheck // ExitOnError FlagSet exits on error, never returns non-nil
-
-	if flagSet.NArg() < 1 {
-		log.Fatalln("usage: sgai [--fresh] <target_directory>")
+func runWorkflow(ctx context.Context, dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
+	runner, cleanup, ok := buildWorkflowRunner(dir, mcpURL, logWriter, sessionCoord)
+	if !ok {
+		return
 	}
-
-	dir, err := filepath.Abs(flagSet.Arg(0))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	goalPath := filepath.Join(dir, "GOAL.md")
-	goalContent, err := os.ReadFile(goalPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Fatalln("GOAL.md not found in", dir)
-		}
-		log.Fatalln(err)
-	}
-
-	metadata, err := parseYAMLFrontmatter(goalContent)
-	if err != nil {
-		log.Fatalln("failed to parse GOAL.md frontmatter:", err)
-	}
-
-	projectConfig, err := loadProjectConfig(dir)
-	if err != nil {
-		log.Fatalln("failed to load sgai.json:", err)
-	}
-
-	if err := validateProjectConfig(projectConfig); err != nil {
-		log.Fatalln(err)
-	}
-
-	applyConfigDefaults(projectConfig, &metadata)
-
-	if err := initializeWorkspaceDir(dir); err != nil {
-		log.Fatalln("failed to initialize workspace directory:", err)
-	}
-
-	if err := applyCustomMCPs(dir, projectConfig); err != nil {
-		log.Fatalln("failed to apply custom MCPs:", err)
-	}
-
-	flowDag, err := parseFlow(metadata.Flow, dir)
-	if err != nil {
-		log.Fatalln("failed to parse flow:", err)
-	}
-
-	if retrospectiveEnabled(metadata) {
-		flowDag.injectRetrospectiveEdge()
-	}
-
-	ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
-	ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-	if err := validateModels(metadata.Models); err != nil {
-		log.Fatalln(err)
-	}
-
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
-	coord := sessionCoord
-	if coord == nil {
-		var errCoord error
-		coord, errCoord = state.NewCoordinator(stateJSONPath)
-		if errCoord != nil && !os.IsNotExist(errCoord) {
-			log.Fatalln("failed to read state.json:", errCoord)
-		}
-		if errCoord != nil {
-			coord = state.NewCoordinatorEmpty(stateJSONPath)
-		}
-	}
-	wfState := coord.State()
-	newChecksum, err := computeGoalChecksum(goalPath)
-	if err != nil {
-		log.Fatalln("failed to compute GOAL.md checksum:", err)
-	}
-
-	dagAgents := flowDag.allAgents()
-	var allAgents []string
-	if slices.Contains(dagAgents, "coordinator") {
-		allAgents = dagAgents
-	} else {
-		allAgents = append([]string{"coordinator"}, dagAgents...)
-	}
-	workspaceName := filepath.Base(dir)
-	longestNameLen := len("sgai")
-	for _, agent := range allAgents {
-		longestNameLen = max(longestNameLen, len(agent))
-	}
-	paddedsgai := workspaceName + "][" + "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
-
-	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
-	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
-
-	resuming := canResumeWorkflow(wfState, *freshFlag, newChecksum)
-
-	var retrospectiveDir string
-	var retrospectiveDirRel string
-
-	switch {
-	case resuming:
-		fmt.Println("["+paddedsgai+"]", "resuming existing workflow...")
-		retrospectiveDirRel = extractRetrospectiveDirFromProjectManagement(pmPath)
-		if retrospectiveDirRel == "" {
-			log.Fatalln("failed to read retrospective directory from PROJECT_MANAGEMENT.md during resume")
-		}
-		retrospectiveDir = filepath.Join(dir, retrospectiveDirRel)
-		if _, err := os.Stat(retrospectiveDir); os.IsNotExist(err) {
-			log.Fatalln("retrospective directory from PROJECT_MANAGEMENT.md does not exist:", retrospectiveDir)
-		}
-	default:
-		retrospectiveDir = filepath.Join(retrospectivesBaseDir, generateRetrospectiveDirName())
-		if err := os.MkdirAll(retrospectiveDir, 0755); err != nil {
-			log.Fatalln("failed to create retrospective directory:", err)
-		}
-
-		retrospectiveDirRel, err = filepath.Rel(dir, retrospectiveDir)
-		if err != nil {
-			log.Fatalln("failed to compute relative retrospective directory path:", err)
-		}
-
-		if err := os.Remove(stateJSONPath); err != nil && !os.IsNotExist(err) {
-			log.Fatalln("failed to truncate state.json on startup:", err)
-		}
-		if err := os.Remove(pmPath); err != nil && !os.IsNotExist(err) {
-			log.Fatalln("failed to truncate PROJECT_MANAGEMENT.md on startup:", err)
-		}
-
-		if err := updateProjectManagementWithRetrospectiveDir(pmPath, retrospectiveDirRel); err != nil {
-			log.Fatalln("failed to update PROJECT_MANAGEMENT.md with retrospective directory:", err)
-		}
-
-		goalRetrospectivePath := filepath.Join(retrospectiveDir, "GOAL.md")
-		if err := copyToRetrospective(goalPath, goalRetrospectivePath); err != nil {
-			log.Fatalln("failed to copy GOAL.md to retrospective:", err)
-		}
-	}
-
-	retroStdoutLog, retroStderrLog, errRetroLogs := openRetrospectiveLogs(retrospectiveDir)
-	if errRetroLogs != nil {
-		log.Fatalln("failed to open retrospective logs:", errRetroLogs)
-	}
-	defer func() {
-		if errClose := retroStdoutLog.Close(); errClose != nil {
-			log.Println("failed to close stdout log:", errClose)
-		}
-		if errClose := retroStderrLog.Close(); errClose != nil {
-			log.Println("failed to close stderr log:", errClose)
-		}
-	}()
-
-	defer func() {
-		if retrospectiveDir != "" {
-			if err := copyFinalStateToRetrospective(dir, retrospectiveDir); err != nil {
-				log.Println("[sgai] warning: failed to copy final state:", err)
-			}
-		}
-	}()
-
-	if !resuming {
-		preservedMode := wfState.InteractionMode
-		freshState := state.Workflow{
-			Status:          state.StatusWorking,
-			Messages:        []state.Message{},
-			GoalChecksum:    newChecksum,
-			VisitCounts:     initVisitCounts(allAgents),
-			InteractionMode: preservedMode,
-		}
-		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-			*wf = freshState
-		}); errUpdate != nil {
-			log.Println("failed to initialize state.json:", errUpdate)
-			return
-		}
-		wfState = coord.State()
-	}
-
-	var iterationCounter int
-	var previousAgent string
-
-	for {
-		if ctx.Err() != nil {
-			fmt.Println("["+paddedsgai+"]", "interrupted, stopping workflow...")
-			return
-		}
-
-		currentAgent := "coordinator"
-		if wfState.CurrentAgent != "" && wfState.CurrentAgent != "coordinator" {
-			currentAgent = wfState.CurrentAgent
-		}
-		wfState.CurrentAgent = currentAgent
-		wfState.VisitCounts[currentAgent]++
-		addAgentHandoffProgress(&wfState, currentAgent)
-		markCurrentAgentInSequence(&wfState, currentAgent)
-		syncedState := wfState
-		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-			*wf = syncedState
-		}); errUpdate != nil {
-			log.Println("failed to save state:", errUpdate)
-			return
-		}
-
-		if previousAgent != "" && previousAgent != currentAgent {
-			fmt.Println("["+paddedsgai+"]", previousAgent, "->", currentAgent)
-			wfState.Todos = []state.TodoItem{}
-			if errOverlay := applyLayerFolderOverlay(dir); errOverlay != nil {
-				log.Println("failed to apply overlay on agent transition:", errOverlay)
-			}
-		}
-		previousAgent = currentAgent
-
-		var errReloadGoalMetadata error
-		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(goalPath, metadata)
-		if errReloadGoalMetadata != nil {
-			log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
-			return
-		}
-		unlockInteractiveForRetrospective(&wfState, currentAgent, coord, paddedsgai)
-		wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, coord, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
-		if wfState.Status == state.StatusComplete {
-			if redirectToPendingMessageAgent(&wfState, coord, paddedsgai) {
-				continue
-			}
-			fmt.Println("["+paddedsgai+"]", "complete:", wfState.Task)
-			return
-		}
-
-		if hasPendingMessages(&wfState, coord, paddedsgai) {
-			continue
-		}
-
-		if len(flowDag.EntryNodes) > 0 {
-			currentAgent = flowDag.EntryNodes[0]
-		} else {
-			log.Println("no entry nodes in flow DAG")
-			return
-		}
-
-		for currentAgent != "" {
-			if ctx.Err() != nil {
-				fmt.Println("["+paddedsgai+"]", "interrupted, stopping workflow...")
-				return
-			}
-
-			if previousAgent != "" && previousAgent != currentAgent {
-				fmt.Println("["+paddedsgai+"]", previousAgent, "->", currentAgent)
-				wfState.Todos = []state.TodoItem{}
-				if errOverlay := applyLayerFolderOverlay(dir); errOverlay != nil {
-					log.Println("failed to apply overlay on agent transition:", errOverlay)
-				}
-			}
-			previousAgent = currentAgent
-
-			wfState.CurrentAgent = currentAgent
-			wfState.VisitCounts[currentAgent]++
-			addAgentHandoffProgress(&wfState, currentAgent)
-			markCurrentAgentInSequence(&wfState, currentAgent)
-			syncedState2 := wfState
-			if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-				*wf = syncedState2
-			}); errUpdate != nil {
-				log.Println("failed to save state:", errUpdate)
-				return
-			}
-
-			var errReloadGoalMetadata error
-			metadata, errReloadGoalMetadata = tryReloadGoalMetadata(goalPath, metadata)
-			if errReloadGoalMetadata != nil {
-				log.Println("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
-				return
-			}
-			unlockInteractiveForRetrospective(&wfState, currentAgent, coord, paddedsgai)
-			wfState = runFlowAgent(ctx, dir, goalPath, currentAgent, flowDag, wfState, stateJSONPath, coord, metadata, retrospectiveDir, longestNameLen, paddedsgai, &iterationCounter, mcpURL, logWriter, retroStdoutLog, retroStderrLog)
-
-			if wfState.Status == state.StatusComplete {
-				if redirectToPendingMessageAgent(&wfState, coord, paddedsgai) {
-					currentAgent = wfState.CurrentAgent
-					continue
-				}
-				fmt.Println("["+paddedsgai+"]", "complete:", wfState.Task)
-				return
-			}
-
-			if hasPendingMessages(&wfState, coord, paddedsgai) {
-				currentAgent = wfState.CurrentAgent
-				continue
-			}
-
-			if flowDag.isTerminal(currentAgent) {
-				break
-			}
-
-			currentAgent = determineNextAgent(flowDag, currentAgent)
-		}
-
-		if flowDag.isTerminal(currentAgent) {
-			fmt.Println("["+paddedsgai+"]", "reached terminal node", currentAgent)
-			redirectToCoordinator(&wfState, coord, paddedsgai)
-			continue
-		}
-	}
+	defer cleanup()
+	runner.run(ctx)
 }
 
 func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent string, coord *state.Coordinator, paddedsgai string) {
@@ -581,7 +282,7 @@ func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state
 		}
 
 		var errReloadGoalMetadata error
-		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(cfg.goalPath, metadata)
+		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(cfg.goalPath, metadata, cfg.flowDag)
 		if errReloadGoalMetadata != nil {
 			log.Fatalln("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
 		}
@@ -677,278 +378,47 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		}
 
 		*iterationCounter++
+		prefix := buildAgentPrefix(cfg.dir, paddedAgentName, *iterationCounter)
 
-		workspaceName := filepath.Base(cfg.dir)
-		prefix := fmt.Sprintf("[%s][%s:%04d]", workspaceName, paddedAgentName, *iterationCounter)
+		saveStateBeforeAgent(cfg.coord, wfState)
+		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
 
-		if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-			*wf = wfState
-		}); errUpdate != nil {
-			log.Fatalln("failed to save state before running agent:", errUpdate)
+		agentArgs := buildAgentArgs(cfg.agent, modelSpec, capturedSessionID)
+		agentMsg := buildAgentMessage(cfg, wfState, metadata)
+
+		newState, capturedSessionID, errExec := executeAgentProcess(ctx, cfg, agentArgs, agentMsg, prefix, outputCapture, wfState)
+		if errExec != nil {
+			return *errExec
 		}
-
-		if cfg.retrospectiveDir != "" {
-			pmPath := filepath.Join(cfg.dir, ".sgai", "PROJECT_MANAGEMENT.md")
-			if _, errStat := os.Stat(pmPath); errStat == nil {
-				pmRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "PROJECT_MANAGEMENT.md")
-				if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
-					log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
-				}
-			}
-		}
-
-		args := []string{"run", "--format=json", "--agent", cfg.agent}
-		if modelSpec != "" {
-			model, variant := parseModelAndVariant(modelSpec)
-			args = append(args, "--model", model)
-			if variant != "" {
-				args = append(args, "--variant", variant)
-			}
-		}
-		if capturedSessionID != "" {
-			args = append(args, "--session", capturedSessionID)
-		}
-		title := cfg.agent
-		if modelSpec != "" {
-			title = cfg.agent + " [" + modelSpec + "]"
-		}
-		args = append(args, "--title", title)
-
-		msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
-
-		multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
-		if multiModelSection != "" {
-			msg += multiModelSection
-		}
-
-		pendingCount := 0
-		for _, m := range wfState.Messages {
-			if m.ToAgent == cfg.agent && !m.Read {
-				pendingCount++
-			}
-		}
-		if pendingCount > 0 {
-			msgNotification := fmt.Sprintf("\nYOU HAVE %d PENDING MESSAGE(S). YOU MUST CALL `sgai_check_inbox()` TO READ THEM.\n", pendingCount)
-			msg = msgNotification + msg
-		}
-
-		pendingTodosCount := countPendingTodos(wfState, cfg.agent)
-		if pendingTodosCount > 0 {
-			todoNudge := fmt.Sprintf("\nYou have %d pending TODO items. Please complete them before marking agent-done.\n", pendingTodosCount)
-			msg += todoNudge
-		}
-
-		if cfg.agent != "coordinator" {
-			outboxPending := 0
-			for _, m := range wfState.Messages {
-				if m.FromAgent == cfg.agent && !m.Read {
-					outboxPending++
-				}
-			}
-			if outboxPending > 0 {
-				msg += "\nYou have sent messages that haven't been read yet. For the recipient agents to process them, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). They cannot run while you hold control.\n"
-			}
-		}
-
-		interactiveEnv := "yes"
-		if wfState.InteractionMode == state.ModeSelfDrive {
-			interactiveEnv = "auto"
-		}
-
-		agentIdentity := cfg.agent
-		if modelSpec != "" {
-			model, variant := parseModelAndVariant(modelSpec)
-			agentIdentity = cfg.agent + "|" + model + "|" + variant
-		}
-
-		cmd := exec.Command("opencode", args...)
-		cmd.Dir = cfg.dir
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		cmd.Env = append(os.Environ(),
-			"OPENCODE_CONFIG_DIR="+filepath.Join(cfg.dir, ".sgai"),
-			"SGAI_MCP_URL="+cfg.mcpURL,
-			"SGAI_AGENT_IDENTITY="+agentIdentity,
-			"SGAI_MCP_INTERACTIVE="+interactiveEnv)
-		cmd.Stdin = strings.NewReader(msg)
-
-		stderrOut := buildAgentStderrWriter(cfg.logWriter, cfg.stderrLog)
-		stdoutOut := buildAgentStdoutWriter(cfg.logWriter, cfg.stdoutLog)
-		stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
-		jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now()}
-
-		cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
-		cmd.Stdout = io.MultiWriter(jsonWriter, outputCapture)
-
-		if errStart := cmd.Start(); errStart != nil {
-			fmt.Fprintln(os.Stderr, "failed to start opencode:", errStart)
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				wf.Status = state.StatusAgentDone
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state:", errUpdate)
-			}
-			fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to start failure")
-			return cfg.coord.State()
-		}
-
-		processExited := make(chan struct{})
-		go terminateProcessGroupOnCancel(ctx, cmd, processExited)
-
-		errWait := cmd.Wait()
-		close(processExited)
-
-		if errWait != nil {
-			if ctx.Err() != nil {
-				fmt.Println("["+cfg.paddedsgai+"]", "interrupted during agent execution")
-				return wfState
-			}
-			fmt.Fprintln(os.Stderr, "\n=== RAW AGENT OUTPUT (last 1000 lines) ===")
-			outputCapture.dump(os.Stderr)
-			fmt.Fprintln(os.Stderr, "=== END RAW AGENT OUTPUT ===")
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				wf.Status = state.StatusAgentDone
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state:", errUpdate)
-			}
-			fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to error")
-			return cfg.coord.State()
-		}
-		jsonWriter.Flush()
-		capturedSessionID = jsonWriter.sessionID
 
 		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
-			timestamp := time.Now().Format("20060102150405")
-			sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", *iterationCounter, cfg.agent, timestamp))
-			if err := exportSession(cfg.dir, capturedSessionID, sessionFile); err != nil {
-				log.Fatalln("failed to export session:", err)
-			}
+			exportAgentSession(cfg, capturedSessionID, *iterationCounter)
 		}
 
-		newState := cfg.coord.State()
 		if newState.VisitCounts == nil {
 			newState.VisitCounts = make(map[string]int)
 		}
 
 		switch newState.Status {
-		case "complete":
-			if cfg.agent != "coordinator" {
-				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "set status=complete, only coordinator can complete workflow; treating as agent-done")
-				newState.Status = state.StatusAgentDone
-				if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-					*wf = newState
-				}); errUpdate != nil {
-					log.Fatalln("failed to save state:", errUpdate)
-				}
-				return newState
-			}
-			if cfg.agent == "coordinator" {
-				count := 0
-				for _, todo := range wfState.Todos {
-					if todo.Status != "completed" && todo.Status != "cancelled" {
-						count++
-					}
-				}
-				if count > 0 {
-					fmt.Println("["+cfg.paddedsgai+"]", "coordinator cannot complete workflow, there are pending TODO items")
-					newState.Status = state.StatusWorking
-					addEnvironmentMessage(&newState, cfg.agent, fmt.Sprintf("# Pending TODO items.\nYou have %d pending TODO items. Please complete them before marking workflow complete.\n", count))
-					if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-						*wf = newState
-					}); errUpdate != nil {
-						log.Fatalln("failed to save state:", errUpdate)
-					}
-					return newState
-				}
-
-				if metadata.CompletionGateScript != "" {
-					fmt.Println("["+cfg.paddedsgai+"]", "running completionGateScript:", metadata.CompletionGateScript)
-					newState.Task = "running completionGateScript: " + metadata.CompletionGateScript
-					if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-						*wf = newState
-					}); errUpdate != nil {
-						log.Fatalln("failed to save state:", errUpdate)
-					}
-					output, errScript := runCompletionGateScript(ctx, cfg.dir, metadata.CompletionGateScript)
-					if errScript != nil {
-						fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
-						newState.Status = state.StatusWorking
-						addEnvironmentMessage(&newState, cfg.agent, formatCompletionGateScriptFailureMessage(metadata.CompletionGateScript, output))
-						if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-							*wf = newState
-						}); errUpdate != nil {
-							log.Fatalln("failed to save state:", errUpdate)
-						}
-						return newState
-					}
-				}
-			}
-
-			if cfg.retrospectiveDir != "" {
-				goalRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "GOAL.md")
-				if err := copyToRetrospective(cfg.goalPath, goalRetrospectivePath); err != nil {
-					log.Fatalln("failed to copy GOAL.md to retrospective:", err)
-				}
-
-				pmPath := filepath.Join(cfg.dir, ".sgai", "PROJECT_MANAGEMENT.md")
-				if _, errStat := os.Stat(pmPath); errStat == nil {
-					pmRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "PROJECT_MANAGEMENT.md")
-					if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
-						log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
-					}
-				}
-			}
-			return newState
+		case state.StatusComplete:
+			return handleCompleteStatus(ctx, cfg, newState, wfState, metadata)
 
 		case state.StatusWaitingForHuman:
-			if newState.MultiChoiceQuestion != nil || newState.HumanMessage != "" {
-				log.Println("agent", cfg.agent, "has pending question after timeout, preserving state for notification")
-				if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-					*wf = newState
-				}); errUpdate != nil {
-					log.Fatalln("failed to save state:", errUpdate)
-				}
-				wfState = newState
-				wfState.Status = state.StatusWorking
-				continue
-			}
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				*wf = newState
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state:", errUpdate)
-			}
-			fmt.Println("["+cfg.paddedsgai+"]", "waiting-for-human status without pending question; re-running...")
-			wfState = newState
-			wfState.Status = state.StatusWorking
+			wfState = handleWaitingForHumanStatus(cfg, newState)
 			continue
 
 		case state.StatusAgentDone:
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				*wf = newState
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state:", errUpdate)
-			}
+			saveState(cfg.coord, newState)
 			fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "done:", newState.Task)
 			return newState
 
 		case state.StatusWorking:
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				*wf = newState
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state:", errUpdate)
-			}
-
+			saveState(cfg.coord, newState)
 			if agentHasUnreadOutgoingMessages(newState, cfg.agent) {
 				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "sent message(s), yielding control...")
 				return newState
 			}
-
-			consecutiveWorkingIterations++
-			if consecutiveWorkingIterations >= maxConsecutiveWorkingIterations {
-				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "stuck in working loop after", consecutiveWorkingIterations, "iterations; discarding session to recover")
-				capturedSessionID = ""
-				consecutiveWorkingIterations = 0
-			}
-
-			fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "still working, re-running...")
+			consecutiveWorkingIterations = handleWorkingLoop(cfg, &capturedSessionID, consecutiveWorkingIterations)
 			wfState = newState
 			continue
 
@@ -958,23 +428,289 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 	}
 }
 
-func runFlowAgent(ctx context.Context, dir, goalPath, agent string, flowDag *dag, wfState state.Workflow, statePath string, coord *state.Coordinator, metadata GoalMetadata, retrospectiveDir string, longestNameLen int, paddedsgai string, iterationCounter *int, mcpURL string, logWriter, stdoutLog, stderrLog io.Writer) state.Workflow {
-	cfg := multiModelConfig{
-		dir:              dir,
-		goalPath:         goalPath,
-		agent:            agent,
-		flowDag:          flowDag,
-		statePath:        statePath,
-		coord:            coord,
-		retrospectiveDir: retrospectiveDir,
-		longestNameLen:   longestNameLen,
-		paddedsgai:       paddedsgai,
-		mcpURL:           mcpURL,
-		logWriter:        logWriter,
-		stdoutLog:        stdoutLog,
-		stderrLog:        stderrLog,
+func buildAgentPrefix(dir, paddedAgentName string, iteration int) string {
+	workspaceName := filepath.Base(dir)
+	return fmt.Sprintf("[%s][%s:%04d]", workspaceName, paddedAgentName, iteration)
+}
+
+func saveStateBeforeAgent(coord *state.Coordinator, wfState state.Workflow) {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		*wf = wfState
+	}); errUpdate != nil {
+		log.Fatalln("failed to save state before running agent:", errUpdate)
 	}
-	return runMultiModelAgent(ctx, cfg, wfState, metadata, iterationCounter)
+}
+
+func saveState(coord *state.Coordinator, s state.Workflow) {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		*wf = s
+	}); errUpdate != nil {
+		log.Fatalln("failed to save state:", errUpdate)
+	}
+}
+
+func copyProjectManagementToRetrospective(dir, retrospectiveDir string) {
+	if retrospectiveDir == "" {
+		return
+	}
+	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
+	if _, errStat := os.Stat(pmPath); errStat != nil {
+		return
+	}
+	pmRetrospectivePath := filepath.Join(retrospectiveDir, "PROJECT_MANAGEMENT.md")
+	if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
+		log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
+	}
+}
+
+func buildAgentArgs(agent, modelSpec, sessionID string) []string {
+	args := []string{"run", "--format=json", "--agent", agent}
+	if modelSpec != "" {
+		model, variant := parseModelAndVariant(modelSpec)
+		args = append(args, "--model", model)
+		if variant != "" {
+			args = append(args, "--variant", variant)
+		}
+	}
+	if sessionID != "" {
+		args = append(args, "--session", sessionID)
+	}
+	title := agent
+	if modelSpec != "" {
+		title = agent + " [" + modelSpec + "]"
+	}
+	args = append(args, "--title", title)
+	return args
+}
+
+func buildAgentMessage(cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata) string {
+	msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
+
+	multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
+	if multiModelSection != "" {
+		msg += multiModelSection
+	}
+
+	pendingCount := 0
+	for _, m := range wfState.Messages {
+		if m.ToAgent == cfg.agent && !m.Read {
+			pendingCount++
+		}
+	}
+	if pendingCount > 0 {
+		msg = fmt.Sprintf("\nYOU HAVE %d PENDING MESSAGE(S). YOU MUST CALL `sgai_check_inbox()` TO READ THEM.\n", pendingCount) + msg
+	}
+
+	pendingTodosCount := countPendingTodos(wfState, cfg.agent)
+	if pendingTodosCount > 0 {
+		msg += fmt.Sprintf("\nYou have %d pending TODO items. Please complete them before marking agent-done.\n", pendingTodosCount)
+	}
+
+	if cfg.agent != "coordinator" {
+		outboxPending := 0
+		for _, m := range wfState.Messages {
+			if m.FromAgent == cfg.agent && !m.Read {
+				outboxPending++
+			}
+		}
+		if outboxPending > 0 {
+			msg += "\nYou have sent messages that haven't been read yet. For the recipient agents to process them, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). They cannot run while you hold control.\n"
+		}
+	}
+
+	return msg
+}
+
+func buildAgentEnv(cfg multiModelConfig, wfState state.Workflow, modelSpec string) []string {
+	interactiveEnv := "yes"
+	if wfState.InteractionMode == state.ModeSelfDrive {
+		interactiveEnv = "auto"
+	}
+
+	agentIdentity := cfg.agent
+	if modelSpec != "" {
+		model, variant := parseModelAndVariant(modelSpec)
+		agentIdentity = cfg.agent + "|" + model + "|" + variant
+	}
+
+	return append(os.Environ(),
+		"OPENCODE_CONFIG_DIR="+filepath.Join(cfg.dir, ".sgai"),
+		"SGAI_MCP_URL="+cfg.mcpURL,
+		"SGAI_AGENT_IDENTITY="+agentIdentity,
+		"SGAI_MCP_INTERACTIVE="+interactiveEnv)
+}
+
+func executeAgentProcess(ctx context.Context, cfg multiModelConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
+	stderrOut := buildAgentStderrWriter(cfg.logWriter, cfg.stderrLog)
+	stdoutOut := buildAgentStdoutWriter(cfg.logWriter, cfg.stdoutLog)
+	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
+	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now()}
+
+	cfg.coord.ResetAgentDoneWatchdog()
+	agentCtx, agentCancel := context.WithCancel(ctx)
+	cfg.coord.SetAgentCancel(agentCancel)
+
+	cmd := exec.CommandContext(agentCtx, "opencode", agentArgs...)
+	cmd.Dir = cfg.dir
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Env = buildAgentEnv(cfg, wfState, extractModelFromArgs(agentArgs))
+	cmd.Stdin = strings.NewReader(agentMsg)
+	cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
+	cmd.Stdout = io.MultiWriter(jsonWriter, outputCapture)
+
+	if errStart := cmd.Start(); errStart != nil {
+		agentCancel()
+		fmt.Fprintln(os.Stderr, "failed to start opencode:", errStart)
+		if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
+			wf.Status = state.StatusAgentDone
+		}); errUpdate != nil {
+			log.Fatalln("failed to save state:", errUpdate)
+		}
+		fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to start failure")
+		result := cfg.coord.State()
+		return state.Workflow{}, "", &result
+	}
+
+	processExited := make(chan struct{})
+	go terminateProcessGroupOnCancel(agentCtx, cmd, processExited)
+
+	errWait := cmd.Wait()
+	close(processExited)
+	cfg.coord.Stop()
+	agentCancel()
+
+	if errWait != nil {
+		if ctx.Err() != nil {
+			fmt.Println("["+cfg.paddedsgai+"]", "interrupted during agent execution")
+			return state.Workflow{}, "", &wfState
+		}
+		fmt.Fprintln(os.Stderr, "\n=== RAW AGENT OUTPUT (last 1000 lines) ===")
+		outputCapture.dump(os.Stderr)
+		fmt.Fprintln(os.Stderr, "=== END RAW AGENT OUTPUT ===")
+		if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
+			wf.Status = state.StatusAgentDone
+		}); errUpdate != nil {
+			log.Fatalln("failed to save state:", errUpdate)
+		}
+		fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to error")
+		result := cfg.coord.State()
+		return state.Workflow{}, "", &result
+	}
+
+	jsonWriter.Flush()
+	return cfg.coord.State(), jsonWriter.sessionID, nil
+}
+
+func extractModelFromArgs(args []string) string {
+	for i, arg := range args {
+		if arg == "--model" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+func exportAgentSession(cfg multiModelConfig, sessionID string, iteration int) {
+	timestamp := time.Now().Format("20060102150405")
+	sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", iteration, cfg.agent, timestamp))
+	if err := exportSession(cfg.dir, sessionID, sessionFile); err != nil {
+		log.Fatalln("failed to export session:", err)
+	}
+}
+
+func handleCompleteStatus(ctx context.Context, cfg multiModelConfig, newState, wfState state.Workflow, metadata GoalMetadata) state.Workflow {
+	if cfg.agent != "coordinator" {
+		fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "set status=complete, only coordinator can complete workflow; treating as agent-done")
+		newState.Status = state.StatusAgentDone
+		saveState(cfg.coord, newState)
+		return newState
+	}
+
+	if blocked := blockCompletionOnPendingTodos(cfg, newState, wfState); blocked != nil {
+		return *blocked
+	}
+
+	if blocked := blockCompletionOnGateScript(ctx, cfg, newState, metadata); blocked != nil {
+		return *blocked
+	}
+
+	copyCompletionArtifactsToRetrospective(cfg)
+	return newState
+}
+
+func blockCompletionOnPendingTodos(cfg multiModelConfig, newState, wfState state.Workflow) *state.Workflow {
+	count := 0
+	for _, todo := range wfState.Todos {
+		if todo.Status != "completed" && todo.Status != "cancelled" {
+			count++
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "coordinator cannot complete workflow, there are pending TODO items")
+	newState.Status = state.StatusWorking
+	addEnvironmentMessage(&newState, cfg.agent, fmt.Sprintf("# Pending TODO items.\nYou have %d pending TODO items. Please complete them before marking workflow complete.\n", count))
+	saveState(cfg.coord, newState)
+	return &newState
+}
+
+func blockCompletionOnGateScript(ctx context.Context, cfg multiModelConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
+	if metadata.CompletionGateScript == "" {
+		return nil
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "running completionGateScript:", metadata.CompletionGateScript)
+	newState.Task = "running completionGateScript: " + metadata.CompletionGateScript
+	saveState(cfg.coord, newState)
+	output, errScript := runCompletionGateScript(ctx, cfg.dir, metadata.CompletionGateScript)
+	if errScript == nil {
+		return nil
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
+	newState.Status = state.StatusWorking
+	addEnvironmentMessage(&newState, cfg.agent, formatCompletionGateScriptFailureMessage(metadata.CompletionGateScript, output))
+	saveState(cfg.coord, newState)
+	return &newState
+}
+
+func copyCompletionArtifactsToRetrospective(cfg multiModelConfig) {
+	if cfg.retrospectiveDir == "" {
+		return
+	}
+	goalRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "GOAL.md")
+	if err := copyToRetrospective(cfg.goalPath, goalRetrospectivePath); err != nil {
+		log.Fatalln("failed to copy GOAL.md to retrospective:", err)
+	}
+	pmPath := filepath.Join(cfg.dir, ".sgai", "PROJECT_MANAGEMENT.md")
+	if _, errStat := os.Stat(pmPath); errStat == nil {
+		pmRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "PROJECT_MANAGEMENT.md")
+		if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
+			log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
+		}
+	}
+}
+
+func handleWaitingForHumanStatus(cfg multiModelConfig, newState state.Workflow) state.Workflow {
+	saveState(cfg.coord, newState)
+	if newState.MultiChoiceQuestion != nil || newState.HumanMessage != "" {
+		log.Println("agent", cfg.agent, "has pending question after timeout, preserving state for notification")
+		newState.Status = state.StatusWorking
+		return newState
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "waiting-for-human status without pending question; re-running...")
+	newState.Status = state.StatusWorking
+	return newState
+}
+
+func handleWorkingLoop(cfg multiModelConfig, capturedSessionID *string, consecutiveWorkingIterations int) int {
+	consecutiveWorkingIterations++
+	if consecutiveWorkingIterations >= maxConsecutiveWorkingIterations {
+		fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "stuck in working loop after", consecutiveWorkingIterations, "iterations; discarding session to recover")
+		*capturedSessionID = ""
+		consecutiveWorkingIterations = 0
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "still working, re-running...")
+	return consecutiveWorkingIterations
 }
 
 func agentHasUnreadOutgoingMessages(s state.Workflow, agentName string) bool {
@@ -1235,7 +971,7 @@ func fetchValidModels() (map[string]bool, error) {
 
 // tryReloadGoalMetadata attempts to reload GOAL.md frontmatter from disk.
 // If the file is unavailable, it preserves current metadata.
-func tryReloadGoalMetadata(goalPath string, current GoalMetadata) (GoalMetadata, error) {
+func tryReloadGoalMetadata(goalPath string, current GoalMetadata, flowDag *dag) (GoalMetadata, error) {
 	content, errRead := os.ReadFile(goalPath)
 	if errRead != nil {
 		if os.IsNotExist(errRead) {
@@ -1248,6 +984,9 @@ func tryReloadGoalMetadata(goalPath string, current GoalMetadata) (GoalMetadata,
 	if errParse != nil {
 		return current, errParse
 	}
+
+	ensureImplicitRetrospectiveModel(flowDag, &newMetadata)
+	ensureImplicitProjectCriticCouncilModel(flowDag, &newMetadata)
 
 	return newMetadata, nil
 }
@@ -1313,28 +1052,6 @@ func redirectToPendingMessageAgent(s *state.Workflow, coord *state.Coordinator, 
 		log.Fatalln("failed to save state:", errUpdate)
 	}
 	return true
-}
-
-func redirectToCoordinator(s *state.Workflow, coord *state.Coordinator, paddedsgai string) {
-	fmt.Println("["+paddedsgai+"]", "redirecting to coordinator before completion")
-	s.Status = state.StatusWorking
-	s.CurrentAgent = "coordinator"
-	s.VisitCounts["coordinator"]++
-	snapshot := *s
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		*wf = snapshot
-	}); errUpdate != nil {
-		log.Fatalln("failed to save state:", errUpdate)
-	}
-}
-
-func hasPendingMessages(s *state.Workflow, coord *state.Coordinator, paddedsgai string) bool {
-	for _, msg := range s.Messages {
-		if !msg.Read {
-			return redirectToPendingMessageAgent(s, coord, paddedsgai)
-		}
-	}
-	return false
 }
 
 func runCompletionGateScript(ctx context.Context, dir, script string) (string, error) {
@@ -1989,12 +1706,8 @@ func updateProjectManagementWithRetrospectiveDir(pmPath, retrospectiveDirRel str
 }
 
 // canResumeWorkflow determines if an existing workflow can be resumed based on
-// the current state, whether the --fresh flag was provided, and whether the
-// GOAL.md checksum matches the stored checksum.
-func canResumeWorkflow(wfState state.Workflow, freshFlag bool, currentGoalChecksum string) bool {
-	if freshFlag {
-		return false
-	}
+// the current state and whether the GOAL.md checksum matches the stored checksum.
+func canResumeWorkflow(wfState state.Workflow, currentGoalChecksum string) bool {
 	if wfState.GoalChecksum != currentGoalChecksum {
 		return false
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "doing something",
 			AddProgress: "progress note",
@@ -89,7 +88,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "agent finished",
 		})
@@ -113,7 +112,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "complete",
 			AddProgress: "claiming completion",
 		})
@@ -137,7 +136,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "",
 			Task:        "new task",
 			AddProgress: "still working",
@@ -169,7 +168,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			},
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "new task during wait",
 			AddProgress: "additional progress",
@@ -200,7 +199,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "finished after human responded",
 		})
@@ -220,7 +219,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "backend-go-developer",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "backend-go-developer", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "backend-go-developer", updateWorkflowStateArgs{
 			Status:      "agent-done",
 			AddProgress: "done with work",
 		})
@@ -248,7 +247,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status: "working",
 			Task:   "updated task",
 		})
@@ -268,7 +267,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status: "invalid-status",
 		})
 		if err != nil {
@@ -291,7 +290,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		result, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		result, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status: "bogus",
 		})
 		if err != nil {
@@ -309,7 +308,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status: "agent-done",
 			Task:   "should be cleared",
 		})
@@ -329,7 +328,7 @@ func TestUpdateWorkflowStatePreservesWaitingForHumanStatus(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "coordinator", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "coordinator", updateWorkflowStateArgs{
 			Status: "complete",
 			Task:   "should be cleared",
 		})
@@ -351,7 +350,7 @@ func TestUpdateWorkflowStateProgressUsesCallerAgent(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "backend-go-developer", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "backend-go-developer", updateWorkflowStateArgs{
 			Status:      "working",
 			Task:        "doing backend work",
 			AddProgress: "wrote the handler",
@@ -378,7 +377,7 @@ func TestUpdateWorkflowStateProgressUsesCallerAgent(t *testing.T) {
 			CurrentAgent: "coordinator",
 		})
 
-		_, err := updateWorkflowState(context.Background(), coord, "react-developer", updateWorkflowStateArgs{
+		_, err := updateWorkflowState(coord, "react-developer", updateWorkflowStateArgs{
 			Status:      "working",
 			AddProgress: "built the component",
 		})
@@ -386,7 +385,7 @@ func TestUpdateWorkflowStateProgressUsesCallerAgent(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		_, err = updateWorkflowState(context.Background(), coord, "go-readability-reviewer", updateWorkflowStateArgs{
+		_, err = updateWorkflowState(coord, "go-readability-reviewer", updateWorkflowStateArgs{
 			Status:      "working",
 			AddProgress: "reviewed the code",
 		})
@@ -403,6 +402,68 @@ func TestUpdateWorkflowStateProgressUsesCallerAgent(t *testing.T) {
 		}
 		if s.Progress[1].Agent != "go-readability-reviewer" {
 			t.Errorf("expected second progress agent %q, got %q", "go-readability-reviewer", s.Progress[1].Agent)
+		}
+	})
+}
+
+func TestUpdateWorkflowStateStartsWatchdog(t *testing.T) {
+	t.Run("agentDoneStartsWatchdogWhenCancelSet", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "backend-go-developer",
+		})
+		coord.SetAgentCancel(func() {})
+
+		_, err := updateWorkflowState(coord, "backend-go-developer", updateWorkflowStateArgs{
+			Status:      "agent-done",
+			AddProgress: "finished work",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !coord.IsShuttingDown() {
+			t.Error("expected watchdog to be started after agent-done with cancel set")
+		}
+		coord.Stop()
+	})
+
+	t.Run("agentDoneDoesNotStartWatchdogWhenNoCancelSet", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "backend-go-developer",
+		})
+
+		_, err := updateWorkflowState(coord, "backend-go-developer", updateWorkflowStateArgs{
+			Status:      "agent-done",
+			AddProgress: "finished work",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if coord.IsShuttingDown() {
+			t.Error("expected watchdog not to be started when no cancel is set")
+		}
+	})
+
+	t.Run("workingStatusDoesNotStartWatchdog", func(t *testing.T) {
+		coord := setupCoordinator(t, state.Workflow{
+			Status:       state.StatusWorking,
+			CurrentAgent: "backend-go-developer",
+		})
+		coord.SetAgentCancel(func() {})
+
+		_, err := updateWorkflowState(coord, "backend-go-developer", updateWorkflowStateArgs{
+			Status:      "working",
+			AddProgress: "still working",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if coord.IsShuttingDown() {
+			t.Error("expected watchdog not to be started for working status")
 		}
 	})
 }

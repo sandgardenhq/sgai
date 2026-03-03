@@ -31,75 +31,14 @@ const (
 	continuousModePollInterval = 2 * time.Second
 )
 
-func runContinuousWorkflow(ctx context.Context, args []string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
-	if len(args) < 1 {
-		log.Fatalln("usage: sgai <target_directory>")
+func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
+	runner := &workflowRunner{
+		dir:       dir,
+		mcpURL:    mcpURL,
+		logWriter: logWriter,
+		coord:     sessionCoord,
 	}
-
-	dir, errAbs := filepath.Abs(args[0])
-	if errAbs != nil {
-		log.Fatalln(errAbs)
-	}
-
-	goalPath := filepath.Join(dir, "GOAL.md")
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
-
-	var coord *state.Coordinator
-
-	for {
-		if ctx.Err() != nil {
-			return
-		}
-
-		runWorkflow(ctx, args, mcpURL, logWriter, sessionCoord)
-
-		var errCoord error
-		coord, errCoord = state.NewCoordinator(stateJSONPath)
-		if errCoord != nil {
-			coord = state.NewCoordinatorEmpty(stateJSONPath)
-		}
-
-		if ctx.Err() != nil {
-			return
-		}
-
-		runContinuousModePrompt(ctx, dir, continuousPrompt, mcpURL, coord)
-
-		if ctx.Err() != nil {
-			return
-		}
-
-		checksum, errChecksum := computeGoalChecksum(goalPath)
-		if errChecksum != nil {
-			log.Println("failed to compute GOAL.md checksum:", errChecksum)
-			return
-		}
-
-		autoDuration, cronExpr := readContinuousModeAutoCron(dir)
-
-		trigger := watchForTrigger(ctx, dir, coord, checksum, autoDuration, cronExpr)
-		if trigger == triggerNone {
-			return
-		}
-
-		freshCoord, errFresh := state.NewCoordinator(stateJSONPath)
-		if errFresh == nil {
-			coord = freshCoord
-		}
-
-		if trigger == triggerSteering {
-			wfState := coord.State()
-			found, msg := hasHumanPartnerMessage(wfState.Messages)
-			if found && msg != nil {
-				if errPrepend := prependSteeringMessage(goalPath, msg.Body); errPrepend != nil {
-					log.Println("failed to prepend steering message:", errPrepend)
-				}
-				markMessageAsRead(coord, msg.ID)
-			}
-		}
-
-		resetWorkflowForNextCycle(coord)
-	}
+	runner.runContinuous(ctx, continuousPrompt)
 }
 
 func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcpURL string, coord *state.Coordinator) {
