@@ -58,11 +58,11 @@ const ComposePreviewPage = lazy(() =>
 const NewWorkspace = lazy(() =>
   import("./pages/NewWorkspace").then((m) => ({ default: m.NewWorkspace })),
 );
+const AttachExternal = lazy(() =>
+  import("./pages/AttachExternal").then((m) => ({ default: m.AttachExternal })),
+);
 const NewFork = lazy(() =>
   import("./pages/NewFork").then((m) => ({ default: m.NewFork })),
-);
-const RenameFork = lazy(() =>
-  import("./pages/RenameFork").then((m) => ({ default: m.RenameFork })),
 );
 const EditGoal = lazy(() =>
   import("./pages/EditGoal").then((m) => ({ default: m.EditGoal })),
@@ -137,6 +137,10 @@ export const router = createBrowserRouter([
         element: withSuspense(NewWorkspace),
       },
       {
+        path: "workspaces/attach",
+        element: withSuspense(AttachExternal),
+      },
+      {
         path: "workspaces/:name/agents",
         element: withSuspense(AgentList),
       },
@@ -159,10 +163,6 @@ export const router = createBrowserRouter([
       {
         path: "workspaces/:name/fork/new",
         element: withSuspense(NewFork),
-      },
-      {
-        path: "workspaces/:name/rename",
-        element: withSuspense(RenameFork),
       },
       {
         path: "workspaces/:name/goal/edit",

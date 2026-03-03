@@ -210,27 +210,6 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyExternalResult{}, err
 	})
 
-	type renameWorkspaceArgs struct {
-		Workspace string `json:"workspace" jsonschema:"The workspace name to rename"`
-		Name      string `json:"name" jsonschema:"The new workspace name"`
-	}
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rename_workspace",
-		Description: "Rename a fork workspace.",
-		InputSchema: mustSchema[renameWorkspaceArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args renameWorkspaceArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
-		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
-		if err != nil {
-			return nil, emptyExternalResult{}, err
-		}
-		renameResult, err := ctx.srv.renameWorkspaceService(workspacePath, args.Name)
-		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
-		}
-		result, err := jsonResult(renameResult)
-		return result, emptyExternalResult{}, err
-	})
-
 	type getGoalArgs struct {
 		Workspace string `json:"workspace" jsonschema:"The workspace name"`
 	}

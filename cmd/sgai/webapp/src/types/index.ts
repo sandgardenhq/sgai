@@ -77,6 +77,7 @@ export interface ApiWorkspaceEntry {
   log: ApiLogEntry[];
   pendingQuestion?: ApiPendingQuestionResponse;
   actions?: ApiActionEntry[];
+  external?: boolean;
 }
 
 export interface ApiWorkspacesResponse {
@@ -460,16 +461,6 @@ export interface ApiDeleteWorkspaceResponse {
   message: string;
 }
 
-export interface ApiRenameRequest {
-  name: string;
-}
-
-export interface ApiRenameResponse {
-  name: string;
-  oldName: string;
-  dir: string;
-}
-
 export interface ApiUpdateGoalRequest {
   content: string;
 }
@@ -518,5 +509,25 @@ export interface ApiAdhocResponse {
 
 export interface ApiForkTemplateResponse {
   content: string;
+}
+
+export interface ApiAttachWorkspaceResponse {
+  name: string;
+  dir: string;
+  hasGoal: boolean;
+}
+
+export interface ApiDetachWorkspaceResponse {
+  detached: boolean;
+  message: string;
+}
+
+export interface ApiBrowseDirectoryEntry {
+  name: string;
+  path: string;
+}
+
+export interface ApiBrowseDirectoriesResponse {
+  entries: ApiBrowseDirectoryEntry[];
 }
 

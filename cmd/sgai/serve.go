@@ -231,17 +231,19 @@ type jjChangesResult struct {
 
 // Server handles HTTP requests for the sgai serve command.
 type Server struct {
-	mu               sync.Mutex
-	sessions         map[string]*session
-	everStartedDirs  map[string]bool
-	pinnedDirs       map[string]bool
-	pinnedConfigDir  string
-	rootDir          string
-	editorAvailable  bool
-	isTerminalEditor bool
-	editorName       string
-	editor           editorOpener
-	shutdownCtx      context.Context
+	mu                sync.Mutex
+	sessions          map[string]*session
+	everStartedDirs   map[string]bool
+	pinnedDirs        map[string]bool
+	pinnedConfigDir   string
+	externalDirs      map[string]bool
+	externalConfigDir string
+	rootDir           string
+	editorAvailable   bool
+	isTerminalEditor  bool
+	editorName        string
+	editor            editorOpener
+	shutdownCtx       context.Context
 
 	signals *signalBroker
 
@@ -296,6 +298,8 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		everStartedDirs:    make(map[string]bool),
 		pinnedDirs:         make(map[string]bool),
 		pinnedConfigDir:    filepath.Join(xdg.ConfigHome, "sgai"),
+		externalDirs:       make(map[string]bool),
+		externalConfigDir:  filepath.Join(xdg.ConfigHome, "sgai"),
 		adhocStates:        make(map[string]*adhocPromptState),
 		signals:            newSignalBroker(),
 		composerSessions:   make(map[string]*composerSession),
@@ -588,6 +592,9 @@ func cmdServe(args []string) {
 	srv.shutdownCtx = ctx
 	if err := srv.loadPinnedProjects(); err != nil {
 		log.Println("warning: failed to load pinned projects:", err)
+	}
+	if err := srv.loadExternalDirs(); err != nil {
+		log.Println("warning: failed to load external dirs:", err)
 	}
 	srv.startStateWatcher()
 	go srv.warmStateCache()
@@ -977,6 +984,7 @@ type workspaceInfo struct {
 	InProgress   bool
 	Pinned       bool
 	HasWorkspace bool
+	External     bool
 }
 
 type workspaceGroup struct {
@@ -1341,7 +1349,7 @@ func (s *Server) getWorkspaceStatus(dir string) (running bool, needsInput bool) 
 	return running, needsInput
 }
 
-func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace bool) workspaceInfo {
+func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace, external bool) workspaceInfo {
 	running, needsInput := s.getWorkspaceStatus(dir)
 	pinned := s.isPinned(dir)
 	inProgress := running || needsInput || s.wasEverStarted(dir) || pinned
@@ -1355,6 +1363,7 @@ func (s *Server) createWorkspaceInfo(dir, dirName string, isRoot, hasWorkspace b
 		InProgress:   inProgress,
 		Pinned:       pinned,
 		HasWorkspace: hasWorkspace,
+		External:     external,
 	}
 }
 
@@ -1488,30 +1497,41 @@ func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
 		case workspaceRoot:
 			if _, exists := rootMap[proj.Directory]; !exists {
 				rootMap[proj.Directory] = &workspaceGroup{
-					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, true, proj.HasWorkspace),
+					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, true, proj.HasWorkspace, false),
 				}
 			}
 		case workspaceFork:
 			rootPath := getRootWorkspacePath(proj.Directory)
 			if rootPath == "" {
 				standaloneGroups = append(standaloneGroups, workspaceGroup{
-					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
+					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace, false),
 				})
 				continue
 			}
 			if existing, exists := rootMap[rootPath]; exists {
-				existing.Forks = append(existing.Forks, s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace))
+				existing.Forks = append(existing.Forks, s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace, false))
 			} else {
 				rootMap[rootPath] = &workspaceGroup{
-					Root:  s.createWorkspaceInfo(rootPath, filepath.Base(rootPath), true, hassgaiDirectory(rootPath)),
-					Forks: []workspaceInfo{s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace)},
+					Root:  s.createWorkspaceInfo(rootPath, filepath.Base(rootPath), true, hassgaiDirectory(rootPath), false),
+					Forks: []workspaceInfo{s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace, false)},
 				}
 			}
 		default:
 			standaloneGroups = append(standaloneGroups, workspaceGroup{
-				Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace),
+				Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace, false),
 			})
 		}
+	}
+
+	s.mu.Lock()
+	externalDirsCopy := maps.Clone(s.externalDirs)
+	s.mu.Unlock()
+
+	for dir := range externalDirsCopy {
+		hasWorkspace := hassgaiDirectory(dir)
+		standaloneGroups = append(standaloneGroups, workspaceGroup{
+			Root: s.createWorkspaceInfo(dir, filepath.Base(dir), false, hasWorkspace, true),
+		})
 	}
 
 	var groups []workspaceGroup

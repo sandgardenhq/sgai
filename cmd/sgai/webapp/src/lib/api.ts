@@ -17,7 +17,6 @@ import type {
   ApiComposeSaveResponse,
   ApiForkResponse,
   ApiForkTemplateResponse,
-  ApiRenameResponse,
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
   ApiModelsResponse,
@@ -28,6 +27,9 @@ import type {
   ApiDeleteWorkspaceResponse,
   ApiDiffResponse,
   ApiDeleteMessageResponse,
+  ApiAttachWorkspaceResponse,
+  ApiDetachWorkspaceResponse,
+  ApiBrowseDirectoriesResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -95,11 +97,6 @@ export const api = {
       fetchJSON<ApiForkResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork`,
         { method: "POST", body: JSON.stringify({ goalContent }) },
-      ),
-    rename: (name: string, newName: string) =>
-      fetchJSON<ApiRenameResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/rename`,
-        { method: "POST", body: JSON.stringify({ name: newName }) },
       ),
     getGoal: (name: string) =>
       fetchJSON<ApiGoalResponse>(
@@ -172,6 +169,23 @@ export const api = {
     forkTemplate: (name: string) =>
       fetchJSON<ApiForkTemplateResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork-template`,
+      ),
+    attach: (path: string) =>
+      fetchJSON<ApiAttachWorkspaceResponse>("/api/v1/workspaces/attach", {
+        method: "POST",
+        body: JSON.stringify({ path }),
+      }),
+    detach: (path: string) =>
+      fetchJSON<ApiDetachWorkspaceResponse>("/api/v1/workspaces/detach", {
+        method: "POST",
+        body: JSON.stringify({ path }),
+      }),
+  },
+
+  browse: {
+    directories: (path: string) =>
+      fetchJSON<ApiBrowseDirectoriesResponse>(
+        `/api/v1/browse-directories?path=${encodeURIComponent(path)}`,
       ),
   },
 
