@@ -158,6 +158,14 @@ type deleteForkResult struct {
 	Message string
 }
 
+func (s *Server) deleteForkByPathService(forkDir string) (deleteForkResult, error) {
+	rootPath := getRootWorkspacePath(forkDir)
+	if rootPath == "" {
+		return deleteForkResult{}, fmt.Errorf("could not determine root workspace for fork")
+	}
+	return s.deleteForkService(rootPath, forkDir, true)
+}
+
 func (s *Server) deleteForkService(workspacePath, forkDir string, confirm bool) (deleteForkResult, error) {
 	if s.classifyWorkspaceCached(workspacePath) != workspaceRoot {
 		return deleteForkResult{}, fmt.Errorf("workspace is not a root")
@@ -199,103 +207,6 @@ func (s *Server) deleteForkService(workspacePath, forkDir string, confirm bool) 
 	s.notifyStateChange()
 
 	return deleteForkResult{Deleted: true, Message: "fork deleted successfully"}, nil
-}
-
-type renameWorkspaceResult struct {
-	Name    string
-	OldName string
-	Dir     string
-}
-
-func (s *Server) renameWorkspaceService(workspacePath, newName string) (renameWorkspaceResult, error) {
-	if s.classifyWorkspaceCached(workspacePath) != workspaceFork {
-		return renameWorkspaceResult{}, fmt.Errorf("only forks can be renamed")
-	}
-
-	normalized := normalizeForkName(newName)
-	if errMsg := validateWorkspaceName(normalized); errMsg != "" {
-		return renameWorkspaceResult{}, fmt.Errorf("%s", errMsg)
-	}
-
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-	if sess != nil {
-		sess.mu.Lock()
-		running := sess.running
-		sess.mu.Unlock()
-		if running {
-			return renameWorkspaceResult{}, fmt.Errorf("cannot rename: session is running")
-		}
-	}
-
-	rootDir := getRootWorkspacePath(workspacePath)
-
-	oldName := filepath.Base(workspacePath)
-	parentDir := filepath.Dir(workspacePath)
-	newPath := filepath.Join(parentDir, normalized)
-	if _, errStat := os.Stat(newPath); errStat == nil {
-		return renameWorkspaceResult{}, fmt.Errorf("a directory with this name already exists")
-	} else if !os.IsNotExist(errStat) {
-		return renameWorkspaceResult{}, fmt.Errorf("failed to check target path")
-	}
-
-	if errRename := os.Rename(workspacePath, newPath); errRename != nil {
-		return renameWorkspaceResult{}, fmt.Errorf("failed to rename directory: %v", errRename)
-	}
-
-	cmd := exec.Command("jj", "workspace", "rename", normalized)
-	cmd.Dir = newPath
-	if output, errJJ := cmd.CombinedOutput(); errJJ != nil {
-		return renameWorkspaceResult{}, fmt.Errorf("jj workspace rename failed: %v: %s", errJJ, output)
-	}
-
-	canonicalOld := resolveSymlinks(workspacePath)
-	canonicalNew := resolveSymlinks(newPath)
-
-	s.mu.Lock()
-	if existing, ok := s.sessions[workspacePath]; ok {
-		delete(s.sessions, workspacePath)
-		s.sessions[newPath] = existing
-	}
-	if s.everStartedDirs[workspacePath] {
-		delete(s.everStartedDirs, workspacePath)
-		s.everStartedDirs[newPath] = true
-	}
-	pinReKeyed := s.pinnedDirs[canonicalOld]
-	if pinReKeyed {
-		delete(s.pinnedDirs, canonicalOld)
-		s.pinnedDirs[canonicalNew] = true
-	}
-	if existing, ok := s.adhocStates[workspacePath]; ok {
-		delete(s.adhocStates, workspacePath)
-		s.adhocStates[newPath] = existing
-	}
-	s.mu.Unlock()
-
-	s.composerSessionsMu.Lock()
-	if existing, ok := s.composerSessions[workspacePath]; ok {
-		delete(s.composerSessions, workspacePath)
-		s.composerSessions[newPath] = existing
-	}
-	s.composerSessionsMu.Unlock()
-
-	s.classifyCache.delete(workspacePath)
-	s.classifyCache.delete(newPath)
-	if rootDir != "" {
-		s.classifyCache.delete(rootDir)
-		s.bookmarkCache.delete(rootDir)
-	}
-
-	if pinReKeyed {
-		if errSave := s.savePinnedProjects(); errSave != nil {
-			return renameWorkspaceResult{}, fmt.Errorf("persisting re-keyed pins: %w", errSave)
-		}
-	}
-	s.invalidateWorkspaceScanCache()
-	s.notifyStateChange()
-
-	return renameWorkspaceResult{Name: normalized, OldName: oldName, Dir: newPath}, nil
 }
 
 type getGoalResult struct {

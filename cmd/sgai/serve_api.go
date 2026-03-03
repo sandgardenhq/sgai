@@ -86,7 +86,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete", s.handleAPIDeleteWorkspace)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/rename", s.handleAPIRenameWorkspace)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/goal", s.handleAPIGetGoal)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/fork-template", s.handleAPIForkTemplate)
 	mux.HandleFunc("PUT /api/v1/workspaces/{name}/goal", s.handleAPIUpdateGoal)
@@ -108,6 +107,10 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/compose/templates", s.handleAPIComposeTemplates)
 	mux.HandleFunc("GET /api/v1/compose/preview", s.handleAPIComposePreview)
 	mux.HandleFunc("POST /api/v1/compose/draft", s.handleAPIComposeDraft)
+
+	mux.HandleFunc("GET /api/v1/browse-directories", s.handleAPIBrowseDirectories)
+	mux.HandleFunc("POST /api/v1/workspaces/attach", s.handleAPIAttachWorkspace)
+	mux.HandleFunc("POST /api/v1/workspaces/detach", s.handleAPIDetachWorkspace)
 }
 
 func (s *Server) handleSignalStream(w http.ResponseWriter, r *http.Request) {
@@ -155,6 +158,7 @@ type apiWorkspaceFullState struct {
 	Pinned          bool                        `json:"pinned"`
 	IsRoot          bool                        `json:"isRoot"`
 	IsFork          bool                        `json:"isFork"`
+	IsExternal      bool                        `json:"isExternal"`
 	HasSGAI         bool                        `json:"hasSgai"`
 	Status          string                      `json:"status"`
 	BadgeClass      string                      `json:"badgeClass"`
@@ -366,6 +370,7 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		Pinned:          ws.Pinned,
 		IsRoot:          kind == workspaceRoot,
 		IsFork:          kind == workspaceFork,
+		IsExternal:      ws.External,
 		HasSGAI:         ws.HasWorkspace,
 		Status:          status,
 		BadgeClass:      badgeClass,
@@ -1825,16 +1830,6 @@ func (s *Server) handleAPIDeleteWorkspace(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	kind := s.classifyWorkspaceCached(workspacePath)
-	if kind == workspaceRoot {
-		http.Error(w, "cannot delete a root workspace that has forks", http.StatusBadRequest)
-		return
-	}
-	if kind == workspaceFork {
-		http.Error(w, "use delete-fork to delete fork workspaces", http.StatusBadRequest)
-		return
-	}
-
 	if !req.Confirm {
 		http.Error(w, "confirmation required to delete workspace", http.StatusBadRequest)
 		return
@@ -1845,135 +1840,49 @@ func (s *Server) handleAPIDeleteWorkspace(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, errDelete := s.deleteWorkspaceService(workspacePath)
-	if errDelete != nil {
-		http.Error(w, errDelete.Error(), http.StatusInternalServerError)
+	kind := s.classifyWorkspaceCached(workspacePath)
+	external := s.isExternalWorkspace(workspacePath)
+
+	if external {
+		switch kind {
+		case workspaceFork:
+			result, errDelete := s.deleteExternalForkService(workspacePath)
+			if errDelete != nil {
+				http.Error(w, errDelete.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, apiDeleteWorkspaceResponse(result))
+		default:
+			s.stopSession(workspacePath)
+			result, errDetach := s.detachExternalWorkspaceService(workspacePath)
+			if errDetach != nil {
+				http.Error(w, errDetach.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, apiDeleteWorkspaceResponse{Deleted: result.Detached, Message: result.Message})
+		}
 		return
 	}
 
-	writeJSON(w, apiDeleteWorkspaceResponse(result))
-}
-
-type apiRenameRequest struct {
-	Name string `json:"name"`
-}
-
-type apiRenameResponse struct {
-	Name    string `json:"name"`
-	OldName string `json:"oldName"`
-	Dir     string `json:"dir"`
-}
-
-func (s *Server) handleAPIRenameWorkspace(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
+	switch kind {
+	case workspaceRoot:
+		http.Error(w, "cannot delete a root workspace that has forks", http.StatusBadRequest)
 		return
-	}
-
-	if s.classifyWorkspaceCached(workspacePath) != workspaceFork {
-		http.Error(w, "only forks can be renamed", http.StatusBadRequest)
-		return
-	}
-
-	var req apiRenameRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	newName := normalizeForkName(req.Name)
-	if errMsg := validateWorkspaceName(newName); errMsg != "" {
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return
-	}
-
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-	if sess != nil {
-		sess.mu.Lock()
-		running := sess.running
-		sess.mu.Unlock()
-		if running {
-			http.Error(w, "cannot rename: session is running", http.StatusConflict)
+	case workspaceFork:
+		result, errDelete := s.deleteForkByPathService(workspacePath)
+		if errDelete != nil {
+			http.Error(w, errDelete.Error(), http.StatusInternalServerError)
 			return
 		}
-	}
-
-	rootDir := getRootWorkspacePath(workspacePath)
-
-	oldName := filepath.Base(workspacePath)
-	parentDir := filepath.Dir(workspacePath)
-	newPath := filepath.Join(parentDir, newName)
-	if _, errStat := os.Stat(newPath); errStat == nil {
-		http.Error(w, "a directory with this name already exists", http.StatusConflict)
-		return
-	} else if !os.IsNotExist(errStat) {
-		http.Error(w, "failed to check target path", http.StatusInternalServerError)
-		return
-	}
-
-	if errRename := os.Rename(workspacePath, newPath); errRename != nil {
-		http.Error(w, fmt.Sprintf("failed to rename directory: %v", errRename), http.StatusInternalServerError)
-		return
-	}
-
-	cmd := exec.Command("jj", "workspace", "rename", newName)
-	cmd.Dir = newPath
-	if output, errJJ := cmd.CombinedOutput(); errJJ != nil {
-		log.Println("jj workspace rename failed:", errJJ, string(output))
-	}
-
-	canonicalOld := resolveSymlinks(workspacePath)
-	canonicalNew := resolveSymlinks(newPath)
-
-	s.mu.Lock()
-	if sess, ok := s.sessions[workspacePath]; ok {
-		delete(s.sessions, workspacePath)
-		s.sessions[newPath] = sess
-	}
-	if s.everStartedDirs[workspacePath] {
-		delete(s.everStartedDirs, workspacePath)
-		s.everStartedDirs[newPath] = true
-	}
-	pinReKeyed := s.pinnedDirs[canonicalOld]
-	if pinReKeyed {
-		delete(s.pinnedDirs, canonicalOld)
-		s.pinnedDirs[canonicalNew] = true
-	}
-	if existing, ok := s.adhocStates[workspacePath]; ok {
-		delete(s.adhocStates, workspacePath)
-		s.adhocStates[newPath] = existing
-	}
-	s.mu.Unlock()
-
-	s.composerSessionsMu.Lock()
-	if existing, ok := s.composerSessions[workspacePath]; ok {
-		delete(s.composerSessions, workspacePath)
-		s.composerSessions[newPath] = existing
-	}
-	s.composerSessionsMu.Unlock()
-
-	s.classifyCache.delete(workspacePath)
-	s.classifyCache.delete(newPath)
-	if rootDir != "" {
-		s.classifyCache.delete(rootDir)
-		s.bookmarkCache.delete(rootDir)
-	}
-
-	if pinReKeyed {
-		if errSave := s.savePinnedProjects(); errSave != nil {
-			log.Printf("failed to persist re-keyed pins after rename: %v", errSave)
+		writeJSON(w, apiDeleteWorkspaceResponse(result))
+	default:
+		result, errDelete := s.deleteWorkspaceService(workspacePath)
+		if errDelete != nil {
+			http.Error(w, errDelete.Error(), http.StatusInternalServerError)
+			return
 		}
+		writeJSON(w, apiDeleteWorkspaceResponse(result))
 	}
-	s.invalidateWorkspaceScanCache()
-	s.notifyStateChange()
-
-	writeJSON(w, apiRenameResponse{
-		Name:    newName,
-		OldName: oldName,
-		Dir:     newPath,
-	})
 }
 
 type apiGoalResponse struct {
@@ -2647,4 +2556,89 @@ func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) 
 		ID:      messageID,
 		Message: "message deleted successfully",
 	})
+}
+
+type apiBrowseDirectoriesResponse struct {
+	Path    string           `json:"path"`
+	Entries []directoryEntry `json:"entries"`
+}
+
+func (s *Server) handleAPIBrowseDirectories(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	entries, errBrowse := browseDirectoriesService(path)
+	if errBrowse != nil {
+		http.Error(w, errBrowse.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, apiBrowseDirectoriesResponse{Path: path, Entries: entries})
+}
+
+type apiAttachWorkspaceRequest struct {
+	Path string `json:"path"`
+}
+
+type apiAttachWorkspaceResponse struct {
+	Name    string `json:"name"`
+	Dir     string `json:"dir"`
+	HasGoal bool   `json:"hasGoal"`
+}
+
+func (s *Server) handleAPIAttachWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req apiAttachWorkspaceRequest
+	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	result, errAttach := s.attachExternalWorkspaceService(req.Path)
+	if errAttach != nil {
+		statusCode := http.StatusInternalServerError
+		switch {
+		case errors.Is(errAttach, errPathNotAbsolute):
+			statusCode = http.StatusBadRequest
+		case errors.Is(errAttach, errNotADirectory):
+			statusCode = http.StatusBadRequest
+		case errors.Is(errAttach, errUnderRootDir):
+			statusCode = http.StatusBadRequest
+		case errors.Is(errAttach, errAlreadyAttached):
+			statusCode = http.StatusConflict
+		}
+		http.Error(w, errAttach.Error(), statusCode)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(apiAttachWorkspaceResponse(result)); err != nil {
+		log.Println("failed to encode json response:", err)
+	}
+}
+
+type apiDetachWorkspaceRequest struct {
+	Path string `json:"path"`
+}
+
+type apiDetachWorkspaceResponse struct {
+	Detached bool   `json:"detached"`
+	Message  string `json:"message"`
+}
+
+func (s *Server) handleAPIDetachWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req apiDetachWorkspaceRequest
+	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	result, errDetach := s.detachExternalWorkspaceService(req.Path)
+	if errDetach != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(errDetach, errNotAttached) {
+			statusCode = http.StatusNotFound
+		}
+		http.Error(w, errDetach.Error(), statusCode)
+		return
+	}
+
+	writeJSON(w, apiDetachWorkspaceResponse(result))
 }

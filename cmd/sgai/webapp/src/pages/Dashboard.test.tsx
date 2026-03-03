@@ -50,7 +50,6 @@ const workspacesData: FactoryStateSnapshot["workspaces"] = [
         description: "Fix authentication bug in the login flow",
         commitAhead: 0,
         commits: [],
-        summary: "Fix authentication bug",
       },
     ],
   },
@@ -248,7 +247,7 @@ describe("Dashboard", () => {
     });
   });
 
-  it("renders new workspace button", async () => {
+  it("renders [ + ] dropdown trigger button", async () => {
     mockFactoryState = {
       workspaces: [],
       fetchStatus: "idle",
@@ -259,6 +258,98 @@ describe("Dashboard", () => {
     await waitFor(() => {
       const buttons = screen.getAllByText("[ + ]");
       expect(buttons.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("shows New Workspace and Attach External options in dropdown", async () => {
+    mockFactoryState = {
+      workspaces: [],
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      const buttons = screen.getAllByText("[ + ]");
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    const trigger = screen.getAllByText("[ + ]")[0].closest("button")!;
+    fireEvent.pointerDown(trigger);
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      const newWorkspaceItems = document.querySelectorAll("[data-slot='dropdown-menu-item']");
+      const texts = Array.from(newWorkspaceItems).map((el) => el.textContent ?? "");
+      expect(texts.some((t) => t.includes("New Workspace"))).toBe(true);
+      expect(texts.some((t) => t.includes("Attach External"))).toBe(true);
+    });
+  });
+
+  it("navigates to /workspaces/new when New Workspace is clicked", async () => {
+    mockFactoryState = {
+      workspaces: [],
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      const buttons = screen.getAllByText("[ + ]");
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    const trigger = screen.getAllByText("[ + ]")[0].closest("button")!;
+    fireEvent.pointerDown(trigger);
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      const items = document.querySelectorAll("[data-slot='dropdown-menu-item']");
+      expect(Array.from(items).some((el) => el.textContent?.includes("New Workspace"))).toBe(true);
+    });
+
+    const items = document.querySelectorAll("[data-slot='dropdown-menu-item']");
+    const newWorkspaceItem = Array.from(items).find((el) => el.textContent?.includes("New Workspace"))!;
+    fireEvent.click(newWorkspaceItem);
+
+    await waitFor(() => {
+      const locationEl = screen.getByTestId("location-display");
+      expect(locationEl.textContent).toBe("/workspaces/new");
+    });
+  });
+
+  it("navigates to /workspaces/attach when Attach External is clicked", async () => {
+    mockFactoryState = {
+      workspaces: [],
+      fetchStatus: "idle",
+      lastFetchedAt: Date.now(),
+    };
+    renderDashboard();
+
+    await waitFor(() => {
+      const buttons = screen.getAllByText("[ + ]");
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    const trigger = screen.getAllByText("[ + ]")[0].closest("button")!;
+    fireEvent.pointerDown(trigger);
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    await waitFor(() => {
+      const items = document.querySelectorAll("[data-slot='dropdown-menu-item']");
+      expect(Array.from(items).some((el) => el.textContent?.includes("Attach External"))).toBe(true);
+    });
+
+    const items = document.querySelectorAll("[data-slot='dropdown-menu-item']");
+    const attachItem = Array.from(items).find((el) => el.textContent?.includes("Attach External"))!;
+    fireEvent.click(attachItem);
+
+    await waitFor(() => {
+      const locationEl = screen.getByTestId("location-display");
+      expect(locationEl.textContent).toBe("/workspaces/attach");
     });
   });
 

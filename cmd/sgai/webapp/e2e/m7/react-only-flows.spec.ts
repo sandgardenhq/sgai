@@ -425,14 +425,6 @@ test.describe("M7 Workspace Management — React-Only", () => {
     expect(pageText).toBeTruthy();
   });
 
-  test("rename page loads", async ({ page }) => {
-    await page.goto(`${BASE_URL}/workspaces/${WORKSPACE}/rename`);
-    await waitForReactContent(page);
-
-    const pageText = await page.textContent("body");
-    expect(pageText).toBeTruthy();
-  });
-
   test("edit goal page loads", async ({ page }) => {
     await page.goto(`${BASE_URL}/workspaces/${WORKSPACE}/goal/edit`);
     await waitForReactContent(page);

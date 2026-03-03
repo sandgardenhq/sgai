@@ -332,11 +332,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startDeleteTransition(async () => {
       try {
-        if (detail.isFork && rootWorkspaceName) {
-          await api.workspaces.deleteFork(rootWorkspaceName, detail.dir);
-        } else {
-          await api.workspaces.deleteWorkspace(workspaceName);
-        }
+        await api.workspaces.deleteWorkspace(workspaceName);
         navigate("/");
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to delete workspace");
@@ -352,16 +348,7 @@ export function WorkspaceDetail(): JSX.Element | null {
             <Tooltip>
               <TooltipTrigger asChild>
                 <h3 className="m-0 text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
-                  {detail.isFork ? (
-                    <Link
-                      to={`/workspaces/${encodeURIComponent(detail.name)}/rename`}
-                      className="no-underline text-inherit"
-                    >
-                      {detail.description || detail.name} ✏️
-                    </Link>
-                  ) : (
-                    detail.name
-                  )}
+                  {detail.description || detail.name}
                 </h3>
               </TooltipTrigger>
               <TooltipContent>{detail.isFork ? detail.name : detail.dir}</TooltipContent>
@@ -587,7 +574,10 @@ export function WorkspaceDetail(): JSX.Element | null {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete workspace</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to permanently delete &lsquo;{detail.name}&rsquo;? This action cannot be undone.
+                            {(!detail.external || detail.isFork)
+                              ? <>This will permanently delete the workspace directory from disk. This action cannot be undone.</>
+                              : <>This will remove &lsquo;{detail.name}&rsquo; from the interface. The directory and its contents will NOT be deleted.</>
+                            }
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -597,7 +587,7 @@ export function WorkspaceDetail(): JSX.Element | null {
                             disabled={isDeletePending}
                             className="bg-destructive text-white hover:bg-destructive/90"
                           >
-                            Delete
+                            {(!detail.external || detail.isFork) ? "Delete" : "Remove"}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

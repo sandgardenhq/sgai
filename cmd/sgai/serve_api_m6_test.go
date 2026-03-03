@@ -22,10 +22,11 @@ func setupM6TestWorkspace(t *testing.T) (string, string, *Server) {
 	}
 	createsgaiDir(t, workspace)
 	srv := NewServer(rootDir)
+	srv.pinnedConfigDir = t.TempDir()
 	return rootDir, workspace, srv
 }
 
-func setupM6ForkWorkspace(t *testing.T) (string, string, *Server) {
+func setupM6ForkWorkspace(t *testing.T) (string, *Server) {
 	t.Helper()
 	installFakeJJWithWorkspaceList(t, 2)
 	rootDir := t.TempDir()
@@ -50,7 +51,8 @@ func setupM6ForkWorkspace(t *testing.T) (string, string, *Server) {
 	createsgaiDir(t, forkPath)
 
 	srv := NewServer(rootDir)
-	return rootDir, forkPath, srv
+	srv.pinnedConfigDir = t.TempDir()
+	return forkPath, srv
 }
 
 func TestGenerateRandomForkName(t *testing.T) {
@@ -248,7 +250,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	})
 
 	t.Run("rejectsForkOfFork", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
+		forkPath, srv := setupM6ForkWorkspace(t)
 		forkName := filepath.Base(forkPath)
 
 		mux := http.NewServeMux()
@@ -320,169 +322,6 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 
 		if result1.Name == result2.Name {
 			t.Errorf("two forks should have different auto-generated names, both got %q", result1.Name)
-		}
-	})
-}
-
-func TestHandleAPIRenameWorkspace(t *testing.T) {
-	t.Run("successfulRename", func(t *testing.T) {
-		rootDir, forkPath, srv := setupM6ForkWorkspace(t)
-		forkName := filepath.Base(forkPath)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"renamed-fork"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
-		}
-
-		var result apiRenameResponse
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-		if result.Name != "renamed-fork" {
-			t.Errorf("name = %q; want %q", result.Name, "renamed-fork")
-		}
-		if result.OldName != forkName {
-			t.Errorf("oldName = %q; want %q", result.OldName, forkName)
-		}
-
-		if _, err := os.Stat(filepath.Join(rootDir, "renamed-fork")); err != nil {
-			t.Errorf("renamed directory should exist: %v", err)
-		}
-		if _, err := os.Stat(forkPath); !os.IsNotExist(err) {
-			t.Errorf("old directory should not exist")
-		}
-	})
-
-	t.Run("rejectsNonFork", func(t *testing.T) {
-		_, _, srv := setupM6TestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"new-name"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusBadRequest)
-		}
-	})
-
-	t.Run("rejectsInvalidName", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
-		forkName := filepath.Base(forkPath)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":""}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusBadRequest)
-		}
-	})
-
-	t.Run("rejectsRunningSession", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
-		forkName := filepath.Base(forkPath)
-
-		srv.mu.Lock()
-		srv.sessions[forkPath] = &session{running: true}
-		srv.mu.Unlock()
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"renamed-fork"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusConflict {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusConflict)
-		}
-	})
-
-	t.Run("conflictsWithExistingDir", func(t *testing.T) {
-		rootDir, forkPath, srv := setupM6ForkWorkspace(t)
-		forkName := filepath.Base(forkPath)
-
-		existingDir := filepath.Join(rootDir, "existing-name")
-		if err := os.MkdirAll(existingDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"existing-name"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusConflict {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusConflict)
-		}
-	})
-
-	t.Run("rekeysSessionMap", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
-		forkName := filepath.Base(forkPath)
-
-		srv.mu.Lock()
-		srv.sessions[forkPath] = &session{running: false}
-		srv.everStartedDirs[forkPath] = true
-		srv.mu.Unlock()
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		body := strings.NewReader(`{"name":"rekeyed-fork"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/rename", body)
-		req.Header.Set("Content-Type", "application/json")
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
-		}
-
-		srv.mu.Lock()
-		_, oldKeyExists := srv.sessions[forkPath]
-		newDir := filepath.Dir(forkPath)
-		newPath := filepath.Join(newDir, "rekeyed-fork")
-		_, newKeyExists := srv.sessions[newPath]
-		_, oldStarted := srv.everStartedDirs[forkPath]
-		_, newStarted := srv.everStartedDirs[newPath]
-		srv.mu.Unlock()
-
-		if oldKeyExists {
-			t.Error("old session key should not exist")
-		}
-		if !newKeyExists {
-			t.Error("new session key should exist")
-		}
-		if oldStarted {
-			t.Error("old everStartedDirs key should not exist")
-		}
-		if !newStarted {
-			t.Error("new everStartedDirs key should exist")
 		}
 	})
 }
@@ -781,7 +620,7 @@ func TestBuildAdhocArgs(t *testing.T) {
 
 func TestHandleAPIDeleteFork(t *testing.T) {
 	t.Run("successfulDelete", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
+		forkPath, srv := setupM6ForkWorkspace(t)
 
 		rootPath := getRootWorkspacePath(forkPath)
 		rootName := filepath.Base(rootPath)
@@ -816,7 +655,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 	})
 
 	t.Run("rejectsNonRoot", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
+		forkPath, srv := setupM6ForkWorkspace(t)
 		forkName := filepath.Base(forkPath)
 
 		mux := http.NewServeMux()
@@ -834,7 +673,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 	})
 
 	t.Run("rejectsMissingConfirm", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
+		forkPath, srv := setupM6ForkWorkspace(t)
 
 		rootPath := getRootWorkspacePath(forkPath)
 		rootName := filepath.Base(rootPath)
@@ -888,7 +727,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 	})
 
 	t.Run("stopsRunningSession", func(t *testing.T) {
-		_, forkPath, srv := setupM6ForkWorkspace(t)
+		forkPath, srv := setupM6ForkWorkspace(t)
 
 		rootPath := getRootWorkspacePath(forkPath)
 		rootName := filepath.Base(rootPath)

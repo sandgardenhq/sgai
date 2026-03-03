@@ -383,15 +383,6 @@ describe("WorkspaceDetail", () => {
     expect(headerScope?.queryByText("stopped") ?? null).toBeNull();
   });
 
-  it("renders rename link for fork workspaces", async () => {
-    const forkWorkspace = makeWorkspace({ isFork: true });
-    renderWorkspaceDetail("/workspaces/test-project/progress", [forkWorkspace]);
-
-    await waitFor(() => {
-      expect(screen.getByText(/test-project ✏️/)).toBeDefined();
-    });
-  });
-
   it("renders stopped badge when not running", async () => {
     const stoppedWorkspace = makeWorkspace({ running: false });
     renderWorkspaceDetail("/workspaces/test-project/progress", [stoppedWorkspace]);

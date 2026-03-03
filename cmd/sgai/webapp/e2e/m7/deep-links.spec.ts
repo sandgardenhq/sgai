@@ -299,14 +299,6 @@ test.describe("M7 Deep Links — Workspace Management Routes (R-12)", () => {
     expect(pageText).toBeTruthy();
   });
 
-  test("/workspaces/{name}/rename loads rename form", async ({ page }) => {
-    await page.goto(`${BASE_URL}/workspaces/${WORKSPACE}/rename`);
-    await waitForReactContent(page);
-
-    const pageText = await page.textContent("body");
-    expect(pageText).toBeTruthy();
-  });
-
   test("/workspaces/{name}/goal/edit loads goal editor", async ({ page }) => {
     await page.goto(`${BASE_URL}/workspaces/${WORKSPACE}/goal/edit`);
     await waitForReactContent(page);

@@ -16,6 +16,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import sgaiLogo from "@/assets/sgai-logo.svg";
 import {
   Sidebar,
@@ -30,7 +37,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Loader2, Inbox, Trash2 } from "lucide-react";
+import { Loader2, Inbox, Trash2, FolderPlus, Link as LinkIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
@@ -39,17 +46,15 @@ import type { ApiWorkspaceEntry } from "@/lib/factory-state";
 
 interface DeleteWorkspaceDialogProps {
   workspaceName: string;
-  workspaceDir: string;
+  isExternal: boolean;
   isFork: boolean;
-  rootWorkspaceName?: string;
   selectedName: string | undefined;
 }
 
 function DeleteWorkspaceDialog({
   workspaceName,
-  workspaceDir,
+  isExternal,
   isFork,
-  rootWorkspaceName,
   selectedName,
 }: DeleteWorkspaceDialogProps) {
   const navigate = useNavigate();
@@ -58,18 +63,15 @@ function DeleteWorkspaceDialog({
   const [isDeleting, startDeleteTransition] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const isDestructive = !isExternal || isFork;
   const nameMatches = confirmText === workspaceName;
 
   const handleDelete = useCallback(() => {
-    if (!nameMatches) return;
+    if (isDestructive && !nameMatches) return;
     setDeleteError(null);
     startDeleteTransition(async () => {
       try {
-        if (isFork && rootWorkspaceName) {
-          await api.workspaces.deleteFork(rootWorkspaceName, workspaceDir);
-        } else {
-          await api.workspaces.deleteWorkspace(workspaceName);
-        }
+        await api.workspaces.deleteWorkspace(workspaceName);
         setOpen(false);
         if (selectedName === workspaceName) {
           navigate("/");
@@ -78,7 +80,7 @@ function DeleteWorkspaceDialog({
         setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
       }
     });
-  }, [nameMatches, isFork, rootWorkspaceName, workspaceDir, workspaceName, selectedName, navigate]);
+  }, [isDestructive, nameMatches, workspaceName, selectedName, navigate]);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -104,31 +106,62 @@ function DeleteWorkspaceDialog({
         <DialogHeader>
           <DialogTitle>Delete workspace</DialogTitle>
           <DialogDescription>
-            Type &lsquo;{workspaceName}&rsquo; to confirm deletion. This action cannot be undone.
+            {isDestructive
+              ? <>This will permanently delete the workspace directory from disk. This action cannot be undone.</>
+              : <>This will remove &lsquo;{workspaceName}&rsquo; from the interface. The directory and its contents will NOT be deleted.</>
+            }
           </DialogDescription>
         </DialogHeader>
-        <div className="py-2">
-          <Input
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            placeholder={workspaceName}
-            disabled={isDeleting}
-            aria-label="Type workspace name to confirm"
-            autoFocus
-          />
-          {deleteError && (
-            <p className="text-sm text-destructive mt-2" role="alert">{deleteError}</p>
-          )}
-        </div>
+        {isDestructive ? (
+          <div className="py-2">
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={workspaceName}
+              disabled={isDeleting}
+              aria-label="Type workspace name to confirm"
+              autoFocus
+            />
+            {deleteError && (
+              <p className="text-sm text-destructive mt-2" role="alert">{deleteError}</p>
+            )}
+          </div>
+        ) : (
+          <>
+            {deleteError && (
+              <p className="text-sm text-destructive" role="alert">{deleteError}</p>
+            )}
+          </>
+        )}
         <DialogFooter>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={!nameMatches || isDeleting}
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
+          {isDestructive ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={!nameMatches || isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Removing..." : "Remove"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -145,8 +178,15 @@ function WorkspaceTreeSkeleton() {
   );
 }
 
+interface WorkspaceIndicatorFields {
+  running: boolean;
+  needsInput: boolean;
+  pinned: boolean;
+  external?: boolean;
+}
+
 interface WorkspaceIndicatorsProps {
-  workspace: ApiWorkspaceEntry;
+  workspace: WorkspaceIndicatorFields;
 }
 
 function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
@@ -155,6 +195,14 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
 
   return (
     <span className="flex items-center gap-1 shrink-0">
+      {workspace.external && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <LinkIcon className="h-3 w-3 text-muted-foreground" aria-label="External workspace" title="External workspace" />
+          </TooltipTrigger>
+          <TooltipContent>External workspace</TooltipContent>
+        </Tooltip>
+      )}
       {isActive && (
         <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
       )}
@@ -181,11 +229,10 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
 interface ForkItemProps {
   fork: ApiWorkspaceEntry["forks"] extends (infer F)[] | undefined ? F : never;
   selectedName: string | undefined;
-  rootWorkspaceName: string;
   workspaceLookup: Map<string, ApiWorkspaceEntry>;
 }
 
-function ForkItem({ fork, selectedName, rootWorkspaceName, workspaceLookup }: ForkItemProps) {
+function ForkItem({ fork, selectedName, workspaceLookup }: ForkItemProps) {
   const forkSelected = fork.name === selectedName;
   const forkFullEntry = workspaceLookup.get(fork.name);
 
@@ -225,9 +272,8 @@ function ForkItem({ fork, selectedName, rootWorkspaceName, workspaceLookup }: Fo
         </SidebarMenuButton>
         <DeleteWorkspaceDialog
           workspaceName={fork.name}
-          workspaceDir={fork.dir}
+          isExternal={false}
           isFork
-          rootWorkspaceName={rootWorkspaceName}
           selectedName={selectedName}
         />
       </div>
@@ -305,7 +351,7 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
         {showDelete && (
           <DeleteWorkspaceDialog
             workspaceName={workspace.name}
-            workspaceDir={workspace.dir}
+            isExternal={workspace.external ?? false}
             isFork={workspace.isFork}
             selectedName={selectedName}
           />
@@ -320,7 +366,6 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
                 key={fork.name}
                 fork={fork}
                 selectedName={selectedName}
-                rootWorkspaceName={workspace.name}
                 workspaceLookup={workspaceLookup}
               />
             ))}
@@ -435,7 +480,13 @@ function WorkspaceList({ workspaces, selectedName }: WorkspaceListProps) {
   );
 }
 
-function deduplicateByName(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[] {
+interface WorkspaceStatusEntry {
+  name: string;
+  running: boolean;
+  needsInput: boolean;
+}
+
+function deduplicateByName<T extends { name: string }>(workspaces: T[]): T[] {
   const seen = new Set<string>();
   return workspaces.filter((w) => {
     if (seen.has(w.name)) return false;
@@ -444,8 +495,8 @@ function deduplicateByName(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[]
   });
 }
 
-function collectAllWorkspaces(workspaces: ApiWorkspaceEntry[]): ApiWorkspaceEntry[] {
-  const all: ApiWorkspaceEntry[] = [];
+function collectAllWorkspaces(workspaces: ApiWorkspaceEntry[]): WorkspaceStatusEntry[] {
+  const all: WorkspaceStatusEntry[] = [];
   for (const w of workspaces) {
     all.push(w);
     if (w.forks) {
@@ -562,8 +613,12 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
     }
   }, [selectedName, setOpenMobile]);
 
-  const handleCreateWorkspace = useCallback(() => {
+  const handleNewWorkspace = useCallback(() => {
     navigate("/workspaces/new");
+  }, [navigate]);
+
+  const handleAttachExternal = useCallback(() => {
+    navigate("/workspaces/attach");
   }, [navigate]);
 
   return (
@@ -597,13 +652,24 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
         </SidebarContent>
         <Separator />
         <SidebarFooter className="p-2">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleCreateWorkspace}
-          >
-            [ + ]
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full">
+                [ + ]
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="center" className="w-48">
+              <DropdownMenuItem onClick={handleNewWorkspace}>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                New Workspace
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleAttachExternal}>
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Attach External
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </SidebarFooter>
         <SidebarRail />
         <div

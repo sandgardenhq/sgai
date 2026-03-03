@@ -19,12 +19,14 @@ func setupStandaloneWorkspace(t *testing.T) (string, *Server) {
 	}
 	createsgaiDir(t, workspace)
 	srv := NewServer(rootDir)
+	srv.pinnedConfigDir = t.TempDir()
 	return workspace, srv
 }
 
 func TestCreateWorkspacePinsByDefault(t *testing.T) {
 	rootDir := t.TempDir()
 	srv := NewServer(rootDir)
+	srv.pinnedConfigDir = t.TempDir()
 
 	mux := http.NewServeMux()
 	srv.registerAPIRoutes(mux)
@@ -225,6 +227,208 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 
 		if sess != nil && sess.running {
 			t.Error("session should have been stopped")
+		}
+	})
+
+	t.Run("cwdForkDeletesFromDisk", func(t *testing.T) {
+		forkPath, srv := setupM6ForkWorkspace(t)
+		forkName := filepath.Base(forkPath)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"confirm":true}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/delete", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+
+		var result apiDeleteWorkspaceResponse
+		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
+			t.Fatalf("failed to decode response: %v", errDecode)
+		}
+		if !result.Deleted {
+			t.Error("deleted should be true")
+		}
+		if result.Message != "fork deleted successfully" {
+			t.Errorf("message = %q; want %q", result.Message, "fork deleted successfully")
+		}
+
+		if _, errStat := os.Stat(forkPath); !os.IsNotExist(errStat) {
+			t.Error("fork directory should not exist after deletion")
+		}
+	})
+}
+
+func setupExternalStandaloneWorkspace(t *testing.T) (string, *Server) {
+	t.Helper()
+	srv, _ := newTestServerForExternal(t)
+
+	externalDir := t.TempDir()
+	createsgaiDir(t, externalDir)
+	canonical := resolveSymlinks(externalDir)
+	srv.mu.Lock()
+	srv.externalDirs[canonical] = true
+	srv.mu.Unlock()
+
+	return externalDir, srv
+}
+
+func setupExternalRootWorkspace(t *testing.T) (string, *Server) {
+	t.Helper()
+	installFakeJJWithWorkspaceList(t, 2)
+	srv, _ := newTestServerForExternal(t)
+
+	externalDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(externalDir, ".jj", "repo"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	createsgaiDir(t, externalDir)
+	canonical := resolveSymlinks(externalDir)
+	srv.mu.Lock()
+	srv.externalDirs[canonical] = true
+	srv.mu.Unlock()
+
+	return externalDir, srv
+}
+
+func setupExternalForkWorkspace(t *testing.T) (string, string, *Server) {
+	t.Helper()
+	installFakeJJWithWorkspaceList(t, 2)
+	srv, _ := newTestServerForExternal(t)
+
+	rootDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(rootDir, ".jj", "repo"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	createsgaiDir(t, rootDir)
+
+	forkDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(forkDir, ".jj"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	repoLink := filepath.Join(rootDir, ".jj", "repo")
+	if err := os.WriteFile(filepath.Join(forkDir, ".jj", "repo"), []byte(repoLink), 0644); err != nil {
+		t.Fatal(err)
+	}
+	createsgaiDir(t, forkDir)
+
+	canonical := resolveSymlinks(forkDir)
+	srv.mu.Lock()
+	srv.externalDirs[canonical] = true
+	srv.mu.Unlock()
+
+	return rootDir, forkDir, srv
+}
+
+func TestHandleAPIDeleteWorkspaceExternal(t *testing.T) {
+	t.Run("externalStandaloneDetachesOnly", func(t *testing.T) {
+		externalDir, srv := setupExternalStandaloneWorkspace(t)
+		wsName := filepath.Base(externalDir)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"confirm":true}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+
+		var result apiDeleteWorkspaceResponse
+		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
+			t.Fatalf("failed to decode response: %v", errDecode)
+		}
+		if !result.Deleted {
+			t.Error("deleted should be true")
+		}
+
+		if _, errStat := os.Stat(externalDir); errStat != nil {
+			t.Error("external standalone workspace directory should still exist on disk after detach")
+		}
+
+		canonical := resolveSymlinks(externalDir)
+		srv.mu.Lock()
+		stillAttached := srv.externalDirs[canonical]
+		srv.mu.Unlock()
+		if stillAttached {
+			t.Error("externalDirs should not contain the workspace after deletion")
+		}
+	})
+
+	t.Run("externalRootDetachesOnly", func(t *testing.T) {
+		externalDir, srv := setupExternalRootWorkspace(t)
+		wsName := filepath.Base(externalDir)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"confirm":true}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+
+		if _, errStat := os.Stat(externalDir); errStat != nil {
+			t.Error("external root workspace directory should still exist on disk after detach")
+		}
+
+		canonical := resolveSymlinks(externalDir)
+		srv.mu.Lock()
+		stillAttached := srv.externalDirs[canonical]
+		srv.mu.Unlock()
+		if stillAttached {
+			t.Error("externalDirs should not contain the root workspace after deletion")
+		}
+	})
+
+	t.Run("externalForkDeletesFromDisk", func(t *testing.T) {
+		_, forkDir, srv := setupExternalForkWorkspace(t)
+		wsName := filepath.Base(forkDir)
+
+		mux := http.NewServeMux()
+		srv.registerAPIRoutes(mux)
+
+		body := strings.NewReader(`{"confirm":true}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp := httptest.NewRecorder()
+		mux.ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+		}
+
+		var result apiDeleteWorkspaceResponse
+		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
+			t.Fatalf("failed to decode response: %v", errDecode)
+		}
+		if !result.Deleted {
+			t.Error("deleted should be true")
+		}
+
+		if _, errStat := os.Stat(forkDir); !os.IsNotExist(errStat) {
+			t.Error("external fork directory should not exist after deletion")
+		}
+
+		canonical := resolveSymlinks(forkDir)
+		srv.mu.Lock()
+		stillAttached := srv.externalDirs[canonical]
+		srv.mu.Unlock()
+		if stillAttached {
+			t.Error("externalDirs should not contain the fork after deletion")
 		}
 	})
 }
