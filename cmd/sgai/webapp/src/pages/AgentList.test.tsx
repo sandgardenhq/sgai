@@ -2,15 +2,7 @@ import { describe, test, expect, afterEach, spyOn } from "bun:test";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { AgentList } from "./AgentList";
-
-function mockFetch(data: unknown, ok = true) {
-  return spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(data), {
-      status: ok ? 200 : 500,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-}
+import { mockFetchResolved } from "@/test-utils";
 
 function renderWithRouter(workspaceName = "test-workspace") {
   return render(
@@ -46,7 +38,7 @@ describe("AgentList", () => {
   });
 
   test("renders agent cards when data loads", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       agents: [
         { name: "coordinator", description: "Coordinates workflow" },
         { name: "react-developer", description: "Builds React UI" },
@@ -68,7 +60,7 @@ describe("AgentList", () => {
   });
 
   test("renders empty state when no agents", async () => {
-    fetchSpy = mockFetch({ agents: [] });
+    fetchSpy = mockFetchResolved({ agents: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -107,7 +99,7 @@ describe("AgentList", () => {
   });
 
   test("calls fetch with correct URL", async () => {
-    fetchSpy = mockFetch({ agents: [] });
+    fetchSpy = mockFetchResolved({ agents: [] });
 
     await act(async () => {
       renderWithRouter("my-project");

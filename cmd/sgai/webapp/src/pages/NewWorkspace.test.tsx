@@ -3,17 +3,7 @@ import { render, screen, act, cleanup, fireEvent } from "@testing-library/react"
 import { MemoryRouter, Routes, Route } from "react-router";
 import { NewWorkspace } from "./NewWorkspace";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown, status = 200) {
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-    Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
-  );
-}
+import { mockFetchJson } from "@/test-utils";
 
 function renderPage() {
   return render(
@@ -63,7 +53,7 @@ describe("NewWorkspace", () => {
   });
 
   test("submits form and navigates to compose wizard on success", async () => {
-    fetchSpy = mockFetch({ name: "my-project", dir: "/tmp/my-project" }, 200);
+    fetchSpy = mockFetchJson({ name: "my-project", dir: "/tmp/my-project" });
     renderPage();
 
     const input = screen.getByLabelText("Workspace Name");

@@ -3,15 +3,7 @@ import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { SnippetList } from "./SnippetList";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-}
+import { mockFetchResolved } from "@/test-utils";
 
 function renderWithRouter(workspaceName = "test-workspace") {
   return render(
@@ -52,7 +44,7 @@ describe("SnippetList", () => {
   });
 
   test("renders snippet languages and cards when data loads", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       languages: [
         {
           name: "go",
@@ -94,7 +86,7 @@ describe("SnippetList", () => {
   });
 
   test("renders empty state when no languages", async () => {
-    fetchSpy = mockFetch({ languages: [] });
+    fetchSpy = mockFetchResolved({ languages: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -118,7 +110,7 @@ describe("SnippetList", () => {
   });
 
   test("snippet cards have links to detail page", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       languages: [
         {
           name: "go",

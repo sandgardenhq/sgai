@@ -2,15 +2,7 @@ import { describe, test, expect, afterEach, spyOn } from "bun:test";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { SkillDetail } from "./SkillDetail";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-}
+import { mockFetchResolved } from "@/test-utils";
 
 function renderWithRouter(
   skillPath = "product-design/brainstorming",
@@ -52,7 +44,7 @@ describe("SkillDetail", () => {
   });
 
   test("renders skill content when data loads", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "brainstorming",
       fullPath: "product-design/brainstorming",
       content: "<h1>Brainstorming</h1><p>Interactive idea refinement</p>",
@@ -94,7 +86,7 @@ describe("SkillDetail", () => {
   });
 
   test("renders markdown content", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "test-skill",
       fullPath: "test-skill",
       content: "<h1>Custom Skill</h1>",
@@ -110,7 +102,7 @@ describe("SkillDetail", () => {
   });
 
   test("calls fetch with correct URL including skill path", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "detecting-emergent-patterns",
       fullPath: "architecture/detecting-emergent-patterns",
       content: "<p>Content</p>",

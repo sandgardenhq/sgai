@@ -1,35 +1,11 @@
-import { describe, test, expect, afterEach, spyOn, mock } from "bun:test";
-import React from "react";
+import { describe, test, expect, afterEach, spyOn } from "bun:test";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { InlineForkEditor } from "./InlineForkEditor";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { setupMarkdownEditorMock, mockFetchJson, mockForkTemplateFetch } from "@/test-utils";
 
-mock.module("@monaco-editor/react", () => ({
-  default: () => null,
-}));
-
-mock.module("@/components/MarkdownEditor", () => ({
-  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
-    React.createElement("textarea", {
-      "data-testid": "markdown-editor",
-      value: props.value,
-      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
-      disabled: props.disabled,
-      placeholder: props.placeholder,
-    }),
-}));
-
-function mockFetch(data: unknown, status = 200) {
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-    Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
-  );
-}
+setupMarkdownEditorMock();
 
 function renderEditor(workspaceName = "root-ws") {
   return render(
@@ -48,21 +24,6 @@ function renderEditor(workspaceName = "root-ws") {
       </TooltipProvider>
     </MemoryRouter>,
   );
-}
-
-function mockForkTemplateFetch() {
-  return spyOn(globalThis, "fetch").mockImplementation((input: string | URL | Request) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-    if (url.includes("fork-template")) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ content: "" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    }
-    return Promise.resolve(new Response("Not Found", { status: 404 }));
-  });
 }
 
 describe("InlineForkEditor", () => {
@@ -138,7 +99,7 @@ describe("InlineForkEditor", () => {
   });
 
   test("submits fork and navigates on success", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchJson({
       name: "clever-blue-a1e2",
       dir: "/tmp/clever-blue-a1e2",
       parent: "root-ws",

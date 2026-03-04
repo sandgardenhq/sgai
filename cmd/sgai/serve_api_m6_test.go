@@ -155,8 +155,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("successfulFork", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":"Build a web app with authentication"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
@@ -186,8 +185,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("writesGoalContent", func(t *testing.T) {
 		rootDir, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		goalText := "Build a REST API for user management"
 		body := strings.NewReader(`{"goalContent":"` + goalText + `"}`)
@@ -218,8 +216,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("rejectsEmptyGoalContent", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":""}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
@@ -235,8 +232,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("rejectsFrontmatterOnlyGoalContent", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":"---\nflow: |\n  a -> b\n---\n"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
@@ -253,8 +249,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 		forkPath, srv := setupM6ForkWorkspace(t)
 		forkName := filepath.Base(forkPath)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":"Build something"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/fork", body)
@@ -270,8 +265,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":"Build something"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/nonexistent/fork", body)
@@ -287,8 +281,7 @@ func TestHandleAPIForkWorkspace(t *testing.T) {
 	t.Run("autoGeneratesUniqueName", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"goalContent":"First goal"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
@@ -330,8 +323,7 @@ func TestHandleAPIUpdateGoal(t *testing.T) {
 	t.Run("successfulUpdate", func(t *testing.T) {
 		_, workspace, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"content":"# New Goal\n\nBuild something great"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/workspaces/root-workspace/goal", body)
@@ -364,8 +356,7 @@ func TestHandleAPIUpdateGoal(t *testing.T) {
 	t.Run("rejectsEmptyContent", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"content":""}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/workspaces/root-workspace/goal", body)
@@ -381,8 +372,7 @@ func TestHandleAPIUpdateGoal(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"content":"content"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/workspaces/nonexistent/goal", body)
@@ -398,8 +388,7 @@ func TestHandleAPIUpdateGoal(t *testing.T) {
 	t.Run("idempotent", func(t *testing.T) {
 		_, workspace, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		goalContent := `{"content":"# Goal v2\n\nSame content"}`
 
@@ -430,8 +419,7 @@ func TestHandleAPIAdhoc(t *testing.T) {
 	t.Run("rejectsEmptyPrompt", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"prompt":"","model":"gpt-4"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
@@ -447,8 +435,7 @@ func TestHandleAPIAdhoc(t *testing.T) {
 	t.Run("rejectsEmptyModel", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"prompt":"do something","model":""}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
@@ -464,8 +451,7 @@ func TestHandleAPIAdhoc(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"prompt":"do something","model":"gpt-4"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/nonexistent/adhoc", body)
@@ -487,8 +473,7 @@ func TestHandleAPIAdhoc(t *testing.T) {
 		st.output.WriteString("partial output")
 		st.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"prompt":"do something","model":"gpt-4"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
@@ -518,8 +503,7 @@ func TestHandleAPIAdhoc(t *testing.T) {
 	t.Run("invalidJSON", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`not json`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
@@ -549,8 +533,7 @@ func TestHandleAPIAdhocLogsCommandAndPrompt(t *testing.T) {
 		installFakeOpencode(t)
 		_, workspace, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"prompt":"create a new feature","model":"anthropic/claude-opus-4-6 (max)"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/adhoc", body)
@@ -625,8 +608,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 		rootPath := getRootWorkspacePath(forkPath)
 		rootName := filepath.Base(rootPath)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"forkDir":"` + forkPath + `","confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+rootName+"/delete-fork", body)
@@ -658,8 +640,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 		forkPath, srv := setupM6ForkWorkspace(t)
 		forkName := filepath.Base(forkPath)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"forkDir":"/some/dir","confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/delete-fork", body)
@@ -678,8 +659,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 		rootPath := getRootWorkspacePath(forkPath)
 		rootName := filepath.Base(rootPath)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"forkDir":"` + forkPath + `","confirm":false}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+rootName+"/delete-fork", body)
@@ -695,8 +675,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"forkDir":"/some/dir","confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/nonexistent/delete-fork", body)
@@ -712,8 +691,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 	t.Run("invalidJSON", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`not json`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/delete-fork", body)
@@ -736,8 +714,7 @@ func TestHandleAPIDeleteFork(t *testing.T) {
 		srv.sessions[forkPath] = &session{running: true}
 		srv.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"forkDir":"` + forkPath + `","confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+rootName+"/delete-fork", body)
@@ -763,8 +740,7 @@ func TestHandleAPIAdhocStatus(t *testing.T) {
 	t.Run("returnsIdleState", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -795,8 +771,7 @@ func TestHandleAPIAdhocStatus(t *testing.T) {
 		st.output.WriteString("partial output")
 		st.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -821,8 +796,7 @@ func TestHandleAPIAdhocStatus(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/nonexistent/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -844,8 +818,7 @@ func TestHandleAPIAdhocStop(t *testing.T) {
 		st.output.WriteString("partial output")
 		st.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -883,8 +856,7 @@ func TestHandleAPIAdhocStop(t *testing.T) {
 	t.Run("stopNonRunningAdhoc", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -909,8 +881,7 @@ func TestHandleAPIAdhocStop(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/nonexistent/adhoc", nil)
 		resp := httptest.NewRecorder()
@@ -930,8 +901,7 @@ func TestHandleAPIAdhocStop(t *testing.T) {
 		st.output.WriteString("output")
 		st.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		for range 3 {
 			req := httptest.NewRequest(http.MethodDelete, "/api/v1/workspaces/root-workspace/adhoc", nil)
@@ -973,8 +943,7 @@ func TestHandleAPIOpenEditorGoal(t *testing.T) {
 		}}
 		srv.editorAvailable = true
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/open-editor/goal", nil)
 		resp := httptest.NewRecorder()
@@ -993,8 +962,7 @@ func TestHandleAPIOpenEditorGoal(t *testing.T) {
 		srv.editor = &mockEditor{openFn: func(_ string) error { return nil }}
 		srv.editorAvailable = true
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/open-editor/goal", nil)
 		resp := httptest.NewRecorder()
@@ -1014,8 +982,7 @@ func TestHandleAPIOpenEditorGoal(t *testing.T) {
 		}
 		srv.editorAvailable = false
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/open-editor/goal", nil)
 		resp := httptest.NewRecorder()
@@ -1043,8 +1010,7 @@ func TestHandleAPIOpenEditorProjectManagement(t *testing.T) {
 		}}
 		srv.editorAvailable = true
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/open-editor/project-management", nil)
 		resp := httptest.NewRecorder()
@@ -1063,8 +1029,7 @@ func TestHandleAPIOpenEditorProjectManagement(t *testing.T) {
 		srv.editor = &mockEditor{openFn: func(_ string) error { return nil }}
 		srv.editorAvailable = true
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/open-editor/project-management", nil)
 		resp := httptest.NewRecorder()

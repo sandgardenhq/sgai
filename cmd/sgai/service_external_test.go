@@ -395,9 +395,7 @@ func TestAPIBrowseDirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
-
+	mux := serverMux(t, srv)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/browse-directories?path="+dir, nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
@@ -423,8 +421,7 @@ func TestAPIAttachWorkspace(t *testing.T) {
 		srv, _ := newTestServerForExternal(t)
 		externalDir := t.TempDir()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
@@ -452,8 +449,7 @@ func TestAPIAttachWorkspace(t *testing.T) {
 			t.Fatalf("first attach failed: %v", err)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
@@ -468,8 +464,7 @@ func TestAPIAttachWorkspace(t *testing.T) {
 	t.Run("relativePathReturnsBadRequest", func(t *testing.T) {
 		srv, _ := newTestServerForExternal(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"path":"relative/path"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
@@ -491,8 +486,7 @@ func TestAPIDetachWorkspace(t *testing.T) {
 			t.Fatalf("attach failed: %v", err)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/detach", body)
@@ -515,8 +509,7 @@ func TestAPIDetachWorkspace(t *testing.T) {
 	t.Run("notAttachedReturnsNotFound", func(t *testing.T) {
 		srv, _ := newTestServerForExternal(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"path":"/some/not/attached/path"}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/detach", body)

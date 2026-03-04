@@ -2521,41 +2521,17 @@ func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	coord := s.workspaceCoordinator(workspacePath)
-	wfState := coord.State()
-
-	found := false
-	for _, msg := range wfState.Messages {
-		if msg.ID == messageID {
-			found = true
-			break
+	deleteResult, errDelete := s.deleteMessageService(workspacePath, messageID)
+	if errDelete != nil {
+		if errors.Is(errDelete, errMessageNotFound) {
+			http.Error(w, "message not found", http.StatusNotFound)
+			return
 		}
-	}
-
-	if !found {
-		http.Error(w, "message not found", http.StatusNotFound)
-		return
-	}
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		for i, msg := range wf.Messages {
-			if msg.ID == messageID {
-				wf.Messages = slices.Delete(wf.Messages, i, i+1)
-				break
-			}
-		}
-	}); errUpdate != nil {
 		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
 		return
 	}
 
-	s.notifyStateChange()
-
-	writeJSON(w, apiDeleteMessageResponse{
-		Deleted: true,
-		ID:      messageID,
-		Message: "message deleted successfully",
-	})
+	writeJSON(w, apiDeleteMessageResponse(deleteResult))
 }
 
 type apiBrowseDirectoriesResponse struct {

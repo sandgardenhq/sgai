@@ -4,10 +4,9 @@ import { render, screen, act, cleanup, fireEvent } from "@testing-library/react"
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WizardStep1 } from "./WizardStep1";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { mockFetchSequence as sharedMockFetchSequence } from "@/test-utils";
 
-mock.module("@monaco-editor/react", () => ({
-  default: () => null,
-}));
+mock.module("@monaco-editor/react", () => ({ default: () => null }));
 
 mock.module("@/components/MarkdownEditor", () => ({
   MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
@@ -44,19 +43,7 @@ const mockPreview = {
   etag: '"abc123"',
 };
 
-function mockFetchSequence(responses: unknown[]) {
-  let callIndex = 0;
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) => {
-    const data = responses[callIndex] ?? responses[responses.length - 1];
-    callIndex++;
-    return Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-  });
-}
+const mockFetchSequence = sharedMockFetchSequence;
 
 function renderWithRouter() {
   return render(

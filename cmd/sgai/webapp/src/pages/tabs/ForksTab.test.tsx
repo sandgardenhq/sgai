@@ -3,12 +3,12 @@ import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router";
 import { ForksTab } from "./ForksTab";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ApiWorkspaceEntry, ApiModelsResponse } from "@/types";
+import type { ApiModelsResponse } from "@/types";
+import { makeWorkspace } from "@/test-utils";
 
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
-  cleanup();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   window.localStorage.clear();
@@ -52,86 +52,19 @@ const sampleForks = [
   },
 ];
 
-function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
-  return {
-    name: "test-project",
-    dir: "/home/user/test-project",
-    running: false,
-    needsInput: false,
-    inProgress: false,
-    pinned: false,
-    isRoot: true,
-    isFork: false,
-    status: "stopped",
-    badgeClass: "",
-    badgeText: "",
-    hasSgai: true,
-    hasEditedGoal: false,
-    interactiveAuto: false,
-    continuousMode: false,
-    currentAgent: "",
-    currentModel: "",
-    task: "",
-    goalContent: "",
-    rawGoalContent: "",
-    pmContent: "",
-    hasProjectMgmt: false,
-    svgHash: "",
-    totalExecTime: "0s",
-    latestProgress: "",
-    humanMessage: "",
-    agentSequence: [],
-    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
-    forks: sampleForks,
-    ...overrides,
-  };
-}
+const makeForksWorkspace = (overrides = {}) => makeWorkspace({ isRoot: true, forks: sampleForks, ...overrides });
 
-function makeForkWorkspace(name: string, needsInput: boolean): ApiWorkspaceEntry {
-  return {
+function makeForkWorkspace(name: string, needsInput: boolean) {
+  return makeWorkspace({
     name,
     dir: `/home/user/${name}`,
     running: needsInput,
     needsInput,
     inProgress: needsInput,
-    pinned: false,
     isRoot: false,
     isFork: true,
     status: needsInput ? "Needs Input" : "stopped",
-    badgeClass: "",
-    badgeText: "",
-    hasSgai: true,
-    hasEditedGoal: false,
-    interactiveAuto: false,
-    continuousMode: false,
-    currentAgent: "",
-    currentModel: "",
-    task: "",
-    goalContent: "",
-    rawGoalContent: "",
-    pmContent: "",
-    hasProjectMgmt: false,
-    svgHash: "",
-    totalExecTime: "0s",
-    latestProgress: "",
-    humanMessage: "",
-    agentSequence: [],
-    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
-  };
+  });
 }
 
 function setupModelsApiMock() {
@@ -180,7 +113,7 @@ describe("ForksTab", () => {
 
   it("renders forks from factory state", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     expect(screen.getByText("project-alpha-fork1")).toBeDefined();
@@ -189,7 +122,7 @@ describe("ForksTab", () => {
 
   it("renders commit details for forks with commits after expanding", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     const expandButtons = screen.getAllByRole("button", { name: "Expand commits" });
@@ -203,7 +136,7 @@ describe("ForksTab", () => {
 
   it("renders respond button enabled for fork that needs input", () => {
     setupModelsApiMock();
-    const rootWorkspace = makeWorkspace();
+    const rootWorkspace = makeForksWorkspace();
     const fork1WithInput = makeForkWorkspace("project-alpha-fork1", true);
     const fork2WithoutInput = makeForkWorkspace("project-alpha-fork2", false);
     renderForksTab([rootWorkspace, fork1WithInput, fork2WithoutInput]);
@@ -218,7 +151,7 @@ describe("ForksTab", () => {
 
   it("renders empty state when no forks", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace({ forks: [] });
+    const workspace = makeForksWorkspace({ forks: [] });
     renderForksTab([workspace]);
 
     expect(screen.getByText(/No forks yet/)).toBeDefined();
@@ -226,7 +159,7 @@ describe("ForksTab", () => {
 
   it("does not call individual forks API endpoint", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     const calledUrls = mockFetch.mock.calls.map((call) => String(call[0]));
@@ -235,7 +168,7 @@ describe("ForksTab", () => {
 
   it("renders run box with model selector", async () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     await waitFor(() => {
@@ -248,7 +181,7 @@ describe("ForksTab", () => {
 
   it("renders submit button in run box", async () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     await waitFor(() => {
@@ -258,7 +191,7 @@ describe("ForksTab", () => {
 
   it("renders run box below empty forks state", async () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace({ forks: [] });
+    const workspace = makeForksWorkspace({ forks: [] });
     renderForksTab([workspace]);
 
     expect(screen.getByText(/No forks yet/)).toBeDefined();
@@ -270,7 +203,7 @@ describe("ForksTab", () => {
 
   it("populates model selector with available models", async () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     await waitFor(() => {
@@ -282,7 +215,7 @@ describe("ForksTab", () => {
 
   it("renders icon action buttons for each fork row", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     const editorButtons = screen.getAllByRole("button", { name: "Open in Editor" });
@@ -297,7 +230,7 @@ describe("ForksTab", () => {
 
   it("renders sgai.json action buttons on each fork row", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     const actions = [
       { name: "Create PR", model: "some-model", prompt: "create pr", description: "Create a pull request" },
       { name: "Sync", model: "some-model", prompt: "sync", description: "Sync with upstream" },
@@ -325,7 +258,7 @@ describe("ForksTab", () => {
 
   it("chevron expand button is disabled when fork has no commits", () => {
     setupModelsApiMock();
-    const workspace = makeWorkspace();
+    const workspace = makeForksWorkspace();
     renderForksTab([workspace]);
 
     const expandButtons = screen.getAllByRole("button", { name: /expand commits/i });

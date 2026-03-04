@@ -40,8 +40,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		setupRootWithFakeJJ(t, rootDir)
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -72,8 +71,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		}
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -97,8 +95,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		rootDir := t.TempDir()
 		srv := NewServer(rootDir)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/nonexistent/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -115,8 +112,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		setupForkDir(t, rootDir, "fork-ws", workspace)
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/fork-ws/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -137,8 +133,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		}
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -164,8 +159,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		setupForkDir(t, rootDir, "fork-no-goal", workspace)
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/fork-template", nil)
 		resp := httptest.NewRecorder()
@@ -190,8 +184,7 @@ func TestHandleAPIForkTemplate(t *testing.T) {
 		setupRootWithFakeJJ(t, rootDir)
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/root-workspace/fork-template", nil)
 		resp := httptest.NewRecorder()

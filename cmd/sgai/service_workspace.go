@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ var (
 	errGoalContentEmpty     = errors.New("GOAL.md must have content describing the goal")
 	errDirectoryExists      = errors.New("a directory with this name already exists")
 	errWorkspaceNameInvalid = errors.New("workspace name is invalid")
+	errMessageNotFound      = errors.New("message not found")
 )
 
 func generateRandomForkName() string {
@@ -110,17 +112,17 @@ func (s *Server) forkWorkspaceService(workspacePath, goalContent string) (forkWo
 	cmd.Dir = workspacePath
 	output, errFork := cmd.CombinedOutput()
 	if errFork != nil {
-		return forkWorkspaceResult{}, fmt.Errorf("failed to fork workspace: %v: %s", errFork, output)
+		return forkWorkspaceResult{}, fmt.Errorf("failed to fork workspace: %w: %s", errFork, output)
 	}
 
 	if errSkel := unpackSkeleton(forkPath); errSkel != nil {
-		return forkWorkspaceResult{}, fmt.Errorf("failed to unpack skeleton: %w", errSkel)
+		return forkWorkspaceResult{}, failForkWorkspaceSetup(workspacePath, forkPath, "failed to unpack skeleton", errSkel)
 	}
 	if errExclude := addGitExclude(forkPath); errExclude != nil {
-		return forkWorkspaceResult{}, fmt.Errorf("failed to add git exclude: %w", errExclude)
+		return forkWorkspaceResult{}, failForkWorkspaceSetup(workspacePath, forkPath, "failed to add git exclude", errExclude)
 	}
 	if errGoal := writeGoalContent(forkPath, goalContent); errGoal != nil {
-		return forkWorkspaceResult{}, fmt.Errorf("failed to create GOAL.md: %w", errGoal)
+		return forkWorkspaceResult{}, failForkWorkspaceSetup(workspacePath, forkPath, "failed to create GOAL.md", errGoal)
 	}
 
 	s.invalidateWorkspaceScanCache()
@@ -141,6 +143,37 @@ func (s *Server) forkWorkspaceService(workspacePath, goalContent string) (forkWo
 		Parent:    filepath.Base(workspacePath),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+func failForkWorkspaceSetup(workspacePath, forkPath, message string, errCause error) error {
+	errSetup := fmt.Errorf("%s: %w", message, errCause)
+	errRollback := rollbackForkWorkspaceCreation(workspacePath, forkPath)
+	if errRollback != nil {
+		return errors.Join(errSetup, fmt.Errorf("failed to rollback fork workspace creation: %w", errRollback))
+	}
+	return errSetup
+}
+
+func rollbackForkWorkspaceCreation(workspacePath, forkPath string) error {
+	forkName := filepath.Base(forkPath)
+	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
+	forgetCmd.Dir = workspacePath
+	output, errForget := forgetCmd.CombinedOutput()
+
+	var errForgetWrapped error
+	if errForget != nil {
+		errForgetWrapped = fmt.Errorf("failed to forget fork workspace during rollback: %w: %s", errForget, output)
+	}
+
+	errRemove := os.RemoveAll(forkPath)
+	if errRemove != nil {
+		errRemove = fmt.Errorf("failed to remove fork workspace during rollback: %w", errRemove)
+	}
+
+	if errForgetWrapped != nil || errRemove != nil {
+		return errors.Join(errForgetWrapped, errRemove)
+	}
+	return nil
 }
 
 func goalContentBodyIsEmpty(goalContent string) bool {
@@ -299,24 +332,18 @@ func (s *Server) deleteMessageService(workspacePath string, messageID int) (dele
 	coord := s.workspaceCoordinator(workspacePath)
 	wfState := coord.State()
 
-	found := false
-	for _, msg := range wfState.Messages {
-		if msg.ID == messageID {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return deleteMessageResult{}, fmt.Errorf("message not found")
+	if !slices.ContainsFunc(wfState.Messages, func(msg state.Message) bool {
+		return msg.ID == messageID
+	}) {
+		return deleteMessageResult{}, errMessageNotFound
 	}
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		for i, msg := range wf.Messages {
-			if msg.ID == messageID {
-				wf.Messages = append(wf.Messages[:i], wf.Messages[i+1:]...)
-				break
-			}
+		i := slices.IndexFunc(wf.Messages, func(msg state.Message) bool {
+			return msg.ID == messageID
+		})
+		if i >= 0 {
+			wf.Messages = slices.Delete(wf.Messages, i, i+1)
 		}
 	}); errUpdate != nil {
 		return deleteMessageResult{}, fmt.Errorf("failed to save workspace state: %w", errUpdate)

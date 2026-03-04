@@ -30,8 +30,7 @@ func TestHandleAPIComposeState(t *testing.T) {
 	workspaceName := filepath.Base(workspace)
 
 	t.Run("returnsDefaultState", func(t *testing.T) {
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
@@ -75,9 +74,7 @@ Build a REST API
 		}
 
 		freshSrv := NewServer(filepath.Dir(workspace))
-		mux := http.NewServeMux()
-		freshSrv.registerAPIRoutes(mux)
-
+		mux := serverMux(t, freshSrv)
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
 		mux.ServeHTTP(resp, req)
@@ -103,8 +100,7 @@ Build a REST API
 	})
 
 	t.Run("notFoundWorkspace", func(t *testing.T) {
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose?workspace=nonexistent", nil)
 		resp := httptest.NewRecorder()
@@ -119,9 +115,7 @@ Build a REST API
 func TestHandleAPIComposeTemplates(t *testing.T) {
 	_, srv := setupComposeTestWorkspace(t)
 
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
-
+	mux := serverMux(t, srv)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/compose/templates", nil)
 	resp := httptest.NewRecorder()
 	mux.ServeHTTP(resp, req)
@@ -168,8 +162,7 @@ func TestHandleAPIComposePreview(t *testing.T) {
 		cs.state.Tasks = "- Task 1\n- Task 2"
 		cs.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose/preview?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
@@ -202,8 +195,7 @@ func TestHandleAPIComposePreview(t *testing.T) {
 		cs.state.Flow = `invalid DOT {{{{ syntax >>>>`
 		cs.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/compose/preview?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
@@ -236,8 +228,7 @@ func TestHandleAPIComposeSave(t *testing.T) {
 		cs.state.Tasks = "- Saved task"
 		cs.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/compose?workspace="+workspaceName, nil)
 		resp := httptest.NewRecorder()
@@ -282,8 +273,7 @@ func TestHandleAPIComposeSave(t *testing.T) {
 		cs.state.Description = "New content"
 		cs.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/compose?workspace="+workspaceName, nil)
 		req.Header.Set("If-Match", `"stale-etag-value"`)
@@ -310,8 +300,7 @@ func TestHandleAPIComposeSave(t *testing.T) {
 		cs.state.Description = "Updated with valid etag"
 		cs.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/compose?workspace="+workspaceName, nil)
 		req.Header.Set("If-Match", currentEtag)
@@ -330,8 +319,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 
 	t.Run("savesDraftToSession", func(t *testing.T) {
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		draftBody := `{
 			"state": {
@@ -385,8 +373,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 
 	t.Run("idempotent", func(t *testing.T) {
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		draftBody := `{
 			"state": {
@@ -424,8 +411,7 @@ func TestHandleAPIComposeDraft(t *testing.T) {
 	})
 
 	t.Run("invalidBody", func(t *testing.T) {
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/compose/draft?workspace="+workspaceName, strings.NewReader("not json"))
 		req.Header.Set("Content-Type", "application/json")
@@ -467,9 +453,7 @@ func TestHandleAPIComposeSaveConcurrentDrafts(t *testing.T) {
 	workspace, srv := setupComposeTestWorkspace(t)
 	workspaceName := filepath.Base(workspace)
 
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
-
+	mux := serverMux(t, srv)
 	var wg sync.WaitGroup
 	for i := range 5 {
 		wg.Add(1)
