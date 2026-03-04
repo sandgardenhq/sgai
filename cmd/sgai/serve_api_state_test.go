@@ -32,22 +32,7 @@ func setupStateTestWorkspace(t *testing.T) (string, *Server) {
 func TestHandleAPIState(t *testing.T) {
 	t.Run("returnsJSONWithWorkspaces", func(t *testing.T) {
 		_, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
-		}
-
-		var result apiFactoryState
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
+		result := requestAPIState(t, srv)
 		if len(result.Workspaces) == 0 {
 			t.Error("workspaces should not be empty")
 		}
@@ -55,27 +40,10 @@ func TestHandleAPIState(t *testing.T) {
 
 	t.Run("workspaceHasExpectedFields", func(t *testing.T) {
 		_, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-
+		result := requestAPIState(t, srv)
 		if len(result.Workspaces) == 0 {
 			t.Fatal("workspaces is empty")
 		}
-
 		ws := result.Workspaces[0]
 		if ws.Name == "" {
 			t.Error("workspace Name should not be empty")
@@ -85,41 +53,10 @@ func TestHandleAPIState(t *testing.T) {
 		}
 	})
 
-	t.Run("contentTypeIsJSON", func(t *testing.T) {
-		_, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		ct := resp.Header().Get("Content-Type")
-		if !strings.Contains(ct, "application/json") {
-			t.Errorf("Content-Type = %q; want application/json", ct)
-		}
-	})
-
 	t.Run("emptyRootDir", func(t *testing.T) {
 		rootDir := t.TempDir()
 		srv := NewServer(rootDir)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
+		result := requestAPIState(t, srv)
 		if result.Workspaces == nil {
 			t.Error("workspaces should not be nil")
 		}
@@ -393,24 +330,7 @@ func setupStateWorkspaceWithData(t *testing.T) (string, *Server) {
 func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 	t.Run("includesTodos", func(t *testing.T) {
 		workspace, srv := setupStateWorkspaceWithData(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if len(ws.AgentTodos) == 0 {
 			t.Error("agentTodos should not be empty")
 		}
@@ -427,24 +347,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 
 	t.Run("includesMessages", func(t *testing.T) {
 		workspace, srv := setupStateWorkspaceWithData(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if len(ws.Messages) == 0 {
 			t.Error("messages should not be empty")
 		}
@@ -455,24 +358,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 
 	t.Run("includesEvents", func(t *testing.T) {
 		workspace, srv := setupStateWorkspaceWithData(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if len(ws.Events) == 0 {
 			t.Error("events should not be empty")
 		}
@@ -480,24 +366,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 
 	t.Run("includesCurrentAgent", func(t *testing.T) {
 		workspace, srv := setupStateWorkspaceWithData(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.CurrentAgent != "test-agent" {
 			t.Errorf("currentAgent = %q; want %q", ws.CurrentAgent, "test-agent")
 		}
@@ -505,24 +374,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 
 	t.Run("includesTaskField", func(t *testing.T) {
 		workspace, srv := setupStateWorkspaceWithData(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.Task != "doing something" {
 			t.Errorf("task = %q; want %q", ws.Task, "doing something")
 		}
@@ -538,23 +390,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errSave)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.Cost.TotalCost != 1.23 {
 			t.Errorf("cost.totalCost = %v; want %v", ws.Cost.TotalCost, 1.23)
 		}
@@ -572,23 +408,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errSave)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if !ws.NeedsInput {
 			t.Error("needsInput should be true when workspace is waiting for human input")
 		}
@@ -613,23 +433,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errSave)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.PendingQuestion != nil {
 			t.Error("pendingQuestion should be nil when not waiting for human input")
 		}
@@ -645,23 +449,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 		srv.sessions[workspace] = &session{outputLog: outputLog}
 		srv.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if len(ws.Log) == 0 {
 			t.Error("log should not be empty when session has output")
 		}
@@ -677,23 +465,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errSave)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.BadgeText == "" {
 			t.Error("badgeText should not be empty")
 		}
@@ -707,23 +479,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errWrite)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.RawGoalContent == "" {
 			t.Error("rawGoalContent should not be empty when GOAL.md exists")
 		}
@@ -752,23 +508,7 @@ func TestHandleAPIStateWorkspaceFields(t *testing.T) {
 			t.Fatal(errSave)
 		}
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.PendingQuestion == nil {
 			t.Fatal("pendingQuestion should not be nil")
 		}
@@ -802,22 +542,7 @@ func TestHandleAPIStateMultipleWorkspaces(t *testing.T) {
 		createsgaiDir(t, ws2)
 
 		srv := NewServer(rootDir)
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
+		result := requestAPIState(t, srv)
 		if len(result.Workspaces) < 2 {
 			t.Errorf("expected at least 2 workspaces; got %d", len(result.Workspaces))
 		}
@@ -827,10 +552,7 @@ func TestHandleAPIStateMultipleWorkspaces(t *testing.T) {
 func TestHandleAPIStateConcurrentAccess(t *testing.T) {
 	t.Run("singleflightDeduplicatesConcurrentRequests", func(t *testing.T) {
 		_, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
+		mux := serverMux(t, srv)
 		const goroutines = 10
 		results := make([]int, goroutines)
 		var wg sync.WaitGroup
@@ -853,10 +575,7 @@ func TestHandleAPIStateConcurrentAccess(t *testing.T) {
 
 	t.Run("concurrentRequestsAllReturnValidJSON", func(t *testing.T) {
 		_, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
+		mux := serverMux(t, srv)
 		const goroutines = 5
 		errs := make([]error, goroutines)
 		var wg sync.WaitGroup
@@ -900,14 +619,7 @@ func TestHandleAPIStateRemovedEndpoints(t *testing.T) {
 	for _, ep := range removedEndpoints {
 		t.Run(ep.method+"_"+ep.path, func(t *testing.T) {
 			_, srv := setupStateTestWorkspace(t)
-
-			mux := http.NewServeMux()
-			srv.registerAPIRoutes(mux)
-
-			req := httptest.NewRequest(ep.method, ep.path, nil)
-			resp := httptest.NewRecorder()
-			mux.ServeHTTP(resp, req)
-
+			resp := requestAPIRoute(t, srv, ep.method, ep.path)
 			if resp.Code != http.StatusMethodNotAllowed && resp.Code != http.StatusNotFound {
 				t.Errorf("%s %s: status = %d; want 404 or 405 (endpoint should be removed)", ep.method, ep.path, resp.Code)
 			}
@@ -931,14 +643,7 @@ func TestHandleAPIStateKeptEndpoints(t *testing.T) {
 	for _, ep := range keptEndpoints {
 		t.Run(ep.method+"_"+ep.path, func(t *testing.T) {
 			_, srv := setupStateTestWorkspace(t)
-
-			mux := http.NewServeMux()
-			srv.registerAPIRoutes(mux)
-
-			req := httptest.NewRequest(ep.method, ep.path, nil)
-			resp := httptest.NewRecorder()
-			mux.ServeHTTP(resp, req)
-
+			resp := requestAPIRoute(t, srv, ep.method, ep.path)
 			if resp.Code == http.StatusNotFound || resp.Code == http.StatusMethodNotAllowed {
 				t.Errorf("%s %s: status = %d; endpoint should still exist", ep.method, ep.path, resp.Code)
 			}
@@ -949,104 +654,61 @@ func TestHandleAPIStateKeptEndpoints(t *testing.T) {
 func TestHandleAPIStateWorkspaceActions(t *testing.T) {
 	t.Run("includesActions", func(t *testing.T) {
 		workspace, srv := setupStateTestWorkspace(t)
-
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
-
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
-		resp := httptest.NewRecorder()
-		mux.ServeHTTP(resp, req)
-
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d; want %d", resp.Code, http.StatusOK)
-		}
-
-		var result apiFactoryState
-		if errDecode := json.NewDecoder(resp.Body).Decode(&result); errDecode != nil {
-			t.Fatalf("failed to decode response: %v", errDecode)
-		}
-
-		ws := findWorkspace(t, result, workspace)
+		ws := requestWorkspaceState(t, srv, workspace)
 		if ws.Actions == nil {
 			t.Error("actions should not be nil (default actions should be present)")
 		}
 	})
 }
 
+func setupBuildWorkspaceTest(t *testing.T, dirName string) (string, *Server) {
+	t.Helper()
+	rootDir := t.TempDir()
+	workspace := filepath.Join(rootDir, dirName)
+	if err := os.MkdirAll(workspace, 0755); err != nil {
+		t.Fatal(err)
+	}
+	createsgaiDir(t, workspace)
+	return workspace, NewServer(rootDir)
+}
+
 func TestBuildWorkspaceFullStateFields(t *testing.T) {
 	t.Run("setsDefaultCurrentAgent", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "test-ws")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
-		}
-		createsgaiDir(t, workspace)
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "test-ws"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		workspace, srv := setupBuildWorkspaceTest(t, "test-ws")
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "test-ws"}, nil)
 		if result.CurrentAgent != "Unknown" {
 			t.Errorf("currentAgent = %q; want %q when no agent set", result.CurrentAgent, "Unknown")
 		}
 	})
 
 	t.Run("setsDefaultStatus", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "test-ws")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
-		}
-		createsgaiDir(t, workspace)
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "test-ws"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		workspace, srv := setupBuildWorkspaceTest(t, "test-ws")
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "test-ws"}, nil)
 		if result.Status != "-" {
 			t.Errorf("status = %q; want %q when no status set", result.Status, "-")
 		}
 	})
 
 	t.Run("reflectsRunningWorkspace", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "test-ws")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
-		}
-		createsgaiDir(t, workspace)
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "test-ws", Running: true}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		workspace, srv := setupBuildWorkspaceTest(t, "test-ws")
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "test-ws", Running: true}, nil)
 		if !result.Running {
 			t.Error("running should be true for a running workspace")
 		}
 	})
 
 	t.Run("includesAgentSequence", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "test-ws")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
-		}
-		createsgaiDir(t, workspace)
-
+		workspace, srv := setupBuildWorkspaceTest(t, "test-ws")
 		wfState := state.Workflow{
 			CurrentAgent: "coord",
 			AgentSequence: []state.AgentSequenceEntry{
 				{Agent: "coord", StartTime: "2026-01-01T00:00:00Z", IsCurrent: true},
 			},
 		}
-		if _, errSave := state.NewCoordinatorWith(statePath(workspace), wfState); errSave != nil {
-			t.Fatal(errSave)
+		if _, err := state.NewCoordinatorWith(statePath(workspace), wfState); err != nil {
+			t.Fatal(err)
 		}
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "test-ws"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "test-ws"}, nil)
 		if len(result.AgentSequence) == 0 {
 			t.Error("agentSequence should not be empty")
 		}
@@ -1056,58 +718,30 @@ func TestBuildWorkspaceFullStateFields(t *testing.T) {
 	})
 
 	t.Run("descriptionFallsToDirNameWhenNoGoalMd", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "my-workspace")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
-		}
-		createsgaiDir(t, workspace)
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "my-workspace"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		workspace, srv := setupBuildWorkspaceTest(t, "my-workspace")
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "my-workspace"}, nil)
 		if result.Description != "my-workspace" {
 			t.Errorf("description = %q; want %q when no GOAL.md present", result.Description, "my-workspace")
 		}
 	})
 
 	t.Run("descriptionUsesGoalMdWhenPresent", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "my-workspace")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
+		workspace, srv := setupBuildWorkspaceTest(t, "my-workspace")
+		if err := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte("# My Great Project\n\nSome details here.\n"), 0644); err != nil {
+			t.Fatal(err)
 		}
-		createsgaiDir(t, workspace)
-		goalContent := "# My Great Project\n\nSome details here.\n"
-		if errWrite := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "my-workspace"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "my-workspace"}, nil)
 		if result.Description != "My Great Project" {
 			t.Errorf("description = %q; want %q when GOAL.md has heading", result.Description, "My Great Project")
 		}
 	})
 
 	t.Run("descriptionFallsToDirNameWhenGoalMdIsEmpty", func(t *testing.T) {
-		rootDir := t.TempDir()
-		workspace := filepath.Join(rootDir, "empty-goal-ws")
-		if errMkdir := os.MkdirAll(workspace, 0755); errMkdir != nil {
-			t.Fatal(errMkdir)
+		workspace, srv := setupBuildWorkspaceTest(t, "empty-goal-ws")
+		if err := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte("---\nkey: val\n---\n"), 0644); err != nil {
+			t.Fatal(err)
 		}
-		createsgaiDir(t, workspace)
-		if errWrite := os.WriteFile(filepath.Join(workspace, "GOAL.md"), []byte("---\nkey: val\n---\n"), 0644); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-
-		srv := NewServer(rootDir)
-		ws := workspaceInfo{Directory: workspace, DirName: "empty-goal-ws"}
-		result := srv.buildWorkspaceFullState(ws, nil)
-
+		result := srv.buildWorkspaceFullState(workspaceInfo{Directory: workspace, DirName: "empty-goal-ws"}, nil)
 		if result.Description != "empty-goal-ws" {
 			t.Errorf("description = %q; want %q when GOAL.md has only frontmatter", result.Description, "empty-goal-ws")
 		}
@@ -1151,21 +785,53 @@ func TestHandleAPIStateSignalBrokerEdgeCases(t *testing.T) {
 	})
 }
 
-func findWorkspace(t *testing.T, state apiFactoryState, dir string) apiWorkspaceFullState {
+func serverMux(t *testing.T, srv *Server) *http.ServeMux {
 	t.Helper()
-	for _, ws := range state.Workspaces {
+	mux := http.NewServeMux()
+	srv.registerAPIRoutes(mux)
+	return mux
+}
+
+func requestAPIRoute(t *testing.T, srv *Server, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	mux := serverMux(t, srv)
+	req := httptest.NewRequest(method, path, nil)
+	resp := httptest.NewRecorder()
+	mux.ServeHTTP(resp, req)
+	return resp
+}
+
+func requestAPIState(t *testing.T, srv *Server) apiFactoryState {
+	t.Helper()
+	mux := serverMux(t, srv)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
+	resp := httptest.NewRecorder()
+	mux.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d; want %d; body = %s", resp.Code, http.StatusOK, resp.Body.String())
+	}
+	if ct := resp.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("Content-Type = %q; want application/json", ct)
+	}
+	var result apiFactoryState
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	return result
+}
+
+func requestWorkspaceState(t *testing.T, srv *Server, dir string) apiWorkspaceFullState {
+	t.Helper()
+	result := requestAPIState(t, srv)
+	for _, ws := range result.Workspaces {
 		if ws.Dir == dir {
 			return ws
 		}
 	}
-	t.Fatalf("workspace %q not found in state (workspaces: %v)", dir, workspaceDirs(state))
-	return apiWorkspaceFullState{}
-}
-
-func workspaceDirs(state apiFactoryState) []string {
-	dirs := make([]string, len(state.Workspaces))
-	for i, ws := range state.Workspaces {
+	dirs := make([]string, len(result.Workspaces))
+	for i, ws := range result.Workspaces {
 		dirs[i] = ws.Dir
 	}
-	return dirs
+	t.Fatalf("workspace %q not found in state (workspaces: %v)", dir, dirs)
+	return apiWorkspaceFullState{}
 }

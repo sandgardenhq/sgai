@@ -123,8 +123,7 @@ func TestHandleAPIStateUsesInteractionMode(t *testing.T) {
 	}
 
 	srv := NewServer(rootDir)
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
+	mux := serverMux(t, srv)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
 	resp := httptest.NewRecorder()

@@ -3,14 +3,7 @@ import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { ComposePreviewPage } from "./ComposePreviewPage";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-    Promise.resolve(
-      new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } }),
-    ),
-  );
-}
+import { mockFetchJson } from "@/test-utils";
 
 function renderWithRouter() {
   return render(
@@ -37,7 +30,7 @@ describe("ComposePreviewPage", () => {
   });
 
   test("renders preview content after load", async () => {
-    fetchSpy = mockFetch({ content: "# My GOAL.md\n\nBuild a project", etag: '"etag1"' });
+    fetchSpy = mockFetchJson({ content: "# My GOAL.md\n\nBuild a project", etag: '"etag1"' });
     await act(async () => { renderWithRouter(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -46,7 +39,7 @@ describe("ComposePreviewPage", () => {
   });
 
   test("renders flow error when present", async () => {
-    fetchSpy = mockFetch({ content: "# GOAL.md", flowError: "Invalid flow definition", etag: '"etag1"' });
+    fetchSpy = mockFetchJson({ content: "# GOAL.md", flowError: "Invalid flow definition", etag: '"etag1"' });
     await act(async () => { renderWithRouter(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -54,7 +47,7 @@ describe("ComposePreviewPage", () => {
   });
 
   test("renders copy button", async () => {
-    fetchSpy = mockFetch({ content: "# GOAL.md", etag: '"etag1"' });
+    fetchSpy = mockFetchJson({ content: "# GOAL.md", etag: '"etag1"' });
     await act(async () => { renderWithRouter(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 
@@ -62,7 +55,7 @@ describe("ComposePreviewPage", () => {
   });
 
   test("renders back link", async () => {
-    fetchSpy = mockFetch({ content: "# GOAL.md", etag: '"etag1"' });
+    fetchSpy = mockFetchJson({ content: "# GOAL.md", etag: '"etag1"' });
     await act(async () => { renderWithRouter(); });
     await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
 

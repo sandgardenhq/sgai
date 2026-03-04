@@ -4,10 +4,9 @@ import { render, screen, act, cleanup, fireEvent } from "@testing-library/react"
 import { MemoryRouter, Routes, Route } from "react-router";
 import { EditGoal } from "./EditGoal";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { mockFetchSequence } from "@/test-utils";
 
-mock.module("@monaco-editor/react", () => ({
-  default: () => null,
-}));
+mock.module("@monaco-editor/react", () => ({ default: () => null }));
 
 mock.module("@/components/MarkdownEditor", () => ({
   MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
@@ -22,24 +21,7 @@ mock.module("@/components/MarkdownEditor", () => ({
 }));
 
 const mockGoalContent = "---\ntitle: My Project\n---\n\n# My Project\n\nBuild something great";
-
-const mockGoalResponse = {
-  content: mockGoalContent,
-};
-
-function mockFetchSequence(responses: unknown[]) {
-  let callIndex = 0;
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) => {
-    const data = responses[callIndex] ?? responses[responses.length - 1];
-    callIndex++;
-    return Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-  });
-}
+const mockGoalResponse = { content: mockGoalContent };
 
 function renderPage() {
   return render(

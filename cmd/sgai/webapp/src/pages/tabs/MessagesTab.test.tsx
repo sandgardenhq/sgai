@@ -4,43 +4,7 @@ import { MemoryRouter } from "react-router";
 import { MessagesTab } from "./MessagesTab";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiMessageEntry, ApiWorkspaceEntry } from "@/types";
-
-const baseWorkspace: Partial<ApiWorkspaceEntry> = {
-  name: "test-project",
-  dir: "/projects/test-project",
-  running: false,
-  needsInput: false,
-  inProgress: false,
-  pinned: false,
-  isRoot: false,
-  isFork: false,
-  status: "idle",
-  badgeClass: "",
-  badgeText: "",
-  hasSgai: true,
-  hasEditedGoal: false,
-  interactiveAuto: false,
-  continuousMode: false,
-  currentAgent: "",
-  currentModel: "",
-  task: "",
-  goalContent: "",
-  rawGoalContent: "",
-  pmContent: "",
-  hasProjectMgmt: false,
-  svgHash: "",
-  totalExecTime: "0s",
-  latestProgress: "",
-  humanMessage: "",
-  agentSequence: [],
-  cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-  events: [],
-  projectTodos: [],
-  agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
-  log: [],
-};
+import { makeWorkspace } from "@/test-utils";
 
 const sampleMessages: ApiMessageEntry[] = [
   { id: 1, fromAgent: "coordinator", toAgent: "backend-developer", body: "Please implement the API", subject: "API Implementation", read: true },
@@ -67,7 +31,7 @@ let mockFactoryOverride: FactoryStateOverride = {};
 
 mock.module("@/lib/factory-state", () => ({
   useFactoryState: () => ({
-    workspaces: mockFactoryOverride.workspaces ?? [{ ...baseWorkspace, messages: sampleMessages }],
+    workspaces: mockFactoryOverride.workspaces ?? [makeWorkspace({ messages: sampleMessages })],
     fetchStatus: mockFactoryOverride.fetchStatus ?? "idle",
     lastFetchedAt: Date.now(),
   }),
@@ -129,7 +93,7 @@ describe("MessagesTab", () => {
   });
 
   it("renders empty state when no messages", async () => {
-    mockFactoryOverride = { workspaces: [{ ...baseWorkspace, messages: [] } as ApiWorkspaceEntry] };
+    mockFactoryOverride = { workspaces: [makeWorkspace({ messages: [] })] };
     renderMessagesTab();
 
     await waitFor(() => {
@@ -147,7 +111,7 @@ describe("MessagesTab", () => {
   });
 
   it("renders markdown content in message body", async () => {
-    mockFactoryOverride = { workspaces: [{ ...baseWorkspace, messages: markdownMessages } as ApiWorkspaceEntry] };
+    mockFactoryOverride = { workspaces: [makeWorkspace({ messages: markdownMessages })] };
     renderMessagesTab();
 
     await waitFor(() => {

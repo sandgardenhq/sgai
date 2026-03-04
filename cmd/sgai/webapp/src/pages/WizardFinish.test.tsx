@@ -3,6 +3,7 @@ import { render, screen, act, cleanup, fireEvent } from "@testing-library/react"
 import { MemoryRouter, Routes, Route } from "react-router";
 import { WizardFinish } from "./WizardFinish";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { mockFetchSequence } from "@/test-utils";
 
 const mockComposeState = {
   workspace: "test-ws",
@@ -31,17 +32,6 @@ const mockPreview = {
   content: "---\nflow: |\n  ...\n---\n\n## Tasks\n\nBuild a web app",
   etag: '"abc123"',
 };
-
-function mockFetchSequence(responses: unknown[]) {
-  let callIndex = 0;
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) => {
-    const data = responses[callIndex] ?? responses[responses.length - 1];
-    callIndex++;
-    return Promise.resolve(
-      new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } }),
-    );
-  });
-}
 
 function renderWithRouter() {
   return render(

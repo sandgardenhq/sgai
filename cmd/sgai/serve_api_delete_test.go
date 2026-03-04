@@ -28,9 +28,7 @@ func TestCreateWorkspacePinsByDefault(t *testing.T) {
 	srv := NewServer(rootDir)
 	srv.pinnedConfigDir = t.TempDir()
 
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
-
+	mux := serverMux(t, srv)
 	body := strings.NewReader(`{"name":"new-project"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces", body)
 	req.Header.Set("Content-Type", "application/json")
@@ -50,9 +48,7 @@ func TestCreateWorkspacePinsByDefault(t *testing.T) {
 func TestForkWorkspacePinsByDefault(t *testing.T) {
 	_, _, srv := setupM6TestWorkspace(t)
 
-	mux := http.NewServeMux()
-	srv.registerAPIRoutes(mux)
-
+	mux := serverMux(t, srv)
 	body := strings.NewReader(`{"goalContent":"Build a pinned fork"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/fork", body)
 	req.Header.Set("Content-Type", "application/json")
@@ -78,8 +74,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		workspace, srv := setupStandaloneWorkspace(t)
 		wsName := filepath.Base(workspace)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -108,8 +103,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		workspace, srv := setupStandaloneWorkspace(t)
 		wsName := filepath.Base(workspace)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":false}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -125,8 +119,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 	t.Run("rejectsRootWorkspace", func(t *testing.T) {
 		_, _, srv := setupM6TestWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/root-workspace/delete", body)
@@ -142,8 +135,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		_, srv := setupStandaloneWorkspace(t)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/nonexistent/delete", body)
@@ -160,8 +152,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		workspace, srv := setupStandaloneWorkspace(t)
 		wsName := filepath.Base(workspace)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`not json`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -182,8 +173,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		srv.pinnedDirs[workspace] = true
 		srv.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -208,8 +198,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		srv.sessions[workspace] = &session{running: true}
 		srv.mu.Unlock()
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -234,8 +223,7 @@ func TestHandleAPIDeleteWorkspace(t *testing.T) {
 		forkPath, srv := setupM6ForkWorkspace(t)
 		forkName := filepath.Base(forkPath)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+forkName+"/delete", body)
@@ -330,8 +318,7 @@ func TestHandleAPIDeleteWorkspaceExternal(t *testing.T) {
 		externalDir, srv := setupExternalStandaloneWorkspace(t)
 		wsName := filepath.Base(externalDir)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -368,8 +355,7 @@ func TestHandleAPIDeleteWorkspaceExternal(t *testing.T) {
 		externalDir, srv := setupExternalRootWorkspace(t)
 		wsName := filepath.Base(externalDir)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)
@@ -398,8 +384,7 @@ func TestHandleAPIDeleteWorkspaceExternal(t *testing.T) {
 		_, forkDir, srv := setupExternalForkWorkspace(t)
 		wsName := filepath.Base(forkDir)
 
-		mux := http.NewServeMux()
-		srv.registerAPIRoutes(mux)
+		mux := serverMux(t, srv)
 
 		body := strings.NewReader(`{"confirm":true}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/"+wsName+"/delete", body)

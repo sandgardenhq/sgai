@@ -3,17 +3,7 @@ import { render, screen, act, cleanup, fireEvent, waitFor } from "@testing-libra
 import { MemoryRouter, Routes, Route } from "react-router";
 import { AttachExternal } from "./AttachExternal";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown, status = 200) {
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-    Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
-  );
-}
+import { mockFetchJson } from "@/test-utils";
 
 function renderPage() {
   return render(
@@ -59,7 +49,7 @@ describe("AttachExternal", () => {
   });
 
   test("enables submit button when path is entered", async () => {
-    fetchSpy = mockFetch({ entries: [] });
+    fetchSpy = mockFetchJson({ entries: [] });
     renderPage();
     const input = screen.getByLabelText("Directory Path");
     await act(async () => { fireEvent.change(input, { target: { value: "/home/user/project" } }); });
@@ -68,7 +58,7 @@ describe("AttachExternal", () => {
   });
 
   test("submits form and navigates to Edit Goal when hasGoal is true", async () => {
-    fetchSpy = mockFetch({ name: "my-project", dir: "/home/user/my-project", hasGoal: true }, 200);
+    fetchSpy = mockFetchJson({ name: "my-project", dir: "/home/user/my-project", hasGoal: true });
     renderPage();
 
     const input = screen.getByLabelText("Directory Path");
@@ -82,7 +72,7 @@ describe("AttachExternal", () => {
   });
 
   test("submits form and navigates to Compose when hasGoal is false", async () => {
-    fetchSpy = mockFetch({ name: "my-project", dir: "/home/user/my-project", hasGoal: false }, 200);
+    fetchSpy = mockFetchJson({ name: "my-project", dir: "/home/user/my-project", hasGoal: false });
     renderPage();
 
     const input = screen.getByLabelText("Directory Path");

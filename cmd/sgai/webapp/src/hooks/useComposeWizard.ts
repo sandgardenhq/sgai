@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate } from "react-router";
 import { api, ApiError } from "@/lib/api";
 import type {
   ApiComposePreviewResponse,
@@ -11,6 +11,7 @@ import type {
 
 const STORAGE_KEY_PREFIX = "compose-wizard-step-";
 const AUTO_SAVE_INTERVAL_MS = 30_000;
+const WIZARD_STEPS = [1, 2, 3, 4] as const;
 
 export interface WizardStepData {
   description: string;
@@ -19,38 +20,115 @@ export interface WizardStepData {
   completionGate: string;
 }
 
+interface StorageLoadResult {
+  data: Partial<WizardStepData> | null;
+  error: string | null;
+}
+
 function getStepStorageKey(step: number): string {
   return `${STORAGE_KEY_PREFIX}${step}`;
 }
 
-export function loadStepFromStorage(step: number): Partial<WizardStepData> | null {
+function validateStoredStepData(
+  step: number,
+  raw: unknown,
+): Partial<WizardStepData> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const candidate = raw as Record<string, unknown>;
+
+  switch (step) {
+    case 1:
+      return typeof candidate.description === "string"
+        ? { description: candidate.description }
+        : null;
+    case 2:
+      return Array.isArray(candidate.techStack) &&
+        candidate.techStack.every((item) => typeof item === "string")
+        ? { techStack: candidate.techStack }
+        : null;
+    case 3:
+      return typeof candidate.safetyAnalysis === "boolean"
+        ? { safetyAnalysis: candidate.safetyAnalysis }
+        : null;
+    case 4:
+      return typeof candidate.completionGate === "string"
+        ? { completionGate: candidate.completionGate }
+        : null;
+    default:
+      return null;
+  }
+}
+
+export function loadStepFromStorage(
+  step: number,
+  storage: Pick<Storage, "getItem"> = sessionStorage,
+): StorageLoadResult {
+  let stored: string | null;
   try {
-    const stored = sessionStorage.getItem(getStepStorageKey(step));
-    if (stored) {
-      return JSON.parse(stored) as Partial<WizardStepData>;
+    stored = storage.getItem(getStepStorageKey(step));
+  } catch (errStorageRead) {
+    const message = errStorageRead instanceof Error ? errStorageRead.message : "unknown sessionStorage read error";
+    return {
+      data: null,
+      error: `Failed to read step ${step} from sessionStorage: ${message}`,
+    };
+  }
+
+  if (!stored) {
+    return { data: null, error: null };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored);
+  } catch (errParseStorage) {
+    const message = errParseStorage instanceof Error ? errParseStorage.message : "unknown JSON parse error";
+    return {
+      data: null,
+      error: `Invalid JSON in step ${step} sessionStorage data: ${message}`,
+    };
+  }
+
+  const validated = validateStoredStepData(step, parsed);
+  if (!validated) {
+    return {
+      data: null,
+      error: `Invalid payload shape in step ${step} sessionStorage data`,
+    };
+  }
+
+  return { data: validated, error: null };
+}
+
+export function saveStepToStorage(
+  step: number,
+  data: Partial<WizardStepData>,
+  storage: Pick<Storage, "setItem"> = sessionStorage,
+): string | null {
+  try {
+    storage.setItem(getStepStorageKey(step), JSON.stringify(data));
+    return null;
+  } catch (errStorageWrite) {
+    const message = errStorageWrite instanceof Error ? errStorageWrite.message : "unknown sessionStorage write error";
+    return `Failed to save step ${step} to sessionStorage: ${message}`;
+  }
+}
+
+export function clearAllWizardStorage(
+  storage: Pick<Storage, "removeItem"> = sessionStorage,
+): string | null {
+  for (const step of WIZARD_STEPS) {
+    try {
+      storage.removeItem(getStepStorageKey(step));
+    } catch (errStorageRemove) {
+      const message = errStorageRemove instanceof Error ? errStorageRemove.message : "unknown sessionStorage remove error";
+      return `Failed to clear step ${step} from sessionStorage: ${message}`;
     }
-  } catch {
-    // Ignore parse errors
   }
   return null;
-}
-
-export function saveStepToStorage(step: number, data: Partial<WizardStepData>): void {
-  try {
-    sessionStorage.setItem(getStepStorageKey(step), JSON.stringify(data));
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-export function clearAllWizardStorage(): void {
-  for (let i = 1; i <= 4; i++) {
-    try {
-      sessionStorage.removeItem(getStepStorageKey(i));
-    } catch {
-      // Ignore
-    }
-  }
 }
 
 function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizardState {
@@ -184,6 +262,31 @@ function buildComposerStateFromData(
   };
 }
 
+function buildDraftRequest(
+  data: WizardStepData,
+  currentStep: number,
+  serverState: ApiComposerState | null,
+): { state: ApiComposerState; wizard: ApiWizardState } {
+  return {
+    state: buildComposerStateFromData(data, serverState),
+    wizard: buildWizardStateFromData(data, currentStep),
+  };
+}
+
+function workspaceSearchParam(workspace: string): string {
+  return workspace ? `?workspace=${encodeURIComponent(workspace)}` : "";
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    return err.message;
+  }
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  return fallback;
+}
+
 interface UseComposeWizardOptions {
   workspace: string;
   currentStep: number;
@@ -209,6 +312,15 @@ interface UseComposeWizardReturn {
   goBack: () => void;
 }
 
+function serializeWizardData(data: WizardStepData): string {
+  return JSON.stringify({
+    description: data.description,
+    techStack: data.techStack,
+    safetyAnalysis: data.safetyAnalysis,
+    completionGate: data.completionGate,
+  });
+}
+
 const DEFAULT_WIZARD_DATA: WizardStepData = {
   description: "",
   techStack: [],
@@ -221,11 +333,11 @@ export function useComposeWizard({
   currentStep,
 }: UseComposeWizardOptions): UseComposeWizardReturn {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [wizardData, setWizardData] = useState<WizardStepData>(DEFAULT_WIZARD_DATA);
   const [techStackItems, setTechStackItems] = useState<ApiTechStackItem[]>([]);
   const [preview, setPreview] = useState<ApiComposePreviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -234,18 +346,21 @@ export function useComposeWizard({
   const [isDirty, setIsDirty] = useState(false);
   const serverStateRef = useRef<ApiComposerState | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const initialLoadDoneRef = useRef(false);
   const saveDraftRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const isDirtyRef = useRef(false);
+  const cleanBaselineRef = useRef(serializeWizardData(DEFAULT_WIZARD_DATA));
+  const wizardDataRef = useRef(wizardData);
 
   // Load initial state from server + sessionStorage
   useEffect(() => {
     if (!workspace) return;
 
     let cancelled = false;
+    setIsInitialLoadDone(false);
 
     async function loadState() {
       setIsLoading(true);
+      setSaveError(null);
       try {
         const [stateResp, previewResp] = await Promise.all([
           api.compose.get(workspace),
@@ -268,8 +383,15 @@ export function useComposeWizard({
         };
 
         // Override with any sessionStorage persisted data per step (R-14)
-        for (let step = 1; step <= 4; step++) {
-          const storedStep = loadStepFromStorage(step);
+        const storageErrors: string[] = [];
+        for (const step of WIZARD_STEPS) {
+          const storedStepResult = loadStepFromStorage(step);
+          if (storedStepResult.error) {
+            storageErrors.push(storedStepResult.error);
+            continue;
+          }
+
+          const storedStep = storedStepResult.data;
           if (storedStep) {
             if (step === 1 && storedStep.description !== undefined) {
               merged.description = storedStep.description;
@@ -289,13 +411,17 @@ export function useComposeWizard({
         }
 
         setWizardData(merged);
-        initialLoadDoneRef.current = true;
-      } catch {
-        // Silently handle fetch errors — use defaults
-        initialLoadDoneRef.current = true;
+        cleanBaselineRef.current = serializeWizardData(merged);
+        setIsDirty(false);
+        if (storageErrors.length > 0) {
+          setSaveError(storageErrors[0]);
+        }
+      } catch (err) {
+        setSaveError(getErrorMessage(err, "Failed to load compose wizard state"));
       } finally {
         if (!cancelled) {
           setIsLoading(false);
+          setIsInitialLoadDone(true);
         }
       }
     }
@@ -309,27 +435,33 @@ export function useComposeWizard({
 
   // Persist current step data to sessionStorage on change (R-14)
   useEffect(() => {
-    if (!initialLoadDoneRef.current) return;
+    if (!isInitialLoadDone) return;
+
+    let storageError: string | null = null;
 
     switch (currentStep) {
       case 1:
-        saveStepToStorage(1, { description: wizardData.description });
+        storageError = saveStepToStorage(1, { description: wizardData.description });
         break;
       case 2:
-        saveStepToStorage(2, { techStack: wizardData.techStack });
+        storageError = saveStepToStorage(2, { techStack: wizardData.techStack });
         break;
       case 3:
-        saveStepToStorage(3, { safetyAnalysis: wizardData.safetyAnalysis });
+        storageError = saveStepToStorage(3, { safetyAnalysis: wizardData.safetyAnalysis });
         break;
       case 4:
-        saveStepToStorage(4, {
+        storageError = saveStepToStorage(4, {
           completionGate: wizardData.completionGate,
         });
         break;
     }
 
-    setIsDirty(true);
-  }, [currentStep, wizardData]);
+    if (storageError) {
+      setSaveError(storageError);
+    }
+
+    setIsDirty(serializeWizardData(wizardData) !== cleanBaselineRef.current);
+  }, [currentStep, isInitialLoadDone, wizardData]);
 
   // beforeunload warning when wizard has unsaved progress (R-9)
   useEffect(() => {
@@ -337,6 +469,7 @@ export function useComposeWizard({
 
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
+      e.returnValue = "";
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -346,12 +479,15 @@ export function useComposeWizard({
   const saveDraftInternal = useCallback(async () => {
     if (!workspace || isSavingDraft) return;
 
+    const savedSnapshot = serializeWizardData(wizardData);
+
     setIsSavingDraft(true);
     try {
-      const draftRequest = {
-        state: buildComposerStateFromData(wizardData, serverStateRef.current),
-        wizard: buildWizardStateFromData(wizardData, currentStep),
-      };
+      const draftRequest = buildDraftRequest(
+        wizardData,
+        currentStep,
+        serverStateRef.current,
+      );
 
       await api.compose.saveDraft(workspace, draftRequest);
 
@@ -359,21 +495,33 @@ export function useComposeWizard({
       setDraftSavedAt(
         now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       );
-      setIsDirty(false);
-    } catch {
-      // Silently handle draft save errors
+      cleanBaselineRef.current = savedSnapshot;
+      const latestSnapshot = serializeWizardData(wizardDataRef.current);
+      setIsDirty(latestSnapshot !== savedSnapshot);
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(getErrorMessage(err, "Failed to save draft"));
     } finally {
       setIsSavingDraft(false);
     }
   }, [workspace, wizardData, currentStep, isSavingDraft]);
 
   // Keep refs in sync for stable auto-save interval (avoids stale closures)
-  useEffect(() => { saveDraftRef.current = saveDraftInternal; }, [saveDraftInternal]);
-  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => {
+    saveDraftRef.current = saveDraftInternal;
+  }, [saveDraftInternal]);
+
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  useEffect(() => {
+    wizardDataRef.current = wizardData;
+  }, [wizardData]);
 
   // Auto-save draft every 30s (R-15) — uses refs to avoid stale closures
   useEffect(() => {
-    if (!workspace || !initialLoadDoneRef.current) return;
+    if (!workspace || !isInitialLoadDone) return;
 
     autoSaveTimerRef.current = setInterval(() => {
       if (!isDirtyRef.current) return;
@@ -385,23 +533,25 @@ export function useComposeWizard({
         clearInterval(autoSaveTimerRef.current);
       }
     };
-  }, [workspace]);
+  }, [workspace, isInitialLoadDone]);
 
   const fetchPreview = useCallback(async () => {
     if (!workspace) return;
     try {
       // Save draft first to update server state, then fetch preview
-      const draftRequest = {
-        state: buildComposerStateFromData(wizardData, serverStateRef.current),
-        wizard: buildWizardStateFromData(wizardData, currentStep),
-      };
+      const draftRequest = buildDraftRequest(
+        wizardData,
+        currentStep,
+        serverStateRef.current,
+      );
       await api.compose.saveDraft(workspace, draftRequest);
 
       const previewResp = await api.compose.preview(workspace);
       setPreview(previewResp);
       setEtag(previewResp.etag);
-    } catch {
-      // Silently handle preview errors
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(getErrorMessage(err, "Failed to refresh preview"));
     }
   }, [workspace, wizardData, currentStep]);
 
@@ -413,25 +563,30 @@ export function useComposeWizard({
 
     try {
       // Save draft first to ensure server state is up to date
-      const draftRequest = {
-        state: buildComposerStateFromData(wizardData, serverStateRef.current),
-        wizard: buildWizardStateFromData(wizardData, currentStep),
-      };
+      const draftRequest = buildDraftRequest(
+        wizardData,
+        currentStep,
+        serverStateRef.current,
+      );
       await api.compose.saveDraft(workspace, draftRequest);
 
       // Save with optimistic locking (R-24)
       await api.compose.save(workspace, etag ?? undefined);
 
-      clearAllWizardStorage();
-      setIsDirty(false);
+      const clearStorageError = clearAllWizardStorage();
+      if (clearStorageError) {
+        setSaveError(clearStorageError);
+      }
+      const savedSnapshot = serializeWizardData(wizardData);
+      cleanBaselineRef.current = savedSnapshot;
+      const latestSnapshot = serializeWizardData(wizardDataRef.current);
+      setIsDirty(latestSnapshot !== savedSnapshot);
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 412) {
         setSaveError("GOAL.md has been modified by another session. Please reload and try again.");
-      } else if (err instanceof ApiError) {
-        setSaveError(err.message);
       } else {
-        setSaveError("Failed to save GOAL.md");
+        setSaveError(getErrorMessage(err, "Failed to save GOAL.md"));
       }
       return false;
     } finally {
@@ -445,23 +600,20 @@ export function useComposeWizard({
 
   const goToStep = useCallback(
     (step: number) => {
-      const wsParam = workspace ? `?workspace=${encodeURIComponent(workspace)}` : "";
-      navigate(`/compose/step/${step}${wsParam}`);
+      navigate(`/compose/step/${step}${workspaceSearchParam(workspace)}`);
     },
     [navigate, workspace],
   );
 
   const goToFinish = useCallback(() => {
-    const wsParam = workspace ? `?workspace=${encodeURIComponent(workspace)}` : "";
-    navigate(`/compose/finish${wsParam}`);
+    navigate(`/compose/finish${workspaceSearchParam(workspace)}`);
   }, [navigate, workspace]);
 
   const goBack = useCallback(() => {
     if (currentStep > 1) {
       goToStep(currentStep - 1);
     } else {
-      const wsParam = workspace ? `?workspace=${encodeURIComponent(workspace)}` : "";
-      navigate(`/compose${wsParam}`);
+      navigate(`/compose${workspaceSearchParam(workspace)}`);
     }
   }, [currentStep, goToStep, navigate, workspace]);
 

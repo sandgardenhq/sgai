@@ -5,20 +5,14 @@ import { MemoryRouter, Routes, Route } from "react-router";
 import { WorkspaceDetail } from "./WorkspaceDetail";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiWorkspaceEntry } from "@/types";
+import { makeWorkspace as makeBaseWorkspace, mockMarkdownEditor } from "@/test-utils";
 
 mock.module("@monaco-editor/react", () => ({
   default: () => null,
 }));
 
 mock.module("@/components/MarkdownEditor", () => ({
-  MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
-    React.createElement("textarea", {
-      "data-testid": "markdown-editor",
-      value: props.value,
-      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => props.onChange(e.target.value),
-      disabled: props.disabled,
-      placeholder: props.placeholder,
-    }),
+  MarkdownEditor: mockMarkdownEditor(),
 }));
 
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
@@ -33,23 +27,14 @@ afterEach(() => {
   cleanup();
 });
 
-function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
-  return {
-    name: "test-project",
-    dir: "/home/user/test-project",
+function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}) {
+  return makeBaseWorkspace({
     running: true,
-    needsInput: false,
     inProgress: true,
-    pinned: false,
-    isRoot: false,
-    isFork: false,
     status: "working",
     badgeClass: "running",
     badgeText: "Running",
-    hasSgai: true,
     hasEditedGoal: true,
-    interactiveAuto: false,
-    continuousMode: false,
     currentAgent: "react-developer",
     currentModel: "anthropic/claude-opus-4-6",
     task: "Implementing Dashboard component",
@@ -61,7 +46,6 @@ function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspace
     svgHash: "abc123",
     totalExecTime: "45m 30s",
     latestProgress: "Working on React migration M2",
-    humanMessage: "",
     agentSequence: [
       { agent: "coordinator", model: "anthropic/claude-opus-4-6 (max)", elapsedTime: "5m", isCurrent: false },
       { agent: "react-developer", model: "anthropic/claude-opus-4-6", elapsedTime: "10m", isCurrent: true },
@@ -71,16 +55,9 @@ function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspace
       totalTokens: { input: 5000, output: 2000, reasoning: 100, cacheRead: 500, cacheWrite: 0 },
       byAgent: [],
     },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
     forks: [],
     ...overrides,
-  };
+  });
 }
 
 function renderWorkspaceDetail(path = "/workspaces/test-project/progress", workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle") {

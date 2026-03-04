@@ -3,15 +3,7 @@ import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { SkillList } from "./SkillList";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-}
+import { mockFetchResolved } from "@/test-utils";
 
 function renderWithRouter(workspaceName = "test-workspace") {
   return render(
@@ -49,7 +41,7 @@ describe("SkillList", () => {
   });
 
   test("renders skill categories and cards when data loads", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       categories: [
         {
           name: "General",
@@ -87,7 +79,7 @@ describe("SkillList", () => {
   });
 
   test("renders empty state when no categories", async () => {
-    fetchSpy = mockFetch({ categories: [] });
+    fetchSpy = mockFetchResolved({ categories: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -111,7 +103,7 @@ describe("SkillList", () => {
   });
 
   test("skill cards have links to detail page", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       categories: [
         {
           name: "General",

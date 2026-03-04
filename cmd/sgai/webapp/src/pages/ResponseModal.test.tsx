@@ -5,10 +5,9 @@ import { MemoryRouter } from "react-router";
 import { ResponseModal } from "./ResponseModal";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
+import { makeWorkspace as makeBaseWorkspace } from "@/test-utils";
 
-mock.module("@monaco-editor/react", () => ({
-  default: () => null,
-}));
+mock.module("@monaco-editor/react", () => ({ default: () => null }));
 
 mock.module("@/components/MarkdownEditor", () => ({
   MarkdownEditor: (props: { value: string; onChange: (v: string | undefined) => void; disabled?: boolean; placeholder?: string }) =>
@@ -36,45 +35,23 @@ const pendingQuestion: ApiPendingQuestionResponse = {
 };
 
 function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
-  return {
+  return makeBaseWorkspace({
     name: "test-workspace",
     dir: "/tmp/test-workspace",
-    running: false,
     needsInput: true,
     inProgress: true,
-    pinned: false,
     isRoot: true,
-    isFork: false,
     status: "waiting",
-    badgeClass: "",
     badgeText: "waiting",
-    hasSgai: true,
-    hasEditedGoal: false,
-    interactiveAuto: false,
-    continuousMode: false,
     currentAgent: "backend-developer",
     currentModel: "claude-opus-4",
-    task: "",
     goalContent: "<p>Goal content for modal</p>",
     rawGoalContent: "# Goal content",
     pmContent: "<p>PM content for modal</p>",
     hasProjectMgmt: true,
-    svgHash: "",
-    totalExecTime: "",
-    latestProgress: "",
-    humanMessage: "",
-    agentSequence: [],
-    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
     pendingQuestion: pendingQuestion,
     ...overrides,
-  };
+  });
 }
 
 type MockFactoryState = {
@@ -95,7 +72,6 @@ mock.module("@/lib/factory-state", () => ({
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
-  cleanup();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   sessionStorage.clear();

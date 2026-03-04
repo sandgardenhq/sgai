@@ -2,52 +2,11 @@ import { describe, it, expect, afterEach, mock } from "bun:test";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SpecificationTab } from "./SpecificationTab";
-import type { ApiWorkspaceEntry } from "@/types";
+import { makeWorkspace } from "@/test-utils";
 
 afterEach(() => {
   cleanup();
 });
-
-function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
-  return {
-    name: "test-project",
-    dir: "/home/user/test-project",
-    running: false,
-    needsInput: false,
-    inProgress: false,
-    pinned: false,
-    isRoot: false,
-    isFork: false,
-    status: "stopped",
-    badgeClass: "",
-    badgeText: "",
-    hasSgai: true,
-    hasEditedGoal: false,
-    interactiveAuto: false,
-    continuousMode: false,
-    currentAgent: "",
-    currentModel: "",
-    task: "",
-    goalContent: "",
-    rawGoalContent: "",
-    pmContent: "",
-    hasProjectMgmt: false,
-    svgHash: "",
-    totalExecTime: "0s",
-    latestProgress: "",
-    humanMessage: "",
-    agentSequence: [],
-    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
-    ...overrides,
-  };
-}
 
 function renderSpecificationTab(workspaces: ApiWorkspaceEntry[] = [], fetchStatus = "idle") {
   mock.module("@/lib/factory-state", () => ({

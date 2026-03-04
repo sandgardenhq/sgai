@@ -3,17 +3,7 @@ import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { ComposeLanding } from "./ComposeLanding";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockImplementation((_input: string | URL | Request) =>
-    Promise.resolve(
-      new Response(JSON.stringify(data), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
-  );
-}
+import { mockFetchJson } from "@/test-utils";
 
 function renderWithRouter(workspace = "test-workspace") {
   return render(
@@ -47,7 +37,7 @@ describe("ComposeLanding", () => {
   });
 
   test("renders page heading", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -61,7 +51,7 @@ describe("ComposeLanding", () => {
   });
 
   test("renders template cards when templates load", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchJson({
       templates: [
         { id: "basic", name: "Basic Project", description: "A simple project", icon: "📦", agents: [], flow: "" },
         { id: "fullstack", name: "Full Stack", description: "Frontend + Backend", icon: "🌐", agents: [], flow: "" },
@@ -81,7 +71,7 @@ describe("ComposeLanding", () => {
   });
 
   test("renders guided wizard section", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -96,7 +86,7 @@ describe("ComposeLanding", () => {
   });
 
   test("renders edit directly section", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter();
@@ -110,7 +100,7 @@ describe("ComposeLanding", () => {
   });
 
   test("wizard link includes workspace param", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter("my-project");
@@ -126,7 +116,7 @@ describe("ComposeLanding", () => {
   });
 
   test("template card links include workspace param", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchJson({
       templates: [
         { id: "basic", name: "Basic", description: "desc", icon: "📦", agents: [], flow: "" },
       ],
@@ -147,7 +137,7 @@ describe("ComposeLanding", () => {
   });
 
   test("edit GOAL link targets goal/edit route", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter("my-project");
@@ -162,7 +152,7 @@ describe("ComposeLanding", () => {
   });
 
   test("back link navigates to workspace", async () => {
-    fetchSpy = mockFetch({ templates: [] });
+    fetchSpy = mockFetchJson({ templates: [] });
 
     await act(async () => {
       renderWithRouter("my-project");

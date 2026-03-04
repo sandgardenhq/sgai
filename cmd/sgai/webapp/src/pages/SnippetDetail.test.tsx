@@ -2,15 +2,7 @@ import { describe, test, expect, afterEach, spyOn } from "bun:test";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { SnippetDetail } from "./SnippetDetail";
-
-function mockFetch(data: unknown) {
-  return spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
-}
+import { mockFetchResolved } from "@/test-utils";
 
 function renderWithRouter(
   lang = "go",
@@ -55,7 +47,7 @@ describe("SnippetDetail", () => {
   });
 
   test("renders snippet content when data loads", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "HTTP Server",
       fileName: "http-server.go",
       language: "go",
@@ -80,7 +72,7 @@ describe("SnippetDetail", () => {
   });
 
   test("renders code block with snippet content", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "HTTP Server",
       fileName: "http-server.go",
       language: "go",
@@ -126,7 +118,7 @@ describe("SnippetDetail", () => {
   });
 
   test("calls fetch with correct URL", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "React Hook",
       fileName: "react-hook.tsx",
       language: "typescript",
@@ -148,7 +140,7 @@ describe("SnippetDetail", () => {
   });
 
   test("renders without whenToUse section when empty", async () => {
-    fetchSpy = mockFetch({
+    fetchSpy = mockFetchResolved({
       name: "Simple Snippet",
       fileName: "simple.go",
       language: "go",

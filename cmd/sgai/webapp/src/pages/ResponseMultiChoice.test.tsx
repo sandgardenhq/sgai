@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { ResponseMultiChoice } from "./ResponseMultiChoice";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
+import { makeWorkspace as makeBaseWorkspace } from "@/test-utils";
 
 const pendingQuestion: ApiPendingQuestionResponse = {
   questionId: "abc123def456",
@@ -61,45 +62,21 @@ const markdownMessageQuestion: ApiPendingQuestionResponse = {
 };
 
 function makeWorkspace(overrides: Partial<ApiWorkspaceEntry> = {}): ApiWorkspaceEntry {
-  return {
-    name: "test-project",
-    dir: "/tmp/test-project",
-    running: false,
+  return makeBaseWorkspace({
     needsInput: true,
     inProgress: true,
-    pinned: false,
     isRoot: true,
-    isFork: false,
     status: "waiting",
-    badgeClass: "",
     badgeText: "waiting",
-    hasSgai: true,
-    hasEditedGoal: false,
-    interactiveAuto: false,
-    continuousMode: false,
     currentAgent: "coordinator",
     currentModel: "claude-opus-4",
-    task: "",
     goalContent: "<p>Test goal content</p>",
     rawGoalContent: "# Test Goal",
     pmContent: "<p>Test PM content</p>",
     hasProjectMgmt: true,
-    svgHash: "",
-    totalExecTime: "",
-    latestProgress: "",
-    humanMessage: "",
-    agentSequence: [],
-    cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-    events: [],
-    messages: [],
-    projectTodos: [],
-    agentTodos: [],
-    changes: { description: "", diffLines: [] },
-    commits: [],
-    log: [],
     pendingQuestion: pendingQuestion,
     ...overrides,
-  };
+  });
 }
 
 type MockFactoryState = {
@@ -120,7 +97,6 @@ mock.module("@/lib/factory-state", () => ({
 const mockFetch = mock(() => Promise.resolve(new Response("{}")));
 
 beforeEach(() => {
-  cleanup();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   sessionStorage.clear();
