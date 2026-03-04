@@ -9,8 +9,6 @@ import (
 
 type workflowBranch interface {
 	run(ctx context.Context, cfg branchConfig)
-	promptSection() string
-	coordinatorPlan() string
 	toolsAllowed() bool
 }
 

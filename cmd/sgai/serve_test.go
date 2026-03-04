@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -314,31 +312,6 @@ func TestValidateDirectoryTraversalVariants(t *testing.T) {
 	}
 }
 
-func TestIsLocalRequest(t *testing.T) {
-	tests := []struct {
-		name       string
-		remoteAddr string
-		want       bool
-	}{
-		{"IPv4 localhost", "127.0.0.1:54321", true},
-		{"IPv6 localhost bracketed", "[::1]:54321", true},
-		{"External IPv4", "192.168.1.100:54321", false},
-		{"External IPv6 bracketed", "[2001:db8::1]:54321", false},
-		{"No port separator", "127.0.0.1", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			req.RemoteAddr = tt.remoteAddr
-			got := isLocalRequest(req)
-			if got != tt.want {
-				t.Errorf("isLocalRequest() with RemoteAddr %q = %v, want %v", tt.remoteAddr, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDashboardBaseURL(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -570,55 +543,6 @@ func TestUnpackSkeleton(t *testing.T) {
 		t.Fatalf("unpackSkeleton failed: %v", err)
 	}
 	assertSkeletonUnpacked(t, dir)
-}
-
-func TestAddGitExclude(t *testing.T) {
-	t.Run("addsExcludeEntry", func(t *testing.T) {
-		dir := t.TempDir()
-		gitInfoDir := filepath.Join(dir, ".git", "info")
-		if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
-			t.Fatalf("failed to create .git/info: %v", err)
-		}
-		if err := addGitExclude(dir); err != nil {
-			t.Fatalf("addGitExclude failed: %v", err)
-		}
-		content, err := os.ReadFile(filepath.Join(gitInfoDir, "exclude"))
-		if err != nil {
-			t.Fatalf("failed to read exclude file: %v", err)
-		}
-		if !strings.Contains(string(content), "/.sgai") {
-			t.Error("exclude file does not contain /.sgai")
-		}
-	})
-
-	t.Run("skipsWhenAlreadyPresent", func(t *testing.T) {
-		dir := t.TempDir()
-		gitInfoDir := filepath.Join(dir, ".git", "info")
-		if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
-			t.Fatalf("failed to create .git/info: %v", err)
-		}
-		excludePath := filepath.Join(gitInfoDir, "exclude")
-		if err := os.WriteFile(excludePath, []byte("/.sgai\n"), 0644); err != nil {
-			t.Fatalf("failed to write exclude: %v", err)
-		}
-		if err := addGitExclude(dir); err != nil {
-			t.Fatalf("addGitExclude failed: %v", err)
-		}
-		content, err := os.ReadFile(excludePath)
-		if err != nil {
-			t.Fatalf("failed to read exclude file: %v", err)
-		}
-		if strings.Count(string(content), "/.sgai") != 1 {
-			t.Error("/.sgai should appear exactly once when already present")
-		}
-	})
-
-	t.Run("noGitDirectory", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := addGitExclude(dir); err != nil {
-			t.Fatalf("addGitExclude should not fail without .git: %v", err)
-		}
-	})
 }
 
 func TestWriteGoalExample(t *testing.T) {

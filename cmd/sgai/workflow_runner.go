@@ -269,8 +269,8 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		flowDag.injectRetrospectiveEdge()
 	}
 
-	ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
-	ensureImplicitRetrospectiveModel(flowDag, &metadata)
+	ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
+	ensureImplicitAgentModel(flowDag, &metadata, "retrospective")
 
 	if errModels := validateModels(metadata.Models); errModels != nil {
 		log.Fatalln(errModels)
@@ -415,7 +415,7 @@ func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath, 
 	}
 
 	goalRetrospectivePath := filepath.Join(retroDir, "GOAL.md")
-	if errCopy := copyToRetrospective(goalPath, goalRetrospectivePath); errCopy != nil {
+	if errCopy := copyFileAtomic(goalPath, goalRetrospectivePath); errCopy != nil {
 		log.Fatalln("failed to copy GOAL.md to retrospective:", errCopy)
 	}
 

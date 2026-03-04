@@ -168,23 +168,18 @@ type configurableEditor struct {
 }
 
 func (e *configurableEditor) open(path string) error {
-	{
-		cmd := exec.Command(e.command, path)
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		err := cmd.Run()
-		if err == nil {
-			return nil
-		}
+	cmd := exec.Command(e.command, path)
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err == nil {
+		return nil
 	}
-	{
-		cmd := exec.Command("code", path)
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		return cmd.Run()
-	}
+	fallback := exec.Command("code", path)
+	fallback.Stderr = os.Stderr
+	fallback.Stdin = os.Stdin
+	fallback.Stdout = os.Stdout
+	return fallback.Run()
 }
 
 func resolveEditor(configEditor string) (name, command string, isTerminal bool) {
@@ -392,27 +387,6 @@ func statePath(dir string) string {
 	return filepath.Join(dir, ".sgai", "state.json")
 }
 
-// isLocalRequest returns true if the HTTP request originates from localhost
-// (127.0.0.1 for IPv4 or ::1 for IPv6).
-func isLocalRequest(r *http.Request) bool {
-	remoteAddr := r.RemoteAddr
-
-	if strings.HasPrefix(remoteAddr, "[") {
-		bracketEnd := strings.Index(remoteAddr, "]")
-		if bracketEnd == -1 {
-			return false
-		}
-		host := remoteAddr[1:bracketEnd]
-		return host == "::1"
-	}
-
-	host, _, found := strings.Cut(remoteAddr, ":")
-	if !found {
-		return false
-	}
-	return host == "127.0.0.1"
-}
-
 type startSessionResult struct {
 	alreadyRunning bool
 	sess           *session
@@ -443,12 +417,17 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 		coord = state.NewCoordinatorEmpty(statePath(workspacePath))
 	}
 	coord.OnUpdate(s.notifyStateChange)
-	_ = coord.UpdateState(func(wf *state.Workflow) {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.HumanMessage = ""
 		if state.IsHumanPending(wf.Status) {
 			wf.Status = state.StatusWorking
 		}
-	})
+	}); errUpdate != nil {
+		sess.mu.Lock()
+		sess.running = false
+		sess.mu.Unlock()
+		return startSessionResult{startError: fmt.Errorf("updating state: %w", errUpdate)}
+	}
 	sess.mu.Lock()
 	sess.coord = coord
 	sess.mu.Unlock()
@@ -1327,9 +1306,11 @@ func (s *Server) workspaceCoordinator(workspacePath string) *state.Coordinator {
 		return state.NewCoordinatorEmpty(statePath(workspacePath))
 	}
 	if coord.State().Status == state.StatusWorking {
-		_ = coord.UpdateState(func(wf *state.Workflow) {
+		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 			wf.Status = ""
-		})
+		}); errUpdate != nil {
+			log.Println("failed to reset workspace status:", errUpdate)
+		}
 	}
 	return coord
 }
@@ -1634,7 +1615,7 @@ func initializeWorkspace(workspacePath string) error {
 	if err := unpackSkeleton(workspacePath); err != nil {
 		return fmt.Errorf("unpacking skeleton: %w", err)
 	}
-	if err := initJJ(workspacePath); err != nil {
+	if err := initializeJJ(workspacePath); err != nil {
 		return fmt.Errorf("initializing jj: %w", err)
 	}
 	if err := addGitExclude(workspacePath); err != nil {
@@ -1665,22 +1646,6 @@ func unpackSkeleton(workspacePath string) error {
 		}
 		return os.WriteFile(outPath, data, 0644)
 	})
-}
-
-func initJJ(dir string) error {
-	cmd := exec.Command("jj", "status")
-	cmd.Dir = dir
-	if err := cmd.Run(); err == nil {
-		return nil
-	} else if isExecNotFound(err) {
-		return nil
-	}
-	initCmd := exec.Command("jj", "git", "init", "--colocate")
-	initCmd.Dir = dir
-	if errInit := initCmd.Run(); errInit != nil {
-		return fmt.Errorf("running jj git init: %w", errInit)
-	}
-	return nil
 }
 
 func addGitExclude(dir string) error {

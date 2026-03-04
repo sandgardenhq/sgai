@@ -1277,7 +1277,7 @@ func (s *Server) handleRespondViaCoordinator(w http.ResponseWriter, coord *state
 		return
 	}
 
-	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
+	responseText := buildAPIResponseText(req)
 	if responseText == "" {
 		http.Error(w, "response cannot be empty", http.StatusBadRequest)
 		return
@@ -1319,7 +1319,7 @@ func (s *Server) handleRespondLegacy(w http.ResponseWriter, workspacePath string
 		return
 	}
 
-	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
+	responseText := buildAPIResponseText(req)
 	if responseText == "" {
 		http.Error(w, "response cannot be empty", http.StatusBadRequest)
 		return
@@ -1340,14 +1340,12 @@ func (s *Server) handleRespondLegacy(w http.ResponseWriter, workspacePath string
 	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
 }
 
-func buildAPIResponseText(req apiRespondRequest, multiChoice *state.MultiChoiceQuestion) string {
+func buildAPIResponseText(req apiRespondRequest) string {
 	var parts []string
 	if len(req.SelectedChoices) > 0 {
 		parts = append(parts, "Selected: "+strings.Join(req.SelectedChoices, ", "))
 	}
-	if req.Answer != "" && (multiChoice == nil || !multiChoice.IsWorkGate) {
-		parts = append(parts, req.Answer)
-	} else if req.Answer != "" && multiChoice != nil && multiChoice.IsWorkGate {
+	if req.Answer != "" {
 		parts = append(parts, req.Answer)
 	}
 	return strings.Join(parts, "\n")

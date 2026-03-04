@@ -155,49 +155,6 @@ func TestExtractAgentFromModelID(t *testing.T) {
 	}
 }
 
-func TestSelectModelForAgent(t *testing.T) {
-	cases := []struct {
-		name   string
-		models map[string]any
-		agent  string
-		want   string
-	}{
-		{
-			name:   "singleModel",
-			models: map[string]any{"agent1": "model-a"},
-			agent:  "agent1",
-			want:   "model-a",
-		},
-		{
-			name:   "multipleModelsReturnsFirst",
-			models: map[string]any{"agent1": []any{"model-a", "model-b"}},
-			agent:  "agent1",
-			want:   "model-a",
-		},
-		{
-			name:   "agentNotFound",
-			models: map[string]any{"agent1": "model-a"},
-			agent:  "agent2",
-			want:   "",
-		},
-		{
-			name:   "emptyModels",
-			models: map[string]any{},
-			agent:  "agent1",
-			want:   "",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := selectModelForAgent(tc.models, tc.agent)
-			if got != tc.want {
-				t.Errorf("selectModelForAgent(%v, %q) = %q; want %q", tc.models, tc.agent, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestAllModelsDone(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -490,49 +447,6 @@ func TestCleanupModelStatuses(t *testing.T) {
 	}
 }
 
-func TestExtractAgentNameFromTarget(t *testing.T) {
-	cases := []struct {
-		name   string
-		target string
-		want   string
-	}{
-		{
-			name:   "agentNameOnly",
-			target: "backend-go-developer",
-			want:   "backend-go-developer",
-		},
-		{
-			name:   "modelID",
-			target: "backend-go-developer:anthropic/claude-opus-4-6",
-			want:   "backend-go-developer",
-		},
-		{
-			name:   "modelIDWithVariant",
-			target: "backend-go-developer:anthropic/claude-opus-4-6 (max)",
-			want:   "backend-go-developer",
-		},
-		{
-			name:   "emptyString",
-			target: "",
-			want:   "",
-		},
-		{
-			name:   "colonAtStart",
-			target: ":model-spec",
-			want:   "",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := extractAgentNameFromTarget(tc.target)
-			if got != tc.want {
-				t.Errorf("extractAgentNameFromTarget(%q) = %q; want %q", tc.target, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestMessageMatchesRecipient(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -645,97 +559,6 @@ func TestMessageMatchesSender(t *testing.T) {
 			got := messageMatchesSender(tc.msg, tc.currentAgent, tc.currentModel)
 			if got != tc.want {
 				t.Errorf("messageMatchesSender() = %v; want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestModelStatusSymbol(t *testing.T) {
-	cases := []struct {
-		name   string
-		status string
-		want   string
-	}{
-		{
-			name:   "working",
-			status: "model-working",
-			want:   "◐",
-		},
-		{
-			name:   "done",
-			status: "model-done",
-			want:   "●",
-		},
-		{
-			name:   "error",
-			status: "model-error",
-			want:   "✕",
-		},
-		{
-			name:   "unknown",
-			status: "some-other-status",
-			want:   "○",
-		},
-		{
-			name:   "empty",
-			status: "",
-			want:   "○",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := modelStatusSymbol(tc.status)
-			if got != tc.want {
-				t.Errorf("modelStatusSymbol(%q) = %q; want %q", tc.status, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestExtractModelShortName(t *testing.T) {
-	cases := []struct {
-		name    string
-		modelID string
-		want    string
-	}{
-		{
-			name:    "standardModelID",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-6",
-			want:    "anthropic/claude-opus-4-6",
-		},
-		{
-			name:    "modelIDWithVariant",
-			modelID: "backend-go-developer:anthropic/claude-opus-4-6 (max)",
-			want:    "anthropic/claude-opus-4-6 (max)",
-		},
-		{
-			name:    "noColon",
-			modelID: "backend-go-developer",
-			want:    "backend-go-developer",
-		},
-		{
-			name:    "emptyString",
-			modelID: "",
-			want:    "",
-		},
-		{
-			name:    "colonAtEnd",
-			modelID: "backend-go-developer:",
-			want:    "",
-		},
-		{
-			name:    "multipleColons",
-			modelID: "agent:model/with:extra",
-			want:    "model/with:extra",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := extractModelShortName(tc.modelID)
-			if got != tc.want {
-				t.Errorf("extractModelShortName(%q) = %q; want %q", tc.modelID, got, tc.want)
 			}
 		})
 	}

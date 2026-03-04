@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestEnsureGitExclude(t *testing.T) {
+func TestAddGitExclude(t *testing.T) {
 	t.Run("addsEntryToNewExcludeFile", func(t *testing.T) {
 		dir := t.TempDir()
 		gitDir := filepath.Join(dir, ".git")
@@ -16,7 +16,9 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir)
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
 
 		excludePath := filepath.Join(gitInfoDir, "exclude")
 		content, err := os.ReadFile(excludePath)
@@ -41,7 +43,9 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir)
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
 
 		content, err := os.ReadFile(excludePath)
 		if err != nil {
@@ -68,7 +72,9 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir)
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
 
 		content, err := os.ReadFile(excludePath)
 		if err != nil {
@@ -82,7 +88,9 @@ func TestEnsureGitExclude(t *testing.T) {
 	t.Run("skipsNonGitRepository", func(t *testing.T) {
 		dir := t.TempDir()
 
-		ensureGitExclude(dir)
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
 
 		excludePath := filepath.Join(dir, ".git", "info", "exclude")
 		if _, err := os.Stat(excludePath); !os.IsNotExist(err) {
@@ -97,7 +105,9 @@ func TestEnsureGitExclude(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ensureGitExclude(dir)
+		if err := addGitExclude(dir); err != nil {
+			t.Fatalf("addGitExclude failed: %v", err)
+		}
 
 		excludePath := filepath.Join(gitDir, "info", "exclude")
 		content, err := os.ReadFile(excludePath)

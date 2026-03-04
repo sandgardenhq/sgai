@@ -1,39 +1,3 @@
-export interface Workspace {
-  directory: string;
-  dirName: string;
-  lastModified: string;
-  hasWorkspace: boolean;
-  isRoot: boolean;
-  running: boolean;
-  needsInput: boolean;
-  inProgress: boolean;
-  pinned: boolean;
-}
-
-export interface WorkspaceGroup {
-  root: Workspace;
-  forks: Workspace[];
-}
-
-export interface SessionState {
-  directory: string;
-  dirName: string;
-  running: boolean;
-  interactiveAuto: boolean;
-  status: string;
-  task: string;
-  currentAgent: string;
-  currentModel: string;
-  humanMessage: string;
-  badgeClass: string;
-  badgeText: string;
-  needsInput: boolean;
-  goalContent: string;
-  projectMgmtContent: string;
-  hasProjectMgmt: boolean;
-  hasEditedGoal: boolean;
-}
-
 export interface ApiWorkspaceEntry {
   name: string;
   dir: string;
@@ -80,17 +44,12 @@ export interface ApiWorkspaceEntry {
   external?: boolean;
 }
 
-export interface ApiWorkspacesResponse {
-  workspaces: ApiWorkspaceEntry[];
-}
-
 export interface ApiAgentSequenceEntry {
   agent: string;
   model: string;
   elapsedTime: string;
   isCurrent: boolean;
 }
-
 
 export interface ApiActionEntry {
   name: string;
@@ -99,41 +58,13 @@ export interface ApiActionEntry {
   description?: string;
 }
 
-
 export interface ApiGoalResponse {
   content: string;
-}
-
-export interface ApiCreateWorkspaceRequest {
-  name: string;
 }
 
 export interface ApiCreateWorkspaceResponse {
   name: string;
   dir: string;
-}
-
-export interface ProgressEntry {
-  timestamp: string;
-  agent: string;
-  description: string;
-}
-
-export interface Message {
-  id: number;
-  fromAgent: string;
-  toAgent: string;
-  read: boolean;
-  readAt: string;
-  readBy: string;
-  body: string;
-}
-
-export interface TodoItem {
-  id: string;
-  content: string;
-  status: "pending" | "in_progress" | "completed" | "cancelled";
-  priority: "high" | "medium" | "low";
 }
 
 export interface Agent {
@@ -200,11 +131,6 @@ export interface MultiChoiceQuestion {
   multiSelect: boolean;
 }
 
-export interface PendingQuestion {
-  agentName: string;
-  questions: MultiChoiceQuestion[];
-}
-
 export interface ApiPendingQuestionResponse {
   questionId: string;
   type: "multi-choice" | "work-gate" | "free-text" | "";
@@ -230,7 +156,6 @@ export interface ApiSessionActionResponse {
   running: boolean;
   message: string;
 }
-
 
 export interface ApiModelStatusEntry {
   modelId: string;
@@ -287,7 +212,6 @@ export interface ApiMessageEntry {
   createdAt?: string;
 }
 
-
 export interface ApiTodoEntry {
   id: string;
   content: string;
@@ -295,12 +219,10 @@ export interface ApiTodoEntry {
   priority: string;
 }
 
-
 export interface ApiLogEntry {
   prefix: string;
   text: string;
 }
-
 
 export interface ApiDiffLine {
   lineNumber: number;
@@ -317,7 +239,6 @@ export interface ApiDiffResponse {
   diff: string;
 }
 
-
 export interface ApiCommitEntry {
   changeId: string;
   commitId: string;
@@ -327,7 +248,6 @@ export interface ApiCommitEntry {
   description: string;
   graphChar: string;
 }
-
 
 export interface ApiEventEntry {
   timestamp: string;
@@ -342,7 +262,6 @@ export interface ApiAgentModelEntry {
   agent: string;
   models: string[];
 }
-
 
 export interface ApiForkCommit {
   changeId: string;
@@ -363,7 +282,6 @@ export interface ApiForkEntry {
   commitAhead: number;
   commits: ApiForkCommit[];
 }
-
 
 export interface ApiComposerAgentConf {
   name: string;
@@ -430,19 +348,9 @@ export interface ApiComposeDraftResponse {
   saved: boolean;
 }
 
-export interface ApiComposeSaveRequest {
-  content: string;
-}
-
 export interface ApiComposeSaveResponse {
   saved: boolean;
   workspace: string;
-}
-
-// M6: Workspace Management Types
-
-export interface ApiForkRequest {
-  goalContent: string;
 }
 
 export interface ApiForkResponse {
@@ -461,17 +369,9 @@ export interface ApiDeleteWorkspaceResponse {
   message: string;
 }
 
-export interface ApiUpdateGoalRequest {
-  content: string;
-}
-
 export interface ApiUpdateGoalResponse {
   updated: boolean;
   workspace: string;
-}
-
-export interface ApiSteerRequest {
-  message: string;
 }
 
 export interface ApiSteerResponse {
@@ -494,11 +394,6 @@ export interface ApiDeleteMessageResponse {
   deleted: boolean;
   id: number;
   message: string;
-}
-
-export interface ApiAdhocRequest {
-  prompt: string;
-  model: string;
 }
 
 export interface ApiAdhocResponse {
