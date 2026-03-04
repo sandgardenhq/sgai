@@ -432,22 +432,6 @@ func TestAgentFilesHaveNoModelVariants(t *testing.T) {
 	}
 }
 
-func TestIsTruish(t *testing.T) {
-	truthy := []string{"yes", "YES", "Yes", "true", "TRUE", "True", "1", "on", "ON", " yes ", " true "}
-	for _, v := range truthy {
-		if !isTruish(v) {
-			t.Errorf("isTruish(%q) = false; want true", v)
-		}
-	}
-
-	falsy := []string{"no", "false", "0", "off", "", "maybe", "random"}
-	for _, v := range falsy {
-		if isTruish(v) {
-			t.Errorf("isTruish(%q) = true; want false", v)
-		}
-	}
-}
-
 func TestIsFalsish(t *testing.T) {
 	falsy := []string{"no", "NO", "No", "false", "FALSE", "False", "0", "off", "OFF", " no ", " false "}
 	for _, v := range falsy {
@@ -543,112 +527,7 @@ func TestGoalMetadataRetrospectiveParsing(t *testing.T) {
 	})
 }
 
-func TestEnsureImplicitRetrospectiveModel(t *testing.T) {
-	t.Run("implicitGetsCoordinatorModel", func(t *testing.T) {
-		flowDag := &dag{
-			Nodes: map[string]*dagNode{
-				"coordinator":   {Name: "coordinator"},
-				"retrospective": {Name: "retrospective"},
-			},
-		}
-		metadata := GoalMetadata{
-			Models: map[string]any{
-				"coordinator": "anthropic/claude-opus-4-6 (max)",
-			},
-		}
-
-		ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-		got, exists := metadata.Models["retrospective"]
-		if !exists {
-			t.Fatal("expected retrospective to exist in Models")
-		}
-		want := "anthropic/claude-opus-4-6 (max)"
-		if got != want {
-			t.Errorf("retrospective model = %v; want %v", got, want)
-		}
-	})
-
-	t.Run("explicitModelNotOverridden", func(t *testing.T) {
-		flowDag := &dag{
-			Nodes: map[string]*dagNode{
-				"coordinator":   {Name: "coordinator"},
-				"retrospective": {Name: "retrospective"},
-			},
-		}
-		metadata := GoalMetadata{
-			Models: map[string]any{
-				"coordinator":   "anthropic/claude-opus-4-6 (max)",
-				"retrospective": "anthropic/claude-sonnet-4-5",
-			},
-		}
-
-		ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-		got := metadata.Models["retrospective"]
-		if got != "anthropic/claude-sonnet-4-5" {
-			t.Errorf("retrospective model = %v; want anthropic/claude-sonnet-4-5", got)
-		}
-	})
-
-	t.Run("coordinatorHasNoModel", func(t *testing.T) {
-		flowDag := &dag{
-			Nodes: map[string]*dagNode{
-				"coordinator":   {Name: "coordinator"},
-				"retrospective": {Name: "retrospective"},
-			},
-		}
-		metadata := GoalMetadata{
-			Models: map[string]any{},
-		}
-
-		ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-		if _, exists := metadata.Models["retrospective"]; exists {
-			t.Error("expected retrospective to NOT exist in Models when coordinator has no model")
-		}
-	})
-
-	t.Run("nilModelsMap", func(t *testing.T) {
-		flowDag := &dag{
-			Nodes: map[string]*dagNode{
-				"coordinator":   {Name: "coordinator"},
-				"retrospective": {Name: "retrospective"},
-			},
-		}
-		metadata := GoalMetadata{
-			Models: nil,
-		}
-
-		ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-		if metadata.Models == nil {
-			t.Fatal("expected Models to be initialized")
-		}
-	})
-
-	t.Run("retrospectiveNotInDag", func(t *testing.T) {
-		flowDag := &dag{
-			Nodes: map[string]*dagNode{
-				"coordinator": {Name: "coordinator"},
-				"planner":     {Name: "planner"},
-			},
-		}
-		metadata := GoalMetadata{
-			Models: map[string]any{
-				"coordinator": "anthropic/claude-opus-4-6 (max)",
-			},
-		}
-
-		ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-		if _, exists := metadata.Models["retrospective"]; exists {
-			t.Error("expected retrospective to NOT exist in Models when not in DAG")
-		}
-	})
-}
-
-func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
+func TestEnsureImplicitAgentModel(t *testing.T) {
 	t.Run("implicitGetsCoordinatorModelWithVariant", func(t *testing.T) {
 		flowDag := &dag{
 			Nodes: map[string]*dagNode{
@@ -662,7 +541,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			},
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		got, exists := metadata.Models["project-critic-council"]
 		if !exists {
@@ -688,7 +567,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			},
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		got := metadata.Models["project-critic-council"]
 		gotSlice, ok := got.([]any)
@@ -714,7 +593,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			Models: map[string]any{},
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		if _, exists := metadata.Models["project-critic-council"]; exists {
 			t.Error("expected project-critic-council to NOT exist in Models when coordinator has no model")
@@ -732,7 +611,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			Models: nil,
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		if metadata.Models == nil {
 			t.Fatal("expected Models to be initialized")
@@ -742,7 +621,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 		}
 	})
 
-	t.Run("projectCriticCouncilNotInDag", func(t *testing.T) {
+	t.Run("agentNotInDag", func(t *testing.T) {
 		flowDag := &dag{
 			Nodes: map[string]*dagNode{
 				"coordinator": {Name: "coordinator"},
@@ -755,7 +634,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			},
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		if _, exists := metadata.Models["project-critic-council"]; exists {
 			t.Error("expected project-critic-council to NOT exist in Models when not in DAG")
@@ -775,7 +654,7 @@ func TestEnsureImplicitProjectCriticCouncilModel(t *testing.T) {
 			},
 		}
 
-		ensureImplicitProjectCriticCouncilModel(flowDag, &metadata)
+		ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 
 		got, exists := metadata.Models["project-critic-council"]
 		if !exists {
@@ -964,70 +843,51 @@ func TestInteractionModeRoundTrip(t *testing.T) {
 	})
 }
 
-func TestBuildAgentStdoutWriter(t *testing.T) {
-	t.Run("noLogWriterNoStdoutLog", func(t *testing.T) {
-		w := buildAgentStdoutWriter(nil, nil)
-		if w != os.Stdout {
-			t.Error("expected os.Stdout when no writers provided")
+func TestBuildAgentOutputWriter(t *testing.T) {
+	t.Run("noExtraWriters", func(t *testing.T) {
+		var base bytes.Buffer
+		w := buildAgentOutputWriter(&base)
+		if w != &base {
+			t.Error("expected base writer returned when no extras provided")
 		}
 	})
 
-	t.Run("withLogWriterOnly", func(t *testing.T) {
-		var buf bytes.Buffer
-		w := buildAgentStdoutWriter(&buf, nil)
+	t.Run("nilExtraWritersReturnBase", func(t *testing.T) {
+		var base bytes.Buffer
+		w := buildAgentOutputWriter(&base, nil, nil)
+		if w != &base {
+			t.Error("expected base writer returned when extras are nil")
+		}
+	})
+
+	t.Run("withOneExtraWriter", func(t *testing.T) {
+		var base, extra bytes.Buffer
+		w := buildAgentOutputWriter(&base, &extra)
 		if _, errWrite := io.WriteString(w, "test"); errWrite != nil {
 			t.Fatal(errWrite)
 		}
-		if buf.String() != "test" {
-			t.Errorf("expected logWriter to receive output, got %q", buf.String())
+		if base.String() != "test" {
+			t.Errorf("expected base to receive output, got %q", base.String())
+		}
+		if extra.String() != "test" {
+			t.Errorf("expected extra to receive output, got %q", extra.String())
 		}
 	})
 
-	t.Run("withStdoutLogOnly", func(t *testing.T) {
-		var buf bytes.Buffer
-		w := buildAgentStdoutWriter(nil, &buf)
-		if _, errWrite := io.WriteString(w, "hello"); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-		if buf.String() != "hello" {
-			t.Errorf("expected stdoutLog to receive output, got %q", buf.String())
-		}
-	})
-
-	t.Run("withBothWriters", func(t *testing.T) {
-		var logBuf, stdoutBuf bytes.Buffer
-		w := buildAgentStdoutWriter(&logBuf, &stdoutBuf)
+	t.Run("withMultipleExtraWriters", func(t *testing.T) {
+		var base, extra1, extra2 bytes.Buffer
+		w := buildAgentOutputWriter(&base, &extra1, &extra2)
 		if _, errWrite := io.WriteString(w, "data"); errWrite != nil {
 			t.Fatal(errWrite)
 		}
-		if logBuf.String() != "data" {
-			t.Errorf("expected logWriter to receive output, got %q", logBuf.String())
+		if base.String() != "data" {
+			t.Errorf("expected base to receive output, got %q", base.String())
 		}
-		if stdoutBuf.String() != "data" {
-			t.Errorf("expected stdoutLog to receive output, got %q", stdoutBuf.String())
+		if extra1.String() != "data" {
+			t.Errorf("expected extra1 to receive output, got %q", extra1.String())
 		}
-	})
-}
-
-func TestBuildAgentStderrWriter(t *testing.T) {
-	t.Run("noLogWriterNoStderrLog", func(t *testing.T) {
-		w := buildAgentStderrWriter(nil, nil)
-		if w != os.Stderr {
-			t.Error("expected os.Stderr when no writers provided")
-		}
-	})
-
-	t.Run("withBothWriters", func(t *testing.T) {
-		var logBuf, stderrBuf bytes.Buffer
-		w := buildAgentStderrWriter(&logBuf, &stderrBuf)
-		if _, errWrite := io.WriteString(w, "errdata"); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-		if logBuf.String() != "errdata" {
-			t.Errorf("expected logWriter to receive output, got %q", logBuf.String())
-		}
-		if stderrBuf.String() != "errdata" {
-			t.Errorf("expected stderrLog to receive output, got %q", stderrBuf.String())
+		if extra2.String() != "data" {
+			t.Errorf("expected extra2 to receive output, got %q", extra2.String())
 		}
 	})
 }

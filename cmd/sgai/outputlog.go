@@ -207,30 +207,15 @@ func (w *sessionLogWriter) addLine(text string) {
 	w.srv.notifyStateChange()
 }
 
-func buildAgentStderrWriter(logWriter, stderrLog io.Writer) io.Writer {
-	base := io.Writer(os.Stderr)
-	if logWriter != nil && stderrLog != nil {
-		return io.MultiWriter(base, logWriter, stderrLog)
+func buildAgentOutputWriter(base io.Writer, extra ...io.Writer) io.Writer {
+	writers := []io.Writer{base}
+	for _, w := range extra {
+		if w != nil {
+			writers = append(writers, w)
+		}
 	}
-	if logWriter != nil {
-		return io.MultiWriter(base, logWriter)
+	if len(writers) == 1 {
+		return base
 	}
-	if stderrLog != nil {
-		return io.MultiWriter(base, stderrLog)
-	}
-	return base
-}
-
-func buildAgentStdoutWriter(logWriter, stdoutLog io.Writer) io.Writer {
-	base := io.Writer(os.Stdout)
-	if logWriter != nil && stdoutLog != nil {
-		return io.MultiWriter(base, logWriter, stdoutLog)
-	}
-	if logWriter != nil {
-		return io.MultiWriter(base, logWriter)
-	}
-	if stdoutLog != nil {
-		return io.MultiWriter(base, stdoutLog)
-	}
-	return base
+	return io.MultiWriter(writers...)
 }

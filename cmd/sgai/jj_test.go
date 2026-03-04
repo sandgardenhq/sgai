@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestEnsureJJ(t *testing.T) {
+func TestInitializeJJ(t *testing.T) {
 	if _, err := exec.LookPath("jj"); err != nil {
 		t.Skip("jj not found in PATH, skipping integration tests")
 	}
@@ -17,7 +17,9 @@ func TestEnsureJJ(t *testing.T) {
 		dir := t.TempDir()
 		initGitRepo(t, dir)
 
-		ensureJJ(dir)
+		if err := initializeJJ(dir); err != nil {
+			t.Fatal(err)
+		}
 
 		verifyJJWorks(t, dir)
 	})
@@ -27,7 +29,9 @@ func TestEnsureJJ(t *testing.T) {
 		initGitRepo(t, dir)
 		initJJRepo(t, dir)
 
-		ensureJJ(dir)
+		if err := initializeJJ(dir); err != nil {
+			t.Fatal(err)
+		}
 
 		verifyJJWorks(t, dir)
 	})
@@ -38,7 +42,9 @@ func TestEnsureJJ(t *testing.T) {
 		initJJRepo(t, dir)
 		createJJCommit(t, dir)
 
-		ensureJJ(dir)
+		if err := initializeJJ(dir); err != nil {
+			t.Fatal(err)
+		}
 
 		verifyJJWorks(t, dir)
 	})
@@ -50,7 +56,9 @@ func TestEnsureJJ(t *testing.T) {
 		forkDir := filepath.Join(dir, "fork-workspace")
 		createForkWorkspace(t, dir, forkDir)
 
-		ensureJJ(forkDir)
+		if err := initializeJJ(forkDir); err != nil {
+			t.Fatal(err)
+		}
 
 		verifyJJWorks(t, forkDir)
 	})
@@ -131,6 +139,6 @@ func verifyJJWorks(t *testing.T, dir string) {
 	cmd := exec.Command("jj", "status")
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("jj status failed after ensureJJ: %v\n%s", err, output)
+		t.Fatalf("jj status failed after initializeJJ: %v\n%s", err, output)
 	}
 }

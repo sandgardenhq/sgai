@@ -146,7 +146,7 @@ func (s *Server) respondViaCoordinatorService(coord *state.Coordinator, req apiR
 		return respondResult{}, fmt.Errorf("question expired")
 	}
 
-	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
+	responseText := buildAPIResponseText(req)
 	if responseText == "" {
 		return respondResult{}, fmt.Errorf("response cannot be empty")
 	}
@@ -187,7 +187,7 @@ func (s *Server) respondLegacyService(workspacePath string, req apiRespondReques
 		return respondResult{}, fmt.Errorf("question expired")
 	}
 
-	responseText := buildAPIResponseText(req, wfState.MultiChoiceQuestion)
+	responseText := buildAPIResponseText(req)
 	if responseText == "" {
 		return respondResult{}, fmt.Errorf("response cannot be empty")
 	}

@@ -5,7 +5,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
 import { stripFrontmatter } from "@/lib/markdown-utils";
-import { useForkTemplate } from "@/hooks/useForkTemplate";
 import { Loader2, GitFork } from "lucide-react";
 
 interface InlineForkEditorProps {
@@ -14,17 +13,20 @@ interface InlineForkEditorProps {
 
 export function InlineForkEditor({ workspaceName }: InlineForkEditorProps) {
   const navigate = useNavigate();
-  const templateContent = useForkTemplate(workspaceName);
   const [content, setContent] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, startSubmitTransition] = useTransition();
 
   useEffect(() => {
-    if (templateContent) {
-      setContent(templateContent);
-    }
-  }, [templateContent]);
+    if (!workspaceName) return;
+    let cancelled = false;
+    api.workspaces.forkTemplate(workspaceName).then(
+      (result) => { if (!cancelled && result.content) setContent(result.content); },
+      () => {},
+    );
+    return () => { cancelled = true; };
+  }, [workspaceName]);
 
   const bodyText = stripFrontmatter(content).trim();
   const isBodyEmpty = bodyText.length === 0;

@@ -56,7 +56,7 @@ func loadComposerStateFromDisk(dir string) composerState {
 		return defaultComposerState()
 	}
 
-	bodyContent := extractBodyContent(content)
+	bodyContent := string(extractBody(content))
 
 	st := composerState{
 		Description:    extractDescriptionFromBody(bodyContent),
@@ -90,11 +90,6 @@ func defaultComposerState() composerState {
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 		},
 	}
-}
-
-func extractBodyContent(content []byte) string {
-	body := extractBody(content)
-	return string(body)
 }
 
 func extractDescriptionFromBody(body string) string {
@@ -150,25 +145,6 @@ func extractTasksFromBody(body string) string {
 	}
 
 	return strings.TrimSpace(strings.Join(taskLines, "\n"))
-}
-
-func splitFrontmatterAndBody(content string) (frontmatter, body string) {
-	if !strings.HasPrefix(content, "---\n") {
-		return "", content
-	}
-
-	rest := content[4:]
-	endIdx := strings.Index(rest, "\n---\n")
-	if endIdx < 0 {
-		endIdx = strings.Index(rest, "\n---")
-		if endIdx < 0 {
-			return "", content
-		}
-	}
-
-	frontmatter = "---\n" + rest[:endIdx] + "\n---"
-	body = strings.TrimPrefix(rest[endIdx+4:], "\n")
-	return frontmatter, body
 }
 
 func buildGOALContent(st composerState) string {

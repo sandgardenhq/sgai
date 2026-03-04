@@ -1011,7 +1011,7 @@ func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAg
 		return "Error: Could not read state.json. Has the workflow been initialized?", nil
 	}
 
-	targetAgentName := extractAgentNameFromTarget(toAgent)
+	targetAgentName := extractAgentFromModelID(toAgent)
 	if !slices.Contains(dagAgents, targetAgentName) {
 		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(dagAgents, ", ")), nil
 	}
@@ -1031,15 +1031,8 @@ func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAg
 			fromAgent = currentState.CurrentModel
 		}
 
-		nextID := 1
-		for _, msg := range currentState.Messages {
-			if msg.ID >= nextID {
-				nextID = msg.ID + 1
-			}
-		}
-
 		message := state.Message{
-			ID:        nextID,
+			ID:        nextMessageID(currentState.Messages),
 			FromAgent: fromAgent,
 			ToAgent:   toAgent,
 			Body:      body,
@@ -1228,13 +1221,6 @@ func projectTodoRead(coord *state.Coordinator) (string, error) {
 		return "0 todos", nil
 	}
 	return formatTodoList(coord.State().ProjectTodos), nil
-}
-
-func extractAgentNameFromTarget(target string) string {
-	if agentName, _, found := strings.Cut(target, ":"); found {
-		return agentName
-	}
-	return target
 }
 
 func messageMatchesRecipient(msg state.Message, currentAgent, currentModel string) bool {

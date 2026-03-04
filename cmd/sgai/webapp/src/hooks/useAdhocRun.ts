@@ -195,50 +195,30 @@ export function useAdhocRun({
     }
   }, [models, selectedModel, currentModel, setSelectedModel]);
 
-  // -- restore running state on mount --
+  const startStatusPolling = useCallback(() => {
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const poll = await api.workspaces.adhocStatus(workspaceName);
+        if (!mountedRef.current) return;
+        if (poll.output) setOutput(poll.output);
+        if (!poll.running) { stopPolling(); setIsRunning(false); }
+      } catch {
+        stopPolling();
+        setIsRunning(false);
+      }
+    }, POLL_INTERVAL_MS);
+  }, [workspaceName, stopPolling]);
 
   useEffect(() => {
     if (!workspaceName) return;
-
     let cancelled = false;
-
-    api.workspaces
-      .adhocStatus(workspaceName)
-      .then((status) => {
-        if (cancelled) return;
-        if (status.output) {
-          setOutput(status.output);
-        }
-        if (status.running) {
-          setIsRunning(true);
-          pollTimerRef.current = setInterval(async () => {
-            try {
-              const poll = await api.workspaces.adhocStatus(workspaceName);
-              if (!mountedRef.current) return;
-              if (poll.output) {
-                setOutput(poll.output);
-              }
-              if (!poll.running) {
-                stopPolling();
-                setIsRunning(false);
-              }
-            } catch {
-              stopPolling();
-              setIsRunning(false);
-            }
-          }, POLL_INTERVAL_MS);
-        }
-      })
-      .catch(() => {
-        // no active run — that's fine
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceName, stopPolling]);
-
-  // -- run adhoc --
+    api.workspaces.adhocStatus(workspaceName).then((status) => {
+      if (cancelled) return;
+      if (status.output) setOutput(status.output);
+      if (status.running) { setIsRunning(true); startStatusPolling(); }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspaceName, startStatusPolling]);
 
   const startRun = useCallback(
     async (promptOverride?: string, modelOverride?: string) => {
@@ -254,30 +234,9 @@ export function useAdhocRun({
 
       try {
         const result = await api.workspaces.adhoc(workspaceName, trimmedPrompt, trimmedModel);
-        if (result.output) {
-          setOutput(result.output);
-        }
-        if (!result.running) {
-          setIsRunning(false);
-          return;
-        }
-
-        pollTimerRef.current = setInterval(async () => {
-          try {
-            const poll = await api.workspaces.adhocStatus(workspaceName);
-            if (!mountedRef.current) return;
-            if (poll.output) {
-              setOutput(poll.output);
-            }
-            if (!poll.running) {
-              stopPolling();
-              setIsRunning(false);
-            }
-          } catch {
-            stopPolling();
-            setIsRunning(false);
-          }
-        }, POLL_INTERVAL_MS);
+        if (result.output) setOutput(result.output);
+        if (!result.running) { setIsRunning(false); return; }
+        startStatusPolling();
       } catch (err) {
         if (err instanceof ApiError) {
           setRunError(err.message);
@@ -287,7 +246,7 @@ export function useAdhocRun({
         setIsRunning(false);
       }
     },
-    [workspaceName, isRunning, prompt, selectedModel, stopPolling, addToHistory],
+    [workspaceName, isRunning, prompt, selectedModel, stopPolling, addToHistory, startStatusPolling],
   );
 
   const stopRun = useCallback(async () => {

@@ -116,31 +116,21 @@ func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent str
 	fmt.Println("["+paddedsgai+"]", "transitioning to retrospective mode")
 }
 
-func ensureImplicitProjectCriticCouncilModel(flowDag *dag, metadata *GoalMetadata) {
+func ensureImplicitAgentModel(flowDag *dag, metadata *GoalMetadata, agentName string) {
 	if metadata.Models == nil {
 		metadata.Models = make(map[string]any)
 	}
-	_, existsInDag := flowDag.Nodes["project-critic-council"]
-	if !existsInDag {
+	if _, existsInDag := flowDag.Nodes[agentName]; !existsInDag {
 		return
 	}
-	_, existsInModels := metadata.Models["project-critic-council"]
-	if existsInModels {
+	if _, existsInModels := metadata.Models[agentName]; existsInModels {
 		return
 	}
 	coordinatorModel, hasCoordinator := metadata.Models["coordinator"]
 	if !hasCoordinator {
 		return
 	}
-	metadata.Models["project-critic-council"] = coordinatorModel
-}
-
-func selectModelForAgent(metadataModels map[string]any, agent string) string {
-	models := getModelsForAgent(metadataModels, agent)
-	if len(models) > 0 {
-		return models[0]
-	}
-	return ""
+	metadata.Models[agentName] = coordinatorModel
 }
 
 func getModelsForAgent(models map[string]any, agent string) []string {
@@ -380,7 +370,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		*iterationCounter++
 		prefix := buildAgentPrefix(cfg.dir, paddedAgentName, *iterationCounter)
 
-		saveStateBeforeAgent(cfg.coord, wfState)
+		saveState(cfg.coord, wfState)
 		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
 
 		agentArgs := buildAgentArgs(cfg.agent, modelSpec, capturedSessionID)
@@ -433,14 +423,6 @@ func buildAgentPrefix(dir, paddedAgentName string, iteration int) string {
 	return fmt.Sprintf("[%s][%s:%04d]", workspaceName, paddedAgentName, iteration)
 }
 
-func saveStateBeforeAgent(coord *state.Coordinator, wfState state.Workflow) {
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		*wf = wfState
-	}); errUpdate != nil {
-		log.Fatalln("failed to save state before running agent:", errUpdate)
-	}
-}
-
 func saveState(coord *state.Coordinator, s state.Workflow) {
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		*wf = s
@@ -458,7 +440,7 @@ func copyProjectManagementToRetrospective(dir, retrospectiveDir string) {
 		return
 	}
 	pmRetrospectivePath := filepath.Join(retrospectiveDir, "PROJECT_MANAGEMENT.md")
-	if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
+	if err := copyFileAtomic(pmPath, pmRetrospectivePath); err != nil {
 		log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
 	}
 }
@@ -541,8 +523,8 @@ func buildAgentEnv(cfg multiModelConfig, wfState state.Workflow, modelSpec strin
 }
 
 func executeAgentProcess(ctx context.Context, cfg multiModelConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
-	stderrOut := buildAgentStderrWriter(cfg.logWriter, cfg.stderrLog)
-	stdoutOut := buildAgentStdoutWriter(cfg.logWriter, cfg.stdoutLog)
+	stderrOut := buildAgentOutputWriter(os.Stderr, cfg.logWriter, cfg.stderrLog)
+	stdoutOut := buildAgentOutputWriter(os.Stdout, cfg.logWriter, cfg.stdoutLog)
 	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
 	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now()}
 
@@ -678,13 +660,13 @@ func copyCompletionArtifactsToRetrospective(cfg multiModelConfig) {
 		return
 	}
 	goalRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "GOAL.md")
-	if err := copyToRetrospective(cfg.goalPath, goalRetrospectivePath); err != nil {
+	if err := copyFileAtomic(cfg.goalPath, goalRetrospectivePath); err != nil {
 		log.Fatalln("failed to copy GOAL.md to retrospective:", err)
 	}
 	pmPath := filepath.Join(cfg.dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	if _, errStat := os.Stat(pmPath); errStat == nil {
 		pmRetrospectivePath := filepath.Join(cfg.retrospectiveDir, "PROJECT_MANAGEMENT.md")
-		if err := copyToRetrospective(pmPath, pmRetrospectivePath); err != nil {
+		if err := copyFileAtomic(pmPath, pmRetrospectivePath); err != nil {
 			log.Fatalln("failed to copy PROJECT_MANAGEMENT.md to retrospective:", err)
 		}
 	}
@@ -806,89 +788,62 @@ type agentMetadata struct {
 	Snippets []string `json:"snippets" yaml:"snippets"`
 }
 
-func shouldLogAgent(dir, agentName string) bool {
+func parseAgentFileMetadata(dir, agentName string) (agentMetadata, bool) {
 	agentPath := filepath.Join(dir, ".sgai", "agent", agentName+".md")
 	content, err := os.ReadFile(agentPath)
 	if err != nil {
-		return true
+		return agentMetadata{}, false
 	}
-
-	delimiter := []byte("---")
-	if !bytes.HasPrefix(content, delimiter) {
-		return true
-	}
-
-	rest := content[len(delimiter):]
-	if len(rest) > 0 && rest[0] == '\n' {
-		rest = rest[1:]
-	}
-
-	before, _, ok := bytes.Cut(rest, delimiter)
+	yamlContent, ok := splitFrontmatter(content)
 	if !ok {
-		return true
+		return agentMetadata{}, false
 	}
-
-	yamlContent := before
 	var metadata agentMetadata
 	metadata.Log = true
 	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
+		return agentMetadata{}, false
+	}
+	return metadata, true
+}
+
+func shouldLogAgent(dir, agentName string) bool {
+	metadata, ok := parseAgentFileMetadata(dir, agentName)
+	if !ok {
 		return true
 	}
-
 	return metadata.Log
 }
 
 func parseAgentSnippets(dir, agentName string) []string {
-	agentPath := filepath.Join(dir, ".sgai", "agent", agentName+".md")
-	content, err := os.ReadFile(agentPath)
-	if err != nil {
+	metadata, ok := parseAgentFileMetadata(dir, agentName)
+	if !ok {
 		return nil
 	}
+	return metadata.Snippets
+}
 
+func splitFrontmatter(content []byte) (yamlContent []byte, ok bool) {
 	delimiter := []byte("---")
 	if !bytes.HasPrefix(content, delimiter) {
-		return nil
+		return nil, false
 	}
-
 	rest := content[len(delimiter):]
 	if len(rest) > 0 && rest[0] == '\n' {
 		rest = rest[1:]
 	}
-
-	before, _, ok := bytes.Cut(rest, delimiter)
-	if !ok {
-		return nil
+	before, _, found := bytes.Cut(rest, delimiter)
+	if !found {
+		return nil, false
 	}
-
-	yamlContent := before
-	var metadata agentMetadata
-	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
-		return nil
-	}
-
-	return metadata.Snippets
+	return before, true
 }
 
 func parseFrontmatterMap(content []byte) map[string]string {
 	result := make(map[string]string)
-	delimiter := []byte("---")
-
-	if !bytes.HasPrefix(content, delimiter) {
-		return result
-	}
-
-	rest := content[len(delimiter):]
-	if len(rest) > 0 && rest[0] == '\n' {
-		rest = rest[1:]
-	}
-
-	before, _, ok := bytes.Cut(rest, delimiter)
+	yamlContent, ok := splitFrontmatter(content)
 	if !ok {
 		return result
 	}
-
-	yamlContent := before
-
 	for line := range bytes.SplitSeq(yamlContent, []byte("\n")) {
 		trimmed := bytes.TrimSpace(line)
 		if colonIdx := bytes.IndexByte(trimmed, ':'); colonIdx > 0 {
@@ -897,7 +852,6 @@ func parseFrontmatterMap(content []byte) map[string]string {
 			result[key] = value
 		}
 	}
-
 	return result
 }
 
@@ -985,8 +939,8 @@ func tryReloadGoalMetadata(goalPath string, current GoalMetadata, flowDag *dag) 
 		return current, errParse
 	}
 
-	ensureImplicitRetrospectiveModel(flowDag, &newMetadata)
-	ensureImplicitProjectCriticCouncilModel(flowDag, &newMetadata)
+	ensureImplicitAgentModel(flowDag, &newMetadata, "retrospective")
+	ensureImplicitAgentModel(flowDag, &newMetadata, "project-critic-council")
 
 	return newMetadata, nil
 }
@@ -994,25 +948,13 @@ func tryReloadGoalMetadata(goalPath string, current GoalMetadata, flowDag *dag) 
 // parseYAMLFrontmatter extracts YAML frontmatter from content delimited by "---".
 // If no frontmatter is found, returns default metadata.
 func parseYAMLFrontmatter(content []byte) (GoalMetadata, error) {
-	delimiter := []byte("---")
-	defaultMetadata := GoalMetadata{}
-
-	if !bytes.HasPrefix(content, delimiter) {
-		return defaultMetadata, nil
-	}
-
-	rest := content[len(delimiter):]
-	if len(rest) > 0 && rest[0] == '\n' {
-		rest = rest[1:]
-	}
-
-	before, _, ok := bytes.Cut(rest, delimiter)
+	yamlContent, ok := splitFrontmatter(content)
 	if !ok {
-		return GoalMetadata{}, fmt.Errorf("no closing '---' found for frontmatter")
+		if bytes.HasPrefix(content, []byte("---")) {
+			return GoalMetadata{}, fmt.Errorf("no closing '---' found for frontmatter")
+		}
+		return GoalMetadata{}, nil
 	}
-
-	yamlContent := before
-
 	var metadata GoalMetadata
 	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
 		return GoalMetadata{}, fmt.Errorf("failed to parse YAML frontmatter: %w", err)
@@ -1098,37 +1040,6 @@ func initVisitCounts(agents []string) map[string]int {
 	return counts
 }
 
-func ensureGitExclude(dir string) {
-	gitDir := filepath.Join(dir, ".git")
-	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		fmt.Println("[sgai]", "not a git repository, skipping .git/info/exclude")
-		return
-	}
-
-	gitInfoDir := filepath.Join(gitDir, "info")
-	if err := os.MkdirAll(gitInfoDir, 0755); err != nil {
-		log.Println("[sgai]", "failed to create .git/info directory:", err)
-		return
-	}
-
-	excludePath := filepath.Join(gitInfoDir, "exclude")
-	existingContent, err := os.ReadFile(excludePath)
-	if err != nil && !os.IsNotExist(err) {
-		log.Println("[sgai]", "failed to read .git/info/exclude:", err)
-		return
-	}
-
-	if dotSGAILinePresent(existingContent) {
-		return
-	}
-
-	existingContent = append(existingContent, []byte("/.sgai\n")...)
-	if err := os.WriteFile(excludePath, existingContent, 0644); err != nil {
-		log.Println("[sgai]", "failed to write .git/info/exclude:", err)
-		return
-	}
-}
-
 func dotSGAILinePresent(content []byte) bool {
 	for line := range bytes.SplitSeq(content, []byte("\n")) {
 		if bytes.Equal(bytes.TrimSpace(line), []byte("/.sgai")) {
@@ -1136,24 +1047,6 @@ func dotSGAILinePresent(content []byte) bool {
 		}
 	}
 	return false
-}
-
-func ensureJJ(dir string) {
-	if classifyWorkspace(dir) == workspaceFork {
-		return
-	}
-	cmd := exec.Command("jj", "status")
-	cmd.Dir = dir
-	if err := cmd.Run(); err != nil {
-		if isExecNotFound(err) {
-			log.Fatalln("jj is required but not found in PATH")
-		}
-		initCmd := exec.Command("jj", "git", "init", "--colocate")
-		initCmd.Dir = dir
-		if errInit := initCmd.Run(); errInit != nil {
-			log.Fatalln("failed to initialize jj:", errInit)
-		}
-	}
 }
 
 func isExecNotFound(err error) bool {
@@ -1165,25 +1058,7 @@ func isExecNotFound(err error) bool {
 }
 
 func initializeWorkspaceDir(dir string) error {
-	subFS, err := fs.Sub(skelFS, "skel")
-	if err != nil {
-		return fmt.Errorf("failed to access skeleton filesystem: %w", err)
-	}
-
-	if err := fs.WalkDir(subFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		outPath := filepath.Join(dir, path)
-		if d.IsDir() {
-			return os.MkdirAll(outPath, 0755)
-		}
-		data, err := fs.ReadFile(subFS, path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(outPath, data, 0644)
-	}); err != nil {
+	if err := unpackSkeleton(dir); err != nil {
 		return fmt.Errorf("failed to unpack skeleton: %w", err)
 	}
 
@@ -1195,7 +1070,9 @@ func initializeWorkspaceDir(dir string) error {
 		return fmt.Errorf("failed to initialize jj: %w", err)
 	}
 
-	ensureGitExclude(dir)
+	if err := addGitExclude(dir); err != nil {
+		return fmt.Errorf("failed to add git exclude: %w", err)
+	}
 
 	return nil
 }
@@ -1748,10 +1625,6 @@ func extractRetrospectiveDirFromProjectManagement(pmPath string) string {
 	return ""
 }
 
-func copyToRetrospective(src, dst string) error {
-	return copyFileAtomic(src, dst)
-}
-
 func copyFileAtomic(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
@@ -1838,27 +1711,6 @@ func exportSession(dir, sessionID, outputPath string) error {
 	return os.WriteFile(outputPath, output, 0644)
 }
 
-func modelStatusSymbol(status string) string {
-	switch status {
-	case "model-working":
-		return "◐"
-	case "model-done":
-		return "●"
-	case "model-error":
-		return "✕"
-	default:
-		return "○"
-	}
-}
-
-func extractModelShortName(modelID string) string {
-	_, modelSpec, found := strings.Cut(modelID, ":")
-	if found {
-		return modelSpec
-	}
-	return modelID
-}
-
 func formatDuration(d time.Duration) string {
 	totalSeconds := int(d.Seconds())
 	minutes := totalSeconds / 60
@@ -1926,15 +1778,6 @@ func isProtectedFile(subfolder, relPath string) bool {
 	return subfolder == "agent" && relPath == "coordinator.md"
 }
 
-func isTruish(s string) bool {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "yes", "true", "1", "on":
-		return true
-	default:
-		return false
-	}
-}
-
 func isFalsish(s string) bool {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "no", "false", "0", "off":
@@ -1945,33 +1788,5 @@ func isFalsish(s string) bool {
 }
 
 func retrospectiveEnabled(metadata GoalMetadata) bool {
-	if metadata.Retrospective == "" {
-		return true
-	}
-	if isTruish(metadata.Retrospective) {
-		return true
-	}
-	if isFalsish(metadata.Retrospective) {
-		return false
-	}
-	return true
-}
-
-func ensureImplicitRetrospectiveModel(flowDag *dag, metadata *GoalMetadata) {
-	if metadata.Models == nil {
-		metadata.Models = make(map[string]any)
-	}
-	_, existsInDag := flowDag.Nodes["retrospective"]
-	if !existsInDag {
-		return
-	}
-	_, existsInModels := metadata.Models["retrospective"]
-	if existsInModels {
-		return
-	}
-	coordinatorModel, hasCoordinator := metadata.Models["coordinator"]
-	if !hasCoordinator {
-		return
-	}
-	metadata.Models["retrospective"] = coordinatorModel
+	return !isFalsish(metadata.Retrospective)
 }

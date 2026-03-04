@@ -55,8 +55,6 @@ func jsonResult(v any) (*mcp.CallToolResult, error) {
 	return textResult(string(data)), nil
 }
 
-type emptyExternalResult struct{}
-
 func (ctx *externalMCPContext) resolveWorkspacePath(name string) (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("workspace name is required")
@@ -88,10 +86,10 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_workspaces",
 		Description: "List all workspaces and their current status.",
 		InputSchema: mustSchema[listWorkspacesArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ listWorkspacesArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ listWorkspacesArgs) (*mcp.CallToolResult, emptyResult, error) {
 		state := ctx.srv.buildFullFactoryState()
 		result, err := jsonResult(state)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getWorkspaceStateArgs struct {
@@ -101,16 +99,16 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_workspace_state",
 		Description: "Get detailed state for a specific workspace.",
 		InputSchema: mustSchema[getWorkspaceStateArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkspaceStateArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkspaceStateArgs) (*mcp.CallToolResult, emptyResult, error) {
 		stateResult, err := ctx.srv.getWorkspaceStateService(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		if !stateResult.Found {
-			return textResult(fmt.Sprintf("workspace not found: %s", args.Workspace)), emptyExternalResult{}, nil
+			return textResult(fmt.Sprintf("workspace not found: %s", args.Workspace)), emptyResult{}, nil
 		}
 		result, err := jsonResult(stateResult.Workspace)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getWorkflowSVGArgs struct {
@@ -120,16 +118,16 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_workflow_svg",
 		Description: "Get the workflow diagram as SVG for a workspace.",
 		InputSchema: mustSchema[getWorkflowSVGArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkflowSVGArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkflowSVGArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		svg := ctx.srv.getWorkflowSVGService(workspacePath)
 		if svg == "" {
-			return textResult("workflow SVG not available"), emptyExternalResult{}, nil
+			return textResult("workflow SVG not available"), emptyResult{}, nil
 		}
-		return textResult(svg), emptyExternalResult{}, nil
+		return textResult(svg), emptyResult{}, nil
 	})
 
 	type getWorkspaceDiffArgs struct {
@@ -139,14 +137,14 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_workspace_diff",
 		Description: "Get the current git diff for a workspace.",
 		InputSchema: mustSchema[getWorkspaceDiffArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkspaceDiffArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkspaceDiffArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		diffResult := ctx.srv.workspaceDiffService(workspacePath)
 		result, err := jsonResult(diffResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -158,13 +156,13 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "create_workspace",
 		Description: "Create a new workspace with the given name.",
 		InputSchema: mustSchema[createWorkspaceArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args createWorkspaceArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args createWorkspaceArgs) (*mcp.CallToolResult, emptyResult, error) {
 		createResult, err := ctx.srv.createWorkspaceService(args.Name)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(createResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type forkWorkspaceArgs struct {
@@ -175,17 +173,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "fork_workspace",
 		Description: "Create a fork of an existing workspace.",
 		InputSchema: mustSchema[forkWorkspaceArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args forkWorkspaceArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args forkWorkspaceArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		forkResult, err := ctx.srv.forkWorkspaceService(workspacePath, args.Name)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(forkResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type deleteForkArgs struct {
@@ -197,17 +195,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "delete_fork",
 		Description: "Delete a fork workspace. Requires confirmation.",
 		InputSchema: mustSchema[deleteForkArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args deleteForkArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args deleteForkArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		deleteResult, err := ctx.srv.deleteForkService(workspacePath, args.ForkDir, args.Confirm)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(deleteResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getGoalArgs struct {
@@ -217,17 +215,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_goal",
 		Description: "Get the GOAL.md content for a workspace.",
 		InputSchema: mustSchema[getGoalArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getGoalArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getGoalArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		goalResult, err := ctx.srv.getGoalService(workspacePath)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		result, err := jsonResult(goalResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type updateGoalArgs struct {
@@ -238,17 +236,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "update_goal",
 		Description: "Update the GOAL.md content for a workspace.",
 		InputSchema: mustSchema[updateGoalArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args updateGoalArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args updateGoalArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		updateResult, err := ctx.srv.updateGoalService(workspacePath, args.Content)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(updateResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type togglePinArgs struct {
@@ -258,17 +256,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "toggle_pin",
 		Description: "Toggle the pinned state of a workspace.",
 		InputSchema: mustSchema[togglePinArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args togglePinArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args togglePinArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		pinResult, err := ctx.srv.togglePinService(workspacePath)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		result, err := jsonResult(pinResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type updateDescriptionArgs struct {
@@ -279,17 +277,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "update_description",
 		Description: "Update the jj commit description for a workspace.",
 		InputSchema: mustSchema[updateDescriptionArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args updateDescriptionArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args updateDescriptionArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		descResult, err := ctx.srv.updateDescriptionService(workspacePath, args.Description)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(descResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type deleteMessageArgs struct {
@@ -300,17 +298,17 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "delete_message",
 		Description: "Delete a message from a workspace.",
 		InputSchema: mustSchema[deleteMessageArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args deleteMessageArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args deleteMessageArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		deleteResult, err := ctx.srv.deleteMessageService(workspacePath, args.ID)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(deleteResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -323,17 +321,17 @@ func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "start_session",
 		Description: "Start an agentic session for a workspace.",
 		InputSchema: mustSchema[startSessionArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args startSessionArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args startSessionArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		sessionResult, err := ctx.srv.startSessionService(workspacePath, args.Auto)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(sessionResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type stopSessionArgs struct {
@@ -343,14 +341,14 @@ func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "stop_session",
 		Description: "Stop the running session for a workspace.",
 		InputSchema: mustSchema[stopSessionArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args stopSessionArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args stopSessionArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		stopResult := ctx.srv.stopSessionService(workspacePath)
 		result, err := jsonResult(stopResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type respondToQuestionArgs struct {
@@ -363,17 +361,17 @@ func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "respond_to_question",
 		Description: "Respond to a pending question in a workspace session.",
 		InputSchema: mustSchema[respondToQuestionArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args respondToQuestionArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args respondToQuestionArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		respondResult, err := ctx.srv.respondService(workspacePath, args.QuestionID, args.Answer, args.SelectedChoices)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(respondResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type steerAgentArgs struct {
@@ -384,17 +382,17 @@ func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "steer_agent",
 		Description: "Send a steering instruction to the running agent.",
 		InputSchema: mustSchema[steerAgentArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args steerAgentArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args steerAgentArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		steerRes, err := ctx.srv.steerService(workspacePath, args.Message)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(steerRes)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -406,14 +404,14 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_agents",
 		Description: "List all agents available in a workspace.",
 		InputSchema: mustSchema[listAgentsArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args listAgentsArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args listAgentsArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		agentsResult := ctx.srv.listAgentsService(workspacePath)
 		result, err := jsonResult(agentsResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type listSkillsArgs struct {
@@ -423,14 +421,14 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_skills",
 		Description: "List all skills available in a workspace.",
 		InputSchema: mustSchema[listSkillsArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSkillsArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSkillsArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		skillsResult := ctx.srv.listSkillsService(workspacePath)
 		result, err := jsonResult(skillsResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getSkillDetailArgs struct {
@@ -441,17 +439,17 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_skill_detail",
 		Description: "Get detailed content for a specific skill.",
 		InputSchema: mustSchema[getSkillDetailArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getSkillDetailArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getSkillDetailArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		skillResult := ctx.srv.skillDetailService(workspacePath, args.Name)
 		if !skillResult.Found {
-			return textResult("skill not found: " + args.Name), emptyExternalResult{}, nil
+			return textResult("skill not found: " + args.Name), emptyResult{}, nil
 		}
 		result, err := jsonResult(skillResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type listSnippetsArgs struct {
@@ -461,14 +459,14 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_snippets",
 		Description: "List all code snippets available in a workspace.",
 		InputSchema: mustSchema[listSnippetsArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSnippetsArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSnippetsArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		snippetsResult := ctx.srv.listSnippetsService(workspacePath)
 		result, err := jsonResult(snippetsResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type listSnippetsByLanguageArgs struct {
@@ -479,17 +477,17 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_snippets_by_language",
 		Description: "List code snippets for a specific programming language.",
 		InputSchema: mustSchema[listSnippetsByLanguageArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSnippetsByLanguageArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args listSnippetsByLanguageArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		snippetsResult := ctx.srv.snippetsByLanguageService(workspacePath, args.Language)
 		if !snippetsResult.Found {
-			return textResult("language not found: " + args.Language), emptyExternalResult{}, nil
+			return textResult("language not found: " + args.Language), emptyResult{}, nil
 		}
 		result, err := jsonResult(snippetsResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getSnippetDetailArgs struct {
@@ -501,17 +499,17 @@ func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_snippet_detail",
 		Description: "Get detailed content for a specific code snippet.",
 		InputSchema: mustSchema[getSnippetDetailArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getSnippetDetailArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getSnippetDetailArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		snippetResult := ctx.srv.snippetDetailService(workspacePath, args.Language, args.FileName)
 		if !snippetResult.Found {
-			return textResult("snippet not found"), emptyExternalResult{}, nil
+			return textResult("snippet not found"), emptyResult{}, nil
 		}
 		result, err := jsonResult(snippetResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -523,14 +521,14 @@ func registerComposeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_compose_state",
 		Description: "Get the compose wizard state for a workspace.",
 		InputSchema: mustSchema[getComposeStateArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getComposeStateArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getComposeStateArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		composeResult := ctx.srv.composeStateService(workspacePath)
 		result, err := jsonResult(composeResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type saveComposeArgs struct {
@@ -541,17 +539,17 @@ func registerComposeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "save_compose",
 		Description: "Save the current compose state to GOAL.md.",
 		InputSchema: mustSchema[saveComposeArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args saveComposeArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args saveComposeArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		saveResult, err := ctx.srv.composeSaveService(workspacePath, args.IfMatch)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(saveResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getComposeTemplatesArgs struct{}
@@ -559,10 +557,10 @@ func registerComposeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_compose_templates",
 		Description: "Get available workflow templates for the compose wizard.",
 		InputSchema: mustSchema[getComposeTemplatesArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ getComposeTemplatesArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ getComposeTemplatesArgs) (*mcp.CallToolResult, emptyResult, error) {
 		templatesResult := ctx.srv.composeTemplatesService()
 		result, err := jsonResult(templatesResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type getComposePreviewArgs struct {
@@ -572,17 +570,17 @@ func registerComposeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_compose_preview",
 		Description: "Preview the GOAL.md that would be generated from the current compose state.",
 		InputSchema: mustSchema[getComposePreviewArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getComposePreviewArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getComposePreviewArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		previewResult, err := ctx.srv.composePreviewService(workspacePath)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		result, err := jsonResult(previewResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type saveComposeDraftArgs struct {
@@ -594,14 +592,14 @@ func registerComposeTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "save_compose_draft",
 		Description: "Save the compose state as a draft without writing to GOAL.md.",
 		InputSchema: mustSchema[saveComposeDraftArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args saveComposeDraftArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args saveComposeDraftArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveAnyWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		draftResult := ctx.srv.composeDraftService(workspacePath, args.State, wizardState(args.Wizard))
 		result, err := jsonResult(draftResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -613,14 +611,14 @@ func registerAdhocTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "get_adhoc_status",
 		Description: "Get the status of the ad-hoc prompt for a workspace.",
 		InputSchema: mustSchema[getAdhocStatusArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getAdhocStatusArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getAdhocStatusArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		statusResult := ctx.srv.adhocStatusService(workspacePath)
 		result, err := jsonResult(statusResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type startAdhocArgs struct {
@@ -632,17 +630,17 @@ func registerAdhocTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "start_adhoc",
 		Description: "Start an ad-hoc prompt in a workspace.",
 		InputSchema: mustSchema[startAdhocArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args startAdhocArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args startAdhocArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		startResult := ctx.srv.adhocStartService(workspacePath, args.Prompt, args.Model)
 		if startResult.Error != nil {
-			return textResult("error: " + startResult.Error.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + startResult.Error.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(startResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type stopAdhocArgs struct {
@@ -652,14 +650,14 @@ func registerAdhocTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "stop_adhoc",
 		Description: "Stop the running ad-hoc prompt in a workspace.",
 		InputSchema: mustSchema[stopAdhocArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args stopAdhocArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args stopAdhocArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		stopResult := ctx.srv.adhocStopService(workspacePath)
 		result, err := jsonResult(stopResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -671,17 +669,17 @@ func registerEditorTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "open_editor",
 		Description: "Open the workspace in the configured editor.",
 		InputSchema: mustSchema[openEditorArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		openResult, err := ctx.srv.openEditorService(workspacePath)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(openResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type openEditorGoalArgs struct {
@@ -691,17 +689,17 @@ func registerEditorTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "open_editor_goal",
 		Description: "Open the GOAL.md file in the configured editor.",
 		InputSchema: mustSchema[openEditorGoalArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorGoalArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorGoalArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		openResult, err := ctx.srv.openEditorGoalService(workspacePath)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(openResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 	type openEditorPMArgs struct {
@@ -711,17 +709,17 @@ func registerEditorTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "open_editor_pm",
 		Description: "Open the PROJECT_MANAGEMENT.md file in the configured editor.",
 		InputSchema: mustSchema[openEditorPMArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorPMArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args openEditorPMArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 		openResult, err := ctx.srv.openEditorProjectManagementService(workspacePath)
 		if err != nil {
-			return textResult("error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("error: " + err.Error()), emptyResult{}, nil
 		}
 		result, err := jsonResult(openResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 
 }
@@ -734,10 +732,10 @@ func registerModelTools(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "list_models",
 		Description: "List all available AI models.",
 		InputSchema: mustSchema[listModelsArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args listModelsArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args listModelsArgs) (*mcp.CallToolResult, emptyResult, error) {
 		modelsResult := ctx.srv.listModelsService(args.Workspace)
 		result, err := jsonResult(modelsResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
@@ -749,27 +747,27 @@ func registerElicitationTool(server *mcp.Server, ctx *externalMCPContext) {
 		Name:        "wait_for_question",
 		Description: "Wait for a pending question in a workspace and respond to it using MCP elicitation. Polls until a question is pending, then presents it to the harness for a response.",
 		InputSchema: mustSchema[waitForQuestionArgs](),
-	}, func(toolCtx context.Context, req *mcp.CallToolRequest, args waitForQuestionArgs) (*mcp.CallToolResult, emptyExternalResult, error) {
+	}, func(toolCtx context.Context, req *mcp.CallToolRequest, args waitForQuestionArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
-			return nil, emptyExternalResult{}, err
+			return nil, emptyResult{}, err
 		}
 
 		questionID, answer, err := elicitPendingQuestion(toolCtx, req.Session, ctx.srv, workspacePath)
 		if err != nil {
-			return textResult("elicitation error: " + err.Error()), emptyExternalResult{}, nil
+			return textResult("elicitation error: " + err.Error()), emptyResult{}, nil
 		}
 		if answer == "" {
-			return textResult("no response provided"), emptyExternalResult{}, nil
+			return textResult("no response provided"), emptyResult{}, nil
 		}
 
 		respondResult, errRespond := ctx.srv.respondService(workspacePath, questionID, answer, nil)
 		if errRespond != nil {
-			return textResult("respond error: " + errRespond.Error()), emptyExternalResult{}, nil
+			return textResult("respond error: " + errRespond.Error()), emptyResult{}, nil
 		}
 
 		result, err := jsonResult(respondResult)
-		return result, emptyExternalResult{}, err
+		return result, emptyResult{}, err
 	})
 }
 
