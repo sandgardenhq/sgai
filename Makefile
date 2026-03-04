@@ -7,7 +7,7 @@ webapp-build:
 webapp-test:
 	cd cmd/sgai/webapp && bun install && bun test
 
-test: webapp-test
+test: webapp-test webapp-build
 	go test -v ./...
 	$(MAKE) lint
 
