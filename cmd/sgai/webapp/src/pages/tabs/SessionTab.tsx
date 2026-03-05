@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
-import { useFactoryState } from "@/lib/factory-state";
+import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import type { ApiAgentCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
@@ -236,6 +236,7 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
     startSteerTransition(async () => {
       try {
         const response = await api.workspaces.steer(workspaceName, steerMessage.trim());
+        triggerFactoryRefresh();
         if (response.success) {
           setSteerSuccess(true);
           setSteerMessage("");

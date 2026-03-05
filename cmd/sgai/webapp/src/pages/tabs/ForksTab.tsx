@@ -10,6 +10,17 @@ import { Select, SelectOption } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
@@ -19,7 +30,7 @@ import {
 import { PromptHistory } from "@/components/PromptHistory";
 import { ActionBar } from "@/pages/tabs/SessionTab";
 import { api } from "@/lib/api";
-import { useFactoryState } from "@/lib/factory-state";
+import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import type { ApiForkEntry, ApiForkCommit, ApiActionEntry } from "@/types";
 
@@ -134,21 +145,18 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
     });
   }, [fork.name, isActionPending]);
 
-  const handleDelete = useCallback((event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleDeleteConfirmed = useCallback(() => {
     if (isActionPending) return;
-    const confirmed = window.confirm(`Delete fork ${fork.name}? This cannot be undone.`);
-    if (!confirmed) return;
     setActionError(null);
     startActionTransition(async () => {
       try {
         await api.workspaces.deleteFork(rootName, fork.dir);
+        triggerFactoryRefresh();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to delete fork");
       }
     });
-  }, [fork.name, fork.dir, rootName, isActionPending]);
+  }, [fork.dir, rootName, isActionPending]);
 
   const handleRespond = useCallback((event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -245,22 +253,43 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
               <TooltipContent>Open in sgai</TooltipContent>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={handleDelete}
-                  disabled={isActionPending}
-                  aria-label="Delete fork"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete fork</TooltipContent>
-            </Tooltip>
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      disabled={isActionPending}
+                      aria-label="Delete fork"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Delete fork</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete fork</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete &lsquo;{fork.name}&rsquo; from disk. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteConfirmed}
+                    disabled={isActionPending}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           {actions && actions.length > 0 && (

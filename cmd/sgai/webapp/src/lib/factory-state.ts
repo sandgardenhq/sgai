@@ -23,6 +23,8 @@ const SSE_CONNECT_TIMEOUT_MS = 5000;
 const SSE_BASE_BACKOFF_MS = 1000;
 const SSE_MAX_BACKOFF_MS = 30000;
 
+const DEBOUNCE_MS = 300;
+
 function createFactoryStateStore() {
   let snapshot: FactoryStateSnapshot = {
     workspaces: [],
@@ -40,6 +42,7 @@ function createFactoryStateStore() {
   let isFetching = false;
   let isDestroyed = false;
   let isStarted = false;
+  let refreshDebounceTimerId: ReturnType<typeof setTimeout> | null = null;
 
   function emitChange() {
     for (const listener of listeners) {
@@ -178,6 +181,21 @@ function createFactoryStateStore() {
     }
   }
 
+  function triggerRefresh() {
+    if (isDestroyed) return;
+
+    if (refreshDebounceTimerId !== null) {
+      clearTimeout(refreshDebounceTimerId);
+      refreshDebounceTimerId = null;
+    }
+
+    refreshDebounceTimerId = setTimeout(() => {
+      refreshDebounceTimerId = null;
+      void fetchState();
+      schedulePoll(POLL_INTERVAL_MS);
+    }, DEBOUNCE_MS);
+  }
+
   function stop() {
     isDestroyed = true;
     isStarted = false;
@@ -185,6 +203,11 @@ function createFactoryStateStore() {
     if (pollTimerId !== null) {
       clearTimeout(pollTimerId);
       pollTimerId = null;
+    }
+
+    if (refreshDebounceTimerId !== null) {
+      clearTimeout(refreshDebounceTimerId);
+      refreshDebounceTimerId = null;
     }
 
     if (sseTimeoutId !== null) {
@@ -234,6 +257,7 @@ function createFactoryStateStore() {
     getSnapshot,
     getServerSnapshot,
     stop,
+    triggerRefresh,
   };
 }
 
@@ -253,6 +277,11 @@ export function resetFactoryStateStore(): void {
     storeInstance.stop();
     storeInstance = null;
   }
+}
+
+export function triggerFactoryRefresh(): void {
+  const store = getFactoryStateStore();
+  store.triggerRefresh();
 }
 
 export function useFactoryState(): FactoryStateSnapshot {

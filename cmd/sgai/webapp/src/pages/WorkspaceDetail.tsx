@@ -18,7 +18,7 @@ import {
 import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { InlineForkEditor } from "@/pages/InlineForkEditor";
 import { api } from "@/lib/api";
-import { useFactoryState } from "@/lib/factory-state";
+import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import { ChevronRight, Square } from "lucide-react";
 import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
@@ -251,7 +251,6 @@ export function WorkspaceDetail(): JSX.Element | null {
   const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
   const selfDriveLabel = effectiveRunning ? "Self-Drive" : "Self-drive";
-  const showForkAction = !detail.isFork && !effectiveRunning;
   const showComposeGoalAction = !effectiveRunning;
   const showEditGoalAction = detail.hasSgai || Boolean(detail.goalContent?.trim());
   const showOpenEditorAction = true;
@@ -263,6 +262,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     startStartStopTransition(async () => {
       try {
         const result = await api.workspaces.start(workspaceName, false);
+        triggerFactoryRefresh();
         if (result.running) {
           setRunningOverride(true);
         }
@@ -275,10 +275,11 @@ export function WorkspaceDetail(): JSX.Element | null {
   const handleStop = () => {
     if (!workspaceName) return;
     setActionError(null);
-    setRunningOverride(null);
+    setRunningOverride(false);
     startStartStopTransition(async () => {
       try {
         await api.workspaces.stop(workspaceName);
+        triggerFactoryRefresh();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to stop session");
       }
@@ -291,6 +292,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     startSelfDriveTransition(async () => {
       try {
         await api.workspaces.start(workspaceName, true);
+        triggerFactoryRefresh();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to start self-drive session");
       }
@@ -303,6 +305,7 @@ export function WorkspaceDetail(): JSX.Element | null {
     startPinTransition(async () => {
       try {
         await api.workspaces.togglePin(workspaceName);
+        triggerFactoryRefresh();
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to toggle pin");
       }
@@ -321,10 +324,6 @@ export function WorkspaceDetail(): JSX.Element | null {
     });
   };
 
-  const rootWorkspaceName = detail.isFork
-    ? workspaces.find((ws) => ws.forks?.some((f) => f.name === workspaceName))?.name
-    : undefined;
-
   const showDeleteAction = !effectiveRunning && !isForkedRoot;
 
   const handleDelete = () => {
@@ -332,7 +331,13 @@ export function WorkspaceDetail(): JSX.Element | null {
     setActionError(null);
     startDeleteTransition(async () => {
       try {
-        await api.workspaces.deleteWorkspace(workspaceName);
+        if (detail.isFork) {
+          // Empty string for fork dir: the backend resolveRootForDeleteFork resolves the root from the fork name.
+          await api.workspaces.deleteFork(workspaceName, "");
+        } else {
+          await api.workspaces.deleteWorkspace(workspaceName);
+        }
+        triggerFactoryRefresh();
         navigate("/");
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to delete workspace");
@@ -471,27 +476,6 @@ export function WorkspaceDetail(): JSX.Element | null {
                         </Button>
                       )}
                     </>
-                  )}
-                  {showForkAction && (
-                    detail.isFork && rootWorkspaceName ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/workspaces/${encodeURIComponent(rootWorkspaceName)}/forks`)}
-                      >
-                        Fork
-                      </Button>
-                    ) : !detail.isFork ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/workspaces/${encodedWorkspace}/fork/new`)}
-                      >
-                        Fork
-                      </Button>
-                    ) : null
                   )}
                   {showComposeGoalAction && (
                     <Button

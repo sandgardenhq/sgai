@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api, ApiError } from "@/lib/api";
+import { triggerFactoryRefresh } from "@/lib/factory-state";
 import { ArrowLeft, FolderPlus, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 
@@ -25,6 +26,7 @@ export function NewWorkspace() {
 
       try {
         const result = await api.workspaces.create(trimmed);
+        triggerFactoryRefresh();
         navigate(`/compose?workspace=${encodeURIComponent(result.name)}`);
       } catch (err) {
         if (err instanceof ApiError) {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
+import { triggerFactoryRefresh } from "@/lib/factory-state";
 import { stripFrontmatter } from "@/lib/markdown-utils";
 import { Loader2, GitFork } from "lucide-react";
 
@@ -50,6 +51,7 @@ export function InlineForkEditor({ workspaceName }: InlineForkEditorProps) {
     startSubmitTransition(async () => {
       try {
         const result = await api.workspaces.fork(workspaceName, content);
+        triggerFactoryRefresh();
         navigate(`/workspaces/${encodeURIComponent(result.name)}/progress`);
       } catch (err) {
         if (err instanceof ApiError) {

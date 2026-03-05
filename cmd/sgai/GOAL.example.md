@@ -6,6 +6,8 @@ flow: |
   "project-critic-council"
   "skill-writer"
   "stpa-analyst"
+alias:
+  # "backend-go-developer-lite": "backend-go-developer"
 models:
   "coordinator": "anthropic/claude-opus-4-6 (max)"
   "backend-go-developer": "anthropic/claude-opus-4-6"
@@ -16,6 +18,7 @@ models:
   "stpa-analyst": "anthropic/claude-opus-4-6"
   "project-critic-council": ["anthropic/claude-opus-4-6"]
   "skill-writer": "anthropic/claude-opus-4-6 (max)"
+  # "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
 ---
 
 # Title of your Goal

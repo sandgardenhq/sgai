@@ -183,10 +183,11 @@ type deleteExternalForkResult struct {
 }
 
 func (s *Server) deleteExternalForkService(forkDir string) (deleteExternalForkResult, error) {
-	rootDir := getRootWorkspacePath(forkDir)
-	if rootDir == "" {
+	rootPath := getRootWorkspacePath(forkDir)
+	if rootPath == "" {
 		return deleteExternalForkResult{}, fmt.Errorf("could not determine root workspace for fork")
 	}
+	rootDir := resolveSymlinks(rootPath)
 
 	forkName := filepath.Base(forkDir)
 	s.stopSession(forkDir)

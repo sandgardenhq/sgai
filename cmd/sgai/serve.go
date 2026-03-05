@@ -62,7 +62,12 @@ func scanForProjects(rootDir string) ([]project, error) {
 			continue
 		}
 
-		dirPath := filepath.Join(rootDir, entry.Name())
+		name := entry.Name()
+		if name == "." || name == ".." {
+			continue
+		}
+
+		dirPath := filepath.Join(rootDir, name)
 		sgaiDir := filepath.Join(dirPath, ".sgai")
 		goalPath := filepath.Join(dirPath, "GOAL.md")
 
@@ -601,6 +606,9 @@ func cmdServe(args []string) {
 }
 
 func renderDotToSVG(dotContent string) string {
+	if dotContent == "" {
+		return ""
+	}
 	dotPath, err := exec.LookPath("dot")
 	if err != nil {
 		return renderDotAsFallbackSVG(dotContent)
@@ -1040,8 +1048,19 @@ func getRootWorkspacePath(forkDir string) string {
 	if rootPath == "" {
 		return ""
 	}
+	if !filepath.IsAbs(rootPath) {
+		absPath, err := filepath.Abs(filepath.Join(forkDir, ".jj", rootPath))
+		if err != nil {
+			return ""
+		}
+		rootPath = absPath
+	}
 	jjDir := filepath.Dir(rootPath)
-	return filepath.Dir(jjDir)
+	rootDir := filepath.Dir(jjDir)
+	if _, err := os.Stat(jjDir); os.IsNotExist(err) {
+		return ""
+	}
+	return rootDir
 }
 
 type jjCommit struct {
@@ -1391,8 +1410,11 @@ func (s *Server) loadPinnedProjects() error {
 	for _, d := range dirs {
 		if _, errStat := os.Stat(d); errStat == nil {
 			existing[resolveSymlinks(d)] = true
-		} else {
+		} else if os.IsNotExist(errStat) {
 			log.Println("pruning stale pinned path:", d)
+		} else {
+			log.Println("warning: cannot verify pinned path:", d, errStat)
+			existing[resolveSymlinks(d)] = true
 		}
 	}
 	s.mu.Lock()
@@ -1474,15 +1496,18 @@ func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
 	var standaloneGroups []workspaceGroup
 
 	for _, proj := range projects {
-		switch s.classifyWorkspaceCached(proj.Directory) {
+		resolvedDir := resolveSymlinks(proj.Directory)
+		classification := s.classifyWorkspaceCached(proj.Directory)
+
+		switch classification {
 		case workspaceRoot:
-			if _, exists := rootMap[proj.Directory]; !exists {
-				rootMap[proj.Directory] = &workspaceGroup{
+			if _, exists := rootMap[resolvedDir]; !exists {
+				rootMap[resolvedDir] = &workspaceGroup{
 					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, true, proj.HasWorkspace, false),
 				}
 			}
 		case workspaceFork:
-			rootPath := getRootWorkspacePath(proj.Directory)
+			rootPath := resolveSymlinks(getRootWorkspacePath(proj.Directory))
 			if rootPath == "" {
 				standaloneGroups = append(standaloneGroups, workspaceGroup{
 					Root: s.createWorkspaceInfo(proj.Directory, proj.DirName, false, proj.HasWorkspace, false),
@@ -1509,6 +1534,10 @@ func (s *Server) doScanWorkspaceGroups() ([]workspaceGroup, error) {
 	s.mu.Unlock()
 
 	for dir := range externalDirsCopy {
+		resolvedDir := resolveSymlinks(dir)
+		if _, exists := rootMap[resolvedDir]; exists {
+			continue
+		}
 		hasWorkspace := hassgaiDirectory(dir)
 		standaloneGroups = append(standaloneGroups, workspaceGroup{
 			Root: s.createWorkspaceInfo(dir, filepath.Base(dir), false, hasWorkspace, true),
@@ -1638,7 +1667,10 @@ func unpackSkeleton(workspacePath string) error {
 		}
 		outPath := filepath.Join(workspacePath, path)
 		if d.IsDir() {
-			return os.MkdirAll(outPath, 0755)
+			if err := os.MkdirAll(outPath, 0755); err != nil {
+				return err
+			}
+			return nil
 		}
 		data, errRead := fs.ReadFile(subFS, path)
 		if errRead != nil {
@@ -1693,17 +1725,6 @@ func validateWorkspaceName(name string) string {
 		}
 	}
 	return ""
-}
-
-func normalizeForkName(name string) string {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return ""
-	}
-	normalized := strings.ReplaceAll(trimmed, "_", " ")
-	parts := strings.Fields(normalized)
-	joined := strings.Join(parts, "-")
-	return strings.ToLower(joined)
 }
 
 type snippetData struct {
