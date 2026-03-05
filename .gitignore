@@ -9,3 +9,4 @@ sgai-test
 trees_dump.html
 verification/
 vendor/
+cover*.out

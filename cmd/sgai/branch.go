@@ -1,3 +1,4 @@
+// Package main contains the branch workflow operations.
 package main
 
 import (

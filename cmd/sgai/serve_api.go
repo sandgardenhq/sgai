@@ -1748,8 +1748,9 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.classifyWorkspaceCached(workspacePath) != workspaceRoot {
-		http.Error(w, "workspace is not a root", http.StatusBadRequest)
+	rootPath := s.resolveRootForDeleteFork(workspacePath)
+	if rootPath == "" {
+		http.Error(w, "workspace is not a root or fork", http.StatusBadRequest)
 		return
 	}
 
@@ -1764,8 +1765,8 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	forkDir, errValidate := s.validateDirectory(req.ForkDir)
-	if errValidate != nil {
+	forkDir := s.resolveForkDir(req.ForkDir, workspacePath, rootPath)
+	if forkDir == "" {
 		http.Error(w, "invalid fork directory", http.StatusBadRequest)
 		return
 	}
@@ -1775,7 +1776,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if getRootWorkspacePath(forkDir) != workspacePath {
+	if resolveSymlinks(getRootWorkspacePath(forkDir)) != rootPath {
 		http.Error(w, "fork does not belong to root", http.StatusBadRequest)
 		return
 	}
@@ -1785,7 +1786,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 	s.stopSession(forkDir)
 
 	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
-	forgetCmd.Dir = workspacePath
+	forgetCmd.Dir = rootPath
 	if _, errForget := forgetCmd.CombinedOutput(); errForget != nil {
 		http.Error(w, "failed to forget fork workspace", http.StatusInternalServerError)
 		return
@@ -1797,7 +1798,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.invalidateWorkspaceScanCache()
-	s.classifyCache.delete(workspacePath)
+	s.classifyCache.delete(rootPath)
 	s.classifyCache.delete(forkDir)
 	s.notifyStateChange()
 
@@ -1805,6 +1806,32 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 		Deleted: true,
 		Message: "fork deleted successfully",
 	})
+}
+
+func (s *Server) resolveRootForDeleteFork(workspacePath string) string {
+	classification := s.classifyWorkspaceCached(workspacePath)
+	switch classification {
+	case workspaceRoot:
+		return resolveSymlinks(workspacePath)
+	case workspaceFork:
+		return resolveSymlinks(getRootWorkspacePath(workspacePath))
+	default:
+		return ""
+	}
+}
+
+func (s *Server) resolveForkDir(requestForkDir, workspacePath, rootPath string) string {
+	if requestForkDir != "" {
+		validated, errValidate := s.validateDirectory(requestForkDir)
+		if errValidate != nil {
+			return ""
+		}
+		return validated
+	}
+	if workspacePath != rootPath {
+		return workspacePath
+	}
+	return ""
 }
 
 type apiDeleteWorkspaceRequest struct {
@@ -2239,7 +2266,7 @@ func (s *Server) filteredCommitsForWorkspace(workspacePath string) []jjCommit {
 		}
 		return s.runJJLogForWorkspaceCached(workspacePath)
 	case workspaceFork:
-		rootDir := getRootWorkspacePath(workspacePath)
+		rootDir := resolveSymlinks(getRootWorkspacePath(workspacePath))
 		if rootDir == "" {
 			return s.runJJLogForWorkspaceCached(workspacePath)
 		}

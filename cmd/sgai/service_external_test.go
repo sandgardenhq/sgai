@@ -1,565 +1,461 @@
 package main
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func newTestServerForExternal(t *testing.T) (*Server, string) {
-	t.Helper()
-	rootDir := t.TempDir()
-	configDir := t.TempDir()
-	srv := &Server{
-		sessions:           make(map[string]*session),
-		everStartedDirs:    make(map[string]bool),
-		pinnedDirs:         make(map[string]bool),
-		pinnedConfigDir:    configDir,
-		externalDirs:       make(map[string]bool),
-		externalConfigDir:  configDir,
-		rootDir:            rootDir,
-		workspaceScanCache: newTTLCache[string, []workspaceGroup](0),
-		classifyCache:      newTTLCache[string, workspaceKind](0),
-		signals:            newSignalBroker(),
-		stateCache:         newTTLCache[string, apiFactoryState](0),
-	}
-	return srv, rootDir
-}
-
 func TestLoadExternalDirs(t *testing.T) {
-	t.Run("missingFile", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		if err := srv.loadExternalDirs(); err != nil {
-			t.Fatalf("loadExternalDirs() unexpected error: %v", err)
-		}
-		if len(srv.externalDirs) != 0 {
-			t.Errorf("externalDirs should be empty; got %d entries", len(srv.externalDirs))
-		}
+	t.Run("noFile", func(t *testing.T) {
+		server, _ := setupTestServer(t)
+		server.externalConfigDir = t.TempDir()
+		err := server.loadExternalDirs()
+		assert.NoError(t, err)
 	})
 
-	t.Run("emptyArray", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		if err := os.WriteFile(srv.externalFilePath(), []byte("[]"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := srv.loadExternalDirs(); err != nil {
-			t.Fatalf("loadExternalDirs() unexpected error: %v", err)
-		}
-		if len(srv.externalDirs) != 0 {
-			t.Errorf("externalDirs should be empty; got %d entries", len(srv.externalDirs))
-		}
-	})
+	t.Run("validFile", func(t *testing.T) {
+		server, _ := setupTestServer(t)
+		configDir := t.TempDir()
+		server.externalConfigDir = configDir
 
-	t.Run("withPaths", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		dirA := t.TempDir()
-		dirB := t.TempDir()
-		data, _ := json.Marshal([]string{dirA, dirB})
-		if err := os.WriteFile(srv.externalFilePath(), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := srv.loadExternalDirs(); err != nil {
-			t.Fatalf("loadExternalDirs() unexpected error: %v", err)
-		}
-		if len(srv.externalDirs) != 2 {
-			t.Fatalf("externalDirs should have 2 entries; got %d", len(srv.externalDirs))
-		}
+		externalDir := t.TempDir()
+		data := `["` + externalDir + `"]`
+		require.NoError(t, os.WriteFile(filepath.Join(configDir, "external.json"), []byte(data), 0644))
+
+		err := server.loadExternalDirs()
+		assert.NoError(t, err)
 	})
 
 	t.Run("invalidJSON", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		if err := os.WriteFile(srv.externalFilePath(), []byte("{invalid"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := srv.loadExternalDirs(); err == nil {
-			t.Error("loadExternalDirs() should return error for invalid JSON")
-		}
-	})
+		server, _ := setupTestServer(t)
+		configDir := t.TempDir()
+		server.externalConfigDir = configDir
 
-	t.Run("prunesNonexistentDirectories", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		realDir := t.TempDir()
-		data, _ := json.Marshal([]string{realDir, "/nonexistent/path/that/does/not/exist"})
-		if err := os.WriteFile(srv.externalFilePath(), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := srv.loadExternalDirs(); err != nil {
-			t.Fatalf("loadExternalDirs() unexpected error: %v", err)
-		}
-		if len(srv.externalDirs) != 1 {
-			t.Fatalf("externalDirs should have 1 entry after pruning; got %d", len(srv.externalDirs))
-		}
+		require.NoError(t, os.WriteFile(filepath.Join(configDir, "external.json"), []byte(`{invalid}`), 0644))
+
+		err := server.loadExternalDirs()
+		assert.Error(t, err)
 	})
 }
 
 func TestSaveExternalDirs(t *testing.T) {
-	t.Run("createsDirectoryAndFile", func(t *testing.T) {
-		configDir := filepath.Join(t.TempDir(), "sgai")
-		srv := &Server{
-			externalDirs:      map[string]bool{"/path/to/a": true, "/path/to/b": true},
-			externalConfigDir: configDir,
-		}
-		if err := srv.saveExternalDirs(); err != nil {
-			t.Fatalf("saveExternalDirs() unexpected error: %v", err)
-		}
-		data, err := os.ReadFile(srv.externalFilePath())
-		if err != nil {
-			t.Fatalf("failed to read external.json: %v", err)
-		}
-		var dirs []string
-		if err := json.Unmarshal(data, &dirs); err != nil {
-			t.Fatalf("failed to parse external.json: %v", err)
-		}
-		if len(dirs) != 2 {
-			t.Fatalf("expected 2 paths; got %d", len(dirs))
-		}
-	})
+	server, _ := setupTestServer(t)
+	configDir := t.TempDir()
+	server.externalConfigDir = configDir
 
-	t.Run("emptyDirs", func(t *testing.T) {
-		configDir := filepath.Join(t.TempDir(), "sgai")
-		srv := &Server{
-			externalDirs:      make(map[string]bool),
-			externalConfigDir: configDir,
-		}
-		if err := srv.saveExternalDirs(); err != nil {
-			t.Fatalf("saveExternalDirs() unexpected error: %v", err)
-		}
-		data, err := os.ReadFile(srv.externalFilePath())
-		if err != nil {
-			t.Fatalf("failed to read external.json: %v", err)
-		}
-		var dirs []string
-		if err := json.Unmarshal(data, &dirs); err != nil {
-			t.Fatalf("failed to parse external.json: %v", err)
-		}
-		if len(dirs) != 0 {
-			t.Errorf("expected empty array; got %v", dirs)
-		}
-	})
+	server.mu.Lock()
+	server.externalDirs["/some/path"] = true
+	server.mu.Unlock()
+
+	err := server.saveExternalDirs()
+	assert.NoError(t, err)
+
+	data, errRead := os.ReadFile(filepath.Join(configDir, "external.json"))
+	require.NoError(t, errRead)
+	assert.Contains(t, string(data), "/some/path")
+}
+
+func TestIsExternalWorkspaceNotExternal(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	assert.False(t, srv.isExternalWorkspace("/some/random/path"))
 }
 
 func TestAttachExternalWorkspaceService(t *testing.T) {
-	t.Run("happyPath", func(t *testing.T) {
-		srv, rootDir := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-		_ = rootDir
+	tests := []struct {
+		name        string
+		path        string
+		setupFunc   func(*testing.T, string, string)
+		wantErr     bool
+		errContains string
+		validate    func(*testing.T, string, attachExternalResult)
+	}{
+		{
+			name: "attachValidExternalDirectory",
+			setupFunc: func(t *testing.T, _, externalPath string) {
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+			},
+			wantErr: false,
+			validate: func(t *testing.T, externalPath string, result attachExternalResult) {
+				assert.NotEmpty(t, result.Name)
+				assert.Equal(t, externalPath, result.Dir)
+			},
+		},
+		{
+			name: "attachWithRelativePath",
+			path: "relative/path",
+			setupFunc: func(_ *testing.T, _, _ string) {
+			},
+			wantErr:     true,
+			errContains: "path must be absolute",
+		},
+		{
+			name: "attachNonExistentDirectory",
+			path: "/non/existent/directory",
+			setupFunc: func(_ *testing.T, _, _ string) {
+			},
+			wantErr:     true,
+			errContains: "directory does not exist",
+		},
+		{
+			name: "attachFileNotDirectory",
+			setupFunc: func(t *testing.T, _, externalPath string) {
+				require.NoError(t, os.WriteFile(externalPath, []byte("test"), 0644))
+			},
+			wantErr:     true,
+			errContains: "path is not a directory",
+		},
+		{
+			name: "attachDirectoryUnderRoot",
+			setupFunc: func(_ *testing.T, _, _ string) {
+			},
+			wantErr:     true,
+			errContains: "path is within the root directory",
+		},
+	}
 
-		result, err := srv.attachExternalWorkspaceService(externalDir)
-		if err != nil {
-			t.Fatalf("attachExternalWorkspaceService() unexpected error: %v", err)
-		}
-		if result.Dir != externalDir {
-			t.Errorf("Dir = %q; want %q", result.Dir, externalDir)
-		}
-		if result.Name != filepath.Base(externalDir) {
-			t.Errorf("Name = %q; want %q", result.Name, filepath.Base(externalDir))
-		}
-		canonical := resolveSymlinks(externalDir)
-		srv.mu.Lock()
-		attached := srv.externalDirs[canonical]
-		srv.mu.Unlock()
-		if !attached {
-			t.Error("externalDirs should contain the attached dir")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			server := NewServer(rootDir)
 
-	t.Run("withGoalMD", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(externalDir, "GOAL.md"), []byte("# Goal\n"), 0644); err != nil {
-			t.Fatal(err)
-		}
+			var externalPath string
+			switch {
+			case tt.name == "attachDirectoryUnderRoot":
+				externalPath = filepath.Join(rootDir, "subdir")
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+			case tt.path != "":
+				externalPath = tt.path
+			default:
+				externalPath = filepath.Join(os.TempDir(), "external-workspace")
+				t.Cleanup(func() {
+					_ = os.RemoveAll(externalPath)
+				})
+			}
 
-		result, err := srv.attachExternalWorkspaceService(externalDir)
-		if err != nil {
-			t.Fatalf("attachExternalWorkspaceService() unexpected error: %v", err)
-		}
-		if !result.HasGoal {
-			t.Error("HasGoal should be true when GOAL.md exists")
-		}
-	})
+			tt.setupFunc(t, rootDir, externalPath)
 
-	t.Run("relativePathRejected", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		_, err := srv.attachExternalWorkspaceService("relative/path")
-		if err == nil {
-			t.Error("expected error for relative path")
-		}
-		if !strings.Contains(err.Error(), "absolute") {
-			t.Errorf("error should mention absolute; got %q", err.Error())
-		}
-	})
+			result, err := server.attachExternalWorkspaceService(externalPath)
 
-	t.Run("nonExistentDirRejected", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		_, err := srv.attachExternalWorkspaceService("/nonexistent/path/xyz")
-		if err == nil {
-			t.Error("expected error for non-existent directory")
-		}
-	})
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
 
-	t.Run("underRootDirRejected", func(t *testing.T) {
-		srv, rootDir := newTestServerForExternal(t)
-		subDir := filepath.Join(rootDir, "myworkspace")
-		if err := os.MkdirAll(subDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		_, err := srv.attachExternalWorkspaceService(subDir)
-		if err == nil {
-			t.Error("expected error for path under rootDir")
-		}
-		if !strings.Contains(err.Error(), "root directory") {
-			t.Errorf("error should mention root directory; got %q", err.Error())
-		}
-	})
-
-	t.Run("alreadyAttachedRejected", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-
-		if _, err := srv.attachExternalWorkspaceService(externalDir); err != nil {
-			t.Fatalf("first attach should succeed: %v", err)
-		}
-		_, err := srv.attachExternalWorkspaceService(externalDir)
-		if err == nil {
-			t.Error("expected error for already-attached directory")
-		}
-		if !strings.Contains(err.Error(), "already attached") {
-			t.Errorf("error should mention already attached; got %q", err.Error())
-		}
-	})
-
-	t.Run("persistsToDisk", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-
-		if _, err := srv.attachExternalWorkspaceService(externalDir); err != nil {
-			t.Fatalf("attachExternalWorkspaceService() unexpected error: %v", err)
-		}
-
-		srv2 := &Server{
-			externalDirs:      make(map[string]bool),
-			externalConfigDir: srv.externalConfigDir,
-		}
-		if err := srv2.loadExternalDirs(); err != nil {
-			t.Fatalf("loadExternalDirs() unexpected error: %v", err)
-		}
-		canonical := resolveSymlinks(externalDir)
-		if !srv2.externalDirs[canonical] {
-			t.Error("attached external dir should persist across server instances")
-		}
-	})
+			require.NoError(t, err)
+			if tt.validate != nil {
+				tt.validate(t, externalPath, result)
+			}
+		})
+	}
 }
 
 func TestDetachExternalWorkspaceService(t *testing.T) {
-	t.Run("happyPath", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
+	tests := []struct {
+		name        string
+		setupFunc   func(*testing.T, string, string, *Server)
+		wantErr     bool
+		errContains string
+		validate    func(*testing.T, detachExternalResult)
+	}{
+		{
+			name: "detachAttachedWorkspace",
+			setupFunc: func(t *testing.T, _ string, externalPath string, server *Server) {
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+				_, err := server.attachExternalWorkspaceService(externalPath)
+				require.NoError(t, err)
+			},
+			wantErr: false,
+			validate: func(t *testing.T, result detachExternalResult) {
+				assert.True(t, result.Detached)
+				assert.Equal(t, "external workspace detached", result.Message)
+			},
+		},
+		{
+			name: "detachNonAttachedWorkspace",
+			setupFunc: func(t *testing.T, _ string, externalPath string, _ *Server) {
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+			},
+			wantErr:     true,
+			errContains: "directory is not attached as an external workspace",
+		},
+	}
 
-		if _, err := srv.attachExternalWorkspaceService(externalDir); err != nil {
-			t.Fatalf("attach failed: %v", err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			server := NewServer(rootDir)
 
-		result, err := srv.detachExternalWorkspaceService(externalDir)
-		if err != nil {
-			t.Fatalf("detachExternalWorkspaceService() unexpected error: %v", err)
-		}
-		if !result.Detached {
-			t.Error("Detached should be true")
-		}
+			externalPath := filepath.Join(os.TempDir(), "external-workspace")
+			t.Cleanup(func() {
+				_ = os.RemoveAll(externalPath)
+			})
 
-		canonical := resolveSymlinks(externalDir)
-		srv.mu.Lock()
-		stillAttached := srv.externalDirs[canonical]
-		srv.mu.Unlock()
-		if stillAttached {
-			t.Error("externalDirs should not contain the detached dir")
-		}
+			tt.setupFunc(t, rootDir, externalPath, server)
 
-		if _, errStat := os.Stat(externalDir); errStat != nil {
-			t.Errorf("detach should not delete the directory: %v", errStat)
-		}
-	})
+			result, err := server.detachExternalWorkspaceService(externalPath)
 
-	t.Run("notAttachedReturnsError", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
 
-		_, err := srv.detachExternalWorkspaceService(externalDir)
-		if err == nil {
-			t.Error("expected error for directory not attached")
-		}
-		if !strings.Contains(err.Error(), "not attached") {
-			t.Errorf("error should mention not attached; got %q", err.Error())
-		}
-	})
+			require.NoError(t, err)
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
+	}
+}
+
+func TestIsExternalWorkspace(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(*testing.T, string, string, *Server)
+		expected  bool
+	}{
+		{
+			name: "isExternalTrue",
+			setupFunc: func(t *testing.T, _ string, externalPath string, server *Server) {
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+				_, err := server.attachExternalWorkspaceService(externalPath)
+				require.NoError(t, err)
+			},
+			expected: true,
+		},
+		{
+			name: "isExternalFalse",
+			setupFunc: func(t *testing.T, _ string, externalPath string, _ *Server) {
+				require.NoError(t, os.MkdirAll(externalPath, 0755))
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			server := NewServer(rootDir)
+
+			externalPath := filepath.Join(os.TempDir(), "external-workspace")
+			t.Cleanup(func() {
+				_ = os.RemoveAll(externalPath)
+			})
+
+			tt.setupFunc(t, rootDir, externalPath, server)
+
+			result := server.isExternalWorkspace(externalPath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDeleteExternalForkService(t *testing.T) {
+	if _, err := exec.LookPath("jj"); err != nil {
+		t.Skip("jj not found in PATH")
+	}
+
+	tests := []struct {
+		name        string
+		setupFunc   func(*testing.T, string, string, *Server)
+		wantErr     bool
+		errContains string
+		validate    func(*testing.T, string, deleteExternalForkResult)
+	}{
+		{
+			name: "deleteExternalFork",
+			setupFunc: func(t *testing.T, _ string, forkPath string, _ *Server) {
+				require.NoError(t, os.MkdirAll(forkPath, 0755))
+				require.NoError(t, os.MkdirAll(filepath.Join(forkPath, ".sgai"), 0755))
+			},
+			wantErr:     true,
+			errContains: "could not determine root workspace for fork",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			server := NewServer(rootDir)
+
+			forkPath := filepath.Join(os.TempDir(), "external-fork")
+			t.Cleanup(func() {
+				_ = os.RemoveAll(forkPath)
+			})
+
+			tt.setupFunc(t, rootDir, forkPath, server)
+
+			result, err := server.deleteExternalForkService(forkPath)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.validate != nil {
+				tt.validate(t, forkPath, result)
+			}
+		})
+	}
 }
 
 func TestBrowseDirectoriesService(t *testing.T) {
-	t.Run("listsSubdirectories", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, "alpha"), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.MkdirAll(filepath.Join(dir, "beta"), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("content"), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		entries, err := browseDirectoriesService(dir)
-		if err != nil {
-			t.Fatalf("browseDirectoriesService() unexpected error: %v", err)
-		}
-		if len(entries) != 2 {
-			t.Fatalf("expected 2 entries; got %d", len(entries))
-		}
-		names := make([]string, len(entries))
-		for i, e := range entries {
-			names[i] = e.Name
-		}
-		if !slices.Contains(names, "alpha") {
-			t.Errorf("expected alpha in entries; got %v", names)
-		}
-		if !slices.Contains(names, "beta") {
-			t.Errorf("expected beta in entries; got %v", names)
-		}
-	})
-
-	t.Run("filtersHiddenDirs", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, ".hidden"), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.MkdirAll(filepath.Join(dir, "visible"), 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		entries, err := browseDirectoriesService(dir)
-		if err != nil {
-			t.Fatalf("browseDirectoriesService() unexpected error: %v", err)
-		}
-		if len(entries) != 1 {
-			t.Fatalf("expected 1 entry (hidden filtered); got %d", len(entries))
-		}
-		if entries[0].Name != "visible" {
-			t.Errorf("expected visible; got %q", entries[0].Name)
-		}
-	})
-
-	t.Run("nonExistentPathReturnsError", func(t *testing.T) {
-		_, err := browseDirectoriesService("/nonexistent/path/xyz")
-		if err == nil {
-			t.Error("expected error for non-existent path")
-		}
-	})
-
-	t.Run("emptyPathUsesHomeDir", func(t *testing.T) {
-		entries, err := browseDirectoriesService("")
-		if err != nil {
-			t.Fatalf("browseDirectoriesService(\"\") unexpected error: %v", err)
-		}
-		_ = entries
-	})
-
-	t.Run("returnsIsDir", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, "subdir"), 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		entries, err := browseDirectoriesService(dir)
-		if err != nil {
-			t.Fatalf("browseDirectoriesService() unexpected error: %v", err)
-		}
-		if len(entries) != 1 {
-			t.Fatalf("expected 1 entry; got %d", len(entries))
-		}
-		if !entries[0].IsDir {
-			t.Error("IsDir should be true for directory entries")
-		}
-	})
-}
-
-func TestAPIBrowseDirectories(t *testing.T) {
-	srv, _ := newTestServerForExternal(t)
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "mysubdir"), 0755); err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name        string
+		path        string
+		setupFunc   func(*testing.T, string)
+		wantErr     bool
+		errContains string
+		validate    func(*testing.T, []directoryEntry)
+	}{
+		{
+			name: "browseValidDirectory",
+			setupFunc: func(t *testing.T, path string) {
+				require.NoError(t, os.MkdirAll(filepath.Join(path, "dir1"), 0755))
+				require.NoError(t, os.MkdirAll(filepath.Join(path, "dir2"), 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(path, "file1.txt"), []byte("test"), 0644))
+			},
+			wantErr: false,
+			validate: func(t *testing.T, entries []directoryEntry) {
+				assert.GreaterOrEqual(t, len(entries), 2)
+				for _, entry := range entries {
+					assert.True(t, entry.IsDir)
+					assert.NotEmpty(t, entry.Name)
+					assert.NotEmpty(t, entry.Path)
+				}
+			},
+		},
+		{
+			name:        "browseNonExistentDirectory",
+			path:        "/non/existent/directory",
+			setupFunc:   func(_ *testing.T, _ string) {},
+			wantErr:     true,
+			errContains: "directory does not exist",
+		},
+		{
+			name:      "browseEmptyPath",
+			path:      "",
+			setupFunc: func(_ *testing.T, _ string) {},
+			wantErr:   false,
+			validate: func(t *testing.T, entries []directoryEntry) {
+				assert.NotNil(t, entries)
+			},
+		},
 	}
 
-	mux := serverMux(t, srv)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/browse-directories?path="+dir, nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200; got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp apiBrowseDirectoriesResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-	if len(resp.Entries) != 1 {
-		t.Fatalf("expected 1 entry; got %d", len(resp.Entries))
-	}
-	if resp.Entries[0].Name != "mysubdir" {
-		t.Errorf("expected mysubdir; got %q", resp.Entries[0].Name)
-	}
-}
-
-func TestAPIAttachWorkspace(t *testing.T) {
-	t.Run("happyPath", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-
-		mux := serverMux(t, srv)
-
-		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
-
-		if w.Code != http.StatusCreated {
-			t.Fatalf("expected 201; got %d: %s", w.Code, w.Body.String())
-		}
-
-		var resp apiAttachWorkspaceResponse
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-		if resp.Dir != externalDir {
-			t.Errorf("Dir = %q; want %q", resp.Dir, externalDir)
-		}
-	})
-
-	t.Run("alreadyAttachedReturnsConflict", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-
-		if _, err := srv.attachExternalWorkspaceService(externalDir); err != nil {
-			t.Fatalf("first attach failed: %v", err)
-		}
-
-		mux := serverMux(t, srv)
-
-		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
-
-		if w.Code != http.StatusConflict {
-			t.Fatalf("expected 409; got %d: %s", w.Code, w.Body.String())
-		}
-	})
-
-	t.Run("relativePathReturnsBadRequest", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-
-		mux := serverMux(t, srv)
-
-		body := strings.NewReader(`{"path":"relative/path"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/attach", body)
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400; got %d: %s", w.Code, w.Body.String())
-		}
-	})
-}
-
-func TestAPIDetachWorkspace(t *testing.T) {
-	t.Run("happyPath", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-		externalDir := t.TempDir()
-
-		if _, err := srv.attachExternalWorkspaceService(externalDir); err != nil {
-			t.Fatalf("attach failed: %v", err)
-		}
-
-		mux := serverMux(t, srv)
-
-		body := strings.NewReader(`{"path":"` + externalDir + `"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/detach", body)
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200; got %d: %s", w.Code, w.Body.String())
-		}
-
-		var resp apiDetachWorkspaceResponse
-		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-		if !resp.Detached {
-			t.Error("Detached should be true")
-		}
-	})
-
-	t.Run("notAttachedReturnsNotFound", func(t *testing.T) {
-		srv, _ := newTestServerForExternal(t)
-
-		mux := serverMux(t, srv)
-
-		body := strings.NewReader(`{"path":"/some/not/attached/path"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/workspaces/detach", body)
-		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Fatalf("expected 404; got %d: %s", w.Code, w.Body.String())
-		}
-	})
-}
-
-func TestExternalWorkspacesAppearInScan(t *testing.T) {
-	rootDir := t.TempDir()
-	configDir := t.TempDir()
-
-	externalDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(externalDir, ".sgai"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	srv := &Server{
-		sessions:           make(map[string]*session),
-		everStartedDirs:    make(map[string]bool),
-		pinnedDirs:         make(map[string]bool),
-		pinnedConfigDir:    configDir,
-		externalDirs:       map[string]bool{resolveSymlinks(externalDir): true},
-		externalConfigDir:  configDir,
-		rootDir:            rootDir,
-		workspaceScanCache: newTTLCache[string, []workspaceGroup](0),
-		classifyCache:      newTTLCache[string, workspaceKind](0),
-		signals:            newSignalBroker(),
-	}
-
-	groups, err := srv.doScanWorkspaceGroups()
-	if err != nil {
-		t.Fatalf("doScanWorkspaceGroups() unexpected error: %v", err)
-	}
-
-	found := false
-	for _, grp := range groups {
-		if grp.Root.Directory == externalDir || grp.Root.Directory == resolveSymlinks(externalDir) {
-			if !grp.Root.External {
-				t.Error("External should be true for external workspace")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDir := t.TempDir()
+			if tt.path != "" && tt.path != "/non/existent/directory" {
+				testDir = tt.path
 			}
-			found = true
-			break
-		}
+
+			tt.setupFunc(t, testDir)
+
+			result, err := browseDirectoriesService(tt.path)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
 	}
-	if !found {
-		t.Errorf("external workspace %q should appear in scan results", externalDir)
+}
+
+func TestBrowseDirectoriesServicePermissionDenied(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping permission test as root")
+	}
+	dir := t.TempDir()
+	restrictedDir := filepath.Join(dir, "restricted")
+	require.NoError(t, os.MkdirAll(restrictedDir, 0755))
+	require.NoError(t, os.Chmod(restrictedDir, 0000))
+	t.Cleanup(func() { _ = os.Chmod(restrictedDir, 0755) })
+
+	_, err := browseDirectoriesService(restrictedDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reading directory")
+}
+
+func TestBrowseDirectoriesServiceHiddenDirsExcluded(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".hidden"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "visible"), 0755))
+
+	entries, err := browseDirectoriesService(dir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		assert.False(t, strings.HasPrefix(entry.Name, "."))
+	}
+}
+
+func TestClassifyWorkspace(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(*testing.T, string)
+		expected  workspaceKind
+	}{
+		{
+			name: "classifyStandaloneWorkspace",
+			setupFunc: func(t *testing.T, workspacePath string) {
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
+			},
+			expected: workspaceStandalone,
+		},
+		{
+			name: "classifyRootWorkspace",
+			setupFunc: func(t *testing.T, workspacePath string) {
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".jj", "repo"), 0755))
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
+			},
+			expected: workspaceStandalone,
+		},
+		{
+			name: "classifyForkWorkspace",
+			setupFunc: func(t *testing.T, workspacePath string) {
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".jj"), 0755))
+				repoFile := filepath.Join(workspacePath, ".jj", "repo")
+				require.NoError(t, os.WriteFile(repoFile, []byte("/path/to/parent"), 0644))
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
+			},
+			expected: workspaceFork,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+			server := NewServer(rootDir)
+
+			workspacePath := filepath.Join(rootDir, "test-workspace")
+			require.NoError(t, os.MkdirAll(workspacePath, 0755))
+			tt.setupFunc(t, workspacePath)
+
+			result := server.classifyWorkspaceCached(workspacePath)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }

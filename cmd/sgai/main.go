@@ -373,7 +373,8 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		saveState(cfg.coord, wfState)
 		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
 
-		agentArgs := buildAgentArgs(cfg.agent, modelSpec, capturedSessionID)
+		baseAgent := resolveBaseAgent(metadata.Alias, cfg.agent)
+		agentArgs := buildAgentArgs(cfg.agent, baseAgent, modelSpec, capturedSessionID)
 		agentMsg := buildAgentMessage(cfg, wfState, metadata)
 
 		newState, capturedSessionID, errExec := executeAgentProcess(ctx, cfg, agentArgs, agentMsg, prefix, outputCapture, wfState)
@@ -381,7 +382,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			return *errExec
 		}
 
-		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
+		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, baseAgent) {
 			exportAgentSession(cfg, capturedSessionID, *iterationCounter)
 		}
 
@@ -445,8 +446,8 @@ func copyProjectManagementToRetrospective(dir, retrospectiveDir string) {
 	}
 }
 
-func buildAgentArgs(agent, modelSpec, sessionID string) []string {
-	args := []string{"run", "--format=json", "--agent", agent}
+func buildAgentArgs(agent, baseAgent, modelSpec, sessionID string) []string {
+	args := []string{"run", "--format=json", "--agent", baseAgent}
 	if modelSpec != "" {
 		model, variant := parseModelAndVariant(modelSpec)
 		args = append(args, "--model", model)
@@ -466,7 +467,7 @@ func buildAgentArgs(agent, modelSpec, sessionID string) []string {
 }
 
 func buildAgentMessage(cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata) string {
-	msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
+	msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode, metadata.Alias)
 
 	multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
 	if multiModelSection != "" {
@@ -616,8 +617,40 @@ func handleCompleteStatus(ctx context.Context, cfg multiModelConfig, newState, w
 		return *blocked
 	}
 
+	if blocked := blockCompletionOnRetrospective(cfg, newState, metadata); blocked != nil {
+		return *blocked
+	}
+
 	copyCompletionArtifactsToRetrospective(cfg)
 	return newState
+}
+
+func blockCompletionOnRetrospective(cfg multiModelConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
+	if !retrospectiveEnabled(metadata) {
+		return nil
+	}
+	if _, exists := cfg.flowDag.Nodes["retrospective"]; !exists {
+		return nil
+	}
+	if newState.VisitCounts["retrospective"] > 0 {
+		return nil
+	}
+	fmt.Println("["+cfg.paddedsgai+"]", "blocking completion: retrospective agent has not run yet")
+	newState.Status = state.StatusAgentDone
+	addRetrospectiveRedirectMessage(&newState, cfg.agent)
+	saveState(cfg.coord, newState)
+	return &newState
+}
+
+func addRetrospectiveRedirectMessage(s *state.Workflow, fromAgent string) {
+	s.Messages = append(s.Messages, state.Message{
+		ID:        nextMessageID(s.Messages),
+		FromAgent: fromAgent,
+		ToAgent:   "retrospective",
+		Body:      "All work is complete and verified. Please run the retrospective analysis.",
+		Read:      false,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func blockCompletionOnPendingTodos(cfg multiModelConfig, newState, wfState state.Workflow) *state.Workflow {
@@ -770,17 +803,25 @@ func countPendingTodos(wfState state.Workflow, agent string) int {
 }
 
 // GoalMetadata represents the YAML frontmatter in GOAL.md files.
-// It configures workflow flow, per-agent models, and completion gate command.
-// Models can be either a single string or an array of strings per agent
-// (for multi-model support).
+// It configures workflow flow, per-agent models, agent aliases,
+// and completion gate command. Models can be either a single string
+// or an array of strings per agent (for multi-model support).
 type GoalMetadata struct {
-	Flow                 string         `json:"flow,omitempty" yaml:"flow,omitempty"`
-	Models               map[string]any `json:"models,omitempty" yaml:"models,omitempty"`
-	CompletionGateScript string         `json:"completionGateScript,omitempty" yaml:"completionGateScript,omitempty"`
-	ContinuousModePrompt string         `json:"continuousModePrompt,omitempty" yaml:"continuousModePrompt,omitempty"`
-	ContinuousModeAuto   string         `json:"continuousModeAuto,omitempty" yaml:"continuousModeAuto,omitempty"`
-	ContinuousModeCron   string         `json:"continuousModeCron,omitempty" yaml:"continuousModeCron,omitempty"`
-	Retrospective        string         `json:"retrospective,omitempty" yaml:"retrospective,omitempty"`
+	Flow                 string            `json:"flow,omitempty" yaml:"flow,omitempty"`
+	Models               map[string]any    `json:"models,omitempty" yaml:"models,omitempty"`
+	Alias                map[string]string `json:"alias,omitempty" yaml:"alias,omitempty"`
+	CompletionGateScript string            `json:"completionGateScript,omitempty" yaml:"completionGateScript,omitempty"`
+	ContinuousModePrompt string            `json:"continuousModePrompt,omitempty" yaml:"continuousModePrompt,omitempty"`
+	ContinuousModeAuto   string            `json:"continuousModeAuto,omitempty" yaml:"continuousModeAuto,omitempty"`
+	ContinuousModeCron   string            `json:"continuousModeCron,omitempty" yaml:"continuousModeCron,omitempty"`
+	Retrospective        string            `json:"retrospective,omitempty" yaml:"retrospective,omitempty"`
+}
+
+func resolveBaseAgent(alias map[string]string, agentName string) string {
+	if base, ok := alias[agentName]; ok {
+		return base
+	}
+	return agentName
 }
 
 type agentMetadata struct {
@@ -1058,6 +1099,11 @@ func isExecNotFound(err error) bool {
 }
 
 func initializeWorkspaceDir(dir string) error {
+	sgaiDir := filepath.Join(dir, ".sgai")
+	if _, err := os.Stat(sgaiDir); err == nil {
+		return nil
+	}
+
 	if err := unpackSkeleton(dir); err != nil {
 		return fmt.Errorf("failed to unpack skeleton: %w", err)
 	}

@@ -380,6 +380,10 @@ export function MarkdownEditor({
     const monaco = monacoRef.current;
     if (!workspaceName || !monaco || !monacoReady) return;
 
+    // The completion provider is registered globally for the "markdown" language. The cleanup
+    // disposes it on unmount/re-render, but if two editors mount simultaneously they would share
+    // the provider. Currently only one editor renders at a time (EditGoal is full-screen,
+    // InlineForkEditor is on workspace detail), so this is safe.
     completionDisposableRef.current?.dispose();
     completionDisposableRef.current = monaco.languages.registerCompletionItemProvider("markdown", {
       triggerCharacters: ['"', "'", " ", ":"],
@@ -565,6 +569,10 @@ export function MarkdownEditor({
               readOnly: disabled,
               domReadOnly: disabled,
               padding: { top: 8, bottom: 8 },
+              quickSuggestions: workspaceName ? { other: true, strings: true } : false,
+              wordBasedSuggestions: "off" as const,
+              suggestOnTriggerCharacters: !!workspaceName,
+              acceptSuggestionOnEnter: workspaceName ? "on" : "off",
             }}
           />
         </>

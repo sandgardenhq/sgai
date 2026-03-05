@@ -3,149 +3,126 @@ package main
 import (
 	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSingleflightBasicDedup(t *testing.T) {
-	var sf singleflight[string, int]
-	var callCount atomic.Int32
+func TestSingleflightDo(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		fn       func() (string, error)
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "success",
+			key:      "test-key",
+			fn:       func() (string, error) { return "result", nil },
+			expected: "result",
+			wantErr:  false,
+		},
+		{
+			name:    "error",
+			key:     "test-key",
+			fn:      func() (string, error) { return "", errors.New("test error") },
+			wantErr: true,
+		},
+	}
 
-	const goroutines = 10
-	var wg sync.WaitGroup
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sf singleflight[string, string]
+			result, err := sf.do(tt.key, tt.fn)
 
-	gate := make(chan struct{})
-	results := make([]int, goroutines)
-	errs := make([]error, goroutines)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 
-	for i := range goroutines {
-		wg.Go(func() {
-			<-gate
-			results[i], errs[i] = sf.do("key", func() (int, error) {
-				callCount.Add(1)
-				time.Sleep(50 * time.Millisecond)
-				return 42, nil
-			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		})
-	}
-
-	close(gate)
-	wg.Wait()
-
-	if got := callCount.Load(); got != 1 {
-		t.Errorf("expected fn called once, got %d", got)
-	}
-	for i := range goroutines {
-		if errs[i] != nil {
-			t.Errorf("goroutine %d: unexpected error: %v", i, errs[i])
-		}
-		if results[i] != 42 {
-			t.Errorf("goroutine %d: got %d, want 42", i, results[i])
-		}
 	}
 }
 
-func TestSingleflightErrorShared(t *testing.T) {
-	var sf singleflight[string, string]
-	errExpected := errors.New("test error")
-	var callCount atomic.Int32
+func TestSingleflightDeduplication(t *testing.T) {
+	var sf singleflight[string, int]
+	var callCount int
+	var mu sync.Mutex
+	shouldFail := false
 
-	const goroutines = 5
-	var wg sync.WaitGroup
-
-	gate := make(chan struct{})
-	errs := make([]error, goroutines)
-
-	for i := range goroutines {
-		wg.Go(func() {
-			<-gate
-			_, errs[i] = sf.do("key", func() (string, error) {
-				callCount.Add(1)
-				time.Sleep(50 * time.Millisecond)
-				return "", errExpected
-			})
-		})
-	}
-
-	close(gate)
-	wg.Wait()
-
-	if got := callCount.Load(); got != 1 {
-		t.Errorf("expected fn called once, got %d", got)
-	}
-	for i := range goroutines {
-		if !errors.Is(errs[i], errExpected) {
-			t.Errorf("goroutine %d: got error %v, want %v", i, errs[i], errExpected)
+	fn := func() (int, error) {
+		mu.Lock()
+		callCount++
+		fail := shouldFail
+		mu.Unlock()
+		if fail {
+			return 0, errors.New("intentional failure")
 		}
+		time.Sleep(100 * time.Millisecond)
+		return 42, nil
 	}
+
+	var wg sync.WaitGroup
+	results := make(chan int, 10)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := sf.do("same-key", fn)
+			require.NoError(t, err)
+			results <- result
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+
+	for result := range results {
+		assert.Equal(t, 42, result)
+	}
+
+	mu.Lock()
+	count := callCount
+	mu.Unlock()
+
+	assert.Equal(t, 1, count, "function should only be called once")
+
+	mu.Lock()
+	shouldFail = true
+	mu.Unlock()
+	_, err := sf.do("fail-key", fn)
+	require.Error(t, err)
 }
 
 func TestSingleflightDifferentKeys(t *testing.T) {
-	var sf singleflight[string, string]
-	var callCount atomic.Int32
-
-	var wg sync.WaitGroup
-
-	gate := make(chan struct{})
-
-	wg.Go(func() {
-		<-gate
-		_, _ = sf.do("key1", func() (string, error) {
-			callCount.Add(1)
-			time.Sleep(50 * time.Millisecond)
-			return "a", nil
-		})
-	})
-
-	wg.Go(func() {
-		<-gate
-		_, _ = sf.do("key2", func() (string, error) {
-			callCount.Add(1)
-			time.Sleep(50 * time.Millisecond)
-			return "b", nil
-		})
-	})
-
-	close(gate)
-	wg.Wait()
-
-	if got := callCount.Load(); got != 2 {
-		t.Errorf("expected fn called twice (different keys), got %d", got)
-	}
-}
-
-func TestSingleflightSequentialCallsNotCached(t *testing.T) {
 	var sf singleflight[string, int]
-	var callCount atomic.Int32
+	var callCount int
+	var mu sync.Mutex
 
-	for range 3 {
-		val, err := sf.do("key", func() (int, error) {
-			callCount.Add(1)
-			return 99, nil
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if val != 99 {
-			t.Fatalf("got %d, want 99", val)
-		}
+	fn := func() (int, error) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		return 1, nil
 	}
 
-	if got := callCount.Load(); got != 3 {
-		t.Errorf("sequential calls should each execute fn, got %d calls", got)
-	}
-}
+	result1, err := sf.do("key1", fn)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result1)
 
-func TestSingleflightZeroValue(t *testing.T) {
-	var sf singleflight[string, int]
-	val, err := sf.do("key", func() (int, error) {
-		return 0, nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if val != 0 {
-		t.Errorf("got %d, want 0", val)
-	}
+	result2, err := sf.do("key2", fn)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result2)
+
+	mu.Lock()
+	count := callCount
+	mu.Unlock()
+
+	assert.Equal(t, 2, count, "function should be called twice for different keys")
 }

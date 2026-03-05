@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
-import { useFactoryState } from "@/lib/factory-state";
+import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -96,6 +96,7 @@ export function MessagesTab({ workspaceName }: MessagesTabProps) {
     startTransition(async () => {
       try {
         const response = await api.workspaces.deleteMessage(workspaceName, messageId);
+        triggerFactoryRefresh();
         if (!response.deleted) {
           setDeleteError(response.message || "Failed to delete message");
         }

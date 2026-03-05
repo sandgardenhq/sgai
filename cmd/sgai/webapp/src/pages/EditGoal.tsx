@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { api, ApiError } from "@/lib/api";
+import { triggerFactoryRefresh, useFactoryState } from "@/lib/factory-state";
 import { ArrowLeft, Save, Loader2, Check } from "lucide-react";
 import { Link } from "react-router";
 
@@ -17,6 +19,11 @@ export function EditGoal(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { workspaces } = useFactoryState();
+  
+  const workspace = workspaces.find(w => w.name === workspaceName);
+  const description = workspace?.description || workspaceName;
+  const dir = workspace?.dir || "";
 
   useEffect(() => {
     return () => {
@@ -60,6 +67,7 @@ export function EditGoal(): JSX.Element {
 
     try {
       await api.workspaces.updateGoal(workspaceName, content);
+      triggerFactoryRefresh();
       setSaveSuccess(true);
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
@@ -118,6 +126,20 @@ export function EditGoal(): JSX.Element {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <span className="text-sm font-medium">Edit GOAL.md</span>
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-sm text-muted-foreground max-w-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-help">
+              {description}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="max-w-xs">
+              <div className="font-medium">{description}</div>
+              {dir && <div className="text-xs text-muted-foreground mt-1">{dir}</div>}
+            </div>
+          </TooltipContent>
+        </Tooltip>
 
         {error ? (
           <Alert className="py-1 px-3 border-destructive/50 text-destructive flex items-center gap-2 h-8">

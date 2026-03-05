@@ -100,6 +100,7 @@ func (s *Server) forkWorkspaceService(workspacePath, goalContent string) (forkWo
 	}
 
 	name := generateRandomForkName()
+
 	parentDir := filepath.Dir(workspacePath)
 	forkPath := filepath.Join(parentDir, name)
 	if _, errStat := os.Stat(forkPath); errStat == nil {
@@ -133,6 +134,15 @@ func (s *Server) forkWorkspaceService(workspacePath, goalContent string) (forkWo
 	s.mu.Unlock()
 	if errSave := s.savePinnedProjects(); errSave != nil {
 		log.Println("failed to persist pins:", errSave)
+	}
+
+	if s.isExternalWorkspace(workspacePath) {
+		s.mu.Lock()
+		s.externalDirs[resolveSymlinks(forkPath)] = true
+		s.mu.Unlock()
+		if errSave := s.saveExternalDirs(); errSave != nil {
+			log.Println("failed to save external dirs:", errSave)
+		}
 	}
 
 	s.notifyStateChange()
@@ -192,7 +202,7 @@ type deleteForkResult struct {
 }
 
 func (s *Server) deleteForkByPathService(forkDir string) (deleteForkResult, error) {
-	rootPath := getRootWorkspacePath(forkDir)
+	rootPath := resolveSymlinks(getRootWorkspacePath(forkDir))
 	if rootPath == "" {
 		return deleteForkResult{}, fmt.Errorf("could not determine root workspace for fork")
 	}
@@ -217,7 +227,7 @@ func (s *Server) deleteForkService(workspacePath, forkDir string, confirm bool) 
 		return deleteForkResult{}, fmt.Errorf("fork workspace not found")
 	}
 
-	if getRootWorkspacePath(validatedForkDir) != workspacePath {
+	if resolveSymlinks(getRootWorkspacePath(validatedForkDir)) != resolveSymlinks(workspacePath) {
 		return deleteForkResult{}, fmt.Errorf("fork does not belong to root")
 	}
 

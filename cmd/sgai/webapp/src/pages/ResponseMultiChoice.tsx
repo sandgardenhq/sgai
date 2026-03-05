@@ -99,7 +99,7 @@ export function ResponseMultiChoice() {
   if (error) {
     return (
       <div className="max-w-2xl mx-auto">
-        <p className="text-sm text-destructive">
+        <p className="text-sm text-destructive" role="alert">
           Failed to load question: {error.message}
         </p>
         <Link
@@ -185,7 +185,7 @@ export function ResponseMultiChoice() {
             </div>
 
             {submitError && (
-              <p className="text-sm text-destructive mt-3">{submitError}</p>
+              <p className="text-sm text-destructive mt-3" role="alert">{submitError}</p>
             )}
 
             <Button
