@@ -4,7 +4,7 @@
 
 - **Date**: 0001-01-01
 - **Version**: 0.0.0+00010101
-- **Summary**: Quick update: this release beefs up workspace management, improves the in-browser markdown editing experience, and rolls out an MCP-compatible HTTP endpoint.
+- **Summary**: Quick update: this release beefs up workspace management, streamlines the in-browser markdown editing experience, and rolls out an MCP-compatible HTTP endpoint.
 
 Hi folks! Here’s what changed.
 
