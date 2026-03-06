@@ -8,7 +8,7 @@
 
 Hi folks! Here’s what changed.
 
-### 🚀 New Features
+### New Features
 
 This release focuses on making it easier to manage workspaces and collaborate on changes, while also improving the editing experience in the web UI.
 
@@ -19,7 +19,7 @@ This release focuses on making it easier to manage workspaces and collaborate on
 - **Fork flow** - Updated `NewFork` to navigate to the workspace goal editor immediately after fork creation.
 - **MCP HTTP endpoint** - Added an external MCP-compatible HTTP endpoint with tool parity to sgai’s web API.
 
-### 🚧 Bug Fixes
+### Bug Fixes
 
 These changes tackle a handful of state and timeout issues to make long-running and interactive workflows more predictable.
 
@@ -30,7 +30,7 @@ These changes tackle a handful of state and timeout issues to make long-running 
 - **Completion gate cancellation** - Fixed long-running completion gate scripts by making execution context-aware and killable.
 - **Workbench timeouts** - Increased MCP HTTP transport timeout to reduce failures during slow interactive responses.
 
-### 🛠 Internal Updates
+### Internal Updates
 
 Under the hood, this release streamlines coordinator and workflow execution paths, tightens review/retrospective protocols, and refreshes build/test and documentation scaffolding.
 
