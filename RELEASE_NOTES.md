@@ -1,9 +1,9 @@
 # Release Notes
 
-## 0.0.0+00010101 — Workspaces, markdown editor, and MCP HTTP
+## 2026-03-06+00010101 — Workspaces, markdown editor, and MCP HTTP
 
 - **Date**: 0001-01-01
-- **Version**: 0.0.0+00010101
+- **Version**: 2026-03-06+00010101
 - **Summary**: Quick update: this release beefs up workspace management, streamlines the in-browser markdown editing experience, and rolls out an MCP-compatible HTTP endpoint.
 
 ### 🚀 New Features
@@ -48,10 +48,10 @@ Under the hood, this release introduces a stateful coordinator and reusable work
 - **Fork/compose refactors** - Refactored fork, compose, and messaging subsystems to reduce duplication and harden behavior.
 - **Workspace rename removal** - Removed workspace rename support in favor of explicit attach/detach flows for external workspaces.
 
-## 0.0.0+20260127 — Improved CI test reliability
+## 2026-03-06+20260127 — Improved CI test reliability
 
 - **Date**: 2026-01-27
-- **Version**: 0.0.0+20260127
+- **Version**: 2026-03-06+20260127
 - **Summary**: This release includes improved CI and cross-platform test reliability.
 
 ### Bug Fixes
