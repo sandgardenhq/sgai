@@ -6,9 +6,9 @@
 - **Version**: 0.0.0+00010101
 - **Summary**: Quick update: this release beefs up workspace management, streamlines the in-browser markdown editing experience, and rolls out an MCP-compatible HTTP endpoint.
 
-### New Features
+### 🚀 New Features
 
-This release focuses on making it easier to manage workspaces and collaborate on changes, while also improving the editing experience in the web UI.
+This release focuses on making it easier to manage, compare, and share workspaces end-to-end: safer attach and detach flows for external workspaces make it possible to disconnect outdated or experimental environments without accidentally destroying data, a server-side full diff endpoint backed by the source-of-truth VCS enables reliable workspace-wide comparisons from automations and MCP tools, and a richer Monaco-based markdown editor—complete with toolbar, live preview, and structured frontmatter support—turns long-form goal and spec editing into a faster, less error-prone experience; combined with a smoother fork flow that jumps directly into goal editing and an MCP-compatible HTTP endpoint that lets external orchestrators drive these capabilities programmatically and at scale, the release reduces friction from initial goal creation, through iterative editing and review, to plugging the system into larger automated workflows.
 
 - **External workspaces** - Added attach/detach support for external workspaces with non-destructive removal semantics and confirmed delete flows.
 - **Workspace full diff endpoint** - Added a server-side full diff API backed by `jj diff --git`.
@@ -17,9 +17,9 @@ This release focuses on making it easier to manage workspaces and collaborate on
 - **Fork flow** - Updated `NewFork` to navigate to the workspace goal editor immediately after fork creation.
 - **MCP HTTP endpoint** - Added an external MCP-compatible HTTP endpoint with tool parity to sgai’s web API.
 
-### Bug Fixes
+### 🐛 Bug Fixes
 
-These changes tackle a handful of state and timeout issues to make long-running and interactive workflows more predictable.
+These changes address a set of subtle state, filesystem, configuration, and timeout issues that previously showed up as flaky behavior in both the UI and automated flows: workspace renames now keep all views and caches in sync instead of leaving behind ghost entries, pinned directories behave consistently even when symlinks are involved, human-in-the-loop prompts and retrospective transitions follow a predictable sequence that is easier to understand and debug, and long-running completion scripts or MCP HTTP calls are more resilient to slow networks, transient failures, and configuration updates; taken together, these fixes reduce unexpected interruptions, make recovery from errors more explicit, and increase confidence that background operations will either complete successfully or fail in clear, debuggable ways.
 
 - **Workspace rename state** - Fixed stale UI state on rename by re-keying and clearing workspace-related caches.
 - **Pinned workspaces and symlinks** - Fixed pinned workspace behavior by storing directories as symlink-resolved paths.
@@ -28,9 +28,9 @@ These changes tackle a handful of state and timeout issues to make long-running 
 - **Completion gate cancellation** - Fixed long-running completion gate scripts by making execution context-aware and killable.
 - **Workbench timeouts** - Increased MCP HTTP transport timeout to reduce failures during slow interactive responses.
 
-### Internal Updates
+### 🧱 Internal Updates
 
-Under the hood, this release streamlines coordinator and workflow execution paths, tightens review/retrospective protocols, and refreshes build/test and documentation scaffolding.
+Under the hood, this release introduces a stateful coordinator and reusable workflow runner, standardizes GOAL-based workspace metadata and review and retrospective protocols, and tightens a broad range of internal systems—from agent prompts and retrospective wiring to actions configuration, build and test orchestration, dependency management, documentation scaffolding, and workspace forking and composition flows—to reduce one-off logic and implicit assumptions; these internal updates are aimed at making multi-step workflows more robust, clarifying review responsibilities and escalation paths, improving observability around long-running processes, and making it easier to evolve the system over time as new agents, goals, MCP integrations, and deployment targets are added.
 
 - **Coordinator model** - Added a stateful `Coordinator` to manage blocking human interaction and improve recovery.
 - **Workflow runner refactor** - Refactored workflow execution into a reusable runner and updated skills/snippets lookup.
