@@ -60,15 +60,12 @@ Ship a small Go API change and get it reviewed.
 
 After this, `backend-go-developer-lite` can be used anywhere an agent name is accepted (for example, in a workflow), and it will run like the base agent but with its alias-specific model.
 
-## What the base agent affects
+## What an alias inherits
 
-Sgai resolves some agent-specific content using the **base agent name** (the alias target).
+An alias:
 
-For example, flow message building uses the base agent name when it reads agent prompt markdown from:
-
-- `.sgai/agent/<base-agent>.md`
-
-It also uses the base agent name when it parses agent snippets.
+- Inherits the base agent’s prompt, tools, and snippets.
+- Uses the alias agent name’s model (from `models`).
 
 ## Notes and tips
 
