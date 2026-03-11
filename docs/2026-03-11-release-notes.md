@@ -1,6 +1,6 @@
 # 2026-03-11 Release Notes: Maintenance, performance, and documentation quality improvements
 
-Quick update: this week we focused on smoother automation configuration, more reliable workspace operations, and a round of cleanup to keep local development and tests predictable.
+Quick update: this week we focused on smoother automation configuration, more reliable workspace operations, and cleanup to keep local development and tests predictable.
 
 ## 🚀 New Features
 
@@ -16,7 +16,7 @@ This week’s fixes focus on making workspace flows more resilient, especially i
 
 We also tightened the compose wizard’s behavior so saving settings and recovering from errors is more consistent across sessions.
 
-- **Fixed workspace and fork recovery flows** - Improved workspace and fork rollback behavior to avoid inconsistent state during recovery.
+- **Fixed workspace and fork recovery flows** - Improved workspace and fork handling to avoid inconsistent state during recovery.
 - **Fixed compose wizard save and recovery** - Improved settings persistence and error handling so incomplete wizard state does not leak across sessions.
 
 ## 🛠 Internal Updates
