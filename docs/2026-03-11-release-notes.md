@@ -4,26 +4,28 @@ Hi folks! Here’s what shipped this week.
 
 - **Date**: 2026-03-11
 - **Version**: 0.0.0+20260311
-- **Summary**: Changes included in this release are listed below.
+- **Summary**: This release focuses on safer multi-repo workspace handling, improved testing reliability, and sharper reviewer-agent behavior.
 
-## Raw release notes data
+## 🚀 New Features
 
-```json
-{
-  "🚀 New Features": [
-    "You can now use agent aliases to refer to reviewer agents more flexibly across workflows.",
-    "The system now handles forks and external repositories more safely during workspace operations."
-  ],
-  "🛠 Internal Updates": [
-    "Running `make test` now ensures the web app is built and tested as part of the same command.",
-    "Reviewer agents now provide stricter, read-only feedback that is treated as blocking by default.",
-    "The codebase is easier to maintain due to consolidation of duplicated helpers and test utilities.",
-    "Core services and persistence flows are more consistent by sharing common logic instead of duplicating it.",
-    "Repository housekeeping and planning artifacts have been updated to reduce noise and track goals."
-  ]
-}
+This week’s feature work makes day-to-day workflows smoother and reduces friction when working across different repos. You can reference reviewer agents more flexibly, and workspace operations are more resilient when forks or external repositories are involved.
 
-```
+- **Agent aliases for reviewer selection** - You can now use agent aliases to refer to reviewer agents more flexibly across workflows.
+- **Safer workspace support for forks/external repos** - The system now handles forks and external repositories more safely during workspace operations.
+
+## 🚧 Bug Fixes
+
+No customer-facing bug fixes were shipped this week.
+
+## 🛠 Internal Updates
+
+We streamlined how tests run, tightened reviewer-agent prompts, and consolidated repeated helpers to keep the codebase easier to evolve. On top of that, we refined shared service logic and did a bit of repository housekeeping to reduce noise.
+
+- **`make test` builds and tests the web app** - Running `make test` now ensures the web app is built and tested as part of the same command.
+- **Stricter, read-only reviewer agents** - Reviewer agents now provide stricter, read-only feedback that is treated as blocking by default.
+- **Consolidated helpers and test utilities** - The codebase is easier to maintain due to consolidation of duplicated helpers and test utilities.
+- **Shared service logic for consistency** - Core services and persistence flows are more consistent by sharing common logic instead of duplicating it.
+- **Housekeeping and planning updates** - Repository housekeeping and planning artifacts have been updated to reduce noise and track goals.
 
 ---
 
