@@ -40,7 +40,7 @@ The codebase also went through simplification passes: shared logic is factored i
 * **Consolidate Go and React test utilities** - Centralize server test helpers, React test utilities, and workspace fixtures.
 * **Simplify code without behavior changes** - Remove unused helpers and consolidate overlapping utilities while updating call sites and tests.
 * **Update code auditing guidance** - Expand `AGENTS.md` guidance to check both literal usage and semantic liveness when auditing for dead routes.
-* **Add global ignore patterns** - Update `.gitignore` to ignore `**/.DS_Store` and `cover*.out`.
+* **Add global ignore patterns** - Update `.gitignore` to ignore `cover*.out`.
 * **Update planning artifacts** - Add and update `GOALS/` entries for ongoing cleanup and issue tracking.
 
 ---
