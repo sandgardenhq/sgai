@@ -2,6 +2,8 @@
 
 `sgai` reads an optional `sgai.json` file from the project root (as a sibling to the `.sgai` directory).
 
+This page documents settings in `sgai.json`. For settings that live in `GOAL.md` frontmatter (like `models`, `flow`, and `completionGateScript`), see [`GOAL.example.md`](../../GOAL.example.md).
+
 ## File name and location
 
 - File name: `sgai.json`
@@ -32,6 +34,10 @@ Notes:
 Type: boolean
 
 If `true`, `sgai` does not create or resume a retrospective directory for the workflow run.
+
+Notes:
+
+- When a workflow uses a `retrospective` agent node, disabling retrospectives also prevents `sgai` from creating/resuming the directory used to store retrospective sessions.
 
 ### `editor`
 
@@ -98,3 +104,14 @@ Merge rules:
 - If `sgai.json` does not exist, `sgai` proceeds without configuration.
 - If `sgai.json` exists but cannot be read due to permissions, `sgai` reports a "permission denied reading config file" error.
 - If `sgai.json` contains invalid JSON syntax or type mismatches, `sgai` reports an error that includes the file path and the failing offset or field.
+
+## Related behavior
+
+### Retrospective completion blocking
+
+Some workflows include a `retrospective` agent step. In that case, `sgai` can block workflow completion until the `retrospective` agent has run at least once.
+
+What this looks like in practice:
+
+- The workflow status is prevented from moving directly to “done” if the `retrospective` node exists in the flow graph and has not been visited.
+- A message is added that directs the workflow from the current agent to `retrospective` with the body: “All work is complete and verified. Please run the retrospective analysis.”
