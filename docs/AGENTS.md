@@ -2,6 +2,29 @@
 
 SGAI (Software Generation AI) uses specialized agents to accomplish different tasks in a software development workflow. Each agent has a specific role, expertise, and set of capabilities. Agents communicate with each other through a messaging system and can be coordinated by the coordinator agent to accomplish complex, multi-step goals.
 
+## Agent aliases
+
+Agent aliases let a workflow refer to an existing agent by another name.
+
+This is useful when the same agent role needs multiple “tiers” (for example, a cheaper model for routine work and a more capable model for difficult tasks), while keeping the base agent’s prompt/tools/snippets consistent.
+
+An aliased agent:
+
+- Inherits the base agent’s prompt, tools, and snippets.
+- Uses its own model configuration.
+- Can be selected and used in a workflow like any other agent.
+
+### Example
+
+The following example shows an alias named `backend-go-developer-lite` that points at `backend-go-developer`, but uses a different model.
+
+```yaml
+alias:
+  backend-go-developer-lite:
+    agent: backend-go-developer
+    model: anthropic/claude-haiku-4-5
+```
+
 ---
 
 ## agent-sdk-verifier-py
