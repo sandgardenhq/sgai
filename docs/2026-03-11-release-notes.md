@@ -1,10 +1,10 @@
-# 2026-03-11 0.0.0+20260311 — Weekly maintenance, usability, and reliability updates
+# 2026-03-11 0.0.0+20260311 — Weekly maintenance and reliability updates
 
 Hi folks! Quick update: here’s what we shipped this week.
 
 - **Date**: 2026-03-11
 - **Version**: 0.0.0+20260311
-- **Summary**: This release focuses on more rock-solid multi-repo workspace handling, improved testing reliability, and sharper reviewer-agent behavior.
+- **Summary**: This release includes more rock-solid multi-repo workspace handling, improved testing reliability, and sharper reviewer-agent behavior.
 
 ## 🚀 New Features
 
