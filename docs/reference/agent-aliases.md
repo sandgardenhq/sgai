@@ -2,17 +2,18 @@
 
 Agent aliases let a workflow refer to an existing agent prompt under an alternate name.
 
-This is useful when the workflow wants to keep the same underlying agent prompt, but use a different name in the workflow.
+Aliases are useful when the workflow wants to keep the same underlying agent prompt and tools, while changing how the agent is configured (for example, picking a different model).
 
 ## What an alias is
 
-In SGAI, an alias is a name mapping defined in `GOAL.md` frontmatter. The alias points to an existing agent.
+In SGAI, an alias is a name mapping defined in `GOAL.md` frontmatter. The alias points to an existing (base) agent.
 
-The weekly update for 2026-03-11 summarizes the current behavior:
+SGAI resolves an alias to its base agent name when it runs the agent.
 
-* Workflows can define `alias:` mappings in `GOAL.md` frontmatter.
-* Alias resolution is used when SGAI reads an agent prompt from disk.
-* Alias resolution is used when SGAI parses snippets for the current agent.
+The README summarizes the intent like this:
+
+* An alias lets the workflow reuse an existing agent’s prompt and tools.
+* The alias can run with a different model setting so the same role can run at different cost/capability tiers.
 
 ## How to define aliases in `GOAL.md`
 
@@ -29,6 +30,21 @@ alias:
 
 In this example, the workflow can refer to `reviewer-lite`, and SGAI resolves it to the `go-readability-reviewer` agent.
 
+## Example: reuse an agent prompt with a different model
+
+The README shows an example where an alias points at a base agent, and the model is overridden for the alias.
+
+```yaml
+---
+alias:
+  backend-go-developer-lite: backend-go-developer
+models:
+  backend-go-developer-lite: anthropic/claude-haiku-4-5
+---
+```
+
+This example keeps the same underlying agent prompt and tools as `backend-go-developer`, but runs it under the `backend-go-developer-lite` name and uses the configured model mapping for that alias.
+
 ## Using an alias
 
 Once defined, use the alias name anywhere the workflow expects an agent name.
@@ -40,5 +56,5 @@ Example (conceptual):
 
 ## Notes and limitations
 
-* This page documents alias behavior described in the 2026-03-11 weekly update and commit summary for `cmd/sgai: fix regressions from #356`.
-* If the repository’s `GOAL.md` uses a different frontmatter style (or different key names), follow that repository’s conventions.
+* An alias inherits the base agent’s prompt, tools, and snippets, and uses its own model configuration.
+* Aliased agent names behave like regular agent names in workflows.
