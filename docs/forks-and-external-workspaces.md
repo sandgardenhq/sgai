@@ -23,13 +23,15 @@ In these cases, two strings can refer to the same underlying directory, and a pl
 
 ### 1) Normalize paths by resolving symlinks
 
-When scanning and grouping workspaces, SGAI resolves symlinks and uses the resolved path as the canonical key.
+SGAI resolves symlinks and uses the resolved path when comparing root and workspace paths.
 
-In `cmd/sgai/serve.go`, workspace grouping and root/workspace comparisons use symlink-resolved paths.
+In `cmd/sgai/service_workspace.go`, root/workspace comparisons use symlink-resolved paths.
 
 ### 2) Treat forks of external workspaces as external
 
 The weekly update also calls out “External workspace fork tracking”: when the target workspace path is external, fork directories are recorded as external using the symlink-resolved fork path.
+
+In `cmd/sgai/service_workspace.go`, this is implemented by storing the fork’s resolved directory path in the service’s `externalDirs` map and attempting to persist the updated set (logging an error if persistence fails).
 
 ## Examples
 
