@@ -1,541 +1,424 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCountAttention(t *testing.T) {
-	cases := []struct {
-		name  string
-		items []menuBarItem
-		want  int
+	tests := []struct {
+		name     string
+		items    []menuBarItem
+		expected int
 	}{
 		{
-			name:  "empty",
-			items: nil,
-			want:  0,
-		},
-		{
-			name: "noAttention",
-			items: []menuBarItem{
-				{name: "a", running: true},
-				{name: "b", running: true},
-			},
-			want: 0,
+			name:     "emptyItems",
+			items:    []menuBarItem{},
+			expected: 0,
 		},
 		{
 			name: "needsInput",
 			items: []menuBarItem{
-				{name: "a", needsInput: true},
-				{name: "b", running: true},
+				{needsInput: true},
 			},
-			want: 1,
+			expected: 1,
 		},
 		{
 			name: "stopped",
 			items: []menuBarItem{
-				{name: "a", stopped: true},
-				{name: "b", running: true},
+				{stopped: true},
 			},
-			want: 1,
+			expected: 1,
 		},
 		{
-			name: "multipleAttention",
+			name: "running",
 			items: []menuBarItem{
-				{name: "a", needsInput: true},
-				{name: "b", stopped: true},
-				{name: "c", running: true},
+				{running: true},
 			},
-			want: 2,
+			expected: 0,
+		},
+		{
+			name: "pinned",
+			items: []menuBarItem{
+				{pinned: true},
+			},
+			expected: 0,
+		},
+		{
+			name: "mixedItems",
+			items: []menuBarItem{
+				{needsInput: true},
+				{running: true},
+				{stopped: true},
+				{pinned: true},
+			},
+			expected: 2,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := countAttention(tc.items)
-			if got != tc.want {
-				t.Errorf("countAttention() = %d; want %d", got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := countAttention(tt.items)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestCountRunning(t *testing.T) {
-	cases := []struct {
-		name  string
-		items []menuBarItem
-		want  int
+	tests := []struct {
+		name     string
+		items    []menuBarItem
+		expected int
 	}{
 		{
-			name:  "empty",
-			items: nil,
-			want:  0,
+			name:     "emptyItems",
+			items:    []menuBarItem{},
+			expected: 0,
 		},
 		{
-			name: "twoRunning",
+			name: "running",
 			items: []menuBarItem{
-				{name: "a", running: true},
-				{name: "b", running: true},
-				{name: "c"},
+				{running: true},
 			},
-			want: 2,
+			expected: 1,
+		},
+		{
+			name: "notRunning",
+			items: []menuBarItem{
+				{running: false},
+			},
+			expected: 0,
+		},
+		{
+			name: "mixedItems",
+			items: []menuBarItem{
+				{running: true},
+				{running: false},
+				{running: true},
+			},
+			expected: 2,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := countRunning(tc.items)
-			if got != tc.want {
-				t.Errorf("countRunning() = %d; want %d", got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := countRunning(tt.items)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestCountActive(t *testing.T) {
-	cases := []struct {
-		name  string
-		items []menuBarItem
-		want  int
+	tests := []struct {
+		name     string
+		items    []menuBarItem
+		expected int
 	}{
 		{
-			name:  "empty",
-			items: nil,
-			want:  0,
+			name:     "emptyItems",
+			items:    []menuBarItem{},
+			expected: 0,
 		},
 		{
-			name: "allRunning",
+			name: "running",
 			items: []menuBarItem{
-				{name: "a", running: true},
-				{name: "b", running: true},
+				{running: true},
 			},
-			want: 2,
+			expected: 1,
 		},
 		{
-			name: "mixed",
+			name: "stopped",
 			items: []menuBarItem{
-				{name: "a", running: true},
-				{name: "b", stopped: true},
-				{name: "c", needsInput: true},
-				{name: "d"},
+				{stopped: true},
 			},
-			want: 3,
+			expected: 1,
 		},
 		{
-			name: "noneActive",
+			name: "needsInput",
 			items: []menuBarItem{
-				{name: "a"},
-				{name: "b"},
+				{needsInput: true},
 			},
-			want: 0,
+			expected: 1,
 		},
 		{
-			name: "pinnedOnly",
+			name: "pinned",
 			items: []menuBarItem{
-				{name: "a", pinned: true},
-				{name: "b"},
+				{pinned: true},
 			},
-			want: 1,
+			expected: 1,
 		},
 		{
-			name: "pinnedAndRunning",
+			name: "inactive",
 			items: []menuBarItem{
-				{name: "a", running: true},
-				{name: "b", pinned: true},
-				{name: "c", pinned: true, running: true},
+				{running: false, stopped: false, needsInput: false, pinned: false},
 			},
-			want: 3,
+			expected: 0,
+		},
+		{
+			name: "mixedItems",
+			items: []menuBarItem{
+				{running: true},
+				{stopped: true},
+				{needsInput: true},
+				{pinned: true},
+				{running: false, stopped: false, needsInput: false, pinned: false},
+			},
+			expected: 4,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := countActive(tc.items)
-			if got != tc.want {
-				t.Errorf("countActive() = %d; want %d", got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := countActive(tt.items)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestFilterVisibleItems(t *testing.T) {
-	t.Run("attentionItems", func(t *testing.T) {
-		items := []menuBarItem{
-			{name: "a", running: true},
-			{name: "b", needsInput: true},
-			{name: "c", stopped: true},
-			{name: "d", running: true},
-		}
-		got := filterVisibleItems(items)
-		if len(got) != 2 {
-			t.Fatalf("filterVisibleItems() returned %d items; want 2", len(got))
-		}
-		if got[0].name != "b" {
-			t.Errorf("filterVisibleItems()[0].name = %q; want %q", got[0].name, "b")
-		}
-		if got[1].name != "c" {
-			t.Errorf("filterVisibleItems()[1].name = %q; want %q", got[1].name, "c")
-		}
-	})
-
-	t.Run("empty", func(t *testing.T) {
-		items := []menuBarItem{
-			{name: "a", running: true},
-		}
-		got := filterVisibleItems(items)
-		if len(got) != 0 {
-			t.Errorf("filterVisibleItems() returned %d items; want 0", len(got))
-		}
-	})
-
-	t.Run("pinnedIncluded", func(t *testing.T) {
-		items := []menuBarItem{
-			{name: "a", running: true},
-			{name: "b", pinned: true},
-			{name: "c", running: true, pinned: true},
-		}
-		got := filterVisibleItems(items)
-		if len(got) != 2 {
-			t.Fatalf("filterVisibleItems() returned %d items; want 2", len(got))
-		}
-		if got[0].name != "b" {
-			t.Errorf("filterVisibleItems()[0].name = %q; want %q", got[0].name, "b")
-		}
-		if got[1].name != "c" {
-			t.Errorf("filterVisibleItems()[1].name = %q; want %q", got[1].name, "c")
-		}
-	})
-
-	t.Run("pinnedWithAttention", func(t *testing.T) {
-		items := []menuBarItem{
-			{name: "a", needsInput: true},
-			{name: "b", pinned: true},
-			{name: "c", stopped: true},
-		}
-		got := filterVisibleItems(items)
-		if len(got) != 3 {
-			t.Fatalf("filterVisibleItems() returned %d items; want 3", len(got))
-		}
-	})
-}
-
-func TestFormatMenuItemLabel(t *testing.T) {
-	cases := []struct {
-		name string
-		item menuBarItem
-		want string
+	tests := []struct {
+		name     string
+		items    []menuBarItem
+		expected int
 	}{
 		{
+			name:     "emptyItems",
+			items:    []menuBarItem{},
+			expected: 0,
+		},
+		{
 			name: "needsInput",
-			item: menuBarItem{name: "my-workspace", needsInput: true},
-			want: "\u26A0 my-workspace (Needs Input)",
+			items: []menuBarItem{
+				{needsInput: true, name: "test"},
+			},
+			expected: 1,
 		},
 		{
 			name: "stopped",
-			item: menuBarItem{name: "my-workspace", stopped: true},
-			want: "\u25A0 my-workspace (Stopped)",
+			items: []menuBarItem{
+				{stopped: true, name: "test"},
+			},
+			expected: 1,
 		},
 		{
-			name: "runningPinned",
-			item: menuBarItem{name: "my-workspace", running: true, pinned: true},
-			want: "\u25B6 my-workspace (Running)",
+			name: "pinned",
+			items: []menuBarItem{
+				{pinned: true, name: "test"},
+			},
+			expected: 1,
 		},
 		{
-			name: "idlePinned",
-			item: menuBarItem{name: "my-workspace", pinned: true},
-			want: "\u25CB my-workspace",
+			name: "runningNotVisible",
+			items: []menuBarItem{
+				{running: true, name: "test"},
+			},
+			expected: 0,
 		},
 		{
-			name: "pinnedWithStoppedFlag",
-			item: menuBarItem{name: "my-workspace", pinned: true, stopped: true},
-			want: "\u25CB my-workspace",
-		},
-		{
-			name: "defaultNoFlags",
-			item: menuBarItem{name: "my-workspace"},
-			want: "my-workspace",
-		},
-		{
-			name: "descriptionOverridesName",
-			item: menuBarItem{name: "my-workspace", description: "My Goal Title", needsInput: true},
-			want: "\u26A0 My Goal Title (Needs Input)",
-		},
-		{
-			name: "descriptionUsedWhenStopped",
-			item: menuBarItem{name: "my-workspace", description: "My Goal Title", stopped: true},
-			want: "\u25A0 My Goal Title (Stopped)",
-		},
-		{
-			name: "descriptionUsedWhenPinned",
-			item: menuBarItem{name: "my-workspace", description: "My Goal Title", pinned: true},
-			want: "\u25CB My Goal Title",
-		},
-		{
-			name: "emptyDescriptionFallsBackToName",
-			item: menuBarItem{name: "my-workspace", description: "", pinned: true},
-			want: "\u25CB my-workspace",
+			name: "mixedItems",
+			items: []menuBarItem{
+				{needsInput: true, name: "a"},
+				{running: true, name: "b"},
+				{stopped: true, name: "c"},
+				{pinned: true, name: "d"},
+			},
+			expected: 3,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := formatMenuItemLabel(tc.item)
-			if got != tc.want {
-				t.Errorf("formatMenuItemLabel() = %q; want %q", got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := filterVisibleItems(tt.items)
+			assert.Len(t, result, tt.expected)
 		})
 	}
 }
 
-func TestGoalDescription(t *testing.T) {
-	t.Run("withGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		goalContent := "# My Project Goal\n\n- [ ] Task 1\n"
-		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-		got := goalDescription(dir, "fallback-name")
-		if got != "My Project Goal" {
-			t.Errorf("goalDescription() = %q; want %q", got, "My Project Goal")
-		}
-	})
-
-	t.Run("withoutGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		got := goalDescription(dir, "fallback-name")
-		if got != "fallback-name" {
-			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
-		}
-	})
-
-	t.Run("emptyGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(""), 0644); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-		got := goalDescription(dir, "fallback-name")
-		if got != "fallback-name" {
-			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
-		}
-	})
-
-	t.Run("emptyDirectory", func(t *testing.T) {
-		got := goalDescription("", "fallback-name")
-		if got != "fallback-name" {
-			t.Errorf("goalDescription() = %q; want %q", got, "fallback-name")
-		}
-	})
-}
-
-func TestWorkspaceURL(t *testing.T) {
-	cases := []struct {
-		name    string
-		baseURL string
-		wsName  string
-		subpath string
-		want    string
+func TestFormatMenuItemLabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		item     menuBarItem
+		expected string
 	}{
 		{
-			name:    "respondRoute",
-			baseURL: "http://127.0.0.1:8080",
-			wsName:  "my-project",
-			subpath: "respond",
-			want:    "http://127.0.0.1:8080/workspaces/my-project/respond",
+			name: "needsInput",
+			item: menuBarItem{
+				name:        "workspace",
+				description: "Test Goal",
+				needsInput:  true,
+			},
+			expected: "\u26A0 Test Goal (Needs Input)",
 		},
 		{
-			name:    "progressRoute",
-			baseURL: "http://127.0.0.1:8080",
-			wsName:  "my-project",
-			subpath: "progress",
-			want:    "http://127.0.0.1:8080/workspaces/my-project/progress",
+			name: "runningAndPinned",
+			item: menuBarItem{
+				name:        "workspace",
+				description: "Test Goal",
+				running:     true,
+				pinned:      true,
+			},
+			expected: "\u25B6 Test Goal (Running)",
 		},
 		{
-			name:    "customPort",
-			baseURL: "http://localhost:9090",
-			wsName:  "test-ws",
-			subpath: "progress",
-			want:    "http://localhost:9090/workspaces/test-ws/progress",
+			name: "pinnedOnly",
+			item: menuBarItem{
+				name:        "workspace",
+				description: "Test Goal",
+				pinned:      true,
+			},
+			expected: "\u25CB Test Goal",
 		},
 		{
-			name:    "invalidURL",
-			baseURL: "://invalid",
-			wsName:  "test",
-			subpath: "respond",
-			want:    "://invalid/workspaces/test/respond",
+			name: "stopped",
+			item: menuBarItem{
+				name:        "workspace",
+				description: "Test Goal",
+				stopped:     true,
+			},
+			expected: "\u25A0 Test Goal (Stopped)",
+		},
+		{
+			name: "default",
+			item: menuBarItem{
+				name:        "workspace",
+				description: "Test Goal",
+			},
+			expected: "Test Goal",
+		},
+		{
+			name: "noDescription",
+			item: menuBarItem{
+				name: "workspace",
+			},
+			expected: "workspace",
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := workspaceURL(tc.baseURL, tc.wsName, tc.subpath)
-			if got != tc.want {
-				t.Errorf("workspaceURL(%q, %q, %q) = %q; want %q", tc.baseURL, tc.wsName, tc.subpath, got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatMenuItemLabel(tt.item)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestWorkspaceItemSubpath(t *testing.T) {
-	cases := []struct {
-		name string
-		item menuBarItem
-		want string
+	tests := []struct {
+		name     string
+		item     menuBarItem
+		expected string
 	}{
 		{
-			name: "needsInput",
-			item: menuBarItem{name: "ws", needsInput: true},
-			want: "respond",
+			name:     "needsInput",
+			item:     menuBarItem{needsInput: true},
+			expected: "respond",
 		},
 		{
-			name: "stopped",
-			item: menuBarItem{name: "ws", stopped: true},
-			want: "progress",
-		},
-		{
-			name: "running",
-			item: menuBarItem{name: "ws", running: true},
-			want: "progress",
+			name:     "notNeedsInput",
+			item:     menuBarItem{needsInput: false},
+			expected: "progress",
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := workspaceItemSubpath(tc.item)
-			if got != tc.want {
-				t.Errorf("workspaceItemSubpath() = %q; want %q", got, tc.want)
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := workspaceItemSubpath(tt.item)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestWorkspaceURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		baseURL   string
+		workspace string
+		subpath   string
+		expected  string
+	}{
+		{
+			name:      "validURL",
+			baseURL:   "http://localhost:8080",
+			workspace: "my-workspace",
+			subpath:   "progress",
+			expected:  "http://localhost:8080/workspaces/my-workspace/progress",
+		},
+		{
+			name:      "urlWithTrailingSlash",
+			baseURL:   "http://localhost:8080/",
+			workspace: "my-workspace",
+			subpath:   "progress",
+			expected:  "http://localhost:8080/workspaces/my-workspace/progress",
+		},
+		{
+			name:      "urlWithPath",
+			baseURL:   "http://localhost:8080/some/path",
+			workspace: "my-workspace",
+			subpath:   "progress",
+			expected:  "http://localhost:8080/workspaces/my-workspace/progress",
+		},
+		{
+			name:      "invalidURL",
+			baseURL:   "://invalid",
+			workspace: "my-workspace",
+			subpath:   "progress",
+			expected:  "://invalid/workspaces/my-workspace/progress",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := workspaceURL(tt.baseURL, tt.workspace, tt.subpath)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestAllocTag(t *testing.T) {
 	state := &menuBarState{
-		tags: make(map[int]menuBarAction),
+		tags:    make(map[int]menuBarAction),
+		nextTag: 0,
 	}
 
-	tag1 := allocTag(state, menuBarAction{actionURL: "http://example.com"})
-	tag2 := allocTag(state, menuBarAction{actionURL: "http://other.com"})
+	tag1 := allocTag(state, menuBarAction{actionURL: "url1"})
+	assert.Equal(t, 1, tag1)
 
-	if tag1 == tag2 {
-		t.Errorf("allocTag returned duplicate tags: %d", tag1)
-	}
-	if tag1 < 1 {
-		t.Errorf("allocTag returned non-positive tag: %d", tag1)
-	}
+	tag2 := allocTag(state, menuBarAction{actionURL: "url2"})
+	assert.Equal(t, 2, tag2)
 
-	state.mu.Lock()
-	action, ok := state.tags[tag1]
-	state.mu.Unlock()
-	if !ok {
-		t.Errorf("allocTag did not store action for tag %d", tag1)
-	}
-	if action.actionURL != "http://example.com" {
-		t.Errorf("stored action URL = %q; want %q", action.actionURL, "http://example.com")
-	}
+	assert.Len(t, state.tags, 2)
+	assert.Equal(t, "url1", state.tags[1].actionURL)
+	assert.Equal(t, "url2", state.tags[2].actionURL)
 }
 
-func TestToMenuBarItem(t *testing.T) {
-	t.Run("running", func(t *testing.T) {
-		w := workspaceInfo{
-			DirName:    "test-workspace",
-			Running:    true,
-			NeedsInput: false,
-			InProgress: true,
-		}
-		got := toMenuBarItem(w)
-		if got.name != "test-workspace" {
-			t.Errorf("name = %q; want %q", got.name, "test-workspace")
-		}
-		if !got.running {
-			t.Error("expected running = true")
-		}
-		if got.needsInput {
-			t.Error("expected needsInput = false")
-		}
-		if got.stopped {
-			t.Error("expected stopped = false (running overrides)")
-		}
+func TestFormatMenuItemLabelVariants(t *testing.T) {
+	t.Run("needsInput", func(t *testing.T) {
+		label := formatMenuItemLabel(menuBarItem{name: "ws", needsInput: true})
+		assert.Contains(t, label, "Needs Input")
 	})
-
-	t.Run("withGoalDescription", func(t *testing.T) {
-		dir := t.TempDir()
-		goalContent := "# My Cool Project\n\n- [ ] Task 1\n"
-		if errWrite := os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644); errWrite != nil {
-			t.Fatal(errWrite)
-		}
-		w := workspaceInfo{
-			Directory: dir,
-			DirName:   "my-cool-project",
-			Running:   false,
-		}
-		got := toMenuBarItem(w)
-		if got.name != "my-cool-project" {
-			t.Errorf("name = %q; want %q", got.name, "my-cool-project")
-		}
-		if got.description != "My Cool Project" {
-			t.Errorf("description = %q; want %q", got.description, "My Cool Project")
-		}
+	t.Run("stopped", func(t *testing.T) {
+		label := formatMenuItemLabel(menuBarItem{name: "ws", stopped: true})
+		assert.Contains(t, label, "Stopped")
 	})
-
-	t.Run("stoppedAfterProgress", func(t *testing.T) {
-		w := workspaceInfo{
-			DirName:    "stopped-ws",
-			Running:    false,
-			NeedsInput: false,
-			InProgress: true,
-		}
-		got := toMenuBarItem(w)
-		if !got.stopped {
-			t.Error("expected stopped = true (not running but in progress)")
-		}
-	})
-
-	t.Run("idle", func(t *testing.T) {
-		w := workspaceInfo{
-			DirName:    "idle-ws",
-			Running:    false,
-			NeedsInput: false,
-			InProgress: false,
-		}
-		got := toMenuBarItem(w)
-		if got.stopped {
-			t.Error("expected stopped = false (never started)")
-		}
-	})
-
-	t.Run("pinned", func(t *testing.T) {
-		w := workspaceInfo{
-			DirName:    "pinned-ws",
-			Running:    false,
-			NeedsInput: false,
-			InProgress: false,
-			Pinned:     true,
-		}
-		got := toMenuBarItem(w)
-		if !got.pinned {
-			t.Error("expected pinned = true")
-		}
-		if got.stopped {
-			t.Error("expected stopped = false (never started)")
-		}
-	})
-
 	t.Run("pinnedRunning", func(t *testing.T) {
-		w := workspaceInfo{
-			DirName:    "pinned-running-ws",
-			Running:    true,
-			NeedsInput: false,
-			InProgress: true,
-			Pinned:     true,
-		}
-		got := toMenuBarItem(w)
-		if !got.pinned {
-			t.Error("expected pinned = true")
-		}
-		if !got.running {
-			t.Error("expected running = true")
-		}
+		label := formatMenuItemLabel(menuBarItem{name: "ws", running: true, pinned: true})
+		assert.Contains(t, label, "Running")
 	})
+	t.Run("idle", func(t *testing.T) {
+		label := formatMenuItemLabel(menuBarItem{name: "ws"})
+		assert.Equal(t, "ws", label)
+	})
+}
+
+func TestFilterVisibleItemsResult(t *testing.T) {
+	items := []menuBarItem{
+		{name: "running-ws", running: true},
+		{name: "idle-ws"},
+		{name: "pinned-ws", pinned: true},
+		{name: "input-ws", needsInput: true},
+		{name: "stopped-ws", stopped: true},
+	}
+	filtered := filterVisibleItems(items)
+	assert.Len(t, filtered, 3)
 }

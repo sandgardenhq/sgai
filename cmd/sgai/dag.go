@@ -333,7 +333,7 @@ func buildMultiModelSection(currentModel string, models map[string]any, currentA
 	return sb.String()
 }
 
-func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string) string {
+func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string, alias map[string]string) string {
 	predecessors := d.getPredecessors(currentAgent)
 	predecessorsStr := strings.Join(predecessors, ", ")
 	if predecessorsStr == "" {
@@ -356,7 +356,8 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 
 	var agentLines []string
 	for _, agent := range agents {
-		agentPath := dir + "/.sgai/agent/" + agent + ".md"
+		baseAgent := resolveBaseAgent(alias, agent)
+		agentPath := dir + "/.sgai/agent/" + baseAgent + ".md"
 		content, err := os.ReadFile(agentPath)
 		var line string
 		if err != nil {
@@ -386,7 +387,8 @@ func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, d
 	msg = strings.ReplaceAll(msg, "%VISIT_COUNTS%", visitCountsStr)
 	msg = strings.ReplaceAll(msg, "%AGENTS_LIST%", agentsListStr)
 
-	snippets := parseAgentSnippets(dir, currentAgent)
+	baseCurrentAgent := resolveBaseAgent(alias, currentAgent)
+	snippets := parseAgentSnippets(dir, baseCurrentAgent)
 	if len(snippets) > 0 {
 		snippetsStr := strings.Join(snippets, ", ")
 		snippetNudge := fmt.Sprintf("\nIMPORTANT: This agent specializes in %s. YOU MUST call sgai_find_snippets() for these languages BEFORE writing code: %s\n", snippetsStr, snippetsStr)

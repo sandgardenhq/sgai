@@ -61,9 +61,6 @@ const NewWorkspace = lazy(() =>
 const AttachExternal = lazy(() =>
   import("./pages/AttachExternal").then((m) => ({ default: m.AttachExternal })),
 );
-const NewFork = lazy(() =>
-  import("./pages/NewFork").then((m) => ({ default: m.NewFork })),
-);
 const EditGoal = lazy(() =>
   import("./pages/EditGoal").then((m) => ({ default: m.EditGoal })),
 );
@@ -159,10 +156,6 @@ export const router = createBrowserRouter([
       {
         path: "workspaces/:name/snippets/:lang/:fileName",
         element: withSuspense(SnippetDetail),
-      },
-      {
-        path: "workspaces/:name/fork/new",
-        element: withSuspense(NewFork),
       },
       {
         path: "workspaces/:name/goal/edit",

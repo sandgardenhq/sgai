@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api, ApiError } from "@/lib/api";
-import { useFactoryState } from "@/lib/factory-state";
+import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
 
 export interface StoredResponseState {
@@ -174,6 +174,7 @@ export function useResponseForm({
           answer: otherText.trim(),
           selectedChoices: allSelectedChoices,
         });
+        triggerFactoryRefresh();
 
         clearStoredState(storagePrefix, workspaceName);
         hasUnsavedChangesRef.current = false;

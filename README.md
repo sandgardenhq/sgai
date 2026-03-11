@@ -117,6 +117,23 @@ Create endpoints for user registration and login with JWT auth.
 
 See [GOAL.example.md](GOAL.example.md) for full reference.
 
+**Agent Aliases:**
+
+You can create agent aliases that reuse an existing agent's prompt and tools with a different model. This lets you run the same agent role at different cost/capability tiers:
+
+```markdown
+---
+flow: |
+  "backend-go-developer-lite" -> "go-readability-reviewer"
+alias:
+  "backend-go-developer-lite": "backend-go-developer"
+models:
+  "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
+---
+```
+
+An aliased agent inherits everything from its base agent (prompt, tools, snippets) but uses its own model configuration. Aliased agents appear like any other agent in the workflow.
+
 ### 2. Agents Plan the Work
 
 <img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/02-ChooseATemplate.png?raw=true" alt="Choose a Template" width="600">

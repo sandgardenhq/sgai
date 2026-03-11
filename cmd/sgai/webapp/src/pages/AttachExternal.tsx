@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { api, ApiError } from "@/lib/api";
+import { triggerFactoryRefresh } from "@/lib/factory-state";
 import { ArrowLeft, FolderInput, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,7 @@ export function AttachExternal() {
 
       try {
         const result = await api.workspaces.attach(trimmed);
+        triggerFactoryRefresh();
         if (result.hasGoal) {
           navigate(`/workspaces/${encodeURIComponent(result.name)}/goal/edit`);
         } else {
