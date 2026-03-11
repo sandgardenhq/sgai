@@ -28,7 +28,7 @@ The net effect is a cleaner developer experience: fewer flaky prerequisites, cle
 - **Updated skill guides terminology** - Updated skill documentation to use OpenCode terminology consistently.
 - **Improved local dev defaults** - Added a global `.DS_Store` ignore pattern and recorded a GOALS entry for issue 357.
 - **Fixed `make test` prerequisites** - Updated the Makefile so `test` depends on `webapp-test` and `webapp-build`.
-- **Refined automated reviewer guardrails** - Tightened reviewer automation to keep reviews read-only, block shell execution, and treat findings as blocking issues.
+- **Refined automated reviewer guardrails** - Streamlined reviewer automation to keep reviews read-only, block shell execution, and treat findings as blocking issues.
 - **Hardened continuous and retrospective workflows** - Improved agent workflows to run more reliably across forks and external repositories.
 - **Consolidated test helpers and utilities** - Centralized server test helpers and consolidated React test utilities to reduce duplication while preserving runtime behavior.
 - **Simplified internal helpers and components** - Removed unused helpers/components and consolidated overlapping utilities to simplify APIs without changing behavior.
