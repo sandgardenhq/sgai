@@ -117,7 +117,7 @@ Create endpoints for user registration and login with JWT auth.
 
 See [GOAL.example.md](GOAL.example.md) for full reference.
 
-**Agent Aliases:**
+**Agent Aliases:** See [Agent Aliases](./docs/reference/agent-aliases.md).
 
 You can create agent aliases that reuse an existing agent's prompt and tools with a different model. This lets you run the same agent role at different cost/capability tiers:
 
