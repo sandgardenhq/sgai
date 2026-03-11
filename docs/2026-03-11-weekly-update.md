@@ -1,33 +1,45 @@
-# 2026-03-11 Weekly Update: Multi-workspace reliability improvements
+# 2026-03-11 Weekly Update: Reliability and workflow polish
 
-This week’s work focuses on making multi-workspace workflows more predictable and easier to operate. Highlights include agent aliases (so a workflow can reuse an agent prompt under a different model setting) and more robust workspace handling when forks live outside the main workspace root.
+This week’s work focuses on reliability: workflows behave more consistently across different modes, reviewer feedback is stricter by default, and multi-workspace operations handle forks and external directories more predictably.
+
+On top of that, the project picked up a few quality-of-life improvements: agent aliases make it easier to reuse an existing agent prompt under a new name, and developer workflows have fewer sharp edges due to test and tooling cleanup.
 
 ## 🚀 New Features
 
-Two themes stand out in this week’s feature work: more flexible agent configuration, and better handling of workspaces that don’t live exactly where the factory expects (for example, forks created into external directories).
+Two themes stand out in this week’s feature work: more flexible agent configuration, and better handling of workspaces that do not live exactly where the factory expects.
 
-* **Agent aliases** - Workflows can define `alias:` mappings in `GOAL.md` frontmatter so a workflow can refer to an agent by an alternate name. Alias resolution is used when SGAI reads an agent prompt from disk and when it parses snippets for the current agent.
-* **Beefed up workspace support for forks/external repos** - Workspace and fork operations normalize paths by resolving symlinks before comparing. Fork deletion also treats both “root workspace” and “fork workspace” inputs as valid, and uses the symlink-resolved root path as the canonical directory for root-level operations.
+Agent aliases are now a first-class workflow feature. A workflow can map an alias name to a base agent, then refer to the alias anywhere an agent name is expected.
+
+* **Agent aliases** - Define `alias:` mappings in `GOAL.md` frontmatter so a workflow can refer to an existing agent prompt under an alternate name. The alias resolves to a base agent name when SGAI runs an agent.
+* **External workspace fork tracking** - Record fork directories as external when the target workspace path is external, using the symlink-resolved fork path.
 
 ## 🧯 Bug Fixes
 
-This week includes regression fixes and hardening around workflows and workspace handling.
+This week includes regression fixes and guardrails around workflow completion and workspace path handling.
 
-* **Fix regressions from #356** - Workflow handling is hardened across continuous/retrospective mode and workspace/fork operations.
+Workflow completion can now be blocked until a configured retrospective step runs. When the workflow is about to finish but the retrospective agent has not run yet, SGAI injects a redirect message to the `retrospective` agent and persists the updated state.
 
-## 🛠️ Internal Updates
+Workspace root detection is also more defensive. Root paths are normalized via symlink resolution before comparisons, and the external-root resolver returns early when no root workspace path is available.
 
-Maintenance work this week tightens reviewer standards, simplifies code, consolidates tests, and smooths out developer workflows.
+* **Fix regressions from #356** - Harden workflow behavior across continuous/retrospective handling, workspace/fork operations, and external repo handling.
+* **Block completion until retrospective runs** - Intercept workflow completion when a `retrospective` node exists but has not run yet, then append a redirect message and save state.
+* **Symlink-normalized workspace comparisons** - Resolve symlinks for root/workspace path comparisons to avoid false mismatches.
 
-* **Stricter reviewer agents** - Reviewer prompts include a mandatory “blocking issues only” contract, are read-only, and deny bash.
-* **Code simplification and consolidation** - Overlapping helpers are consolidated and call sites are updated to use simplified APIs.
-* **Consolidated test suite** - Fragmented tests are replaced with a consolidated Go/React test suite.
-* **Centralized server test helpers** - Server test helpers are consolidated to reduce duplication across the test suite.
-* **Consolidated React test utilities** - React test helpers are consolidated for fetch, Markdown editor, and workspace fixtures.
-* **Compose wizard hardening** - Compose wizard storage and error handling are made more robust, including dirty-state logic.
-* **Shared service for message deletion** - Message deletion is refactored into a shared service.
-* **`make test` includes webapp checks** - The `test` Makefile target depends on both `webapp-test` and `webapp-build`.
-* **Repository housekeeping** - `.gitignore` ignores `cover*.out`.
+## 🛠 Internal Updates
+
+Maintenance work this week tightens reviewer standards, consolidates tests, and reduces duplicated utilities across Go and the web app.
+
+Reviewer agents are now configured with stricter defaults. The updated prompts emphasize read-only review behavior, disallow bash, and treat findings as blocking issues.
+
+The codebase also went through simplification passes: shared logic is factored into common services, repeated helpers are removed, and tests are rewritten into larger consolidated suites.
+
+* **Make `make test` include web app build and tests** - Update the Makefile so the `test` target depends on both `webapp-test` and `webapp-build`.
+* **Use stricter reviewer agent rules** - Tighten reviewer prompts so reviews are read-only, deny bash, and treat findings as mandatory blocking issues.
+* **Consolidate Go and React test utilities** - Centralize server test helpers, React test utilities, and workspace fixtures.
+* **Simplify code without behavior changes** - Remove unused helpers and consolidate overlapping utilities while updating call sites and tests.
+* **Update code auditing guidance** - Expand `AGENTS.md` guidance to check both literal usage and semantic liveness when auditing for dead routes.
+* **Add global `.DS_Store` ignore** - Update `.gitignore` to ignore `**/.DS_Store`.
+* **Update planning artifacts** - Add and update `GOALS/` entries for ongoing cleanup and issue tracking.
 
 ---
 Written by [doc.holiday](https://doc.holiday)
