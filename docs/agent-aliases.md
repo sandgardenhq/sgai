@@ -53,6 +53,15 @@ flow: |
   "backend-go-developer-lite" -> "go-readability-reviewer"
 ```
 
+## Model selection for aliases
+
+An alias name can appear in the `models:` map.
+
+In the example above, `backend-go-developer-lite`:
+
+1. Resolves to the `backend-go-developer` agent definition when SGAI reads `.sgai/agent/<agent>.md`.
+2. Can still have its own model entry under `models:`.
+
 ## What gets inherited
 
 The repository’s README describes alias behavior like this:
