@@ -11,7 +11,12 @@ Hi folks! Quick update: here’s what we shipped this week.
 This week’s feature work makes day-to-day workflows smoother and reduces friction when working across different repos. Better yet, you can reference reviewer agents more flexibly, and workspace operations are more resilient when forks or external repositories are involved.
 
 - **Rolled out agent aliases for reviewer selection** - You can now use agent aliases to refer to reviewer agents more flexibly across workflows.
-- **Beefed up workspace support for forks/external repos** - Some workspace operations could mis-classify a fork as “inside” (or “outside”) the workspace due to path differences (for example, when symlinks are involved). Forked workspaces that live in external locations also weren’t consistently recorded as external. Workspace handling now normalizes root/workspace paths by resolving symlinks before comparing them, and it records fork directories as external (persisting the symlink-resolved fork path) when the target workspace path is external.
+- **Beefed up workspace support for forks/external repos** - Some workspace operations treated the *same* workspace as different directories depending on which path form you started with (for example, a symlinked path vs. its resolved path). That led to a few concrete issues:
+  - Forks could be mis-classified as being “inside” or “outside” a workspace when root/fork paths were compared without normalizing them.
+  - Delete-fork requests were sensitive to whether the request started from the root workspace path or a fork workspace path.
+  - Forks created from an attached external workspace weren’t handled consistently (placement/recording) when the external directory involved symlinks.
+
+  Workspace handling now resolves symlinks before it compares or groups paths, and fork deletion first resolves the canonical root (whether the request starts from a root or a fork). For external workspaces, fork handling uses the external directory’s resolved path so fork placement and external tracking stay consistent.
 
 ## 🚧 Bug Fixes
 
