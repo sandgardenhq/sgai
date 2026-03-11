@@ -25,7 +25,7 @@ In these cases, two strings can refer to the same underlying directory, and a pl
 
 When scanning and grouping workspaces, SGAI resolves symlinks and uses the resolved path as the canonical key.
 
-In `cmd/sgai/serve.go`, the workspace grouping map uses `resolveSymlinks(proj.Directory)` as the key, and root/workspace comparisons use symlink-resolved paths.
+In `cmd/sgai/serve.go`, workspace grouping and root/workspace comparisons use symlink-resolved paths.
 
 ### 2) Treat forks of external workspaces as external
 
