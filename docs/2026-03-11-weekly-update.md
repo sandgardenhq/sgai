@@ -23,7 +23,7 @@ Maintenance work this week tightens reviewer standards, simplifies code, consoli
 * **Code simplification and consolidation** - Overlapping helpers are consolidated and call sites are updated to use simplified APIs.
 * **Consolidated test suite** - Fragmented tests are replaced with a consolidated Go/React test suite.
 * **`make test` includes webapp checks** - The `test` Makefile target depends on both `webapp-test` and `webapp-build`.
-* **Repository housekeeping** - `.gitignore` ignores `**/.DS_Store` and `cover*.out`.
+* **Repository housekeeping** - `.gitignore` ignores `cover*.out`.
 
 ---
 Written by [doc.holiday](https://doc.holiday)
