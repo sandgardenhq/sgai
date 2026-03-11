@@ -10,6 +10,8 @@ sgai [--interactive] [--fresh] <target_directory>
 
 `sgai` expects a `GOAL.md` file in the target directory.
 
+Note: workflows can refer to agents by name. If agent aliases are configured in `GOAL.md` frontmatter, `sgai` resolves an alias to its base agent name when running `opencode`.
+
 ## Global options
 
 - `--interactive`
