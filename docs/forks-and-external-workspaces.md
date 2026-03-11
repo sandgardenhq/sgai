@@ -27,6 +27,11 @@ SGAI resolves symlinks and uses the resolved path when comparing root and worksp
 
 In `cmd/sgai/service_workspace.go`, root/workspace comparisons use symlink-resolved paths.
 
+Related implementation details in this commit range:
+
+* In `cmd/sgai/service_external.go`, the root workspace path is resolved via `resolveSymlinks(...)` before it’s used, and the function returns early if `getRootWorkspacePath(...)` returns an empty string.
+* In `cmd/sgai/serve.go` and `cmd/sgai/serve_api.go`, grouping and validation logic uses `resolveSymlinks(...)` and compares resolved root paths instead of raw strings.
+
 ### 2) Treat forks of external workspaces as external
 
 The weekly update also calls out “External workspace fork tracking”: when the target workspace path is external, fork directories are recorded as external using the symlink-resolved fork path.
