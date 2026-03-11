@@ -12,6 +12,11 @@ Aliases are useful when the workflow should treat two agent names as separate ro
 
 The repository also documents a common pattern: use an alias to run the same role with a different model configuration.
 
+Common use cases:
+
+* **Model tiering for the same role**: keep the same prompt/tools/snippets, but assign a different model for cost/speed.
+* **Two “roles” that should behave identically**: treat two names as distinct in `flow:` (for example, to make a workflow easier to read), while reusing one agent definition.
+
 ## Configure an alias in `GOAL.md`
 
 Add an `alias:` section to the YAML frontmatter.
@@ -78,3 +83,23 @@ In `cmd/sgai/dag.go`, `buildFlowMessage`:
 1. Accepts an `alias map[string]string` parameter.
 2. Calls `resolveBaseAgent(alias, agent)` to resolve each agent name to a base agent name.
 3. Loads agent markdown from `.sgai/agent/<base-agent>.md`.
+
+## Example: reusing an agent with a different model
+
+The pattern shown in `GOAL.example.md` uses an alias name in both `alias:` and `models:`.
+
+```yaml
+---
+alias:
+  "backend-go-developer-lite": "backend-go-developer"
+models:
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
+---
+```
+
+In this setup:
+
+* The workflow can schedule `backend-go-developer-lite`.
+* SGAI loads the agent definition from `.sgai/agent/backend-go-developer.md`.
+* SGAI can still pick a different model because `models:` includes an entry keyed by the alias name.
