@@ -1,84 +1,44 @@
 # Agent aliases
 
-Agent aliases let a workflow refer to an agent by an alternate name that resolves to a “base” agent at runtime.
+Agent aliases let a workflow refer to an existing agent prompt under an alternate name.
 
-This is useful when the same role (prompt/tools/snippets) should run under a different model configuration.
-
-This repository supports aliases through `GOAL.md` frontmatter and uses alias resolution when reading agent prompt files and snippets.
+This is useful when the workflow wants to keep the same underlying agent prompt, but use a different name in the workflow.
 
 ## What an alias is
 
-An alias is a name that maps to an existing agent name (the base agent).
+In SGAI, an alias is a name mapping defined in `GOAL.md` frontmatter. The alias points to an existing agent.
 
-When an alias is used:
+The weekly update for 2026-03-11 summarizes the current behavior:
 
-- The workflow resolves the alias name to a base agent name.
-- The workflow uses the base agent name when it needs to read the agent prompt from disk (for example, `.sgai/agent/<agent>.md`) and when it needs to parse snippets for the current agent.
-- The alias can still have its own model configuration.
+* Workflows can define `alias:` mappings in `GOAL.md` frontmatter.
+* Alias resolution is used when SGAI reads an agent prompt from disk.
+* Alias resolution is used when SGAI parses snippets for the current agent.
 
-In other words: **use the alias name in your flow**, and SGAI resolves it to the base agent name when it needs to look up the base agent’s on-disk content.
+## How to define aliases in `GOAL.md`
 
-## How to define aliases
+Add an `alias:` mapping to the frontmatter of `GOAL.md`.
 
-Aliases are configured in `GOAL.md` frontmatter.
+Example (YAML frontmatter):
 
-Example (from the repository README):
-
-```md
+```yaml
 ---
 alias:
-  backend-go-developer-lite: backend-go-developer
-models:
-  backend-go-developer: anthropic/claude-opus-4-6
-  backend-go-developer-lite: anthropic/claude-haiku-4-5
+  reviewer-lite: go-readability-reviewer
 ---
 ```
 
-An additional example appears in `cmd/sgai/GOAL.example.md` (commented out in that file):
+In this example, the workflow can refer to `reviewer-lite`, and SGAI resolves it to the `go-readability-reviewer` agent.
 
-```md
----
-# alias:
-#   backend-go-developer-lite: backend-go-developer
+## Using an alias
 
-# alias:
-#   backend-go-developer-lite: anthropic/claude-haiku-4-5
----
-```
+Once defined, use the alias name anywhere the workflow expects an agent name.
 
-Note: the `GOAL.example.md` snippet shows two alternative ways to write a commented example block. Refer to the repository README example for a working `alias:` + `models:` pairing.
+Example (conceptual):
 
-In this example:
+* Configure or reference `reviewer-lite` in the workflow.
+* SGAI resolves `reviewer-lite` to `go-readability-reviewer` when loading the agent prompt and when parsing snippets for the current agent.
 
-- `backend-go-developer-lite` is an alias for the base agent `backend-go-developer`.
-- The base agent and the alias each have a `models:` entry.
+## Notes and limitations
 
-## How to use aliases
-
-Once defined, aliased agent names behave like regular agents in workflows.
-
-For example, a workflow step can reference `backend-go-developer-lite`, and the runtime resolves that to `backend-go-developer` when it builds the agent invocation.
-
-### Example: use an alias in a flow
-
-```md
----
-flow: |
-  "backend-go-developer-lite" -> "go-readability-reviewer"
-alias:
-  backend-go-developer-lite: backend-go-developer
-models:
-  backend-go-developer: anthropic/claude-opus-4-6
-  backend-go-developer-lite: anthropic/claude-haiku-4-5
----
-```
-
-In this setup:
-
-- The flow refers to `backend-go-developer-lite`.
-- SGAI resolves `backend-go-developer-lite` to `backend-go-developer` when reading agent content from `.sgai/agent/backend-go-developer.md`.
-- The alias can still have its own `models:` entry.
-
-## Notes
-
-- If an agent name is not in the alias map, it resolves to itself.
+* This page documents alias behavior described in the 2026-03-11 weekly update and commit summary for `cmd/sgai: fix regressions from #356`.
+* If the repository’s `GOAL.md` uses a different frontmatter style (or different key names), follow that repository’s conventions.
