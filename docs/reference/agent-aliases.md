@@ -2,6 +2,12 @@
 
 Hey there! This page explains **agent aliases**: what they are, why they’re useful, and how to configure and use them.
 
+## What you’ll learn
+
+- What an agent alias is
+- How to define aliases in `GOAL.md`
+- How aliases interact with agent prompts/snippets and model selection
+
 ## What are agent aliases?
 
 An **agent alias** is an agent name that *reuses another agent’s prompt and tools*, but can run with a *different model configuration*.
@@ -35,21 +41,42 @@ The following example defines:
 - An alias agent: `backend-go-developer-lite`
 - A model override for the alias: `anthropic/claude-haiku-4-5`
 
-```yaml
-# Example configuration
-alias:
-  backend-go-developer-lite: backend-go-developer
+Define aliases and model overrides in your `GOAL.md` frontmatter.
 
+```markdown
+---
+flow: |
+  "backend-go-developer-lite" -> "go-readability-reviewer"
+alias:
+  "backend-go-developer-lite": "backend-go-developer"
 models:
-  backend-go-developer-lite: anthropic/claude-haiku-4-5
+  "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
+---
+
+# Example goal
+
+Ship a small Go API change and get it reviewed.
 ```
 
 After this, `backend-go-developer-lite` can be used anywhere an agent name is accepted (for example, in a workflow), and it will run like the base agent but with its alias-specific model.
+
+## What the base agent affects
+
+Sgai resolves some agent-specific content using the **base agent name** (the alias target).
+
+For example, flow message building uses the base agent name when it reads agent prompt markdown from:
+
+- `.sgai/agent/<base-agent>.md`
+
+It also uses the base agent name when it parses agent snippets.
 
 ## Notes and tips
 
 - Define the base agent normally; the alias points at it.
 - Configure the model on the alias name when the alias should use a different model.
+
+> [!TIP]
+> Pick alias names that make intent obvious (for example, a suffix like `-lite`). That keeps workflows readable when multiple model tiers exist.
 
 ## Next steps
 
