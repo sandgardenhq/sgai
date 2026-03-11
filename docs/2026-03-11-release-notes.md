@@ -33,7 +33,6 @@ The net effect is a cleaner developer experience: fewer flaky prerequisites, cle
 - **Consolidated test helpers and utilities** - Centralized server test helpers and consolidated React test utilities to reduce duplication while preserving runtime behavior.
 - **Simplified internal helpers and components** - Removed unused helpers/components and consolidated overlapping utilities to simplify APIs without changing behavior.
 
-
 ---
 
 Written by <a href="https://doc.holiday">doc.holiday</a>
