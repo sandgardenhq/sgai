@@ -32,6 +32,15 @@ The net effect is a cleaner developer experience: fewer flaky prerequisites, cle
 - **Consolidated test helpers and utilities** - Centralized server test helpers and consolidated React test utilities to reduce duplication while preserving runtime behavior.
 - **Simplified internal helpers and components** - Removed unused helpers/components and consolidated overlapping utilities to simplify APIs without changing behavior.
 
+<!-- auto-generated entries to be categorized -->
+{
+  "🛠 Internal Updates": [
+    "We updated repository hygiene and planning metadata to reduce accidental file churn and keep work tracking consistent. Specifically, we added a global `.DS_Store` ignore pattern and created a new `GOALS` entry for issue 357.",
+    "We expanded the agent workflow to be more flexible and reliable across more repository setups, including forks and external repositories. This adds agent alias support, hardens the continuous/retrospective workflow and workspace/fork handling, and replaces fragmented tests with a consolidated Go/React test suite alongside related UI and documentation updates."
+  ]
+}
+
+
 ---
 
 Written by <a href="https://doc.holiday">doc.holiday</a>
