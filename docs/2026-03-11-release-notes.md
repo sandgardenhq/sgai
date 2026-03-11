@@ -1,27 +1,36 @@
 # 2026-03-11 Release Notes: Maintenance, performance, and documentation quality improvements
 
-This week’s update includes the following changes across new features, bug fixes, and internal updates.
+Quick update: this week we focused on smoother automation configuration, more reliable workspace operations, and a round of cleanup to keep local development and tests predictable.
 
-```json
-{
-  "🆕 New Features": [
-    "You can now configure and use agent aliases so the same automation can be referenced by multiple names in different contexts."
-  ],
-  "🐜 Bug Fixes": [
-    "Workspace and fork handling is now more reliable, especially when working with external repositories and recovery flows.",
-    "The compose wizard now behaves more predictably when saving settings or recovering from errors."
-  ],
-  "🛠 Internal Updates": [
-    "Documentation now consistently refers to OpenCode rather than Claude, reducing confusion when following the skill guides.",
-    "Local development defaults are now a bit cleaner and more consistent across environments.",
-    "The `test` build target now runs the steps it actually depends on, which reduces flaky results from missing prerequisites.",
-    "Reviewer automation now enforces stricter guardrails so review feedback is consistently actionable and non-destructive.",
-    "The test and helper codebase is now easier to maintain with fewer duplicated utilities and clearer ownership boundaries.",
-    "Internal helpers and UI components have been simplified to reduce overlap and make future changes safer."
-  ]
-}
+## 🚀 New Features
 
-```
+This week’s customer-facing changes focus on making automation configuration more flexible across different projects and teams.
+
+The main theme is reducing friction when you want to refer to the same agent using different names in different contexts.
+
+- **Added agent aliases** - Configure agent aliases so the same automation can be referenced by multiple names in different contexts.
+
+## 🚧 Bug Fixes
+
+This week’s fixes focus on making workspace flows more resilient, especially in scenarios that involve external repos and recovery.
+
+We also tightened the compose wizard’s behavior so saving settings and recovering from errors is more consistent across sessions.
+
+- **Fixed workspace and fork recovery flows** - Improved workspace and fork rollback behavior to avoid inconsistent state during recovery.
+- **Fixed compose wizard save and recovery** - Improved settings persistence and error handling so incomplete wizard state does not leak across sessions.
+
+## 🛠 Internal Updates
+
+This week’s internal updates focus on keeping the codebase and docs easier to maintain, with special attention to tests, automation guardrails, and removing duplication.
+
+The net effect is a cleaner developer experience: fewer flaky prerequisites, clearer documentation terminology, and more consistent reviewer automation.
+
+- **Updated skill guides terminology** - Updated skill documentation to use OpenCode terminology consistently.
+- **Improved local dev defaults** - Added a global `.DS_Store` ignore pattern and recorded a GOALS entry for issue 357.
+- **Fixed `make test` prerequisites** - Updated the Makefile so `test` depends on `webapp-test` and `webapp-build`.
+- **Refined automated reviewer guardrails** - Tightened reviewer automation to keep reviews read-only, block shell execution, and treat findings as blocking issues.
+- **Consolidated test helpers and utilities** - Centralized server test helpers and consolidated React test utilities to reduce duplication while preserving runtime behavior.
+- **Simplified internal helpers and components** - Removed unused helpers/components and consolidated overlapping utilities to simplify APIs without changing behavior.
 
 ---
 
