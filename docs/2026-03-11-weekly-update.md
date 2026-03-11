@@ -12,6 +12,7 @@ Agent aliases are now a first-class workflow feature. A workflow can map an alia
 
 * **Agent aliases** - Define `alias:` mappings in `GOAL.md` frontmatter so a workflow can refer to an existing agent prompt under an alternate name. The alias resolves to a base agent name when SGAI runs an agent.
 * **External workspace fork tracking** - Record fork directories as external when the target workspace path is external, using the symlink-resolved fork path.
+* **Expanded MCP external tool coverage** - Exercise the external MCP server’s tool surface area with a broad set of success and error-path tests (workspace, state, session, knowledge, compose, ad-hoc, editor, and model tools).
 
 ## 🧯 Bug Fixes
 
@@ -24,6 +25,7 @@ Workspace root detection is also more defensive. Root paths are normalized via s
 * **Fix regressions from #356** - Harden workflow behavior across continuous/retrospective handling, workspace/fork operations, and external repo handling.
 * **Block completion until retrospective runs** - Intercept workflow completion when a `retrospective` node exists but has not run yet, then append a redirect message and save state.
 * **Symlink-normalized workspace comparisons** - Resolve symlinks for root/workspace path comparisons to avoid false mismatches.
+* **Defensive root path detection** - Return early when no root workspace path is available, and avoid reporting a root when required filesystem paths do not exist.
 
 ## 🛠 Internal Updates
 
@@ -38,7 +40,7 @@ The codebase also went through simplification passes: shared logic is factored i
 * **Consolidate Go and React test utilities** - Centralize server test helpers, React test utilities, and workspace fixtures.
 * **Simplify code without behavior changes** - Remove unused helpers and consolidate overlapping utilities while updating call sites and tests.
 * **Update code auditing guidance** - Expand `AGENTS.md` guidance to check both literal usage and semantic liveness when auditing for dead routes.
-* **Add global `.DS_Store` ignore** - Update `.gitignore` to ignore `**/.DS_Store`.
+* **Add global ignore patterns** - Update `.gitignore` to ignore `**/.DS_Store` and `cover*.out`.
 * **Update planning artifacts** - Add and update `GOALS/` entries for ongoing cleanup and issue tracking.
 
 ---
