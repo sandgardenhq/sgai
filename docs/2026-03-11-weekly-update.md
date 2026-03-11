@@ -22,6 +22,10 @@ Maintenance work this week tightens reviewer standards, simplifies code, consoli
 * **Stricter reviewer agents** - Reviewer prompts include a mandatory “blocking issues only” contract, are read-only, and deny bash.
 * **Code simplification and consolidation** - Overlapping helpers are consolidated and call sites are updated to use simplified APIs.
 * **Consolidated test suite** - Fragmented tests are replaced with a consolidated Go/React test suite.
+* **Centralized server test helpers** - Server test helpers are consolidated to reduce duplication across the test suite.
+* **Consolidated React test utilities** - React test helpers are consolidated for fetch, Markdown editor, and workspace fixtures.
+* **Compose wizard hardening** - Compose wizard storage and error handling are made more robust, including dirty-state logic.
+* **Shared service for message deletion** - Message deletion is refactored into a shared service.
 * **`make test` includes webapp checks** - The `test` Makefile target depends on both `webapp-test` and `webapp-build`.
 * **Repository housekeeping** - `.gitignore` ignores `cover*.out`.
 
