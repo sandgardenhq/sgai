@@ -19,6 +19,11 @@ That can go wrong when the same directory can be referenced via multiple paths, 
 
 In these cases, two strings can refer to the same underlying directory, and a plain string comparison can mis-classify the workspace.
 
+This mis-classification shows up as “fork/external repo” rough edges in day-to-day work:
+
+* A fork that should be associated with a root can appear disconnected because the fork path and root path don’t match byte-for-byte.
+* A fork of an external workspace can fail to be treated as external if the fork directory is tracked using the non-resolved path.
+
 ## What SGAI does now
 
 ### 1) Normalize paths by resolving symlinks
@@ -48,6 +53,13 @@ In `cmd/sgai/service_workspace.go`, this is implemented by storing the fork’s 
 Without symlink normalization, those two paths look different even though they point at the same directory.
 
 With symlink normalization, SGAI compares (and groups) workspaces using resolved paths so the root and fork stay connected.
+
+If these paths refer to the same directory:
+
+* `/Users/alex/work/root-project`
+* `/Users/alex/link-to-work/root-project`
+
+SGAI uses the resolved (real) path for comparisons instead of assuming the raw strings must match.
 
 ### Example: external root workspace, external fork
 
