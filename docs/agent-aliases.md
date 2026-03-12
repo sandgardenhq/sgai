@@ -30,6 +30,26 @@ The base agent name is then used when SGAI loads the agent definition from `.sga
 3. Add an `alias:` mapping in `GOAL.md` frontmatter.
 4. Use the alias name anywhere you would use a normal agent name (for example, in `flow:`).
 
+## How to think about aliases
+
+Aliases are easy to misunderstand if the term “agent” is overloaded. In SGAI configuration, there are two separate things:
+
+1. **The name used in the workflow graph** (`flow:`)
+2. **The agent definition file that is loaded** (`.sgai/agent/<agent>.md`)
+
+An alias only changes **which agent definition file is loaded**.
+
+Example:
+
+- `flow:` contains `"backend-go-developer-lite"`.
+- `GOAL.md` frontmatter contains `alias: { "backend-go-developer-lite": "backend-go-developer" }`.
+- SGAI loads the base definition from `.sgai/agent/backend-go-developer.md`.
+
+This means:
+
+- No `.sgai/agent/backend-go-developer-lite.md` is required.
+- Any documentation that says “the workflow runs agent X” can refer to the alias name, even though the underlying prompt/tools/snippets come from the base agent.
+
 ## Why use an alias?
 
 Aliases are useful when the workflow should treat two agent names as separate roles (for example, to make the workflow easier to read), but both roles should use the same underlying agent definition.
@@ -100,6 +120,25 @@ For example:
 flow: |
   "backend-go-developer-lite" -> "go-readability-reviewer"
 ```
+
+## Troubleshooting
+
+### “Do I need an agent markdown file for the alias?”
+
+No. The alias name does not correspond to an agent markdown file.
+
+If `GOAL.md` contains:
+
+```yaml
+alias:
+  "backend-go-developer-lite": "backend-go-developer"
+```
+
+Then SGAI loads `.sgai/agent/backend-go-developer.md` when the workflow schedules `backend-go-developer-lite`.
+
+### “Where does the alias name show up?”
+
+The alias name is the identifier used in `flow:` and in `models:` (if configured). The base agent name is the identifier used when loading `.sgai/agent/<agent>.md`.
 
 ## Model selection for aliases
 
