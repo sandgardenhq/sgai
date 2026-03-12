@@ -10,12 +10,14 @@ Two themes stand out in this week’s feature work: more flexible agent configur
 
 Agent aliases are now a first-class workflow feature.
 
-An *agent alias* is just a “nickname” used in your workflow configuration.
+An *agent alias* is a name you can use in the workflow (`flow:`) that points to a *base agent name*.
 
-* In `flow:`, you can write the **alias name** (for example, `backend-go-developer-lite`).
-* When SGAI needs to load the agent definition, it resolves that alias to a **base agent name** and reads `.sgai/agent/<base-agent>.md`.
+Practically:
 
-This is useful when the workflow should treat two names as separate roles (for readability or intent), but both roles should share the same prompt/tools/snippets. It also supports a common pattern: keep the base agent definition the same, but give the alias its own model entry under `models:` in `GOAL.md`.
+* The workflow can schedule an alias name (for example, `backend-go-developer-lite`).
+* SGAI then resolves that alias to a base agent name and loads the agent definition from `.sgai/agent/<base-agent>.md`.
+
+This helps when the workflow should treat two names as separate roles (for readability or intent), but both roles should share the same underlying prompt/tools/snippets. It also supports a common pattern shown in `GOAL.example.md`: keep the base agent definition the same, but add a separate model entry under `models:` for the alias name.
 
 * **Agent aliases** - Define `alias:` mappings in `GOAL.md` frontmatter so a workflow can refer to an existing agent prompt under an alternate name. The alias resolves to a base agent name when SGAI runs an agent.
 * **External workspace fork tracking** - Record fork directories as external when the target workspace path is external, using the symlink-resolved fork path.
