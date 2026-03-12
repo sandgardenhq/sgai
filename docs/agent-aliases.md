@@ -2,16 +2,33 @@
 
 Agent aliases let a workflow use an existing agent definition under an alternate agent name.
 
-In practice, an alias is a name-to-name mapping:
+In other words: the workflow can **refer to an agent by one name**, while SGAI **loads the agent’s actual definition** (prompt/tools/snippets) from a *different* name.
+
+## What an alias is (and isn’t)
+
+An alias is a **name-to-name mapping**:
 
 * **Alias name**: the name used in your `flow:`
 * **Base agent name**: the agent name that SGAI uses to load the agent definition from `.sgai/agent/<agent>.md`
 
-In SGAI, aliases are configured in `GOAL.md` frontmatter under the `alias:` key.
+An alias is **not** a second agent file.
+
+For an alias, SGAI does **not** expect `.sgai/agent/<alias>.md` to exist.
+
+## Where aliases are configured
+
+Aliases are configured in `GOAL.md` frontmatter under the `alias:` key.
 
 An alias maps an alias name to a *base agent* name.
 
 The base agent name is then used when SGAI loads the agent definition from `.sgai/agent/<agent>.md`.
+
+## Quick start
+
+1. Pick an existing agent file in your repo (for example, `.sgai/agent/backend-go-developer.md`).
+2. Decide on an alias name to use in the workflow (for example, `backend-go-developer-lite`).
+3. Add an `alias:` mapping in `GOAL.md` frontmatter.
+4. Use the alias name anywhere you would use a normal agent name (for example, in `flow:`).
 
 ## Why use an alias?
 
@@ -53,6 +70,12 @@ In this example:
 1. `backend-go-developer-lite` is an alias.
 2. `backend-go-developer` is the base agent.
 3. The `models:` map can include a model entry for the alias name.
+
+### How `models:` interacts with aliases
+
+An alias can have its *own* model configuration because `models:` is keyed by the name used in the workflow.
+
+This lets two workflow roles share the same base agent definition, while running with different models.
 
 ### Minimal example
 
@@ -109,6 +132,11 @@ In `cmd/sgai/dag.go`, `buildFlowMessage`:
 1. Accepts an `alias map[string]string` parameter.
 2. Calls `resolveBaseAgent(alias, agent)` to resolve each agent name to a base agent name.
 3. Loads agent markdown from `.sgai/agent/<base-agent>.md`.
+
+In `cmd/sgai/main.go`, the alias is also resolved before running an agent:
+
+* SGAI computes `baseAgent := resolveBaseAgent(metadata.Alias, cfg.agent)`.
+* The `run` invocation uses `--agent <baseAgent>`.
 
 ## Example: reusing an agent with a different model
 
