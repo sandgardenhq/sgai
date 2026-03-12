@@ -8,7 +8,11 @@ On top of that, the project picked up a few quality-of-life improvements: agent 
 
 Two themes stand out in this week’s feature work: more flexible agent configuration, and better handling of workspaces that do not live exactly where the factory expects.
 
-Agent aliases are now a first-class workflow feature. A workflow can map an alias name to a base agent, then refer to the alias anywhere an agent name is expected.
+Agent aliases are now a first-class workflow feature.
+
+An *agent alias* is a workflow-level name that points at an existing *base agent*. When SGAI runs an agent, it resolves the alias to the base agent name before loading the agent definition from `.sgai/agent/<agent>.md`.
+
+This is useful when the workflow should treat two names as separate roles (for readability or intent), but both roles should share the same prompt/tools/snippets. It also supports a common pattern: keep the base agent definition the same, but assign a different model to the alias name via `models:` in `GOAL.md` frontmatter.
 
 * **Agent aliases** - Define `alias:` mappings in `GOAL.md` frontmatter so a workflow can refer to an existing agent prompt under an alternate name. The alias resolves to a base agent name when SGAI runs an agent.
 * **External workspace fork tracking** - Record fork directories as external when the target workspace path is external, using the symlink-resolved fork path.
