@@ -1,14 +1,21 @@
 # Agent Aliases
 
-Agent aliases let a workflow refer to an existing agent prompt under an alternate agent name.
+Agent aliases let a workflow use an existing agent definition under an alternate agent name.
 
-In SGAI, aliases are configured in `GOAL.md` frontmatter under the `alias:` key. An alias maps an alias name to a *base agent* name.
+In practice, an alias is a name-to-name mapping:
+
+* **Alias name**: the name used in your `flow:`
+* **Base agent name**: the agent name that SGAI uses to load the agent definition from `.sgai/agent/<agent>.md`
+
+In SGAI, aliases are configured in `GOAL.md` frontmatter under the `alias:` key.
+
+An alias maps an alias name to a *base agent* name.
 
 The base agent name is then used when SGAI loads the agent definition from `.sgai/agent/<agent>.md`.
 
 ## Why use an alias?
 
-Aliases are useful when the workflow should treat two agent names as separate roles, but both roles should use the same underlying agent definition.
+Aliases are useful when the workflow should treat two agent names as separate roles (for example, to make the workflow easier to read), but both roles should use the same underlying agent definition.
 
 The repository also documents a common pattern: use an alias to run the same role with a different model configuration.
 
@@ -47,6 +54,19 @@ In this example:
 2. `backend-go-developer` is the base agent.
 3. The `models:` map can include a model entry for the alias name.
 
+### Minimal example
+
+This is the smallest useful setup: define an alias and then reference it from `flow:`.
+
+```yaml
+---
+flow: |
+  "backend-go-developer-lite"
+alias:
+  "backend-go-developer-lite": "backend-go-developer"
+---
+```
+
 ## Use an alias in the workflow flow
 
 Once defined, an alias behaves like a regular agent name in `flow:`.
@@ -73,6 +93,12 @@ The repository’s README describes alias behavior like this:
 
 - The alias inherits the base agent’s prompt, tools, and snippets.
 - The alias uses its own model configuration.
+
+## What does *not* change
+
+An alias does not create a new `.sgai/agent/<alias>.md` file.
+
+Instead, SGAI resolves the alias name to the base agent name before reading agent markdown and parsing snippets.
 
 ## How alias resolution works (implementation notes)
 
