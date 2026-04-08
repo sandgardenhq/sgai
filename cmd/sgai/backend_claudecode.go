@@ -45,6 +45,14 @@ func (b *claudeCodeBackend) BuildAgentArgs(p AgentRunParams) []string {
 	// Skip permissions — SGAI controls permissions via its own MCP layer
 	args = append(args, "--permission-mode", "bypassPermissions")
 
+	// Inject MCP config with SGAI MCP server
+	if p.McpURL != "" {
+		mcpConfig, err := buildClaudeCodeMCPConfig(p.McpURL, nil)
+		if err == nil {
+			args = append(args, "--mcp-config", mcpConfig)
+		}
+	}
+
 	return args
 }
 
