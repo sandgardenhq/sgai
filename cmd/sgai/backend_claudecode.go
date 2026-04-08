@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -29,6 +30,21 @@ func (b *claudeCodeBackend) BuildAgentArgs(p AgentRunParams) []string {
 		title = p.Agent + " [" + p.ModelSpec + "]"
 	}
 	args = append(args, "--name", title)
+
+	// Inject agent system prompt from .sgai/agent/<name>.md
+	if p.AgentDir != "" && p.BaseAgent != "" {
+		agentPath := filepath.Join(p.AgentDir, ".sgai", "agent", p.BaseAgent+".md")
+		if content, err := os.ReadFile(agentPath); err == nil {
+			body := strings.TrimSpace(string(extractBody(content)))
+			if body != "" {
+				args = append(args, "--append-system-prompt", body)
+			}
+		}
+	}
+
+	// Skip permissions — SGAI controls permissions via its own MCP layer
+	args = append(args, "--permission-mode", "bypassPermissions")
+
 	return args
 }
 
