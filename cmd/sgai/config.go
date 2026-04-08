@@ -44,9 +44,30 @@ type actionConfig struct {
 // The configuration file must be located at the project root, as a sibling to the .sgai directory.
 type projectConfig struct {
 	DefaultModel string                     `json:"defaultModel,omitempty"`
+	Backend      string                     `json:"backend,omitempty"` // "opencode" (default) or "claude-code"
 	MCP          map[string]json.RawMessage `json:"mcp,omitempty"`
 	Editor       string                     `json:"editor,omitempty"`
 	Actions      []actionConfig             `json:"actions,omitempty"`
+}
+
+// resolveBackend returns the Backend implementation for the given config.
+// Defaults to opencode if config is nil or backend is unset.
+func resolveBackend(config *projectConfig) Backend {
+	if config != nil && config.Backend == "claude-code" {
+		return &claudeCodeBackend{}
+	}
+	return &opencodeBackend{}
+}
+
+// resolveBackendStrict returns an error for invalid backend values.
+func resolveBackendStrict(config *projectConfig) (Backend, error) {
+	if config == nil || config.Backend == "" || config.Backend == "opencode" {
+		return &opencodeBackend{}, nil
+	}
+	if config.Backend == "claude-code" {
+		return &claudeCodeBackend{}, nil
+	}
+	return nil, fmt.Errorf("unsupported backend: %q (valid: \"opencode\", \"claude-code\")", config.Backend)
 }
 
 func loadProjectConfig(dir string) (*projectConfig, error) {
