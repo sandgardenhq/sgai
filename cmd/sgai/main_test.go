@@ -485,7 +485,8 @@ func TestBuildAgentArgsVariants(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			args := buildAgentArgs(tc.agent, tc.baseAgent, tc.modelSpec, tc.sessionID)
+			b := &opencodeBackend{}
+			args := b.BuildAgentArgs(AgentRunParams{Agent: tc.agent, BaseAgent: tc.baseAgent, ModelSpec: tc.modelSpec, SessionID: tc.sessionID})
 			assert.Contains(t, args, "run")
 			assert.Contains(t, args, "--agent")
 			if tc.wantModel {
@@ -1806,7 +1807,8 @@ func TestBuildAgentArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildAgentArgs(tt.agent, tt.baseAgent, tt.modelSpec, tt.sessionID)
+			b := &opencodeBackend{}
+			result := b.BuildAgentArgs(AgentRunParams{Agent: tt.agent, BaseAgent: tt.baseAgent, ModelSpec: tt.modelSpec, SessionID: tt.sessionID})
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -2251,8 +2253,9 @@ func TestBuildAgentMessage(t *testing.T) {
 
 func TestBuildAgentEnv(t *testing.T) {
 	cfg := multiModelConfig{
-		agent: "test-agent",
-		dir:   "/tmp/test-workspace",
+		agent:   "test-agent",
+		dir:     "/tmp/test-workspace",
+		backend: &opencodeBackend{},
 	}
 	wfState := state.Workflow{
 		InteractionMode: state.ModeSelfDrive,
@@ -2278,8 +2281,9 @@ func TestBuildAgentEnv(t *testing.T) {
 
 func TestBuildAgentEnvWithModel(t *testing.T) {
 	cfg := multiModelConfig{
-		agent: "test-agent",
-		dir:   "/tmp/test-workspace",
+		agent:   "test-agent",
+		dir:     "/tmp/test-workspace",
+		backend: &opencodeBackend{},
 	}
 	wfState := state.Workflow{}
 
@@ -3118,6 +3122,7 @@ func TestJSONPrettyWriterWrite(t *testing.T) {
 		prefix:    " [test] ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	event := streamEvent{Type: "text", Part: part{Text: "hello world"}}
@@ -3139,6 +3144,7 @@ func TestJSONPrettyWriterProcessEventText(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{Type: "text", Part: part{Text: "some text"}})
@@ -3154,6 +3160,7 @@ func TestJSONPrettyWriterProcessEventToolPending(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{
@@ -3177,6 +3184,7 @@ func TestJSONPrettyWriterProcessEventToolRunning(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{
@@ -3201,6 +3209,7 @@ func TestJSONPrettyWriterProcessEventToolCompleted(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{
@@ -3226,6 +3235,7 @@ func TestJSONPrettyWriterProcessEventToolCompletedTodo(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	todos := `[{"content":"task1","status":"completed","priority":"high"},{"content":"task2","status":"pending","priority":"medium"}]`
@@ -3254,6 +3264,7 @@ func TestJSONPrettyWriterProcessEventToolError(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{
@@ -3279,6 +3290,7 @@ func TestJSONPrettyWriterProcessEventStepStart(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.currentText.WriteString("buffered text")
@@ -3294,6 +3306,7 @@ func TestJSONPrettyWriterProcessEventReasoning(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{Type: "reasoning", Part: part{Text: "thinking about it"}})
@@ -3306,6 +3319,7 @@ func TestJSONPrettyWriterProcessEventUnknownType(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{Type: "custom_event"})
@@ -3318,6 +3332,7 @@ func TestJSONPrettyWriterSessionIDCapture(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{Type: "text", SessionID: "sess-123", Part: part{Text: "hi"}})
@@ -3330,6 +3345,7 @@ func TestJSONPrettyWriterFlushEmpty(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.Flush()
@@ -3342,6 +3358,7 @@ func TestJSONPrettyWriterProcessBufferMultipleEvents(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	event1, _ := json.Marshal(streamEvent{Type: "text", Part: part{Text: "hello"}})
@@ -3360,6 +3377,7 @@ func TestJSONPrettyWriterProcessBufferPartialLine(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	event, _ := json.Marshal(streamEvent{Type: "text", Part: part{Text: "partial"}})
@@ -3386,6 +3404,7 @@ func TestJSONPrettyWriterRecordStepCost(t *testing.T) {
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
+		backend:      &opencodeBackend{},
 	}
 
 	w.recordStepCost(part{
@@ -3417,6 +3436,7 @@ func TestJSONPrettyWriterRecordStepCostMultipleSteps(t *testing.T) {
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
+		backend:      &opencodeBackend{},
 	}
 
 	w.recordStepCost(part{Cost: 0.01, Tokens: partTokens{Input: 10, Output: 5}}, time.Now().UnixMilli())
@@ -3436,6 +3456,7 @@ func TestJSONPrettyWriterRecordStepCostNilCoord(_ *testing.T) {
 		startTime:    time.Now(),
 		coord:        nil,
 		currentAgent: "test-agent",
+		backend:      &opencodeBackend{},
 	}
 
 	w.recordStepCost(part{Cost: 0.05}, time.Now().UnixMilli())
@@ -3453,6 +3474,7 @@ func TestJSONPrettyWriterRecordStepCostEmptyAgent(t *testing.T) {
 		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "",
+		backend:      &opencodeBackend{},
 	}
 
 	w.recordStepCost(part{Cost: 0.05}, time.Now().UnixMilli())
@@ -3472,6 +3494,7 @@ func TestJSONPrettyWriterRecordStepCostZeroValues(t *testing.T) {
 		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "agent",
+		backend:      &opencodeBackend{},
 	}
 
 	w.recordStepCost(part{Cost: 0, Tokens: partTokens{}}, time.Now().UnixMilli())
@@ -3485,6 +3508,7 @@ func TestJSONPrettyWriterFormatTodoOutput(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	todos := `[{"content":"write tests","status":"in_progress","priority":"high"},{"content":"fix bug","status":"completed","priority":"medium"},{"content":"deploy","status":"cancelled","priority":"low"}]`
@@ -3505,6 +3529,7 @@ func TestJSONPrettyWriterFormatTodoOutputInvalidJSON(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.formatTodoOutput("not json at all")
@@ -3520,6 +3545,7 @@ func TestJSONPrettyWriterFormatTodoOutputWithPrefix(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	todos := "Updated todos\n" + `[{"content":"task","status":"pending","priority":"high"}]`
@@ -3543,6 +3569,7 @@ func TestJSONPrettyWriterProcessEventStepFinish(t *testing.T) {
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
+		backend:      &opencodeBackend{},
 	}
 
 	w.currentText.WriteString("some text")
@@ -3566,6 +3593,7 @@ func TestJSONPrettyWriterToolNilState(t *testing.T) {
 		prefix:    " ",
 		w:         &buf,
 		startTime: time.Now(),
+		backend:   &opencodeBackend{},
 	}
 
 	w.processEvent(streamEvent{
@@ -3770,7 +3798,8 @@ func TestTerminateProcessGroupOnCancelWithContext(t *testing.T) {
 func TestExportSessionMissingBinary(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0755))
-	err := exportSession(dir, "session-1", filepath.Join(dir, "output.json"))
+	b := &opencodeBackend{}
+	err := b.ExportSession(dir, "session-1", filepath.Join(dir, "output.json"))
 	assert.Error(t, err)
 }
 
