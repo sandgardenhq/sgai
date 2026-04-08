@@ -86,11 +86,11 @@ func (b *claudeCodeBackend) StripProviderPrefix(model string) string {
 	return model
 }
 
-func (b *claudeCodeBackend) ValidateModels(models map[string]any) error {
+func (b *claudeCodeBackend) ValidateModels(_ map[string]any) error {
 	return nil // Claude Code has no `models` command; skip validation
 }
 
-func (b *claudeCodeBackend) ExportSession(dir, sessionID, outputPath string) error {
+func (b *claudeCodeBackend) ExportSession(_, _, _ string) error {
 	return nil // Claude Code sessions are stored in ~/.claude/; no export needed
 }
 

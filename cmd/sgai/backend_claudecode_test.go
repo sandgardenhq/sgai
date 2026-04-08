@@ -89,12 +89,12 @@ func TestClaudeCodeBackendBuildEnv(t *testing.T) {
 	})
 	found := map[string]bool{}
 	for _, e := range env {
-		switch {
-		case e == "SGAI_MCP_URL=http://localhost:8080/mcp":
+		switch e {
+		case "SGAI_MCP_URL=http://localhost:8080/mcp":
 			found["mcp"] = true
-		case e == "SGAI_AGENT_IDENTITY=coordinator":
+		case "SGAI_AGENT_IDENTITY=coordinator":
 			found["identity"] = true
-		case e == "SGAI_MCP_INTERACTIVE=yes":
+		case "SGAI_MCP_INTERACTIVE=yes":
 			found["interactive"] = true
 		}
 	}
