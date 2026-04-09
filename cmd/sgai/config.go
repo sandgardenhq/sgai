@@ -139,12 +139,8 @@ func applyConfigDefaults(config *projectConfig, metadata *GoalMetadata) {
 	}
 }
 
-func applyCustomMCPs(dir string, config *projectConfig, backend Backend) error {
+func applyCustomMCPs(dir string, config *projectConfig) error {
 	if config == nil || len(config.MCP) == 0 {
-		return nil
-	}
-	// Claude Code handles MCPs via --mcp-config flag at runtime, not via opencode.jsonc
-	if backend.Name() != "opencode" {
 		return nil
 	}
 

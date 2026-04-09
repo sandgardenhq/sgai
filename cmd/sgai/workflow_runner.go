@@ -268,7 +268,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		log.Fatalln("failed to initialize workspace directory:", errInit)
 	}
 
-	if errMCP := applyCustomMCPs(dir, projectConfig, backend); errMCP != nil {
+	if errMCP := applyCustomMCPs(dir, projectConfig); errMCP != nil {
 		log.Fatalln("failed to apply custom MCPs:", errMCP)
 	}
 

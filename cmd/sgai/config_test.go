@@ -385,7 +385,7 @@ func TestApplyCustomMCPs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			tt.setupFunc(t, dir)
-			err := applyCustomMCPs(dir, tt.config, &opencodeBackend{})
+			err := applyCustomMCPs(dir, tt.config)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -452,19 +452,6 @@ func TestLoadProjectConfigBackendField(t *testing.T) {
 	assert.Equal(t, "claude-code", b.Name())
 }
 
-func TestApplyCustomMCPsClaudeCodeSkips(t *testing.T) {
-	// Claude Code backend should skip applyCustomMCPs entirely
-	dir := t.TempDir()
-	cfg := &projectConfig{
-		MCP: map[string]json.RawMessage{
-			"test-server": json.RawMessage(`{"command": "test"}`),
-		},
-	}
-	// No .sgai/opencode.jsonc exists, but should not error because claude-code skips
-	err := applyCustomMCPs(dir, cfg, &claudeCodeBackend{})
-	assert.NoError(t, err)
-}
-
 func TestLoadProjectConfigTypeError(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, configFileName), []byte(`{"editor": 12345}`), 0644))
@@ -494,7 +481,7 @@ func TestApplyCustomMCPsInvalidOpencodeJSON(t *testing.T) {
 			"test-server": json.RawMessage(`{"command": "test"}`),
 		},
 	}
-	err := applyCustomMCPs(dir, cfg, &opencodeBackend{})
+	err := applyCustomMCPs(dir, cfg)
 	assert.Error(t, err)
 }
 
@@ -508,7 +495,7 @@ func TestApplyCustomMCPsInvalidMCPSection(t *testing.T) {
 			"test-server": json.RawMessage(`{"command": "test"}`),
 		},
 	}
-	err := applyCustomMCPs(dir, cfg, &opencodeBackend{})
+	err := applyCustomMCPs(dir, cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "extracting mcp section")
 }
