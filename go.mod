@@ -9,7 +9,7 @@ require (
 	github.com/mactaggart/gographviz v0.0.0-20250815040658-9ffd0326c418
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 	github.com/stretchr/testify v1.11.1
-	github.com/yuin/goldmark v1.7.16
+	github.com/yuin/goldmark v1.8.2
 	github.com/yuin/goldmark-emoji v1.0.6
 	sigs.k8s.io/yaml v1.6.0
 )
