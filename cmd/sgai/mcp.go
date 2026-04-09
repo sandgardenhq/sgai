@@ -310,7 +310,7 @@ func resolveCallerAgent(headerAgent string, coord *state.Coordinator) string {
 }
 
 func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator, dagAgents []string) http.Handler {
-	return mcp.NewSSEHandler(func(r *http.Request) *mcp.Server {
+	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return buildMCPServer(workingDir, r, coord, dagAgents)
 	}, nil)
 }
