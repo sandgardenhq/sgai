@@ -45,7 +45,6 @@ type AgentRunParams struct {
 	ModelSpec string // e.g. "anthropic/claude-opus-4-6 (max)"
 	SessionID string // resume session
 	AgentDir  string // workspace directory containing .sgai/agent/*.md files
-	McpURL    string // SGAI MCP server URL for --mcp-config injection
 }
 
 // AgentEnvParams contains the parameters for BuildEnv.
