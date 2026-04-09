@@ -646,15 +646,13 @@ func TestCollectAgentModelsVariants(t *testing.T) {
 }
 
 func TestBuildAdhocArgs(t *testing.T) {
-	b := &opencodeBackend{}
-
 	t.Run("simpleModel", func(t *testing.T) {
-		args := b.BuildAdhocArgs("claude-opus-4")
+		args := buildAdhocArgs("claude-opus-4")
 		assert.Equal(t, []string{"run", "-m", "claude-opus-4", "--agent", "build", "--title", "adhoc [claude-opus-4]"}, args)
 	})
 
 	t.Run("modelWithVariant", func(t *testing.T) {
-		args := b.BuildAdhocArgs("claude-opus-4:fast")
+		args := buildAdhocArgs("claude-opus-4:fast")
 		assert.Contains(t, args, "run")
 		assert.Contains(t, args, "-m")
 		assert.Contains(t, args, "--agent")
@@ -663,13 +661,13 @@ func TestBuildAdhocArgs(t *testing.T) {
 	})
 
 	t.Run("withVariantAddsFlag", func(t *testing.T) {
-		args := b.BuildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
+		args := buildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
 		assert.Contains(t, args, "--variant")
 		assert.Contains(t, args, "thinking")
 	})
 
 	t.Run("withoutVariantNoFlag", func(t *testing.T) {
-		args := b.BuildAdhocArgs("anthropic/claude-sonnet-4-6")
+		args := buildAdhocArgs("anthropic/claude-sonnet-4-6")
 		for _, arg := range args {
 			assert.NotEqual(t, "--variant", arg)
 		}
@@ -3086,15 +3084,13 @@ func TestHandleAPIStateWithCaching(t *testing.T) {
 }
 
 func TestBuildAdhocArgsWithVariantAddsFlag(t *testing.T) {
-	b := &opencodeBackend{}
-	args := b.BuildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
+	args := buildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
 	assert.Contains(t, args, "--variant")
 	assert.Contains(t, args, "thinking")
 }
 
 func TestBuildAdhocArgsWithoutVariantNoFlag(t *testing.T) {
-	b := &opencodeBackend{}
-	args := b.BuildAdhocArgs("anthropic/claude-sonnet-4-6")
+	args := buildAdhocArgs("anthropic/claude-sonnet-4-6")
 	for _, arg := range args {
 		assert.NotEqual(t, "--variant", arg)
 	}

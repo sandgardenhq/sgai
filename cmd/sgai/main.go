@@ -50,8 +50,11 @@ func main() {
 		subcommand = os.Args[1]
 	}
 
-	// Binary check is deferred to workflow startup where the backend is known.
-	// Each backend validates its CLI binary availability via BinaryName().
+	if subcommand != "help" && subcommand != "-h" && subcommand != "--help" {
+		if _, err := exec.LookPath("opencode"); err != nil {
+			log.Fatalln("opencode is required but not found in PATH")
+		}
+	}
 
 	switch subcommand {
 	case "help", "-h", "--help":
@@ -247,7 +250,6 @@ type multiModelConfig struct {
 	logWriter        io.Writer
 	stdoutLog        io.Writer
 	stderrLog        io.Writer
-	backend          Backend
 }
 
 func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
@@ -372,12 +374,7 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
 
 		baseAgent := resolveBaseAgent(metadata.Alias, cfg.agent)
-		agentArgs := cfg.backend.BuildAgentArgs(AgentRunParams{
-			Agent:     cfg.agent,
-			BaseAgent: baseAgent,
-			ModelSpec: modelSpec,
-			SessionID: capturedSessionID,
-		})
+		agentArgs := buildAgentArgs(cfg.agent, baseAgent, modelSpec, capturedSessionID)
 		agentMsg := buildAgentMessage(cfg, wfState, metadata)
 
 		newState, capturedSessionID, errExec := executeAgentProcess(ctx, cfg, agentArgs, agentMsg, prefix, outputCapture, wfState)
@@ -449,6 +446,26 @@ func copyProjectManagementToRetrospective(dir, retrospectiveDir string) {
 	}
 }
 
+func buildAgentArgs(agent, baseAgent, modelSpec, sessionID string) []string {
+	args := []string{"run", "--format=json", "--agent", baseAgent}
+	if modelSpec != "" {
+		model, variant := parseModelAndVariant(modelSpec)
+		args = append(args, "--model", model)
+		if variant != "" {
+			args = append(args, "--variant", variant)
+		}
+	}
+	if sessionID != "" {
+		args = append(args, "--session", sessionID)
+	}
+	title := agent
+	if modelSpec != "" {
+		title = agent + " [" + modelSpec + "]"
+	}
+	args = append(args, "--title", title)
+	return args
+}
+
 func buildAgentMessage(cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata) string {
 	msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode, metadata.Alias)
 
@@ -499,25 +516,24 @@ func buildAgentEnv(cfg multiModelConfig, wfState state.Workflow, modelSpec strin
 		agentIdentity = cfg.agent + "|" + model + "|" + variant
 	}
 
-	return cfg.backend.BuildEnv(AgentEnvParams{
-		Dir:             cfg.dir,
-		McpURL:          cfg.mcpURL,
-		AgentIdentity:   agentIdentity,
-		InteractiveMode: interactiveEnv,
-	})
+	return append(os.Environ(),
+		"OPENCODE_CONFIG_DIR="+filepath.Join(cfg.dir, ".sgai"),
+		"SGAI_MCP_URL="+cfg.mcpURL,
+		"SGAI_AGENT_IDENTITY="+agentIdentity,
+		"SGAI_MCP_INTERACTIVE="+interactiveEnv)
 }
 
 func executeAgentProcess(ctx context.Context, cfg multiModelConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
 	stderrOut := buildAgentOutputWriter(os.Stderr, cfg.logWriter, cfg.stderrLog)
 	stdoutOut := buildAgentOutputWriter(os.Stdout, cfg.logWriter, cfg.stdoutLog)
 	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
-	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now(), backend: cfg.backend}
+	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now()}
 
 	cfg.coord.ResetAgentDoneWatchdog()
 	agentCtx, agentCancel := context.WithCancel(ctx)
 	cfg.coord.SetAgentCancel(agentCancel)
 
-	cmd := exec.CommandContext(agentCtx, cfg.backend.BinaryName(), agentArgs...)
+	cmd := exec.CommandContext(agentCtx, "opencode", agentArgs...)
 	cmd.Dir = cfg.dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = buildAgentEnv(cfg, wfState, extractModelFromArgs(agentArgs))
@@ -527,7 +543,7 @@ func executeAgentProcess(ctx context.Context, cfg multiModelConfig, agentArgs []
 
 	if errStart := cmd.Start(); errStart != nil {
 		agentCancel()
-		fmt.Fprintln(os.Stderr, "failed to start "+cfg.backend.BinaryName()+":", errStart)
+		fmt.Fprintln(os.Stderr, "failed to start opencode:", errStart)
 		if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
 			wf.Status = state.StatusAgentDone
 		}); errUpdate != nil {
@@ -580,7 +596,7 @@ func extractModelFromArgs(args []string) string {
 func exportAgentSession(cfg multiModelConfig, sessionID string, iteration int) {
 	timestamp := time.Now().Format("20060102150405")
 	sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", iteration, cfg.agent, timestamp))
-	if err := cfg.backend.ExportSession(cfg.dir, sessionID, sessionFile); err != nil {
+	if err := exportSession(cfg.dir, sessionID, sessionFile); err != nil {
 		log.Fatalln("failed to export session:", err)
 	}
 }
@@ -1290,7 +1306,6 @@ type jsonPrettyWriter struct {
 	currentAgent string
 	stepCounter  int
 	startTime    time.Time
-	backend      Backend
 }
 
 func (j *jsonPrettyWriter) tsPrefix() string {
@@ -1317,8 +1332,8 @@ func (j *jsonPrettyWriter) processBuffer() {
 			continue
 		}
 
-		event, ok := j.backend.ParseEvent(line)
-		if !ok {
+		var event streamEvent
+		if err := json.Unmarshal(line, &event); err != nil {
 			continue
 		}
 
@@ -1726,6 +1741,20 @@ func copyFinalStateToRetrospective(dir, retrospectiveDir string) error {
 	}
 
 	return nil
+}
+
+func exportSession(dir, sessionID, outputPath string) error {
+	cmd := exec.Command("opencode", "export", sessionID)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("opencode export failed: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(outputPath, output, 0644)
 }
 
 func formatDuration(d time.Duration) string {

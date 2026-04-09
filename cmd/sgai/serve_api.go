@@ -2109,12 +2109,11 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	st.selectedModel = strings.TrimSpace(req.Model)
 	st.promptText = strings.TrimSpace(req.Prompt)
 
-	backend := s.resolveAdhocBackend(workspacePath)
-	args := backend.BuildAdhocArgs(st.selectedModel)
-	cmd := exec.Command(backend.BinaryName(), args...)
+	args := buildAdhocArgs(st.selectedModel)
+	cmd := exec.Command("opencode", args...)
 	cmd.Dir = workspacePath
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = backend.BuildEnv(AgentEnvParams{Dir: workspacePath})
+	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
 	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
@@ -2122,7 +2121,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr, startTime: time.Now()}
 	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
-	commandLine := "$ " + backend.BinaryName() + " " + strings.Join(args, " ")
+	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
 	_, _ = fmt.Fprintln(stderrPW, commandLine)
 	_, _ = fmt.Fprintln(stderrPW, promptLine)
@@ -2158,6 +2157,14 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func buildAdhocArgs(modelSpec string) []string {
+	baseModel, variant := parseModelAndVariant(modelSpec)
+	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]"}
+	if variant != "" {
+		args = append(args, "--variant", variant)
+	}
+	return args
+}
 
 func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
 	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)

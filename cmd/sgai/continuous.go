@@ -41,7 +41,7 @@ func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt str
 	runner.runContinuous(ctx, continuousPrompt)
 }
 
-func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcpURL string, coord *state.Coordinator, backend Backend) {
+func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcpURL string, coord *state.Coordinator) {
 	updateContinuousModeState(coord, "Running continuous mode prompt...", "continuous-mode", "continuous mode prompt started")
 
 	for attempt := range continuousModeMaxRetries {
@@ -49,14 +49,12 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 			return
 		}
 
-		args := backend.BuildContinuousArgs()
-		cmd := exec.CommandContext(ctx, backend.BinaryName(), args...)
+		cmd := exec.CommandContext(ctx, "opencode", "run", "--title", "continuous-mode-prompt")
 		cmd.Dir = dir
-		cmd.Env = backend.BuildEnv(AgentEnvParams{
-			Dir:             dir,
-			McpURL:          mcpURL,
-			InteractiveMode: "auto",
-		})
+		cmd.Env = append(os.Environ(),
+			"OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"),
+			"SGAI_MCP_URL="+mcpURL,
+			"SGAI_MCP_INTERACTIVE=auto")
 		cmd.Stdin = strings.NewReader(prompt)
 
 		if errRun := cmd.Run(); errRun != nil {

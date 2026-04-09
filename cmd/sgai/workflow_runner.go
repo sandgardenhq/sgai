@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -29,7 +28,6 @@ type workflowRunner struct {
 	retroLogs        retroLogWriters
 	iterationCounter int
 	previousAgent    string
-	backend          Backend
 }
 
 type retroLogWriters struct {
@@ -159,7 +157,6 @@ func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) 
 		logWriter:        r.logWriter,
 		stdoutLog:        r.retroLogs.stdout,
 		stderrLog:        r.retroLogs.stderr,
-		backend:          r.backend,
 	}
 	return runMultiModelAgent(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter)
 }
@@ -185,7 +182,7 @@ func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt str
 			return
 		}
 
-		runContinuousModePrompt(ctx, r.dir, continuousPrompt, r.mcpURL, r.coord, r.backend)
+		runContinuousModePrompt(ctx, r.dir, continuousPrompt, r.mcpURL, r.coord)
 
 		if ctx.Err() != nil {
 			return
@@ -249,15 +246,6 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		log.Fatalln("failed to load sgai.json:", errConfig)
 	}
 
-	backend, errBackend := resolveBackendStrict(projectConfig)
-	if errBackend != nil {
-		log.Fatalln(errBackend)
-	}
-
-	if _, err := exec.LookPath(backend.BinaryName()); err != nil {
-		log.Fatalf("%s is required but not found in PATH", backend.BinaryName())
-	}
-
 	if errValidate := validateProjectConfig(projectConfig); errValidate != nil {
 		log.Fatalln(errValidate)
 	}
@@ -284,7 +272,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
 	ensureImplicitAgentModel(flowDag, &metadata, "retrospective")
 
-	if errModels := backend.ValidateModels(metadata.Models); errModels != nil {
+	if errModels := validateModels(metadata.Models); errModels != nil {
 		log.Fatalln(errModels)
 	}
 
@@ -373,7 +361,6 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		mcpURL:         mcpURL,
 		logWriter:      logWriter,
 		retroLogs:      retroLogs,
-		backend:        backend,
 	}
 	return runner, cleanup, true
 }
