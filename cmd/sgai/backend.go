@@ -44,7 +44,6 @@ type AgentRunParams struct {
 	BaseAgent string // agent identity passed to CLI --agent flag
 	ModelSpec string // e.g. "anthropic/claude-opus-4-6 (max)"
 	SessionID string // resume session
-	AgentDir  string // workspace directory containing .sgai/agent/*.md files
 }
 
 // AgentEnvParams contains the parameters for BuildEnv.

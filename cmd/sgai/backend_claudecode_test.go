@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -140,88 +138,6 @@ func TestClaudeCodeBackendExportSession(t *testing.T) {
 	if err := b.ExportSession("/tmp", "ses_1", "/tmp/out.json"); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
-}
-
-func TestClaudeCodeBuildAgentArgsWithSystemPrompt(t *testing.T) {
-	dir := t.TempDir()
-	agentDir := filepath.Join(dir, ".sgai", "agent")
-	if err := os.MkdirAll(agentDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	agentContent := "---\npermissions:\n  edit: allow\n---\nYou are a coordinator agent.\nFollow these rules carefully."
-	if err := os.WriteFile(filepath.Join(agentDir, "coordinator.md"), []byte(agentContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	b := &claudeCodeBackend{}
-	args := b.BuildAgentArgs(AgentRunParams{
-		Agent:     "coordinator",
-		BaseAgent: "coordinator",
-		ModelSpec: "anthropic/claude-opus-4-6",
-		AgentDir:  dir,
-	})
-
-	// Should have --append-system-prompt with the body (frontmatter stripped)
-	assertContains(t, args, "--append-system-prompt")
-	found := false
-	for i, arg := range args {
-		if arg == "--append-system-prompt" && i+1 < len(args) {
-			if strings.Contains(args[i+1], "You are a coordinator agent.") {
-				found = true
-			}
-			// Should NOT contain frontmatter
-			if strings.Contains(args[i+1], "permissions:") {
-				t.Error("system prompt should not contain frontmatter")
-			}
-		}
-	}
-	if !found {
-		t.Error("expected --append-system-prompt to contain agent body")
-	}
-}
-
-func TestClaudeCodeBuildAgentArgsPermissionMode(t *testing.T) {
-	b := &claudeCodeBackend{}
-	args := b.BuildAgentArgs(AgentRunParams{
-		Agent:     "builder",
-		BaseAgent: "builder",
-	})
-	assertContains(t, args, "--permission-mode")
-	assertContains(t, args, "bypassPermissions")
-}
-
-func TestClaudeCodeBuildAgentArgsNoAgentFile(t *testing.T) {
-	dir := t.TempDir()
-	b := &claudeCodeBackend{}
-	args := b.BuildAgentArgs(AgentRunParams{
-		Agent:     "builder",
-		BaseAgent: "builder",
-		AgentDir:  dir,
-	})
-	// No --append-system-prompt when agent file doesn't exist
-	assertNotContains(t, args, "--append-system-prompt")
-	// But permission mode should still be set
-	assertContains(t, args, "--permission-mode")
-}
-
-func TestClaudeCodeBuildAgentArgsEmptyBody(t *testing.T) {
-	dir := t.TempDir()
-	agentDir := filepath.Join(dir, ".sgai", "agent")
-	if err := os.MkdirAll(agentDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	// Agent file with only frontmatter, no body
-	if err := os.WriteFile(filepath.Join(agentDir, "builder.md"), []byte("---\npermissions:\n  edit: allow\n---\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	b := &claudeCodeBackend{}
-	args := b.BuildAgentArgs(AgentRunParams{
-		Agent:     "builder",
-		BaseAgent: "builder",
-		AgentDir:  dir,
-	})
-	assertNotContains(t, args, "--append-system-prompt")
 }
 
 func TestClaudeCodeParseEventText(t *testing.T) {

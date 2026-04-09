@@ -377,7 +377,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 			BaseAgent: baseAgent,
 			ModelSpec: modelSpec,
 			SessionID: capturedSessionID,
-			AgentDir:  cfg.dir,
 		})
 		agentMsg := buildAgentMessage(cfg, wfState, metadata)
 
