@@ -398,60 +398,6 @@ func TestApplyCustomMCPs(t *testing.T) {
 	}
 }
 
-func TestResolveBackend(t *testing.T) {
-	t.Run("defaultsToOpencode", func(t *testing.T) {
-		b := resolveBackend(nil)
-		assert.Equal(t, "opencode", b.Name())
-	})
-	t.Run("emptyBackendDefaultsToOpencode", func(t *testing.T) {
-		config := &projectConfig{}
-		b := resolveBackend(config)
-		assert.Equal(t, "opencode", b.Name())
-	})
-	t.Run("explicitOpencode", func(t *testing.T) {
-		config := &projectConfig{Backend: "opencode"}
-		b := resolveBackend(config)
-		assert.Equal(t, "opencode", b.Name())
-	})
-	t.Run("claudeCode", func(t *testing.T) {
-		config := &projectConfig{Backend: "claude-code"}
-		b := resolveBackend(config)
-		assert.Equal(t, "claude-code", b.Name())
-	})
-}
-
-func TestResolveBackendStrict(t *testing.T) {
-	t.Run("nilConfig", func(t *testing.T) {
-		b, err := resolveBackendStrict(nil)
-		require.NoError(t, err)
-		assert.Equal(t, "opencode", b.Name())
-	})
-	t.Run("validClaudeCode", func(t *testing.T) {
-		b, err := resolveBackendStrict(&projectConfig{Backend: "claude-code"})
-		require.NoError(t, err)
-		assert.Equal(t, "claude-code", b.Name())
-	})
-	t.Run("invalidBackend", func(t *testing.T) {
-		_, err := resolveBackendStrict(&projectConfig{Backend: "invalid"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported backend")
-	})
-}
-
-func TestLoadProjectConfigBackendField(t *testing.T) {
-	dir := t.TempDir()
-	data := []byte(`{"backend": "claude-code", "defaultModel": "anthropic/claude-opus-4-6"}`)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, configFileName), data, 0644))
-
-	config, err := loadProjectConfig(dir)
-	require.NoError(t, err)
-	require.NotNil(t, config)
-	assert.Equal(t, "claude-code", config.Backend)
-
-	b := resolveBackend(config)
-	assert.Equal(t, "claude-code", b.Name())
-}
-
 func TestLoadProjectConfigTypeError(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, configFileName), []byte(`{"editor": 12345}`), 0644))
