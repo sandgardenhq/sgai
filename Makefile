@@ -15,7 +15,7 @@ webapp-check-deps:
 	cd cmd/sgai/webapp && bun outdated
 
 lint:
-	GOOS= GOARCH= go run -mod=readonly github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0 run ./...
+	GOOS= GOARCH= go run -mod=readonly github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2 run ./...
 
 install: build
 	cp sgai $(HOME)/bin/sgai
