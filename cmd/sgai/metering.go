@@ -22,14 +22,32 @@ const modelsDevURL = "https://models.dev/api.json"
 const modelsDevCacheTTL = 24 * time.Hour
 
 var exportSessionBytes = func(dir, sessionID string) ([]byte, error) {
+	tmpFile, errCreate := os.CreateTemp("", "sgai-opencode-export-*.json")
+	if errCreate != nil {
+		return nil, errCreate
+	}
+	tmpPath := tmpFile.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+
 	cmd := exec.Command("opencode", "export", sessionID)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("opencode export failed: %w", err)
+	cmd.Stdout = tmpFile
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if errRun := cmd.Run(); errRun != nil {
+		_ = tmpFile.Close()
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("opencode export failed: %w: %s", errRun, msg)
+		}
+		return nil, fmt.Errorf("opencode export failed: %w", errRun)
 	}
-	return output, nil
+	if errClose := tmpFile.Close(); errClose != nil {
+		return nil, errClose
+	}
+	return os.ReadFile(tmpPath)
 }
 
 var fetchModelsDevCatalog = func() ([]byte, error) {
