@@ -3,13 +3,13 @@
     {
       "name": "Create PR",
       "model": "openai/gpt-5.5",
-      "prompt": "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me. REMEMBER: 'GOALS' must never be the used commit message or PR title prefix",
+      "prompt": "first run('make absorb-sgai'); store the git path (by querying jj git root) into the environment variable GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me. REMEMBER: 'GOALS' must never be the used commit message or PR title prefix; when the PR already exists, make sure you update its body and title with the latest updates; store the PR information (like URL) into .sgai/PR_INFO",
       "description": "Create a draft pull request from current changes"
     },
     {
       "name": "Upstream Sync",
-      "model": "openai/gpt-5.5",
-      "prompt": "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
+      "model": "openai/gpt-5.5 (high)",
+      "prompt": "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push (make sure you push onto the branch of the PR, if a PR already exists for this workspace)",
       "description": "Fetch and rebase against upstream main branch"
     },
     {
