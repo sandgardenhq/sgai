@@ -39,7 +39,7 @@ IMPORTANT: Hand the control back to the human partner so they can feed you with 
 
 ### Phase 4: Validation Criteria
 
-After design is agreed upon, gather validation criteria for project-critic-council.
+After design is agreed upon, gather validation criteria for the coordinator-owned completion review gate.
 
 Ask these questions (each with escape hatch option):
 1. **Acceptance Criteria:** "How will you know this feature is done?"

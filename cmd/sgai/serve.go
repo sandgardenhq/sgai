@@ -1591,18 +1591,19 @@ func orderedModelStatuses(dir string, modelStatuses map[string]string) []modelSt
 		return nil
 	}
 
-	modelOrder := modelsForAgentFromGoal(dir, "project-critic-council")
 	ordered := make([]modelStatusDisplay, 0, len(modelStatuses))
 	used := make(map[string]bool)
 
-	for _, modelSpec := range modelOrder {
-		modelID := formatModelID("project-critic-council", modelSpec)
-		status, ok := modelStatuses[modelID]
-		if !ok {
-			continue
+	for _, agent := range orderedStatusAgents(modelStatuses) {
+		for _, modelSpec := range modelsForAgentFromGoal(dir, agent) {
+			modelID := formatModelID(agent, modelSpec)
+			status, ok := modelStatuses[modelID]
+			if !ok {
+				continue
+			}
+			ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: status})
+			used[modelID] = true
 		}
-		ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: status})
-		used[modelID] = true
 	}
 
 	remaining := make([]string, 0, len(modelStatuses))
@@ -1625,6 +1626,21 @@ func orderedModelStatuses(dir string, modelStatuses map[string]string) []modelSt
 		ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: modelStatuses[modelID]})
 	}
 	return ordered
+}
+
+func orderedStatusAgents(modelStatuses map[string]string) []string {
+	agents := make([]string, 0, len(modelStatuses))
+	seen := make(map[string]bool)
+	for modelID := range modelStatuses {
+		agent := extractAgentFromModelID(modelID)
+		if seen[agent] {
+			continue
+		}
+		seen[agent] = true
+		agents = append(agents, agent)
+	}
+	slices.Sort(agents)
+	return agents
 }
 
 func modelsForAgentFromGoal(dir, agent string) []string {

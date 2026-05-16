@@ -176,7 +176,7 @@ After reading all artifacts in Step 1, write a structured analysis summary to yo
 ```
 Analysis Summary:
 - Files: Read 15/15 session JSONs, session state.json (from .sgai/retrospectives/<session-id>/state.json), GOAL.md, PROJECT_MANAGEMENT.md, stdout.log, stderr.log
-- Visits: coordinator(8), go(3), go-reviewer(2), react(1), project-critic-council(1)
+- Visits: coordinator(8), backend-go-developer(3), go-readability-reviewer(2), react-developer(1), retrospective(1)
 - Messages: 19 inter-agent messages, 3 reviewer feedback rounds
 - Efficiency: Backend developer visited 3 times due to reviewer feedback — could skills reduce this?
 - Quality: Reviewer caught SQL formatting issues 3 times — suggests missing skill

@@ -116,7 +116,9 @@ func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent str
 	fmt.Println("["+paddedsgai+"]", "transitioning to retrospective mode")
 }
 
-func ensureImplicitAgentModel(flowDag *dag, metadata *GoalMetadata, agentName string) {
+func ensureImplicitRetrospectiveModel(flowDag *dag, metadata *GoalMetadata) {
+	const agentName = "retrospective"
+
 	if metadata.Models == nil {
 		metadata.Models = make(map[string]any)
 	}
@@ -980,8 +982,7 @@ func tryReloadGoalMetadata(goalPath string, current GoalMetadata, flowDag *dag) 
 		return current, errParse
 	}
 
-	ensureImplicitAgentModel(flowDag, &newMetadata, "retrospective")
-	ensureImplicitAgentModel(flowDag, &newMetadata, "project-critic-council")
+	ensureImplicitRetrospectiveModel(flowDag, &newMetadata)
 
 	return newMetadata, nil
 }
@@ -1777,7 +1778,7 @@ func applyLayerFolderOverlay(dir string) error {
 	for _, subfolder := range allowedSubfolders {
 		srcDir := filepath.Join(layerDir, subfolder)
 		dstDir := filepath.Join(dir, ".sgai", subfolder)
-		if err := copyLayerSubfolder(srcDir, dstDir, subfolder); err != nil {
+		if err := copyLayerSubfolder(srcDir, dstDir); err != nil {
 			return err
 		}
 	}
@@ -1785,7 +1786,7 @@ func applyLayerFolderOverlay(dir string) error {
 	return nil
 }
 
-func copyLayerSubfolder(srcDir, dstDir, subfolder string) error {
+func copyLayerSubfolder(srcDir, dstDir string) error {
 	if !isExistingDirectory(srcDir) {
 		return nil
 	}
@@ -1804,10 +1805,6 @@ func copyLayerSubfolder(srcDir, dstDir, subfolder string) error {
 			return os.MkdirAll(filepath.Join(dstDir, relPath), 0755)
 		}
 
-		if isProtectedFile(subfolder, relPath) {
-			return nil
-		}
-
 		return copyFileAtomic(path, filepath.Join(dstDir, relPath))
 	})
 }
@@ -1818,10 +1815,6 @@ func isExistingDirectory(path string) bool {
 		return false
 	}
 	return fi.IsDir()
-}
-
-func isProtectedFile(subfolder, relPath string) bool {
-	return subfolder == "agent" && relPath == "coordinator.md"
 }
 
 func isFalsish(s string) bool {

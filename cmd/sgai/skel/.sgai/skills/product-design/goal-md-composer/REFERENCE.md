@@ -174,13 +174,12 @@ not implementation. Focus on outcomes.
 | `c4-component` | C4 Component-level architecture synthesis from code documentation. |
 | `c4-container` | C4 Container-level deployment documentation. |
 | `c4-context` | C4 System context diagrams for stakeholders (highest C4 level). |
-| `project-critic-council` | Multi-model council that validates completion claims with strict standards. |
 
 ### Coordination
 
 | Agent | Description |
 |-------|-------------|
-| `coordinator` | **Always present** - orchestrates workflow, manages tasks, human communication. Never include in flow. |
+| `coordinator` | **Always present** - orchestrates workflow, manages tasks, human communication, and owns the internal completion review gate. Never include in flow. |
 
 ### SDK Verification Agents
 

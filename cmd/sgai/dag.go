@@ -70,8 +70,9 @@ type dagNode struct {
 }
 
 type dag struct {
-	Nodes      map[string]*dagNode
-	EntryNodes []string
+	Nodes            map[string]*dagNode
+	EntryNodes       []string
+	parsedEntryNodes []string
 }
 
 func (d *dag) ensureNode(name string) *dagNode {
@@ -138,13 +139,13 @@ func parseFlow(flowSpec string, dir string) (*dag, error) {
 		}
 	}
 	slices.Sort(d.EntryNodes)
+	d.parsedEntryNodes = slices.Clone(d.EntryNodes)
 
 	if len(d.EntryNodes) == 0 {
 		return nil, fmt.Errorf("no entry nodes found in DAG (all nodes have predecessors, which implies a cycle)")
 	}
 
 	d.injectCoordinatorEdges()
-	d.injectProjectCriticCouncilEdge()
 
 	if err := d.detectCycles(); err != nil {
 		return nil, err
@@ -177,19 +178,6 @@ func (d *dag) injectCoordinatorEdges() {
 	slices.Sort(coordNode.Successors)
 
 	d.EntryNodes = []string{"coordinator"}
-}
-
-func (d *dag) injectProjectCriticCouncilEdge() {
-	coordNode := d.ensureNode("coordinator")
-	pccNode := d.ensureNode("project-critic-council")
-
-	if !slices.Contains(coordNode.Successors, "project-critic-council") {
-		coordNode.Successors = append(coordNode.Successors, "project-critic-council")
-	}
-	if !slices.Contains(pccNode.Predecessors, "coordinator") {
-		pccNode.Predecessors = append(pccNode.Predecessors, "coordinator")
-	}
-	slices.Sort(coordNode.Successors)
 }
 
 func (d *dag) injectRetrospectiveEdge() {
