@@ -1372,7 +1372,7 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 				}
 				if part.State.Output != "" {
 					if isTodoTool(part.Tool) {
-						j.formatTodoOutput(part.State.Output)
+						j.handleTodoOutput(part.Tool, part.State.Output)
 					} else {
 						for line := range strings.SplitSeq(part.State.Output, "\n") {
 							if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"  → "+line); err != nil {
@@ -1485,23 +1485,34 @@ func isTodoTool(tool string) bool {
 	}
 }
 
-func (j *jsonPrettyWriter) formatTodoOutput(output string) {
-	type todo struct {
-		Content  string `json:"content"`
-		Status   string `json:"status"`
-		Priority string `json:"priority"`
+func isNativeTodoTool(tool string) bool {
+	switch tool {
+	case "todowrite", "todoread":
+		return true
+	default:
+		return false
 	}
+}
 
+func (j *jsonPrettyWriter) handleTodoOutput(tool, output string) {
+	todos, errParse := j.formatTodoOutput(output)
+	if errParse != nil {
+		return
+	}
+	j.persistNativeTodoOutput(tool, todos)
+}
+
+func (j *jsonPrettyWriter) formatTodoOutput(output string) ([]state.TodoItem, error) {
 	jsonOutput := stripMCPTodoPrefix(output)
 
-	var todos []todo
-	if err := json.Unmarshal([]byte(jsonOutput), &todos); err != nil {
+	var todos []state.TodoItem
+	if errUnmarshal := json.Unmarshal([]byte(jsonOutput), &todos); errUnmarshal != nil {
 		for line := range strings.SplitSeq(output, "\n") {
 			if _, err := fmt.Fprintln(j.w, j.tsPrefix()+"  → "+line); err != nil {
 				log.Println("write failed:", err)
 			}
 		}
-		return
+		return nil, errUnmarshal
 	}
 
 	for _, t := range todos {
@@ -1509,6 +1520,18 @@ func (j *jsonPrettyWriter) formatTodoOutput(output string) {
 		if _, err := fmt.Fprintf(j.w, "%s  → %s %s (%s)\n", j.tsPrefix(), symbol, t.Content, t.Priority); err != nil {
 			log.Println("write failed:", err)
 		}
+	}
+	return todos, nil
+}
+
+func (j *jsonPrettyWriter) persistNativeTodoOutput(tool string, todos []state.TodoItem) {
+	if !isNativeTodoTool(tool) || j.coord == nil || j.currentAgent == "" || j.currentAgent == "coordinator" {
+		return
+	}
+	if errUpdate := j.coord.UpdateState(func(wf *state.Workflow) {
+		wf.Todos = todos
+	}); errUpdate != nil {
+		log.Println("failed to save native todos:", errUpdate)
 	}
 }
 

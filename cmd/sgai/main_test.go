@@ -3248,6 +3248,109 @@ func TestJSONPrettyWriterProcessEventToolCompletedTodo(t *testing.T) {
 	assert.Contains(t, output, "task2")
 }
 
+func TestJSONPrettyWriterPersistsNativeTodoOutput(t *testing.T) {
+	dir := t.TempDir()
+	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, "state.json"), state.Workflow{
+		ProjectTodos: []state.TodoItem{
+			{ID: "project-1", Content: "keep project todo", Status: "pending", Priority: "high"},
+		},
+	})
+	require.NoError(t, errCoord)
+
+	var buf bytes.Buffer
+	w := &jsonPrettyWriter{
+		prefix:       " ",
+		w:            &buf,
+		startTime:    time.Now(),
+		coord:        coord,
+		currentAgent: "go",
+	}
+
+	todos := `[{"id":"agent-1","content":"diagnose native todos","status":"in_progress","priority":"high"},{"id":"agent-2","content":"write regression","status":"pending","priority":"medium"}]`
+	w.processEvent(streamEvent{
+		Type: "tool",
+		Part: part{
+			Tool: "todowrite",
+			State: &toolState{
+				Status: "completed",
+				Input:  map[string]any{},
+				Output: todos,
+			},
+		},
+	})
+
+	wfState := coord.State()
+	require.Len(t, wfState.Todos, 2)
+	assert.Equal(t, "agent-1", wfState.Todos[0].ID)
+	assert.Equal(t, "diagnose native todos", wfState.Todos[0].Content)
+	assert.Equal(t, "in_progress", wfState.Todos[0].Status)
+	assert.Equal(t, "high", wfState.Todos[0].Priority)
+	assert.Equal(t, []state.TodoItem{{ID: "project-1", Content: "keep project todo", Status: "pending", Priority: "high"}}, wfState.ProjectTodos)
+}
+
+func TestJSONPrettyWriterMalformedNativeTodoOutputPreservesTodos(t *testing.T) {
+	w, coord, existingAgentTodos, existingProjectTodos := newTodoStateJSONPrettyWriter(t, "go")
+
+	w.processEvent(streamEvent{
+		Type: "tool",
+		Part: part{
+			Tool: "todowrite",
+			State: &toolState{
+				Status: "completed",
+				Input:  map[string]any{},
+				Output: "not json at all",
+			},
+		},
+	})
+
+	wfState := coord.State()
+	assert.Equal(t, existingAgentTodos, wfState.Todos)
+	assert.Equal(t, existingProjectTodos, wfState.ProjectTodos)
+}
+
+func TestJSONPrettyWriterProjectTodoOutputDoesNotOverwriteAgentTodos(t *testing.T) {
+	w, coord, existingAgentTodos, existingProjectTodos := newTodoStateJSONPrettyWriter(t, "coordinator")
+
+	w.processEvent(streamEvent{
+		Type: "tool",
+		Part: part{
+			Tool: "sgai_project_todowrite",
+			State: &toolState{
+				Status: "completed",
+				Input:  map[string]any{},
+				Output: `[{"id":"project-2","content":"formatted only","status":"pending","priority":"low"}]`,
+			},
+		},
+	})
+
+	wfState := coord.State()
+	assert.Equal(t, existingAgentTodos, wfState.Todos)
+	assert.Equal(t, existingProjectTodos, wfState.ProjectTodos)
+}
+
+func newTodoStateJSONPrettyWriter(t *testing.T, currentAgent string) (*jsonPrettyWriter, *state.Coordinator, []state.TodoItem, []state.TodoItem) {
+	t.Helper()
+
+	dir := t.TempDir()
+	existingAgentTodos := []state.TodoItem{{ID: "agent-1", Content: "keep agent todo", Status: "pending", Priority: "medium"}}
+	existingProjectTodos := []state.TodoItem{{ID: "project-1", Content: "keep project todo", Status: "pending", Priority: "high"}}
+	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, "state.json"), state.Workflow{
+		Todos:        existingAgentTodos,
+		ProjectTodos: existingProjectTodos,
+	})
+	require.NoError(t, errCoord)
+
+	var buf bytes.Buffer
+	w := &jsonPrettyWriter{
+		prefix:       " ",
+		w:            &buf,
+		startTime:    time.Now(),
+		coord:        coord,
+		currentAgent: currentAgent,
+	}
+	return w, coord, existingAgentTodos, existingProjectTodos
+}
+
 func TestJSONPrettyWriterProcessEventToolError(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
@@ -3488,7 +3591,8 @@ func TestJSONPrettyWriterFormatTodoOutput(t *testing.T) {
 	}
 
 	todos := `[{"content":"write tests","status":"in_progress","priority":"high"},{"content":"fix bug","status":"completed","priority":"medium"},{"content":"deploy","status":"cancelled","priority":"low"}]`
-	w.formatTodoOutput(todos)
+	_, errFormat := w.formatTodoOutput(todos)
+	require.NoError(t, errFormat)
 
 	output := buf.String()
 	assert.Contains(t, output, "◐")
@@ -3507,7 +3611,8 @@ func TestJSONPrettyWriterFormatTodoOutputInvalidJSON(t *testing.T) {
 		startTime: time.Now(),
 	}
 
-	w.formatTodoOutput("not json at all")
+	_, errFormat := w.formatTodoOutput("not json at all")
+	require.Error(t, errFormat)
 
 	output := buf.String()
 	assert.Contains(t, output, "→")
@@ -3523,7 +3628,8 @@ func TestJSONPrettyWriterFormatTodoOutputWithPrefix(t *testing.T) {
 	}
 
 	todos := "Updated todos\n" + `[{"content":"task","status":"pending","priority":"high"}]`
-	w.formatTodoOutput(todos)
+	_, errFormat := w.formatTodoOutput(todos)
+	require.NoError(t, errFormat)
 
 	output := buf.String()
 	assert.Contains(t, output, "○")
