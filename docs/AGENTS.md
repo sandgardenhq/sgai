@@ -16,9 +16,9 @@ Verifies that TypeScript Claude Agent SDK applications are properly configured, 
 
 ---
 
-## backend-go-developer
+## go
 
-Expert Go backend developer for building production-quality APIs, CLI tools, and services with idiomatic Go patterns. This agent writes, tests, and refactors Go code following official Go conventions and best practices from Effective Go. It handles HTTP/API development, database operations, testing, and uses modern Go features (Go 1.21+) including generics, the slices package, and iterators. The agent works closely with the go-readability-reviewer for code quality assurance and must address all review feedback before completing work.
+Primary Go wrapper agent that coordinates Go implementation and review by delegating implementation to go-developer and review to go-reviewer. This agent breaks broad Go requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures review feedback is resolved before completion.
 
 ---
 
@@ -64,21 +64,21 @@ General-purpose agent for researching complex questions, searching for code, and
 
 ---
 
-## go-readability-reviewer
+## go-reviewer
 
-Reviews Go code for readability, idioms, and best practices following Go Code Review Comments and the Google Go Style Guide. This is a read-only reviewer that cannot modify files - it provides detailed feedback with line numbers and sends fix recommendations to the backend-go-developer agent via messaging. The agent uses a comprehensive checklist covering formatting, naming, error handling, concurrency, interfaces, documentation, type safety, and modern Go idioms. Every issue identified is mandatory and must be addressed before work can proceed.
-
----
-
-## htmx-picocss-frontend-developer
-
-Frontend developer specializing in building modern, lightweight web interfaces using HTMX and PicoCSS without heavy JavaScript frameworks. This agent creates fast, accessible, and maintainable web applications with semantic HTML, partial page updates via HTMX attributes, and PicoCSS's classless styling approach. It enforces a strict no-custom-JavaScript policy (except for idiomorph extension setup), uses Playwright for visual verification, and ensures accessibility with proper contrast ratios. Use this agent for building interactive web UIs that need HTMX's AJAX capabilities.
+Hidden Go reviewer subagent that reviews Go code for readability, idioms, and best practices following Go Code Review Comments and the Google Go Style Guide. This is a read-only reviewer that cannot modify files - it provides detailed feedback with line numbers and sends fix recommendations to the go-developer agent via messaging. The agent uses a comprehensive checklist covering formatting, naming, error handling, concurrency, interfaces, documentation, type safety, and modern Go idioms. Every issue identified is mandatory and must be addressed before work can proceed.
 
 ---
 
-## htmx-picocss-frontend-reviewer
+## htmx-picocss
 
-The "UI OCD Web Agent" - a hyper-perfectionist frontend reviewer for interfaces built with HTMX and PicoCSS. This agent obsessively reviews visual consistency, predictable interaction patterns, cohesive information architecture, and code readability. It verifies that every interactive element has proper hover/focus/loading/error states, layouts are responsive, accessibility requirements are met, and Playwright tests cover UI behavior. Any rough edge is considered a bug. Use this agent to review and polish HTMX/PicoCSS interfaces to production quality.
+Primary HTMX/PicoCSS wrapper agent that coordinates implementation and review by delegating implementation to htmx-picocss-developer and review to htmx-picocss-reviewer. This agent breaks broad frontend requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures review feedback is resolved before completion.
+
+---
+
+## htmx-picocss-reviewer
+
+Hidden HTMX/PicoCSS reviewer subagent. The "UI OCD Web Agent" obsessively reviews visual consistency, predictable interaction patterns, cohesive information architecture, and code readability. It verifies that every interactive element has proper hover/focus/loading/error states, layouts are responsive, accessibility requirements are met, and Playwright tests cover UI behavior. Any rough edge is considered a bug.
 
 ---
 
@@ -97,6 +97,12 @@ Verifies that TypeScript OpenAI Agents SDK applications are properly configured 
 ## project-critic-council
 
 A multi-model council that strictly evaluates whether GOAL.md items are truly complete. Multiple models collaborate in a debate-style evaluation, examining checked items against actual evidence (test results, code review, file contents). The council reaches consensus through structured communication, then requests checkbox reverts through the coordinator if work was not genuinely complete. This agent enforces extremely strict standards - "mostly done" or "should work" does not count as complete. It is the last line of defense against incomplete work being marked complete.
+
+---
+
+## react
+
+Primary React wrapper agent that coordinates React implementation and review by delegating implementation to react-developer and review to react-reviewer. This agent breaks broad React requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures review feedback is resolved before completion.
 
 ---
 
@@ -124,15 +130,15 @@ Analyzes exported session JSON transcripts to identify skill gaps, struggle patt
 
 ---
 
-## shell-script-coder
+## shell-script
 
-Expert shell script developer specializing in writing production-quality shell scripts. This agent creates POSIX-compliant scripts for maximum portability, uses bash-specific features when appropriate, implements proper argument parsing with edge case handling, and ensures robust error handling with appropriate exit codes. It follows best practices like quoting variables, using `"$@"` for arguments, and providing meaningful error messages. Use this agent when you need to create new shell scripts.
+Primary shell script wrapper agent that coordinates shell script implementation and review by delegating implementation to shell-script-developer and review to shell-script-reviewer. This agent breaks broad shell requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures review feedback is resolved before completion.
 
 ---
 
 ## shell-script-reviewer
 
-Reviews shell script quality for correctness, portability, security, and best practices. This is a read-only reviewer that cannot modify files or execute commands. It analyzes scripts against criteria including logical correctness, POSIX compatibility, proper variable quoting, input validation, command injection prevention, secure temporary file handling, and meaningful error messages. The agent provides structured feedback with specific line references and a PASS/NEEDS WORK verdict.
+Hidden shell script reviewer subagent. Reviews shell script quality for correctness, portability, security, and best practices. This is a read-only reviewer that cannot modify files or execute commands. It analyzes scripts against criteria including logical correctness, POSIX compatibility, proper variable quoting, input validation, command injection prevention, secure temporary file handling, and meaningful error messages. The agent provides structured feedback with specific line references and a PASS/NEEDS WORK verdict.
 
 ---
 
@@ -156,4 +162,4 @@ STPA (System Theoretic Process Analysis) hazard analyst for software, physical, 
 
 ## webmaster
 
-Website developer specializing in building marketing sites, landing pages, and institutional websites (not web applications). This agent creates simple Go backends with HTML templates, embedded assets, and Let's Encrypt HTTPS support. It is proficient in Bootstrap, Tailwind CSS, PicoCSS, and vanilla CSS, choosing the appropriate framework based on project needs. The agent emphasizes SEO best practices (meta tags, semantic HTML, Open Graph), mobile-first responsive design, and accessibility. Use this agent for content-driven websites that prioritize presentation and conversion, not complex interactive applications.
+Primary website wrapper agent that coordinates website implementation and review by delegating implementation to webmaster-developer and review to webmaster-reviewer. This agent breaks broad website requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures visual, accessibility, SEO, and content review feedback is resolved before completion.

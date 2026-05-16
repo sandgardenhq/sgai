@@ -21,10 +21,10 @@ Response:
 {
   "workspace": "my-project",
   "state": {
-    "flow": "\"coordinator\" -> \"backend-go-developer\" -> \"go-readability-reviewer\"",
+    "flow": "\"go\"",
     "models": {
       "coordinator": "openai/gpt-5.5",
-      "backend-go-developer": "openai/gpt-5.5"
+      "go": "openai/gpt-5.5"
     },
     "goals": "- [ ] Build a REST API for user management\n- [ ] Write tests with 80%+ coverage",
     "completionGateScript": "make test"
@@ -81,9 +81,9 @@ Response:
       "icon": "🔧",
       "agents": [
         {"name": "coordinator", "model": "openai/gpt-5.5"},
-        {"name": "backend-go-developer", "model": "openai/gpt-5.5"}
+        {"name": "go", "model": "openai/gpt-5.5"}
       ],
-      "flow": "\"backend-go-developer\" -> \"go-readability-reviewer\""
+      "flow": "\"go\""
     }
   ]
 }
@@ -102,7 +102,7 @@ curl -s "$BASE_URL/api/v1/compose/preview?workspace=my-project"
 Response:
 ```json
 {
-  "content": "---\nflow: |\n  \"backend-go-developer\" -> \"go-readability-reviewer\"\nmodels:\n  coordinator: openai/gpt-5.5\n  backend-go-developer: openai/gpt-5.5\ncompletionGateScript: make test\n---\n\n- [ ] Build a REST API\n",
+  "content": "---\nflow: |\n  \"go\"\nmodels:\n  coordinator: openai/gpt-5.5\n  go: openai/gpt-5.5\ncompletionGateScript: make test\n---\n\n- [ ] Build a REST API\n",
   "flowError": "",
   "etag": "\"abc123def456\""
 }
@@ -123,7 +123,7 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
   -H "Content-Type: application/json" \
   -d '{
     "state": {
-      "flow": "\"coordinator\" -> \"backend-go-developer\"",
+      "flow": "\"go\"",
       "models": {"coordinator": "openai/gpt-5.5"},
       "goals": "- [ ] Build authentication\n",
       "completionGateScript": ""
@@ -181,11 +181,10 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
   -H "Content-Type: application/json" \
   -d '{
     "state": {
-      "flow": "\"backend-go-developer\" -> \"go-readability-reviewer\"",
+      "flow": "\"go\"",
       "models": {
         "coordinator": "openai/gpt-5.5",
-        "backend-go-developer": "openai/gpt-5.5",
-        "go-readability-reviewer": "openai/gpt-5.5"
+        "go": "openai/gpt-5.5"
       },
       "goals": "- [ ] Build REST API\n- [ ] Add authentication\n- [ ] Write tests\n",
       "completionGateScript": "make test"

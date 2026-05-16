@@ -32,11 +32,10 @@ test.describe("Goal Management Workflow", () => {
         await page.keyboard.press("Control+a");
         await page.keyboard.type(`---
 flow: |
-  "coordinator" -> "backend-go-developer"
-  "backend-go-developer" -> "go-readability-reviewer"
+  "go"
 models:
   "coordinator": "opencode/glm-5"
-  "backend-go-developer": "opencode/glm-5"
+  "go": "opencode/glm-5"
 completionGateScript: make test
 ---
 

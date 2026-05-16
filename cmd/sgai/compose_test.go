@@ -350,7 +350,7 @@ func TestSyncWizardState(t *testing.T) {
 			},
 			state: composerState{
 				Agents: []composerAgentConf{
-					{Name: "backend-go-developer", Selected: true, Model: "model1"},
+					{Name: "go", Selected: true, Model: "model1"},
 					{Name: "stpa-analyst", Selected: true, Model: "model2"},
 				},
 			},
@@ -367,7 +367,7 @@ func TestSyncWizardState(t *testing.T) {
 			},
 			state: composerState{
 				Agents: []composerAgentConf{
-					{Name: "backend-go-developer", Selected: true, Model: "model1"},
+					{Name: "go", Selected: true, Model: "model1"},
 				},
 			},
 			validate: func(t *testing.T, wizard wizardState) {
@@ -382,7 +382,7 @@ func TestSyncWizardState(t *testing.T) {
 			},
 			state: composerState{
 				Agents: []composerAgentConf{
-					{Name: "backend-go-developer", Selected: true, Model: "model1"},
+					{Name: "go", Selected: true, Model: "model1"},
 				},
 			},
 			validate: func(t *testing.T, wizard wizardState) {
@@ -396,7 +396,7 @@ func TestSyncWizardState(t *testing.T) {
 			},
 			state: composerState{
 				Agents: []composerAgentConf{
-					{Name: "backend-go-developer", Selected: true, Model: "model1"},
+					{Name: "go", Selected: true, Model: "model1"},
 				},
 			},
 			validate: func(t *testing.T, wizard wizardState) {
@@ -424,28 +424,28 @@ func TestTechStackFromAgents(t *testing.T) {
 		{
 			name: "extractGoStack",
 			agents: []composerAgentConf{
-				{Name: "backend-go-developer", Selected: true, Model: "model1"},
+				{Name: "go", Selected: true, Model: "model1"},
 			},
 			expected: []string{"go"},
 		},
 		{
 			name: "extractReactStack",
 			agents: []composerAgentConf{
-				{Name: "react-developer", Selected: true, Model: "model1"},
+				{Name: "react", Selected: true, Model: "model1"},
 			},
 			expected: []string{"react"},
 		},
 		{
 			name: "extractHTMXStack",
 			agents: []composerAgentConf{
-				{Name: "htmx-picocss-frontend-developer", Selected: true, Model: "model1"},
+				{Name: "htmx-picocss", Selected: true, Model: "model1"},
 			},
 			expected: []string{"htmx"},
 		},
 		{
 			name: "extractShellStack",
 			agents: []composerAgentConf{
-				{Name: "shell-script-coder", Selected: true, Model: "model1"},
+				{Name: "shell-script", Selected: true, Model: "model1"},
 			},
 			expected: []string{"shell"},
 		},
@@ -473,16 +473,16 @@ func TestTechStackFromAgents(t *testing.T) {
 		{
 			name: "extractMultipleStacks",
 			agents: []composerAgentConf{
-				{Name: "backend-go-developer", Selected: true, Model: "model1"},
-				{Name: "react-developer", Selected: true, Model: "model2"},
+				{Name: "go", Selected: true, Model: "model1"},
+				{Name: "react", Selected: true, Model: "model2"},
 			},
 			expected: []string{"go", "react"},
 		},
 		{
 			name: "extractWithUnselectedAgents",
 			agents: []composerAgentConf{
-				{Name: "backend-go-developer", Selected: true, Model: "model1"},
-				{Name: "react-developer", Selected: false, Model: "model2"},
+				{Name: "go", Selected: true, Model: "model1"},
+				{Name: "react", Selected: false, Model: "model2"},
 			},
 			expected: []string{"go"},
 		},
