@@ -83,6 +83,7 @@ function buildDraftRequest(template: ApiComposeTemplateEntry) {
     state: {
       description: "",
       completionGate: "",
+      retrospective: false,
       agents: template.agents,
       flow: template.flow,
       tasks: "",
@@ -94,6 +95,7 @@ function buildDraftRequest(template: ApiComposeTemplateEntry) {
       techStack: [],
       safetyAnalysis: false,
       completionGate: "",
+      retrospective: false,
     },
   };
 }

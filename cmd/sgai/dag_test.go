@@ -313,6 +313,49 @@ func TestDagInjectCoordinatorEdges(t *testing.T) {
 	}
 }
 
+func TestDagRemoveRetrospective(t *testing.T) {
+	t.Run("bypassesRetrospectiveBetweenAgents", func(t *testing.T) {
+		d := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":   {Name: "coordinator", Successors: []string{"worker"}},
+				"worker":        {Name: "worker", Predecessors: []string{"coordinator"}, Successors: []string{"retrospective"}},
+				"retrospective": {Name: "retrospective", Predecessors: []string{"worker"}, Successors: []string{"deployer"}},
+				"deployer":      {Name: "deployer", Predecessors: []string{"retrospective"}},
+			},
+			EntryNodes:       []string{"coordinator"},
+			parsedEntryNodes: []string{"coordinator"},
+		}
+
+		d.removeRetrospective()
+
+		assert.NotContains(t, d.Nodes, "retrospective")
+		assert.Equal(t, []string{"deployer"}, d.Nodes["worker"].Successors)
+		assert.Equal(t, []string{"worker"}, d.Nodes["deployer"].Predecessors)
+		assert.Equal(t, []string{"coordinator"}, d.EntryNodes)
+		assert.Equal(t, []string{"coordinator"}, d.parsedEntryNodes)
+	})
+
+	t.Run("recomputesNewEntryNodes", func(t *testing.T) {
+		d := &dag{
+			Nodes: map[string]*dagNode{
+				"coordinator":   {Name: "coordinator", Successors: []string{"retrospective"}},
+				"retrospective": {Name: "retrospective", Predecessors: []string{"coordinator"}, Successors: []string{"worker"}},
+				"worker":        {Name: "worker", Predecessors: []string{"retrospective"}},
+			},
+			EntryNodes:       []string{"coordinator"},
+			parsedEntryNodes: []string{"coordinator"},
+		}
+
+		d.removeRetrospective()
+
+		assert.NotContains(t, d.Nodes, "retrospective")
+		assert.Equal(t, []string{"worker"}, d.Nodes["coordinator"].Successors)
+		assert.Equal(t, []string{"coordinator"}, d.Nodes["worker"].Predecessors)
+		assert.Equal(t, []string{"coordinator"}, d.EntryNodes)
+		assert.Equal(t, []string{"coordinator"}, d.parsedEntryNodes)
+	})
+}
+
 func TestDagDetectCycles(t *testing.T) {
 	tests := []struct {
 		name        string

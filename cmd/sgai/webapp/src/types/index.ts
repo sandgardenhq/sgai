@@ -320,6 +320,7 @@ export interface ApiComposerAgentConf {
 export interface ApiComposerState {
   description: string;
   completionGate: string;
+  retrospective: boolean;
   agents: ApiComposerAgentConf[];
   flow: string;
   tasks: string;
@@ -332,6 +333,7 @@ export interface ApiWizardState {
   techStack: string[];
   safetyAnalysis: boolean;
   completionGate?: string;
+  retrospective: boolean;
 }
 
 export interface ApiTechStackItem {

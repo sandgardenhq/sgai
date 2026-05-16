@@ -442,7 +442,7 @@ func TestHandleCompleteStatus(t *testing.T) {
 		newState := state.Workflow{Status: state.StatusComplete, VisitCounts: map[string]int{}}
 		wfState := state.Workflow{}
 
-		result := handleCompleteStatus(t.Context(), cfg, newState, wfState, GoalMetadata{})
+		result := handleCompleteStatus(t.Context(), cfg, newState, wfState, GoalMetadata{Retrospective: "true"})
 		assert.Equal(t, state.StatusAgentDone, result.Status)
 	})
 }
@@ -606,19 +606,50 @@ func TestFormatDurationVariants(t *testing.T) {
 	assert.Equal(t, "135m 0s", formatDuration(2*time.Hour+15*time.Minute))
 }
 
-func TestIsFalsishVariants(t *testing.T) {
-	assert.True(t, isFalsish("false"))
-	assert.True(t, isFalsish("no"))
-	assert.True(t, isFalsish("0"))
-	assert.True(t, isFalsish("FALSE"))
-	assert.False(t, isFalsish("true"))
-	assert.False(t, isFalsish("yes"))
+func TestRetrospectiveEnabledVariants(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"absent", "", false},
+		{"empty", "   ", false},
+		{"false", "false", false},
+		{"no", "no", false},
+		{"off", "off", false},
+		{"zero", "0", false},
+		{"true", "true", true},
+		{"yes", "yes", true},
+		{"on", "on", true},
+		{"one", "1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, retrospectiveEnabled(GoalMetadata{Retrospective: tt.in}))
+		})
+	}
 }
 
-func TestRetrospectiveEnabledVariants(t *testing.T) {
-	assert.True(t, retrospectiveEnabled(GoalMetadata{}))
-	assert.False(t, retrospectiveEnabled(GoalMetadata{Retrospective: "false"}))
-	assert.True(t, retrospectiveEnabled(GoalMetadata{Retrospective: "true"}))
+func TestBlockCompletionOnRetrospectiveDefaultDisabled(t *testing.T) {
+	dir := t.TempDir()
+	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, ".sgai", "state.json"), state.Workflow{})
+	require.NoError(t, errCoord)
+	cfg := multiModelConfig{
+		dir:        dir,
+		agent:      "coordinator",
+		flowDag:    buildTestDag(map[string][]string{"coordinator": {"retrospective"}}, []string{"coordinator"}),
+		coord:      coord,
+		paddedsgai: "test",
+	}
+	wfState := state.Workflow{
+		Status:      state.StatusComplete,
+		VisitCounts: map[string]int{"coordinator": 1},
+	}
+
+	blocked := blockCompletionOnRetrospective(cfg, wfState, GoalMetadata{})
+
+	assert.Nil(t, blocked)
 }
 
 func TestFormatElapsedOutput(t *testing.T) {
@@ -1006,6 +1037,30 @@ retrospective: "true"
 				assert.Equal(t, "true", m.Retrospective)
 			},
 		},
+		{
+			name: "withUnquotedRetrospectiveTrue",
+			content: `---
+flow: "test"
+retrospective: true
+---
+# Goal`,
+			wantErr: false,
+			validate: func(t *testing.T, m GoalMetadata) {
+				assert.True(t, retrospectiveEnabled(m))
+			},
+		},
+		{
+			name: "withEmptyRetrospective",
+			content: `---
+flow: "test"
+retrospective:
+---
+# Goal`,
+			wantErr: false,
+			validate: func(t *testing.T, m GoalMetadata) {
+				assert.False(t, retrospectiveEnabled(m))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1047,7 +1102,7 @@ func TestRetrospectiveEnabled(t *testing.T) {
 		{
 			name:     "emptyString",
 			metadata: GoalMetadata{Retrospective: ""},
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "yesString",
@@ -2748,72 +2803,6 @@ func TestFormatToolCall(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.expected, result)
 			}
-		})
-	}
-}
-
-func TestIsFalsish(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{
-			name:     "no",
-			input:    "no",
-			expected: true,
-		},
-		{
-			name:     "false",
-			input:    "false",
-			expected: true,
-		},
-		{
-			name:     "zero",
-			input:    "0",
-			expected: true,
-		},
-		{
-			name:     "off",
-			input:    "off",
-			expected: true,
-		},
-		{
-			name:     "yes",
-			input:    "yes",
-			expected: false,
-		},
-		{
-			name:     "true",
-			input:    "true",
-			expected: false,
-		},
-		{
-			name:     "one",
-			input:    "1",
-			expected: false,
-		},
-		{
-			name:     "empty",
-			input:    "",
-			expected: false,
-		},
-		{
-			name:     "uppercaseFalse",
-			input:    "FALSE",
-			expected: true,
-		},
-		{
-			name:     "spacedFalse",
-			input:    " false ",
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isFalsish(tt.input)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

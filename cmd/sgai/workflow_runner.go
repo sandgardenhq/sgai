@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -274,8 +275,11 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		log.Fatalln("failed to parse flow:", errFlow)
 	}
 
-	if retrospectiveEnabled(metadata) {
+	retrospectiveOn := retrospectiveEnabled(metadata)
+	if retrospectiveOn {
 		flowDag.injectRetrospectiveEdge()
+	} else {
+		flowDag.removeRetrospective()
 	}
 
 	ensureImplicitRetrospectiveModel(flowDag, &metadata)
@@ -289,7 +293,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	if coord == nil {
 		var errCoord error
 		coord, errCoord = state.NewCoordinator(stateJSONPath)
-		if errCoord != nil && !os.IsNotExist(errCoord) {
+		if errCoord != nil && !errors.Is(errCoord, os.ErrNotExist) {
 			log.Fatalln("failed to read state.json:", errCoord)
 		}
 		if errCoord != nil {
@@ -315,7 +319,10 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 
 	resuming := canResumeWorkflow(wfState, newChecksum)
 
-	retroDir := resolveRetrospectiveDir(resuming, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
+	retroDir := ""
+	if retrospectiveOn {
+		retroDir = resolveRetrospectiveDir(resuming, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
+	}
 
 	retroStdoutLog, retroStderrLog, errRetroLogs := openRetrospectiveLogs(retroDir)
 	if errRetroLogs != nil {
@@ -323,11 +330,15 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	}
 
 	cleanup := func() {
-		if errClose := retroStdoutLog.Close(); errClose != nil {
-			log.Println("failed to close stdout log:", errClose)
+		if retroStdoutLog != nil {
+			if errClose := retroStdoutLog.Close(); errClose != nil {
+				log.Println("failed to close stdout log:", errClose)
+			}
 		}
-		if errClose := retroStderrLog.Close(); errClose != nil {
-			log.Println("failed to close stderr log:", errClose)
+		if retroStderrLog != nil {
+			if errClose := retroStderrLog.Close(); errClose != nil {
+				log.Println("failed to close stderr log:", errClose)
+			}
 		}
 		if retroDir != "" {
 			if errCopy := copyFinalStateToRetrospective(dir, retroDir); errCopy != nil {
@@ -355,6 +366,20 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		wfState = coord.State()
 	}
 
+	if !retrospectiveOn {
+		sanitizedState, changed := sanitizeDisabledRetrospectiveState(wfState)
+		if changed {
+			if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+				*wf = sanitizedState
+			}); errUpdate != nil {
+				log.Println("failed to sanitize disabled retrospective state:", errUpdate)
+				cleanup()
+				return nil, func() {}, false
+			}
+			wfState = coord.State()
+		}
+	}
+
 	retroLogs := retroLogWriters{stdout: retroStdoutLog, stderr: retroStderrLog}
 	runner := &workflowRunner{
 		dir:            dir,
@@ -371,6 +396,47 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		retroLogs:      retroLogs,
 	}
 	return runner, cleanup, true
+}
+
+func sanitizeDisabledRetrospectiveState(wfState state.Workflow) (state.Workflow, bool) {
+	changed := false
+	if wfState.CurrentAgent == "retrospective" {
+		wfState.CurrentAgent = "coordinator"
+		changed = true
+	}
+	if wfState.InteractionMode == state.ModeRetrospective {
+		wfState.InteractionMode = state.ModeBuilding
+		changed = true
+	}
+	if _, exists := wfState.VisitCounts["retrospective"]; exists {
+		delete(wfState.VisitCounts, "retrospective")
+		changed = true
+	}
+	if extractAgentFromModelID(wfState.CurrentModel) == "retrospective" {
+		wfState.CurrentModel = ""
+		changed = true
+	}
+	for modelID := range wfState.ModelStatuses {
+		if extractAgentFromModelID(modelID) == "retrospective" {
+			delete(wfState.ModelStatuses, modelID)
+			changed = true
+		}
+	}
+	messages := slices.DeleteFunc(wfState.Messages, func(msg state.Message) bool {
+		return !msg.Read && (extractAgentFromModelID(msg.ToAgent) == "retrospective" || extractAgentFromModelID(msg.FromAgent) == "retrospective")
+	})
+	if len(messages) != len(wfState.Messages) {
+		wfState.Messages = messages
+		changed = true
+	}
+	agentSequence := slices.DeleteFunc(wfState.AgentSequence, func(entry state.AgentSequenceEntry) bool {
+		return entry.Agent == "retrospective"
+	})
+	if len(agentSequence) != len(wfState.AgentSequence) {
+		wfState.AgentSequence = agentSequence
+		changed = true
+	}
+	return wfState, changed
 }
 
 func buildAllAgents(dagAgents []string) []string {

@@ -13,6 +13,7 @@ type composerState struct {
 	Description    string              `json:"description"`
 	CompletionGate string              `json:"completionGate"`
 	SafetyAnalysis bool                `json:"safetyAnalysis"`
+	Retrospective  bool                `json:"retrospective"`
 	Agents         []composerAgentConf `json:"agents"`
 	Flow           string              `json:"flow"`
 	Tasks          string              `json:"tasks"`
@@ -64,6 +65,7 @@ func loadComposerStateFromDisk(dir string) composerState {
 		Description:    extractDescriptionFromBody(bodyContent),
 		CompletionGate: metadata.CompletionGateScript,
 		SafetyAnalysis: bodyHasSafetyAnalysis(bodyContent) || legacySafetyAnalysis,
+		Retrospective:  retrospectiveEnabled(metadata),
 		Flow:           activeComposerFlow(metadata.Flow),
 		Tasks:          extractTasksFromBody(bodyContent),
 	}
@@ -208,6 +210,10 @@ func buildGOALContent(st composerState) string {
 		buf.WriteString("completionGateScript: ")
 		buf.WriteString(st.CompletionGate)
 		buf.WriteString("\n")
+	}
+
+	if st.Retrospective {
+		buf.WriteString("retrospective: true\n")
 	}
 
 	buf.WriteString("---\n\n")

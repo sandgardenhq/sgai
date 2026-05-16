@@ -123,11 +123,13 @@ func TestComposeDraftService(t *testing.T) {
 	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
 
 	result := server.composeDraftService(wsDir, composerState{
-		Description: "Test description",
-		Tasks:       "Test tasks",
+		Description:   "Test description",
+		Tasks:         "Test tasks",
+		Retrospective: true,
 	}, wizardState{})
 	assert.True(t, result.Saved)
 
 	stateResult := server.composeStateService(wsDir)
 	assert.Equal(t, "Test description", stateResult.State.Description)
+	assert.True(t, stateResult.State.Retrospective)
 }

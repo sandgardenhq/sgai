@@ -3594,12 +3594,13 @@ func TestHandleAPIComposeStateFull(t *testing.T) {
 	cs := srv.getComposerSession(wsDir)
 	cs.mu.Lock()
 	cs.state.Description = "test"
+	cs.state.Retrospective = true
 	cs.state.Agents = []composerAgentConf{
 		{Name: "coordinator", Selected: true, Model: "openai/gpt-5.5"},
 	}
 	cs.state.Flow = `digraph G { "coordinator" -> "builder" }`
 	cs.state.CompletionGate = "make test"
-	cs.wizard = wizardState{TechStack: []string{"go", "react"}}
+	cs.wizard = wizardState{TechStack: []string{"go", "react"}, Retrospective: true}
 	cs.mu.Unlock()
 
 	w := serveHTTP(srv, "GET", "/api/v1/compose?workspace=compose-full", "")
@@ -3608,7 +3609,32 @@ func TestHandleAPIComposeStateFull(t *testing.T) {
 	var resp apiComposeStateResponse
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "test", resp.State.Description)
+	assert.True(t, resp.State.Retrospective)
+	assert.True(t, resp.Wizard.Retrospective)
 	assert.NotEmpty(t, resp.TechStackItems)
+}
+
+func TestHandleAPIComposeDraftPreviewAndSaveRetrospective(t *testing.T) {
+	srv, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "compose-retro")
+	goalPath := filepath.Join(wsDir, "GOAL.md")
+	require.NoError(t, os.WriteFile(goalPath, []byte("# Goal"), 0o644))
+
+	draftBody := `{"state":{"description":"Retro project","retrospective":true},"wizard":{"currentStep":4,"techStack":[],"retrospective":true}}`
+	wDraft := serveHTTP(srv, "POST", "/api/v1/compose/draft?workspace=compose-retro", draftBody)
+	assert.Equal(t, http.StatusOK, wDraft.Code)
+
+	wPreview := serveHTTP(srv, "GET", "/api/v1/compose/preview?workspace=compose-retro", "")
+	assert.Equal(t, http.StatusOK, wPreview.Code)
+	var preview apiComposePreviewResponse
+	require.NoError(t, json.Unmarshal(wPreview.Body.Bytes(), &preview))
+	assert.Contains(t, preview.Content, "retrospective: true")
+
+	wSave := serveHTTP(srv, "POST", "/api/v1/compose?workspace=compose-retro", "")
+	assert.Equal(t, http.StatusCreated, wSave.Code)
+	saved, errRead := os.ReadFile(goalPath)
+	require.NoError(t, errRead)
+	assert.Contains(t, string(saved), "retrospective: true")
 }
 
 func TestHandleAPIComposeStateFullContent(t *testing.T) {

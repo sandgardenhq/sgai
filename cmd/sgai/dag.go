@@ -201,6 +201,60 @@ func (d *dag) injectRetrospectiveEdge() {
 	slices.Sort(coordNode.Successors)
 }
 
+func (d *dag) removeRetrospective() {
+	retrospectiveNode, exists := d.Nodes["retrospective"]
+	if !exists {
+		return
+	}
+	for _, predecessor := range retrospectiveNode.Predecessors {
+		if predecessor == "retrospective" {
+			continue
+		}
+		predecessorNode := d.Nodes[predecessor]
+		if predecessorNode == nil {
+			continue
+		}
+		for _, successor := range retrospectiveNode.Successors {
+			if successor == "retrospective" || successor == predecessor {
+				continue
+			}
+			successorNode := d.Nodes[successor]
+			if successorNode == nil {
+				continue
+			}
+			if !slices.Contains(predecessorNode.Successors, successor) {
+				predecessorNode.Successors = append(predecessorNode.Successors, successor)
+			}
+			if !slices.Contains(successorNode.Predecessors, predecessor) {
+				successorNode.Predecessors = append(successorNode.Predecessors, predecessor)
+			}
+		}
+		slices.Sort(predecessorNode.Successors)
+	}
+	delete(d.Nodes, "retrospective")
+	for _, node := range d.Nodes {
+		node.Predecessors = slices.DeleteFunc(node.Predecessors, func(agent string) bool {
+			return agent == "retrospective"
+		})
+		node.Successors = slices.DeleteFunc(node.Successors, func(agent string) bool {
+			return agent == "retrospective"
+		})
+	}
+	d.recomputeEntryNodes()
+	d.injectCoordinatorEdges()
+}
+
+func (d *dag) recomputeEntryNodes() {
+	d.EntryNodes = d.EntryNodes[:0]
+	for name, node := range d.Nodes {
+		if len(node.Predecessors) == 0 {
+			d.EntryNodes = append(d.EntryNodes, name)
+		}
+	}
+	slices.Sort(d.EntryNodes)
+	d.parsedEntryNodes = slices.Clone(d.EntryNodes)
+}
+
 func (d *dag) detectCycles() error {
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)

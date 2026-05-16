@@ -344,8 +344,8 @@ sgai_update_workflow_state({status: "agent-done"})
 - Step Name: RUN-RETROSPECTIVE
   BEFORE transitioning to the retrospective phase, the coordinator must verify that all pending inter-agent messages have been processed. Unread messages represent incomplete work (e.g., re-review requests, status updates) that would be orphaned at session end. Call `sgai_check_inbox()` and process any remaining messages before proceeding.
   BEFORE marking the workflow as complete, check if retrospective should run:
-  1. Check GOAL.md frontmatter for `retrospective:` key (default: enabled when absent or truish)
-  2. If disabled (falsish value like "no", "false", "off", "0"), skip to MARK-COMPLETE
+  1. Check GOAL.md frontmatter for `retrospective:` key (default: disabled when absent or empty)
+  2. If disabled (absent, empty, or falsish value like "no", "false", "off", "0"), skip to MARK-COMPLETE
   3. If enabled AND the session is running in interactive mode:
      - Send a message to the retrospective agent asking it to start its analysis:
        ```

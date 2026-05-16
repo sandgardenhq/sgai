@@ -265,6 +265,179 @@ func TestResolveRetrospectiveDirNewSession(t *testing.T) {
 	assert.True(t, os.IsNotExist(errStatState))
 }
 
+func TestBuildWorkflowRunnerDefaultRetrospectiveDisabledCreatesNoArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	goalContent := `---
+flow: |
+  "worker"
+models: {}
+---
+# Test Goal
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
+
+	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
+	require.True(t, ok)
+	defer cleanup()
+
+	assert.Empty(t, runner.retroDir)
+	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
+	assert.Nil(t, runner.retroLogs.stdout)
+	assert.Nil(t, runner.retroLogs.stderr)
+	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
+	assert.NoFileExists(t, filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md"))
+}
+
+func TestBuildWorkflowRunnerDisabledRetrospectivePrunesExplicitFlowNode(t *testing.T) {
+	dir := t.TempDir()
+	goalContent := `---
+flow: |
+  "worker" -> "retrospective"
+models: {}
+---
+# Test Goal
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
+
+	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
+	require.True(t, ok)
+	defer cleanup()
+
+	assert.Empty(t, runner.retroDir)
+	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
+	assert.NotContains(t, runner.flowDag.getSuccessors("worker"), "retrospective")
+	assert.NotContains(t, runner.flowDag.getSuccessors("coordinator"), "retrospective")
+	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
+}
+
+func TestBuildWorkflowRunnerRetrospectiveEnabledCreatesArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	goalContent := `---
+retrospective: true
+flow: |
+  "worker"
+models: {}
+---
+# Test Goal
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
+
+	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
+	require.True(t, ok)
+	defer cleanup()
+
+	assert.NotEmpty(t, runner.retroDir)
+	assert.Contains(t, runner.flowDag.Nodes, "retrospective")
+	assert.NotNil(t, runner.retroLogs.stdout)
+	assert.NotNil(t, runner.retroLogs.stderr)
+	assert.DirExists(t, runner.retroDir)
+	assert.FileExists(t, filepath.Join(runner.retroDir, "GOAL.md"))
+}
+
+func TestBuildWorkflowRunnerIgnoresLegacyDisableRetrospectiveConfig(t *testing.T) {
+	dir := t.TempDir()
+	goalContent := `---
+retrospective: true
+flow: |
+  "worker"
+models: {}
+---
+# Test Goal
+`
+	requiredFiles := map[string]string{
+		"GOAL.md":   goalContent,
+		"sgai.json": `{"disable_retrospective": true}`,
+	}
+	for name, content := range requiredFiles {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
+	}
+
+	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
+	require.True(t, ok)
+	defer cleanup()
+
+	assert.NotEmpty(t, runner.retroDir)
+	assert.Contains(t, runner.flowDag.Nodes, "retrospective")
+	assert.DirExists(t, runner.retroDir)
+}
+
+func TestBuildWorkflowRunnerDisabledRetrospectiveSanitizesResumedState(t *testing.T) {
+	dir := t.TempDir()
+	goalContent := `---
+retrospective: false
+flow: |
+  "worker" -> "retrospective"
+models: {}
+---
+# Test Goal
+`
+	goalPath := filepath.Join(dir, "GOAL.md")
+	require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0o644))
+
+	checksum, errChecksum := computeGoalChecksum(goalPath)
+	require.NoError(t, errChecksum)
+
+	statePath := filepath.Join(dir, ".sgai", "state.json")
+	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
+		Status:          state.StatusWorking,
+		GoalChecksum:    checksum,
+		CurrentAgent:    "retrospective",
+		InteractionMode: state.ModeRetrospective,
+		VisitCounts:     map[string]int{"coordinator": 1, "retrospective": 1},
+		CurrentModel:    "retrospective:openai/gpt-5.5",
+		ModelStatuses: map[string]string{
+			"retrospective:openai/gpt-5.5": "model-working",
+			"coordinator:openai/gpt-5.5":   "model-done",
+		},
+		Messages: []state.Message{
+			{ID: 1, FromAgent: "coordinator", ToAgent: "retrospective", Body: "run retrospective", Read: false},
+			{ID: 2, FromAgent: "retrospective", ToAgent: "worker", Body: "stale outgoing", Read: false},
+			{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false},
+		},
+	})
+	require.NoError(t, errCoord)
+
+	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
+	require.True(t, ok)
+	defer cleanup()
+
+	assert.Empty(t, runner.retroDir)
+	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
+	assert.NotEqual(t, "retrospective", runner.wfState.CurrentAgent)
+	assert.NotEqual(t, state.ModeRetrospective, runner.wfState.InteractionMode)
+	assert.NotContains(t, runner.wfState.VisitCounts, "retrospective")
+	assert.Empty(t, runner.wfState.CurrentModel)
+	assert.NotContains(t, runner.wfState.ModelStatuses, "retrospective:openai/gpt-5.5")
+	assertNoUnreadRetrospectiveMessages(t, runner.wfState.Messages)
+	assert.Equal(t, []state.Message{{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false}}, runner.wfState.Messages)
+	assert.Equal(t, "worker", findFirstPendingMessageAgent(runner.wfState))
+	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
+	assert.NoFileExists(t, filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md"))
+
+	persistedCoord, errPersisted := state.NewCoordinator(statePath)
+	require.NoError(t, errPersisted)
+	persisted := persistedCoord.State()
+	assert.NotEqual(t, "retrospective", persisted.CurrentAgent)
+	assert.NotEqual(t, state.ModeRetrospective, persisted.InteractionMode)
+	assert.NotContains(t, persisted.VisitCounts, "retrospective")
+	assert.Empty(t, persisted.CurrentModel)
+	assert.NotContains(t, persisted.ModelStatuses, "retrospective:openai/gpt-5.5")
+	assertNoUnreadRetrospectiveMessages(t, persisted.Messages)
+	assert.Equal(t, []state.Message{{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false}}, persisted.Messages)
+	assert.Equal(t, "worker", findFirstPendingMessageAgent(persisted))
+}
+
+func assertNoUnreadRetrospectiveMessages(t *testing.T, messages []state.Message) {
+	t.Helper()
+	for _, msg := range messages {
+		if msg.Read {
+			continue
+		}
+		assert.NotEqual(t, "retrospective", extractAgentFromModelID(msg.FromAgent), "message ID %d FromAgent", msg.ID)
+		assert.NotEqual(t, "retrospective", extractAgentFromModelID(msg.ToAgent), "message ID %d ToAgent", msg.ID)
+	}
+}
+
 func TestHandleWorkingLoop(t *testing.T) {
 	cfg := multiModelConfig{paddedsgai: "test", agent: "builder"}
 	sessionID := "session-123"

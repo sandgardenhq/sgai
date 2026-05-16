@@ -152,6 +152,7 @@ Description here.
 			validate: func(t *testing.T, state composerState) {
 				assert.Equal(t, "My Project\n\nDescription here.", state.Description)
 				assert.Equal(t, "make test", state.CompletionGate)
+				assert.False(t, state.Retrospective)
 				assert.Contains(t, state.Flow, "agent1")
 				assert.Contains(t, state.Tasks, "Task 1")
 				assert.Len(t, state.Agents, 2)
@@ -261,6 +262,21 @@ flow: |
 				assert.Len(t, state.Agents, 0)
 			},
 		},
+		{
+			name: "loadFromGOALWithRetrospectiveEnabled",
+			setupFunc: func(t *testing.T, dir string) {
+				goalContent := `---
+retrospective: true
+---
+# My Project
+`
+				goalPath := filepath.Join(dir, "GOAL.md")
+				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
+			},
+			validate: func(t *testing.T, state composerState) {
+				assert.True(t, state.Retrospective)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -343,6 +359,20 @@ func TestBuildGOALContent(t *testing.T) {
 				assert.NotContains(t, content, "stpa-analyst")
 				assert.NotContains(t, content, "models:")
 				assert.NotContains(t, content, "flow:")
+			},
+		},
+		{
+			name:  "buildGOALOmitsRetrospectiveByDefault",
+			state: composerState{Description: "My Project"},
+			validate: func(t *testing.T, content string) {
+				assert.NotContains(t, content, "retrospective:")
+			},
+		},
+		{
+			name:  "buildGOALIncludesRetrospectiveWhenEnabled",
+			state: composerState{Description: "My Project", Retrospective: true},
+			validate: func(t *testing.T, content string) {
+				assert.Contains(t, content, "retrospective: true")
 			},
 		},
 		{
