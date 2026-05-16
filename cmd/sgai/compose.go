@@ -12,6 +12,7 @@ import (
 type composerState struct {
 	Description    string              `json:"description"`
 	CompletionGate string              `json:"completionGate"`
+	SafetyAnalysis bool                `json:"safetyAnalysis"`
 	Agents         []composerAgentConf `json:"agents"`
 	Flow           string              `json:"flow"`
 	Tasks          string              `json:"tasks"`
@@ -57,15 +58,21 @@ func loadComposerStateFromDisk(dir string) composerState {
 	}
 
 	bodyContent := string(extractBody(content))
+	legacySafetyAnalysis := strings.Contains(metadata.Flow, "stpa-analyst")
 
 	st := composerState{
 		Description:    extractDescriptionFromBody(bodyContent),
 		CompletionGate: metadata.CompletionGateScript,
-		Flow:           metadata.Flow,
+		SafetyAnalysis: bodyHasSafetyAnalysis(bodyContent) || legacySafetyAnalysis,
+		Flow:           activeComposerFlow(metadata.Flow),
 		Tasks:          extractTasksFromBody(bodyContent),
 	}
 
 	for agentName, modelVal := range metadata.Models {
+		if agentName == "stpa-analyst" {
+			st.SafetyAnalysis = true
+			continue
+		}
 		model := ""
 		if s, ok := modelVal.(string); ok {
 			model = s
@@ -84,6 +91,10 @@ func loadComposerStateFromDisk(dir string) composerState {
 	return st
 }
 
+func bodyHasSafetyAnalysis(body string) bool {
+	return strings.Contains(body, "## Safety Analysis") || strings.Contains(body, "stpa-overview")
+}
+
 func defaultComposerState() composerState {
 	return composerState{
 		Agents: []composerAgentConf{
@@ -96,9 +107,17 @@ func extractDescriptionFromBody(body string) string {
 	lines := strings.Split(body, "\n")
 	var descLines []string
 	inTasks := false
+	inSafetyAnalysis := false
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## Safety Analysis") {
+			inSafetyAnalysis = true
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") && inSafetyAnalysis {
+			inSafetyAnalysis = false
+		}
 		if strings.HasPrefix(trimmed, "## Tasks") || strings.HasPrefix(trimmed, "## Task") {
 			inTasks = true
 			continue
@@ -106,7 +125,7 @@ func extractDescriptionFromBody(body string) string {
 		if strings.HasPrefix(trimmed, "## ") && inTasks {
 			inTasks = false
 		}
-		if !inTasks {
+		if !inTasks && !inSafetyAnalysis {
 			descLines = append(descLines, line)
 		}
 	}
@@ -152,17 +171,19 @@ func buildGOALContent(st composerState) string {
 
 	buf.WriteString("---\n")
 
-	if st.Flow != "" {
+	flow := activeComposerFlow(st.Flow)
+	if flow != "" {
 		buf.WriteString("flow: |\n")
-		for line := range strings.SplitSeq(st.Flow, "\n") {
+		for line := range strings.SplitSeq(flow, "\n") {
 			buf.WriteString("  ")
 			buf.WriteString(line)
 			buf.WriteString("\n")
 		}
 	}
 
+	agents := activeComposerAgents(st.Agents)
 	hasSelectedAgents := false
-	for _, a := range st.Agents {
+	for _, a := range agents {
 		if a.Selected {
 			hasSelectedAgents = true
 			break
@@ -171,7 +192,7 @@ func buildGOALContent(st composerState) string {
 
 	if hasSelectedAgents {
 		buf.WriteString("models:\n")
-		for _, a := range st.Agents {
+		for _, a := range agents {
 			if !a.Selected {
 				continue
 			}
@@ -196,6 +217,13 @@ func buildGOALContent(st composerState) string {
 		buf.WriteString("\n\n")
 	}
 
+	if st.SafetyAnalysis {
+		buf.WriteString("## Safety Analysis\n\n")
+		buf.WriteString("- STPA analysis is a skill workflow, not a routable workflow agent; do not add `stpa-analyst` to GOAL `flow` or `models`.\n")
+		buf.WriteString("- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.\n")
+		buf.WriteString("- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.\n\n")
+	}
+
 	if st.Tasks != "" {
 		buf.WriteString("## Tasks\n\n")
 		buf.WriteString(st.Tasks)
@@ -203,4 +231,27 @@ func buildGOALContent(st composerState) string {
 	}
 
 	return buf.String()
+}
+
+func activeComposerFlow(flow string) string {
+	var lines []string
+	for line := range strings.SplitSeq(flow, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.Contains(trimmed, "stpa-analyst") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func activeComposerAgents(agents []composerAgentConf) []composerAgentConf {
+	active := make([]composerAgentConf, 0, len(agents))
+	for _, agent := range agents {
+		if agent.Name == "stpa-analyst" {
+			continue
+		}
+		active = append(active, agent)
+	}
+	return active
 }

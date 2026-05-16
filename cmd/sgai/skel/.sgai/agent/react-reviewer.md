@@ -26,6 +26,12 @@ This will load React best practices. Load and follow them during review.
 
 ---
 
+## STPA Skill Guidance
+
+When reviewed React changes involve hazards, unsafe state transitions, external input, filesystem operations, concurrency, physical systems, AI-driven systems, or high-impact failure modes, you may load and use `stpa-overview` to inform the review. STPA is a skill workflow; do not route to or request work from `stpa-analyst`.
+
+---
+
 ## MANDATORY REVIEW CONTRACT
 
 **CRITICAL:** Every issue you raise is MANDATORY. There are no suggestions.

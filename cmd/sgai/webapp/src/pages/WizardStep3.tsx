@@ -44,6 +44,10 @@ export function WizardStep3() {
     return <MissingWorkspaceNotice />;
   }
 
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -66,7 +70,7 @@ export function WizardStep3() {
       <div>
         <h2 className="text-xl font-semibold mb-1">Step 3: Safety Analysis</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Enable STPA (System Theoretic Process Analysis) for hazard analysis and safety-critical systems.
+          Enable STPA (System Theoretic Process Analysis) guidance for hazard analysis and safety-critical systems.
         </p>
 
         <div className="flex items-center justify-between p-4 border rounded-lg mb-4">
@@ -75,7 +79,7 @@ export function WizardStep3() {
               Enable Safety Analysis
             </Label>
             <p className="text-sm text-muted-foreground mt-0.5">
-              STPA analyst will identify unsafe control actions and loss scenarios
+              Coordinator loads the STPA skill to identify unsafe control actions and loss scenarios
             </p>
           </div>
           <Switch
@@ -91,7 +95,7 @@ export function WizardStep3() {
               <div className="flex items-start gap-3">
                 <ShieldCheck className="size-5 text-primary mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-sm mb-2">What STPA provides:</p>
+                  <p className="font-semibold text-sm mb-2">What STPA skill guidance provides:</p>
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                     <li>Loss identification</li>
                     <li>Hazard analysis</li>

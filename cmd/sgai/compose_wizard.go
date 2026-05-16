@@ -15,14 +15,14 @@ var workflowTemplates = []workflowTemplate{
 	{
 		ID:          "backend",
 		Name:        "Backend Development",
-		Description: "Go developer with code reviewer and safety analysis",
+		Description: "Go developer with code reviewer",
 		Icon:        "⚙️",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "go", Selected: true, Model: defaultAgentModel},
-			{Name: "stpa-analyst", Selected: true, Model: defaultAgentModel},
+			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
+			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"go" -> "stpa-analyst"`,
+		Flow: `"backend-go-developer" -> "go-readability-reviewer"`,
 	},
 	{
 		ID:          "frontend",
@@ -38,16 +38,17 @@ var workflowTemplates = []workflowTemplate{
 	{
 		ID:          "fullstack",
 		Name:        "Full Stack",
-		Description: "Backend + Frontend developers with reviewers and safety analysis",
+		Description: "Backend + Frontend developers with reviewers",
 		Icon:        "🚀",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "go", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss", Selected: true, Model: defaultAgentModel},
-			{Name: "stpa-analyst", Selected: true, Model: defaultAgentModel},
+			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
+			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "htmx-picocss-frontend-developer", Selected: true, Model: defaultAgentModel},
+			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"go" -> "stpa-analyst"
-"htmx-picocss" -> "stpa-analyst"`,
+		Flow: `"backend-go-developer" -> "go-readability-reviewer"
+"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"`,
 	},
 	{
 		ID:          "research",
@@ -188,7 +189,7 @@ func syncWizardState(wizard wizardState, st composerState) wizardState {
 		wizard.TechStack = techStackFromAgents(st.Agents)
 	}
 	if !wizard.SafetyAnalysis {
-		wizard.SafetyAnalysis = agentSelected(st.Agents, "stpa-analyst")
+		wizard.SafetyAnalysis = st.SafetyAnalysis
 	}
 	return wizard
 }

@@ -52,7 +52,7 @@ You must use the skill `run-long-running-processes-in-tmux`
 
 "OpenCode" (aka `opencode`) is always installed and available.
 
-When implementing new features that handle external input, interact with the filesystem, or manage concurrent operations, the coordinator should consider invoking the stpa-analyst to identify unsafe control actions and loss scenarios before implementation begins.
+When implementing new features that handle external input, interact with the filesystem, or manage concurrent operations, the coordinator should load and use the `stpa-overview` skill to identify unsafe control actions and loss scenarios before implementation begins. STPA is a skill workflow, not a routable `stpa-analyst` agent.
 
 # Code Auditing Guidance
 

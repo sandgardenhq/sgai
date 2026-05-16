@@ -1,156 +1,71 @@
 # GOAL.md Composer Reference
 
-Complete reference documentation for composing GOAL.md files for SGAI.
-
----
+Complete reference documentation for composing `GOAL.md` files for SGAI.
 
 ## GOAL.md Format Specification
 
-### Structure
-
-A GOAL.md file consists of two parts:
+A `GOAL.md` file consists of YAML frontmatter followed by a markdown project specification.
 
 ```markdown
 ---
-<YAML frontmatter>
+flow: |
+  "agent-a" -> "agent-b"
+models:
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+interactive: yes
+completionGateScript: make test
 ---
 
-<Markdown body: project description, requirements, tasks>
+# Project Goal
+
+[Goal, requirements, tasks]
 ```
 
-### Frontmatter Fields
+## Frontmatter Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `flow` | string (DOT format) | **Yes** | Directed acyclic graph defining agent execution order and dependencies |
-| `models` | map[string]string | No | Per-agent model assignments with optional variant syntax |
-| `completionGateScript` | string | No | Shell command that must succeed for workflow to be considered complete |
+| `flow` | string (DOT format) | Yes | Directed acyclic graph defining routable agents and dependencies |
+| `models` | map | No | Per-agent model assignments with optional variant syntax |
+| `completionGateScript` | string | No | Shell command that must succeed for workflow completion |
 | `interactive` | string | No | Human interaction mode: `yes`, `no`, or `auto` |
 
----
+## Flow Rules
 
-## Frontmatter Field Details
-
-### `flow` (Required)
-
-DOT-format DAG defining which agents run and their dependencies.
-
-**Syntax:**
-- Edges: `"agent-a" -> "agent-b"` (agent-a must complete before agent-b starts)
-- Standalone: `"agent-name"` (agent with no dependencies)
+- Edges: `"agent-a" -> "agent-b"`
+- Standalone: `"agent-name"`
 - Use double quotes around agent names
-- Use `|` for multi-line YAML strings
+- The graph must be a DAG with no cycles
+- The `coordinator` is always present automatically; do not include it in `flow`
+- Safety Analysis is a coordinator/reviewer `stpa-overview` skill workflow; do not include `stpa-analyst` in `flow`
 
-**Example:**
+Example:
+
 ```yaml
 flow: |
-  "go" -> "stpa-analyst"
-  "general-purpose" -> "stpa-analyst"
-  "htmx-picocss" -> "stpa-analyst"
-```
-
-**Standalone agents (no dependencies):**
-```yaml
-flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
   "general-purpose"
-  "htmx-picocss"
 ```
 
-**Rules:**
-- The graph must be a DAG (Directed Acyclic Graph) - no cycles allowed
-- The `coordinator` agent is ALWAYS present automatically - do NOT include it in the flow
-- All agents listed in the flow will be available for task delegation
+## Models
 
----
+Example:
 
-### `models` (Optional)
-
-Per-agent model assignments. Supports variant syntax in parentheses.
-
-**Example:**
 ```yaml
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5"
-  "general-purpose": "openai/gpt-5.5"
-  "htmx-picocss": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
 ```
 
-**Notes:**
-- Agents without explicit model assignments use `defaultModel` from `sgai.json` or system default
-- Variant syntax (e.g., `(max)`) is passed through to the inference engine
-- The `coordinator` should typically use the most capable model
+Notes:
 
----
-
-### `completionGateScript` (Optional)
-
-Shell command that determines if the workflow is complete. The workflow is only considered complete when this script exits with status 0.
-
-**Examples:**
-```yaml
-completionGateScript: make test
-```
-
-```yaml
-completionGateScript: go test ./... && npm run lint
-```
-
-```yaml
-completionGateScript: ./scripts/verify-all.sh
-```
-
----
-
-### `interactive` (Optional)
-
-Controls how agent questions are handled.
-
-| Value | Behavior |
-|-------|----------|
-| `yes` | Agent questions appear in web UI; human responds interactively (recommended) |
-| `no` | Workflow exits when an agent asks a question |
-| `auto` | Self-driving mode; agents attempt to proceed without human input |
-
-**Example:**
-```yaml
-interactive: yes
-```
-
----
-
-## Markdown Body
-
-The body contains the project specification in markdown.
-
-**Structure:**
-```markdown
-# Project Goal
-
-Describe what you want to build here. Be specific about behavior,
-not implementation. Focus on outcomes.
-
-## Requirements
-
-- What should happen when a user does X?
-- What constraints exist?
-- What does success look like?
-
-## Tasks
-
-- [ ] Task 1
-- [ ] Task 2
-  - [ ] Task 2.1
-- [ ] Task 3
-```
-
-**Key Points:**
-- Checkboxes (`- [ ]`) are managed by the coordinator agent
-- Nested checkboxes are supported for subtasks
-- Focus on *what* to build, not *how*
-- Be specific about behavior and constraints
-
----
+- Agents without explicit model assignments use defaults.
+- Variant syntax such as `(max)` is passed through to the inference engine.
+- The `coordinator` should typically use the strongest model.
+- Do not assign a model to `stpa-analyst`.
 
 ## Available Agents
 
@@ -158,28 +73,35 @@ not implementation. Focus on outcomes.
 
 | Agent | Description | Paired Reviewer |
 |-------|-------------|-----------------|
-| `go` | Primary Go wrapper that delegates implementation to `go-developer` and review to `go-reviewer`. | Handled internally |
-| `htmx-picocss` | Primary HTMX/PicoCSS wrapper that delegates implementation to `htmx-picocss-developer` and review to `htmx-picocss-reviewer`. | Handled internally |
-| `shell-script` | Primary shell script wrapper that delegates implementation to `shell-script-developer` and review to `shell-script-reviewer`. | Handled internally |
-| `react` | Primary React wrapper that delegates implementation to `react-developer` and review to `react-reviewer`. | Handled internally |
-| `general-purpose` | Cross-domain tasks, research, multi-step operations. No dedicated reviewer. | None |
-| `webmaster` | Marketing sites, landing pages with Bootstrap/Tailwind/PicoCSS. SEO and accessibility focus. | None |
+| `backend-go-developer` | Expert Go backend developer for APIs, CLI tools, and services. | `go-readability-reviewer` |
+| `htmx-picocss-frontend-developer` | Frontend developer using HTMX and PicoCSS. | `htmx-picocss-frontend-reviewer` |
+| `shell-script-coder` | Production-quality POSIX/bash shell scripts. | `shell-script-reviewer` |
+| `react-developer` | React/TypeScript frontend developer. | `react-reviewer` |
+| `general-purpose` | Cross-domain tasks, research, and multi-step work. | None |
+| `webmaster` | Marketing sites, landing pages, SEO, and accessibility. | None |
 
-### Analysis Agents
+### Review Agents
 
 | Agent | Description |
 |-------|-------------|
-| `stpa-analyst` | STPA hazard analysis for safety-critical software, physical, and AI systems. |
-| `c4-code` | C4 Code-level documentation from source files (lowest C4 level). |
-| `c4-component` | C4 Component-level architecture synthesis from code documentation. |
-| `c4-container` | C4 Container-level deployment documentation. |
-| `c4-context` | C4 System context diagrams for stakeholders (highest C4 level). |
+| `go-readability-reviewer` | Reviews Go code for readability, idioms, and best practices. |
+| `htmx-picocss-frontend-reviewer` | UI polish, accessibility, and visual consistency for HTMX/PicoCSS. |
+| `react-reviewer` | React code review for best practices, performance, accessibility, and hooks usage. |
+| `shell-script-reviewer` | Shell script correctness, portability, and security review. |
+
+Any `*-reviewer` may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
+
+### Skill Workflows
+
+| Skill | Description |
+|-------|-------------|
+| `stpa-overview` | Coordinator/reviewer STPA hazard and safety analysis workflow. Use for Safety Analysis instead of adding a routable agent. |
 
 ### Coordination
 
 | Agent | Description |
 |-------|-------------|
-| `coordinator` | **Always present** - orchestrates workflow, manages tasks, human communication, and owns the internal completion review gate. Never include in flow. |
+| `coordinator` | Always present. Orchestrates workflow, manages tasks, and communicates with the human. Never include in `flow`. |
 
 ### SDK Verification Agents
 
@@ -194,74 +116,59 @@ not implementation. Focus on outcomes.
 
 | Agent | Description |
 |-------|-------------|
-| `cli-output-style-adjuster` | Adjusts CLI output for Unix philosophy compliance (minimal, plain-text). |
+| `cli-output-style-adjuster` | Adjusts CLI output for minimal, plain-text style. |
 
----
+## Mandatory Reviewer Pairing
 
-## Mandatory Coding Wrappers
+Every coding agent must be paired with its corresponding reviewer.
 
-> **CRITICAL CONSTRAINT:** Coding work must use public wrapper agents. Wrapper agents delegate to hidden developer and reviewer subagents internally.
-
-| Coding Capability | Public Wrapper |
+| Development Agent | Required Reviewer |
 |-------------------|-------------------|
-| Go | `go` |
-| HTMX/PicoCSS | `htmx-picocss` |
-| React | `react` |
-| Shell scripts | `shell-script` |
-| Websites | `webmaster` |
+| `backend-go-developer` | `go-readability-reviewer` |
+| `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
+| `react-developer` | `react-reviewer` |
+| `shell-script-coder` | `shell-script-reviewer` |
 
-### Enforcement Rules
+Rules:
 
-When selecting a coding capability:
-1. **Select** the public wrapper agent only
-2. **Do not add** hidden developer or reviewer subagents to the GOAL.md flow
-3. **Do not assign** models to hidden developer or reviewer subagents in GOAL.md
-4. **Show notice** explaining that implementation and review are handled internally by the wrapper
+1. Auto-add the paired reviewer when selecting a development agent.
+2. Auto-create the dependency edge from developer to reviewer.
+3. Show a notice explaining why the reviewer was added.
+4. Warn if the user tries to remove the required reviewer.
 
-### Flow Pattern
+Pattern:
 
 ```yaml
 flow: |
-  "go"
+  "backend-go-developer" -> "go-readability-reviewer"
 ```
 
-### Exception: `general-purpose`
+`general-purpose` has no dedicated reviewer. If Safety Analysis is needed, add `## Safety Analysis` guidance to the GOAL body rather than routing it to another agent.
 
-The `general-purpose` agent does not have a dedicated reviewer since it handles cross-domain tasks. It may optionally flow into `stpa-analyst` for safety analysis.
+## Safety Analysis Pattern
 
----
+Safety Analysis must be represented as instructions, not an agent node.
 
-## Available Models
+```markdown
+## Safety Analysis
 
-### Google Models
+- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
+```
 
-| Model | Cost | Description |
-|-------|------|-------------|
-| `google/gemini-2.0-flash-001` | $$ | Fast responses, good for simpler tasks |
-| `google/gemini-2.5-pro-preview-05-06` | $$$ | Advanced reasoning |
+Use this pattern when the project involves safety-critical behavior, physical systems, AI autonomy, external input, filesystem writes, concurrency, state machines, workflow completion, deployment, or risk assessment.
 
-### OpenAI Models
-
-| Model | Cost | Description |
-|-------|------|-------------|
-| `openai/gpt-5.5` | $$$ | High capability, good reasoning |
-| `openai/gpt-5.4-mini` | $$ | Faster, lower cost |
-| `openai/gpt-5.5 (xhigh)` | $$$$ | Advanced reasoning model |
-
-### Model Selection Guidelines
+## Model Selection Guidelines
 
 | Agent Type | Recommended Model | Reason |
 |------------|-------------------|--------|
-| Coordinator | `openai/gpt-5.5 (xhigh)` | Needs best reasoning for orchestration |
-| Go Developer | `openai/gpt-5.5` | Complex code generation |
-| Go Reviewer | `openai/gpt-5.5` | Thorough code analysis |
-| Frontend Dev | `openai/gpt-5.5` | Good balance for UI work |
-| Frontend Reviewer | `openai/gpt-5.5` | Detailed visual analysis |
-| General Purpose | `openai/gpt-5.5` | Varied complex tasks |
-| STPA Analyst | `openai/gpt-5.5` | Safety-critical analysis |
-| Utility Agents | `openai/gpt-5.5` | Cost-effective for simple tasks |
-
----
+| Coordinator | Strongest available model, often `(max)` | Orchestration and safety-gate reasoning |
+| Go Developer | Strong coding model | Complex code generation |
+| Go Reviewer | Strong reasoning model | Thorough code analysis |
+| Frontend Developer | Balanced capable model | UI implementation |
+| Frontend Reviewer | Strong reasoning/model with visual analysis capability | Detailed review |
+| General Purpose | Strong flexible model | Varied tasks |
+| Utility Agents | Cost-effective model | Simple targeted work |
 
 ## Complete Examples
 
@@ -270,10 +177,11 @@ The `general-purpose` agent does not have a dedicated reviewer since it handles 
 ```markdown
 ---
 flow: |
-  "go"
+  "backend-go-developer" -> "go-readability-reviewer"
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
 interactive: yes
 completionGateScript: go test ./...
 ---
@@ -285,35 +193,32 @@ Create a command-line tool that validates JSON files against a schema.
 ## Requirements
 
 - Accept JSON file path and schema file path as arguments
-- Support JSON Schema draft-07
 - Output validation errors with line numbers
 - Exit with code 0 on valid, 1 on invalid, 2 on error
-- No external dependencies beyond standard library
 
 ## Tasks
 
 - [ ] Create main.go with argument parsing
-- [ ] Implement JSON schema validation
-- [ ] Add error formatting with line numbers
-- [ ] Write unit tests
-- [ ] Add integration tests with sample files
+- [ ] Implement validation
+- [ ] Write tests
 ```
 
-### Example 2: Full-Stack Web Application
+### Example 2: Full-Stack Web Application with Safety Analysis
 
 ```markdown
 ---
 completionGateScript: make test
 flow: |
-  "go" -> "stpa-analyst"
-  "htmx-picocss" -> "stpa-analyst"
-  "general-purpose" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
+  "general-purpose"
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5"
-  "htmx-picocss": "openai/gpt-5.5"
-  "general-purpose": "openai/gpt-5.5"
-  "stpa-analyst": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "htmx-picocss-frontend-developer": "anthropic/claude-sonnet-4-5"
+  "htmx-picocss-frontend-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
 interactive: yes
 ---
 
@@ -324,27 +229,19 @@ Build a web-based task management application for small teams.
 ## Requirements
 
 - Users can create, edit, and delete tasks
-- Tasks have title, description, status (todo/in-progress/done), and assignee
-- Dashboard shows tasks grouped by status in Kanban-style columns
-- Drag-and-drop to change task status (using HTMX)
-- Simple authentication with username/password
-- Data persisted to SQLite database
-- Responsive design that works on mobile
+- Drag-and-drop changes task status
+- Data persists to SQLite
+
+## Safety Analysis
+
+- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
 
 ## Tasks
 
-- [ ] Set up Go backend with HTTP server
-- [ ] Create SQLite database schema
-- [ ] Implement user authentication
-  - [ ] Login/logout endpoints
-  - [ ] Session management
-- [ ] Build task CRUD API endpoints
-- [ ] Create HTMX frontend
-  - [ ] Kanban board layout
-  - [ ] Task cards with drag-and-drop
-  - [ ] Create/edit task modals
-- [ ] Add Playwright tests for UI
-- [ ] Write integration tests for API
+- [ ] Set up Go backend
+- [ ] Build HTMX frontend
+- [ ] Add Playwright tests
 ```
 
 ### Example 3: Exploratory Research
@@ -354,8 +251,8 @@ Build a web-based task management application for small teams.
 flow: |
   "general-purpose"
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "general-purpose": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "general-purpose": "anthropic/claude-opus-4-6"
 interactive: yes
 ---
 
@@ -365,18 +262,15 @@ Research and document best practices for REST API versioning.
 
 ## Requirements
 
-- Survey common versioning strategies (URL, header, query param)
-- Document pros/cons of each approach
-- Find real-world examples from major APIs
-- Recommend approach for our use case (internal microservices)
+- Survey common versioning strategies
+- Document pros and cons
+- Recommend an approach
 
 ## Tasks
 
-- [ ] Research URL-based versioning (/v1/, /v2/)
-- [ ] Research header-based versioning (Accept-Version)
-- [ ] Research query parameter versioning (?version=1)
-- [ ] Document findings with examples
-- [ ] Write recommendation document
+- [ ] Research URL-based versioning
+- [ ] Research header-based versioning
+- [ ] Write recommendation
 ```
 
 ### Example 4: Shell Script Project
@@ -384,101 +278,86 @@ Research and document best practices for REST API versioning.
 ```markdown
 ---
 flow: |
-  "shell-script"
+  "shell-script-coder" -> "shell-script-reviewer"
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "shell-script": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "shell-script-coder": "anthropic/claude-opus-4-6"
+  "shell-script-reviewer": "anthropic/claude-opus-4-6"
 interactive: yes
 completionGateScript: shellcheck scripts/*.sh
 ---
 
 # Deployment Scripts
 
-Create deployment automation scripts for our Go application.
+Create deployment automation scripts for a Go application.
 
 ## Requirements
 
-- POSIX-compliant for maximum portability
-- Support for staging and production environments
-- Rollback capability if deployment fails
-- Health check verification after deployment
-- Logging to both file and stdout
+- POSIX-compliant where possible
+- Support staging and production
+- Rollback capability
 
 ## Tasks
 
-- [ ] Create deploy.sh with environment selection
-- [ ] Add rollback.sh for failed deployments
-- [ ] Create healthcheck.sh for verification
-- [ ] Add common.sh with shared functions
-- [ ] Document usage in README
+- [ ] Create deploy.sh
+- [ ] Add rollback.sh
+- [ ] Document usage
 ```
-
----
-
-## Validation Checklist
-
-Before finalizing a GOAL.md, verify:
-
-- [ ] **Flow DAG is valid** - No cycles, all edges point forward
-- [ ] **Coordinator not in flow** - It's always present automatically
-- [ ] **Wrapper pairing enforced** - Coding work uses wrapper agents that handle implementation and review internally
-- [ ] **Review path exists** - Coding wrapper agents delegate to hidden developer and reviewer subagents internally
-- [ ] **Models assigned correctly** - All agents in flow have model assignments (or use defaults)
-- [ ] **Interactive mode set** - Explicitly set to `yes`, `no`, or `auto`
-- [ ] **Specification complete** - Has Goal description, Requirements, and Tasks
-- [ ] **Tasks use checkboxes** - Format: `- [ ] Task description`
-- [ ] **No implementation details** - Focus on WHAT, not HOW
-- [ ] **CompletionGateScript valid** - If set, command should be runnable
-
----
 
 ## Common Patterns
 
 ### Go Backend Only
+
 ```yaml
 flow: |
-  "go"
+  "backend-go-developer" -> "go-readability-reviewer"
 ```
 
 ### Go Backend with Safety Analysis
+
 ```yaml
 flow: |
-  "go" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
 ```
+
+Add `## Safety Analysis` body guidance using `stpa-overview`.
 
 ### HTMX Frontend Only
+
 ```yaml
 flow: |
-  "htmx-picocss"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
 ```
 
-### Full-Stack Go + HTMX
+### Full-Stack Go + HTMX with Safety Analysis
+
 ```yaml
 flow: |
-  "go" -> "stpa-analyst"
-  "htmx-picocss" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
 ```
+
+Add `## Safety Analysis` body guidance using `stpa-overview`.
 
 ### React Frontend Only
+
 ```yaml
 flow: |
-  "react"
+  "react-developer" -> "react-reviewer"
 ```
 
-### Full-Stack Go + React
+### Full-Stack Go + React with Safety Analysis
+
 ```yaml
 flow: |
-  "go" -> "stpa-analyst"
-  "react" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "react-developer" -> "react-reviewer"
 ```
 
-### Research/Exploration
-```yaml
-flow: |
-  "general-purpose"
-```
+Add `## Safety Analysis` body guidance using `stpa-overview`.
 
 ### Documentation
+
 ```yaml
 flow: |
   "c4-code" -> "c4-component"
@@ -486,26 +365,39 @@ flow: |
   "c4-container" -> "c4-context"
 ```
 
----
+## Validation Checklist
+
+Before finalizing a GOAL.md, verify:
+
+- [ ] Flow DAG is valid and acyclic
+- [ ] Coordinator is not in flow
+- [ ] `stpa-analyst` is not in flow
+- [ ] Reviewer pairing is enforced
+- [ ] Reviewer edges exist from developer to reviewer
+- [ ] Models are assigned correctly
+- [ ] `stpa-analyst` is not in models
+- [ ] Interactive mode is set
+- [ ] Specification is complete
+- [ ] Tasks use checkbox format
+- [ ] Safety Analysis, if needed, is represented as `stpa-overview` coordinator/reviewer guidance
+- [ ] Completion gate command is runnable if present
 
 ## Troubleshooting
 
 ### "Agent not found" Error
-- Verify agent name is spelled correctly (case-sensitive)
-- Check that agent is listed in the Available Agents section
-- Ensure agent name is in double quotes in the flow
+
+- Verify agent name spelling and quotes.
+- Check that the agent is listed in Available Agents.
+- If the missing agent is `stpa-analyst`, remove it from `flow`/`models` and add `stpa-overview` Safety Analysis guidance instead.
 
 ### "Cycle detected" Error
-- Review the flow for circular dependencies
-- Ensure terminal analysis agents do not flow back to coding wrappers
-- Use a topological sort tool to verify DAG validity
 
-### "Model not available" Error
-- Check model name spelling
-- Verify model is available in your opencode configuration
-- Try using a different model variant
+- Review the flow for circular dependencies.
+- Ensure reviewers do not flow back to developers.
+- Keep Safety Analysis out of the DAG.
 
 ### Tasks not being tracked
-- Ensure tasks use checkbox format: `- [ ]`
-- Nested tasks should be indented with 2 spaces
-- Don't use other list formats (*, 1., etc.) for trackable tasks
+
+- Ensure tasks use checkbox format: `- [ ] Task description`.
+- Nested tasks should be indented with two spaces.
+- Do not use other list formats for trackable tasks.

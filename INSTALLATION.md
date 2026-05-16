@@ -279,13 +279,14 @@ mkdir -p ./sgai/TodoApp/.sgai
 ```markdown
 ---
 flow: |
-  "go" -> "stpa-analyst"
-  "general-purpose" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "general-purpose"
+  "project-critic-council"
 models:
   "coordinator": "opencode/big-pickle"
   "go": "opencode/big-pickle"
   "general-purpose": "opencode/big-pickle"
-  "stpa-analyst": "opencode/big-pickle"
+  "project-critic-council": "opencode/big-pickle"
 interactive: yes
 ---
 
@@ -298,6 +299,7 @@ Build a simple command-line todo application.
 - Add, list, complete, and delete todos
 - Persist todos to a local file
 - Simple and clean CLI interface
+- Coordinator and reviewer agents should use STPA skill guidance if file persistence or CLI inputs create safety-relevant risks
 
 ## Tasks
 
