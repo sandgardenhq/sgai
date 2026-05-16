@@ -35,6 +35,11 @@ func TestExtractDescriptionFromBody(t *testing.T) {
 			expected: "My Project\n\nThis is a description.\n\nMore details here.",
 		},
 		{
+			name:     "descriptionWithSafetyAnalysisSection",
+			body:     "# My Project\n\nDescription.\n\n## Safety Analysis\n\n- The coordinator must load/use `stpa-overview`.\n\n## Tasks\n\n- Task 1",
+			expected: "My Project\n\nDescription.",
+		},
+		{
 			name:     "noTasksSection",
 			body:     "# My Project\n\nThis is a description.",
 			expected: "My Project\n\nThis is a description.",
@@ -119,7 +124,6 @@ func TestLoadComposerStateFromDisk(t *testing.T) {
 	tests := []struct {
 		name      string
 		setupFunc func(*testing.T, string)
-		wantErr   bool
 		validate  func(*testing.T, composerState)
 	}{
 		{
@@ -145,7 +149,6 @@ Description here.
 				goalPath := filepath.Join(dir, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
-			wantErr: false,
 			validate: func(t *testing.T, state composerState) {
 				assert.Equal(t, "My Project\n\nDescription here.", state.Description)
 				assert.Equal(t, "make test", state.CompletionGate)
@@ -158,10 +161,69 @@ Description here.
 			},
 		},
 		{
+			name: "loadSafetyAnalysisFromGOALBody",
+			setupFunc: func(t *testing.T, dir string) {
+				goalContent := `---
+flow: |
+  "backend-go-developer" -> "go-readability-reviewer"
+models:
+  "coordinator": "model1"
+---
+# My Project
+
+Description here.
+
+## Safety Analysis
+
+- The coordinator must load/use ` + "`stpa-overview`" + ` when safety concerns are relevant.
+
+## Tasks
+
+- Task 1
+`
+				goalPath := filepath.Join(dir, "GOAL.md")
+				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
+			},
+			validate: func(t *testing.T, state composerState) {
+				assert.True(t, state.SafetyAnalysis)
+				assert.Equal(t, "My Project\n\nDescription here.", state.Description)
+				assert.Equal(t, "- Task 1", state.Tasks)
+			},
+		},
+		{
+			name: "migrateLegacySTPAAgentToSafetyAnalysis",
+			setupFunc: func(t *testing.T, dir string) {
+				goalContent := `---
+flow: |
+  "backend-go-developer" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+models:
+  "coordinator": "model1"
+  "backend-go-developer": "model2"
+  "stpa-analyst": "model3"
+---
+# My Project
+
+Description here.
+`
+				goalPath := filepath.Join(dir, "GOAL.md")
+				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
+			},
+			validate: func(t *testing.T, state composerState) {
+				assert.True(t, state.SafetyAnalysis)
+				assert.NotContains(t, state.Flow, "stpa-analyst")
+				for _, agent := range state.Agents {
+					assert.NotEqual(t, "stpa-analyst", agent.Name)
+				}
+				content := buildGOALContent(state)
+				assert.NotContains(t, content, "stpa-analyst\":")
+				assert.Contains(t, content, "stpa-overview")
+			},
+		},
+		{
 			name: "loadFromMissingGOAL",
 			setupFunc: func(_ *testing.T, _ string) {
 			},
-			wantErr: false,
 			validate: func(t *testing.T, state composerState) {
 				assert.Len(t, state.Agents, 1)
 				assert.Equal(t, "coordinator", state.Agents[0].Name)
@@ -178,7 +240,6 @@ invalid yaml content
 				goalPath := filepath.Join(dir, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
-			wantErr: false,
 			validate: func(t *testing.T, state composerState) {
 				assert.Len(t, state.Agents, 1)
 				assert.Equal(t, "coordinator", state.Agents[0].Name)
@@ -196,7 +257,6 @@ flow: |
 				goalPath := filepath.Join(dir, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
-			wantErr: false,
 			validate: func(t *testing.T, state composerState) {
 				assert.Len(t, state.Agents, 0)
 			},
@@ -246,6 +306,43 @@ func TestBuildGOALContent(t *testing.T) {
 				assert.Contains(t, content, "My Project")
 				assert.Contains(t, content, "## Tasks")
 				assert.Contains(t, content, "Task 1")
+			},
+		},
+		{
+			name: "buildGOALWithSafetyAnalysis",
+			state: composerState{
+				Description:    "My Project",
+				SafetyAnalysis: true,
+				Flow:           `"backend-go-developer" -> "go-readability-reviewer"`,
+				Agents: []composerAgentConf{
+					{Name: "coordinator", Selected: true, Model: "model1"},
+					{Name: "backend-go-developer", Selected: true, Model: "model2"},
+					{Name: "go-readability-reviewer", Selected: true, Model: "model3"},
+				},
+			},
+			validate: func(t *testing.T, content string) {
+				assert.NotContains(t, content, `"stpa-analyst" ->`)
+				assert.NotContains(t, content, `-> "stpa-analyst"`)
+				assert.NotContains(t, content, `"stpa-analyst":`)
+				assert.Contains(t, content, "## Safety Analysis")
+				assert.Contains(t, content, "stpa-overview")
+				assert.Contains(t, content, "coordinator must load/use")
+				assert.Contains(t, content, "*-reviewer")
+			},
+		},
+		{
+			name: "buildGOALFiltersRetiredSTPAAgent",
+			state: composerState{
+				Description: "My Project",
+				Flow:        `"backend-go-developer" -> "stpa-analyst"`,
+				Agents: []composerAgentConf{
+					{Name: "stpa-analyst", Selected: true, Model: "model1"},
+				},
+			},
+			validate: func(t *testing.T, content string) {
+				assert.NotContains(t, content, "stpa-analyst")
+				assert.NotContains(t, content, "models:")
+				assert.NotContains(t, content, "flow:")
 			},
 		},
 		{
@@ -343,7 +440,7 @@ func TestSyncWizardState(t *testing.T) {
 		validate func(*testing.T, wizardState)
 	}{
 		{
-			name: "syncWithEmptyTechStack",
+			name: "syncWithEmptyTechStackDoesNotInferSafetyAnalysisFromRetiredAgent",
 			wizard: wizardState{
 				CurrentStep: 1,
 				TechStack:   []string{},
@@ -356,7 +453,7 @@ func TestSyncWizardState(t *testing.T) {
 			},
 			validate: func(t *testing.T, wizard wizardState) {
 				assert.Contains(t, wizard.TechStack, "go")
-				assert.True(t, wizard.SafetyAnalysis)
+				assert.False(t, wizard.SafetyAnalysis)
 			},
 		},
 		{
@@ -410,6 +507,17 @@ func TestSyncWizardState(t *testing.T) {
 			result := syncWizardState(tt.wizard, tt.state)
 			if tt.validate != nil {
 				tt.validate(t, result)
+			}
+		})
+	}
+}
+
+func TestWorkflowTemplatesDoNotRouteSafetyAnalysisToSTPAAgent(t *testing.T) {
+	for _, tmpl := range workflowTemplates {
+		t.Run(tmpl.ID, func(t *testing.T) {
+			assert.NotContains(t, tmpl.Flow, "stpa-analyst")
+			for _, agent := range tmpl.Agents {
+				assert.NotEqual(t, "stpa-analyst", agent.Name)
 			}
 		})
 	}
@@ -559,7 +667,8 @@ func TestGetComposerSession(t *testing.T) {
 			name: "createNewSession",
 			setupFunc: func(_ *testing.T, _ string) {
 			},
-			validate: func(t *testing.T, session *composerSession) { //nolint:thelper
+			validate: func(t *testing.T, session *composerSession) {
+				t.Helper()
 				assert.NotNil(t, session)
 				assert.NotNil(t, session.state)
 				assert.NotNil(t, session.wizard)
@@ -569,7 +678,8 @@ func TestGetComposerSession(t *testing.T) {
 		},
 		{
 			name: "loadExistingSession",
-			setupFunc: func(t *testing.T, dir string) { //nolint:thelper
+			setupFunc: func(t *testing.T, dir string) {
+				t.Helper()
 				goalContent := `---
 flow: |
   "agent1" -> "agent2"
@@ -582,7 +692,8 @@ models:
 				goalPath := filepath.Join(dir, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
-			validate: func(t *testing.T, session *composerSession) { //nolint:thelper
+			validate: func(t *testing.T, session *composerSession) {
+				t.Helper()
 				assert.NotNil(t, session)
 				assert.NotNil(t, session.state)
 				assert.Contains(t, session.state.Flow, "agent1")
@@ -593,7 +704,8 @@ models:
 			name: "reuseExistingSession",
 			setupFunc: func(_ *testing.T, _ string) {
 			},
-			validate: func(t *testing.T, session *composerSession) { //nolint:thelper
+			validate: func(t *testing.T, session *composerSession) {
+				t.Helper()
 				assert.NotNil(t, session)
 			},
 			checkReuse: true,

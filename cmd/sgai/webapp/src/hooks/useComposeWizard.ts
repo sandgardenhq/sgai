@@ -195,9 +195,24 @@ const TECH_STACK_AGENT_MAP: Record<string, TechStackMapping> = {
   },
 };
 
+const RETIRED_AGENT_NAMES = new Set(["stpa-analyst"]);
+
+function sanitizeComposerAgents(agents: ApiComposerAgentConf[]): ApiComposerAgentConf[] {
+  return agents.filter((agent) => !RETIRED_AGENT_NAMES.has(agent.name));
+}
+
+function sanitizeComposerFlow(flow: string): string {
+  return flow
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return trimmed && !Array.from(RETIRED_AGENT_NAMES).some((name) => trimmed.includes(name));
+    })
+    .join("\n");
+}
+
 function computeAgentsAndFlowFromTechStack(
   techStack: string[],
-  safetyAnalysis: boolean,
 ): { agents: ApiComposerAgentConf[]; flow: string } {
   const agentSet = new Set<string>(["coordinator"]);
   const flowLines: string[] = [];
@@ -210,32 +225,6 @@ function computeAgentsAndFlowFromTechStack(
     }
     for (const line of mapping.flow) {
       flowLines.push(line);
-    }
-  }
-
-  if (safetyAnalysis) {
-    agentSet.add("stpa-analyst");
-    for (const tech of techStack) {
-      const mapping = TECH_STACK_AGENT_MAP[tech];
-      if (!mapping) continue;
-      const reviewerNamePattern = /reviewer|verifier/;
-      const reviewers: string[] = [];
-      for (const agent of mapping.agents) {
-        if (reviewerNamePattern.test(agent)) {
-          reviewers.push(agent);
-        }
-      }
-      for (const reviewer of reviewers) {
-        flowLines.push(`"${reviewer}" -> "stpa-analyst"`);
-      }
-      if (tech === "go" || tech === "htmx" || tech === "react" || tech === "shell") {
-        for (const agent of mapping.agents) {
-          flowLines.push(`"${agent}" -> "stpa-analyst"`);
-        }
-      }
-      if (tech === "general-purpose") {
-        flowLines.push('"general-purpose" -> "stpa-analyst"');
-      }
     }
   }
 
@@ -252,18 +241,15 @@ function buildComposerStateFromData(
   data: WizardStepData,
   serverState: ApiComposerState | null,
 ): ApiComposerState {
-  const { agents, flow } = computeAgentsAndFlowFromTechStack(
-    data.techStack,
-    data.safetyAnalysis,
-  );
+  const { agents, flow } = computeAgentsAndFlowFromTechStack(data.techStack);
 
   const hasUserAgents = agents.length > 1;
 
   return {
     description: data.description,
     completionGate: data.completionGate,
-    agents: hasUserAgents ? agents : (serverState?.agents ?? []),
-    flow: hasUserAgents ? flow : (serverState?.flow ?? ""),
+    agents: sanitizeComposerAgents(hasUserAgents ? agents : (serverState?.agents ?? [])),
+    flow: sanitizeComposerFlow(hasUserAgents ? flow : (serverState?.flow ?? "")),
     tasks: serverState?.tasks ?? "",
   };
 }
@@ -385,10 +371,7 @@ export function useComposeWizard({
     async function loadState() {
       updateState({ isLoading: true, saveError: null });
       try {
-        const [stateResp, previewResp] = await Promise.all([
-          api.compose.get(workspace),
-          api.compose.preview(workspace),
-        ]);
+        const stateResp = await api.compose.get(workspace);
 
         if (cancelled) return;
 
@@ -432,6 +415,11 @@ export function useComposeWizard({
 
         setWizardData(merged);
         cleanBaselineRef.current = serializeWizardData(merged);
+        const draftRequest = buildDraftRequest(merged, currentStep, stateResp.state);
+        await api.compose.saveDraft(workspace, draftRequest);
+        const previewResp = await api.compose.preview(workspace);
+        if (cancelled) return;
+
         updateState({
           techStackItems: stateResp.techStackItems,
           etag: previewResp.etag,
@@ -457,7 +445,7 @@ export function useComposeWizard({
     return () => {
       cancelled = true;
     };
-  }, [workspace]);
+  }, [workspace, currentStep]);
 
   // Persist current step data to sessionStorage on change (R-14)
   useEffect(() => {

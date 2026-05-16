@@ -1,226 +1,185 @@
 ---
 name: goal-md-composer
-description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. When your human partner wants to create a new GOAL.md file, start a new SGAI project, configure agents for a software factory, or asks "help me set up GOAL.md", "I want to configure agents", "let's start a new project with SGAI".
+description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. Use when creating GOAL.md, configuring agents, model lists, flow DAGs, safety-analysis guidance, or starting an SGAI project. Safety Analysis must use coordinator/reviewer stpa-overview skill guidance, not stpa-analyst flow nodes.
 ---
 
 # GOAL.md Composer
 
 ## Overview
 
-An interactive wizard that guides you through composing valid, well-structured GOAL.md files for SGAI (Software Generation AI). This skill walks through 7 phases to help configure agents, models, workflows, and project specifications.
+An interactive wizard that guides you through composing valid, well-structured `GOAL.md` files for SGAI. It configures project scope, agents, workflow flow, models, options, and final validation.
 
 **Announce at start:** "I'm using the GOAL.md Composer skill to help you create a valid GOAL.md file."
 
 ## Prerequisites
 
-Before starting, load the REFERENCE.md companion document for the complete agent catalog and format specification:
+Before starting, load the companion reference when you need the full catalog or examples:
+
 - `skills/product-design/goal-md-composer/REFERENCE.md`
+
+## Non-Negotiable Safety Analysis Rule
+
+Safety Analysis is **not** a workflow agent. Do not add `stpa-analyst` to `flow`, `models`, examples, generated GOAL files, or model recommendations.
+
+When the user wants Safety Analysis, add coordinator/reviewer guidance in the GOAL body instead:
+
+```markdown
+## Safety Analysis
+
+- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
+```
 
 ## The 7-Phase Process
 
 ### Phase 1: Project Description
 
-Understand what the user is building.
-
-**Ask these questions (one at a time):**
+Ask one question at a time:
 
 1. "What type of project are you building?"
    - Options: API/Backend, CLI Tool, Web Application, Full-Stack App, Documentation, Library/SDK, Other
-
 2. "What programming language(s) will you use?"
    - Options: Go, TypeScript, Python, Shell/Bash, Multiple languages, Other
-
 3. "What's the scope of this project?"
    - Options: Quick prototype, MVP, Production-ready application, Exploratory research
+4. "Are there any specific constraints, including safety, security, filesystem, concurrency, or external-input concerns?"
 
-4. "Are there any specific constraints?"
-   - Free-form answer about: external dependencies, testing requirements, security needs, etc.
-
-**Log answers in:** `@.sgai/PROJECT_MANAGEMENT.md` under "## GOAL.md Composer Session"
-
-**Hand control back to human after each question.**
-
----
+Log answers in `.sgai/PROJECT_MANAGEMENT.md` under `## GOAL.md Composer Session`.
 
 ### Phase 2: Agent Recommendations
 
-Based on project description, recommend appropriate agents.
+Recommend agents from the reference catalog.
 
-**CRITICAL - Mandatory Coding Wrapper Rules:**
-When selecting a coding capability, you MUST select the public wrapper agent. Wrapper agents handle their developer and reviewer subagents internally; do not add hidden subagents to the GOAL.md flow or model assignments.
+**Mandatory reviewer pairing:**
 
-| Coding Capability | Public Wrapper |
+| Development Agent | Required Reviewer |
 |-------------------|-------------------|
-| Go | `go` |
-| HTMX/PicoCSS | `htmx-picocss` |
-| React | `react` |
-| Shell scripts | `shell-script` |
-| Websites | `webmaster` |
+| `backend-go-developer` | `go-readability-reviewer` |
+| `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
+| `react-developer` | `react-reviewer` |
+| `shell-script-coder` | `shell-script-reviewer` |
 
-**Process:**
+Process:
 
-1. Based on Phase 1 answers, present recommended agents organized by category
-2. For each coding wrapper recommended, show: "This wrapper delegates implementation and review internally"
-3. Present the full agent list with descriptions (see REFERENCE.md)
+1. Present recommended agents organized by category.
+2. For each development agent, show its automatically included reviewer.
+3. If Safety Analysis is requested, say: "Safety Analysis will be handled by coordinator/reviewer use of `stpa-overview`; it does not add a workflow agent."
 4. Ask: "Do you want to add or remove any agents from this selection?"
 
-**Example recommendation for Go Backend API:**
-```
-Recommended agents for your Go Backend API:
-- go (Go implementation and review wrapper)
+Example recommendation for a Go Backend API with Safety Analysis:
+
+```markdown
+Recommended agents:
+- backend-go-developer (Go development)
+- go-readability-reviewer (automatically paired)
 - general-purpose (cross-domain tasks)
-- stpa-analyst (safety analysis)
 
-Do you want to add or remove any agents?
+Safety Analysis:
+- The coordinator will be instructed to load/use `stpa-overview` when safety or hazard analysis is relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant it.
 ```
-
-**Hand control back to human for confirmation.**
-
----
 
 ### Phase 3: Flow Builder
 
 Generate the DOT syntax DAG defining agent execution order and dependencies.
 
-**Auto-generation rules:**
+Rules:
 
-1. Coding work should use wrapper agents:
+1. Development agents always flow into their paired reviewers:
+   ```yaml
+   flow: |
+     "backend-go-developer" -> "go-readability-reviewer"
    ```
-   "go"
-   "react"
-   "htmx-picocss"
-   "shell-script"
-   ```
-
-2. Wrapper agents typically flow into terminal analysis agents:
-   ```
-   "go" -> "stpa-analyst"
-   ```
-
-3. Standalone agents (no dependencies) are listed without arrows:
-   ```
-   "general-purpose"
+2. Do not include `coordinator` in the flow; it is always present automatically.
+3. Do not include `stpa-analyst`; Safety Analysis is represented in GOAL body guidance, not the flow DAG.
+4. Standalone agents with no dependencies are listed without arrows:
+   ```yaml
+   flow: |
+     "general-purpose"
    ```
 
-**Present the generated flow:**
+Example generated flow:
+
 ```yaml
 flow: |
-  "go" -> "stpa-analyst"
-  "general-purpose" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "general-purpose"
 ```
 
-**Ask:** "Does this workflow look correct? Would you like to add or modify any dependencies?"
-
-**Hand control back to human for adjustments.**
-
----
+Ask: "Does this workflow look correct? Would you like to add or modify any dependencies?"
 
 ### Phase 4: Model Configuration
 
 Configure per-agent model assignments.
 
-**Available models (see REFERENCE.md for full list):**
-- `openai/gpt-5.5` - Most capable, highest cost ($$$$)
-- `openai/gpt-5.5 (xhigh)` - Extended thinking variant
-- `openai/gpt-5.5` - Balanced capability/cost ($$$)
-- `openai/gpt-5.5 (max)` - Extended thinking variant
-- `google/gemini-2.0-flash-001` - Fast, lower cost ($$)
-- `openai/gpt-4.1` - Alternative high-capability model ($$$)
+Default recommendations:
 
-**Default recommendations:**
-- `coordinator`: `openai/gpt-5.5 (xhigh)` (always use strongest for coordination)
-- Development agents: `openai/gpt-5.5` (complex reasoning)
-- Review agents: `openai/gpt-5.5` (thorough analysis)
-- Frontend agents: `openai/gpt-5.5` (good balance)
-- Utility agents: `openai/gpt-5.5` (cost-effective)
+- `coordinator`: strongest available model for orchestration
+- Development agents: strong coding model
+- Review agents: strong reasoning model
+- Frontend agents: capable balanced model
+- Utility agents: cost-effective model
 
-**Present configuration:**
+Do not add a model entry for `stpa-analyst`.
+
+Example:
+
 ```yaml
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5"
-  "general-purpose": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
 ```
 
-**Ask:** "Do you want to adjust any model assignments? (e.g., use a faster/cheaper model for certain agents)"
-
-**Hand control back to human for adjustments.**
-
----
+Ask: "Do you want to adjust any model assignments?"
 
 ### Phase 5: Specification Writing
 
-Guide through writing the markdown body with Goal, Requirements, and Tasks.
+Guide the markdown body. Focus on **what** to build, not implementation details.
 
-**Structure to generate:**
+Suggested structure:
 
 ```markdown
 # [Project Title]
 
-[1-2 paragraph description of what to build, focusing on outcomes not implementation]
+[1-2 paragraph description]
 
 ## Requirements
 
-- [Behavioral requirement 1]
-- [Behavioral requirement 2]
-- [Constraint 1]
+- [Behavioral requirement]
+- [Constraint]
+
+## Safety Analysis
+
+- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
 
 ## Tasks
 
 - [ ] Task 1
-  - [ ] Subtask 1.1
-  - [ ] Subtask 1.2
 - [ ] Task 2
-- [ ] Task 3
 ```
 
-**Guidance:**
-1. Ask: "Describe the main goal in 1-2 sentences. Focus on WHAT, not HOW."
-2. Ask: "What are the key requirements? Think about: user actions, constraints, success criteria."
-3. Ask: "What are the major tasks? Break down into actionable items."
-
-**Tips to share:**
-- Focus on behavior, not implementation
-- Use checkboxes (`- [ ]`) for tasks - the coordinator manages these
-- Be specific about constraints (e.g., "no external dependencies", "must pass CI")
-- Nested checkboxes are supported for subtasks
-
-**Hand control back to human after each section.**
-
----
+Only include `## Safety Analysis` when requested or warranted by project risk.
 
 ### Phase 6: Options
 
-Configure optional settings.
+Ask about:
 
-**Ask about each option:**
+1. **Interactive mode** — `yes`, `no`, or `auto`
+2. **Completion gate script** — for example `make test`, `go test ./...`, `npm run lint && npm test`
 
-1. **Interactive mode:**
-   "How should agent questions be handled?"
-   - `yes` - Questions appear in web UI; human responds interactively (RECOMMENDED)
-   - `no` - Workflow exits when an agent asks a question
-   - `auto` - Self-driving mode; agents attempt to proceed without human input
+Example:
 
-2. **Completion gate script:**
-   "Should a command verify workflow completion?"
-   - Examples: `make test`, `go test ./...`, `npm run lint && npm test`
-   - Leave empty if no verification needed
-
-**Present configuration:**
 ```yaml
 interactive: yes
 completionGateScript: make test
 ```
 
-**Hand control back to human for confirmation.**
-
----
-
 ### Phase 7: Output & Validation
 
-Generate the complete GOAL.md and validate.
-
-**Generate the complete file:**
+Generate the complete file:
 
 ```markdown
 ---
@@ -235,28 +194,24 @@ completionGateScript: [from Phase 6, if set]
 [generated specification from Phase 5]
 ```
 
-**Validation checklist (present to user):**
+Present this validation checklist:
 
-- [ ] Coding work uses public wrapper agents, not hidden developer or reviewer subagents
-- [ ] Flow has no cycles (DAG is valid)
-- [ ] Coordinator is NOT in the flow (it's always present automatically)
-- [ ] Models are assigned to agents that appear in the flow
+- [ ] All development agents have paired reviewers in the flow
+- [ ] Flow has no cycles
+- [ ] Coordinator is not in the flow
+- [ ] `stpa-analyst` is not in the flow
+- [ ] `stpa-analyst` is not in models
+- [ ] Safety Analysis, if selected, appears as coordinator/reviewer `stpa-overview` guidance
+- [ ] Models are assigned to agents that appear in the flow or to the coordinator
 - [ ] Interactive mode is set
-- [ ] Specification has Goal, Requirements, and Tasks sections
-- [ ] Tasks use checkbox format (`- [ ]`)
+- [ ] Specification has clear requirements and checkbox tasks
 
-**Ask:** "I've generated the GOAL.md. Would you like me to:
-1. Write it to ./GOAL.md
-2. Show me the complete file first
-3. Make adjustments"
-
-**Hand control back to human for final decision.**
-
----
+Ask: "I've generated the GOAL.md. Would you like me to write it to `./GOAL.md`, show the complete file first, or make adjustments?"
 
 ## Quick Reference
 
 ### Minimal GOAL.md Template
+
 ```markdown
 ---
 flow: |
@@ -277,18 +232,22 @@ interactive: yes
 - [ ] Task
 ```
 
-### Full-Featured Template
+### Full-Featured Template with Safety Analysis
+
 ```markdown
 ---
 completionGateScript: make test
 flow: |
-  "go" -> "stpa-analyst"
-  "general-purpose" -> "stpa-analyst"
+  "backend-go-developer" -> "go-readability-reviewer"
+  "react-developer" -> "react-reviewer"
+  "general-purpose"
 models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5"
-  "general-purpose": "openai/gpt-5.5"
-  "stpa-analyst": "openai/gpt-5.5"
+  "coordinator": "anthropic/claude-opus-4-6 (max)"
+  "backend-go-developer": "anthropic/claude-opus-4-6"
+  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "react-developer": "anthropic/claude-sonnet-4-5"
+  "react-reviewer": "anthropic/claude-opus-4-6"
+  "general-purpose": "anthropic/claude-opus-4-6"
 interactive: yes
 ---
 
@@ -301,31 +260,30 @@ interactive: yes
 - [Requirement 1]
 - [Requirement 2]
 
+## Safety Analysis
+
+- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.
+- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.
+
 ## Tasks
 
 - [ ] Task 1
-  - [ ] Subtask 1.1
 - [ ] Task 2
 ```
 
----
+## Red Flags - STOP
+
+- Adding `stpa-analyst` to `flow`
+- Adding `stpa-analyst` to `models`
+- Describing Safety Analysis as a terminal workflow agent
+- Making reviewers flow into STPA
+- Omitting coordinator/reviewer `stpa-overview` guidance after the user requested Safety Analysis
 
 ## Remember
 
-- Announce skill usage at start
-- Ask ONE question at a time during gathering phases
-- Auto-enforce reviewer pairing (mandatory, not optional)
-- Present configuration incrementally for validation
-- Log all decisions in `@.sgai/PROJECT_MANAGEMENT.md`
-- Hand control back to human between phases
-- Validate the final output before writing
-- Use `sgai_ask_user_question` for structured questions:
-  ```
-  sgai_ask_user_question({
-    questions: [{
-      question: "**Phase 1: Project Description**\n\nWhat type of project are you building?",
-      choices: ["API/Backend", "CLI Tool", "Web Application", "Full-Stack App", "Documentation", "Other"],
-      multiSelect: false
-    }]
-  })
-  ```
+- Ask one question at a time during gathering phases
+- Auto-enforce reviewer pairing
+- Safety Analysis means `stpa-overview` skill guidance, not an agent node
+- Log decisions in `.sgai/PROJECT_MANAGEMENT.md`
+- Hand control back to the human between phases
+- Validate before writing final output

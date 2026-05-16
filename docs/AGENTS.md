@@ -66,7 +66,7 @@ General-purpose agent for researching complex questions, searching for code, and
 
 ## go-reviewer
 
-Hidden Go reviewer subagent that reviews Go code for readability, idioms, and best practices following Go Code Review Comments and the Google Go Style Guide. This is a read-only reviewer that cannot modify files - it provides detailed feedback with line numbers and sends fix recommendations to the go-developer agent via messaging. The agent uses a comprehensive checklist covering formatting, naming, error handling, concurrency, interfaces, documentation, type safety, and modern Go idioms. Every issue identified is mandatory and must be addressed before work can proceed.
+Hidden Go reviewer subagent that reviews Go code for readability, idioms, and best practices following Go Code Review Comments and the Google Go Style Guide. This is a read-only reviewer that cannot modify files - it provides detailed feedback with line numbers and sends fix recommendations to the go-developer agent via messaging. The agent uses a comprehensive checklist covering formatting, naming, error handling, concurrency, interfaces, documentation, type safety, and modern Go idioms. Every issue identified is mandatory and must be addressed before work can proceed. When circumstances warrant hazard or safety analysis, the reviewer may load and use STPA skill guidance through `stpa-overview`.
 
 ---
 
@@ -78,7 +78,7 @@ Primary HTMX/PicoCSS wrapper agent that coordinates implementation and review by
 
 ## htmx-picocss-reviewer
 
-Hidden HTMX/PicoCSS reviewer subagent. The "UI OCD Web Agent" obsessively reviews visual consistency, predictable interaction patterns, cohesive information architecture, and code readability. It verifies that every interactive element has proper hover/focus/loading/error states, layouts are responsive, accessibility requirements are met, and Playwright tests cover UI behavior. Any rough edge is considered a bug.
+Hidden HTMX/PicoCSS reviewer subagent. The "UI OCD Web Agent" obsessively reviews visual consistency, predictable interaction patterns, cohesive information architecture, and code readability. It verifies that every interactive element has proper hover/focus/loading/error states, layouts are responsive, accessibility requirements are met, and Playwright tests cover UI behavior. Any rough edge is considered a bug. When circumstances warrant hazard or safety analysis, the reviewer may load and use STPA skill guidance through `stpa-overview`.
 
 ---
 
@@ -126,7 +126,7 @@ Primary shell script wrapper agent that coordinates shell script implementation 
 
 ## shell-script-reviewer
 
-Hidden shell script reviewer subagent. Reviews shell script quality for correctness, portability, security, and best practices. This is a read-only reviewer that cannot modify files or execute commands. It analyzes scripts against criteria including logical correctness, POSIX compatibility, proper variable quoting, input validation, command injection prevention, secure temporary file handling, and meaningful error messages. The agent provides structured feedback with specific line references and a PASS/NEEDS WORK verdict.
+Hidden shell script reviewer subagent. Reviews shell script quality for correctness, portability, security, and best practices. This is a read-only reviewer that cannot modify files or execute commands. It analyzes scripts against criteria including logical correctness, POSIX compatibility, proper variable quoting, input validation, command injection prevention, secure temporary file handling, and meaningful error messages. The agent provides structured feedback with specific line references and a PASS/NEEDS WORK verdict. When circumstances warrant hazard or safety analysis, the reviewer may load and use STPA skill guidance through `stpa-overview`.
 
 ---
 
@@ -139,12 +139,6 @@ Creates new skills from approved suggestions with mandatory validation using the
 ## snippet-writer
 
 Creates new code snippets from approved suggestions following established conventions. This agent writes clean, reusable code snippets with proper header comments documenting purpose, usage, and examples. It uses TODO comments for customizable parts, ensures proper formatting for the target language, and follows language-specific idioms. Snippets are created in the sgai overlay directory for distribution and must pass quality checks including syntax validity and proper documentation.
-
----
-
-## stpa-analyst
-
-STPA (System Theoretic Process Analysis) hazard analyst for software, physical, and AI systems. This agent treats safety as a control problem and guides users through the 4 STPA steps: defining purpose (losses, hazards, constraints), modeling control structures with Graphviz diagrams, identifying unsafe control actions (4 types), and tracing loss scenarios through causal pathways. It uses interactive questioning to gather system information and documents findings in PROJECT_MANAGEMENT.md. Use this agent for systematic hazard analysis of any system where safety is a concern.
 
 ---
 

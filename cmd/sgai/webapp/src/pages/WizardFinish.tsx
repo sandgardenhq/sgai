@@ -71,6 +71,10 @@ export function WizardFinish() {
     return <MissingWorkspaceNotice />;
   }
 
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -167,6 +171,11 @@ export function WizardFinish() {
                 <div className="font-semibold text-sm">
                   {wizardData.safetyAnalysis ? "Enabled" : "Disabled"}
                 </div>
+                {wizardData.safetyAnalysis ? (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Coordinator uses the STPA skill workflow
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
