@@ -102,13 +102,23 @@ func TestResolveNextAgent(t *testing.T) {
 	})
 
 	t.Run("coordinatorGoesToFirstEntry", func(t *testing.T) {
-		r := &workflowRunner{
-			paddedsgai: "test",
-			flowDag:    buildTestDag(map[string][]string{"coordinator": {"builder"}}, []string{"builder"}),
-			wfState:    state.Workflow{Messages: []state.Message{}},
-		}
+		flowDag, errFlow := parseFlow("\"builder\" -> \"reviewer\"", t.TempDir())
+		require.NoError(t, errFlow)
+		require.Equal(t, []string{"coordinator"}, flowDag.EntryNodes)
+
+		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{Messages: []state.Message{}}}
 		got := r.resolveNextAgent("coordinator")
 		assert.Equal(t, "builder", got)
+	})
+
+	t.Run("coordinatorSkipsRetrospectiveEdgeForFirstEntry", func(t *testing.T) {
+		flowDag, errFlow := parseFlow("\"worker\" -> \"reviewer\"", t.TempDir())
+		require.NoError(t, errFlow)
+		flowDag.injectRetrospectiveEdge()
+
+		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{Messages: []state.Message{}}}
+		got := r.resolveNextAgent("coordinator")
+		assert.Equal(t, "worker", got)
 	})
 }
 

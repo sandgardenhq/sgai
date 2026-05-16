@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -672,7 +673,7 @@ flow: |
 retrospective: false
 ---
 # Test Goal`,
-			expected: []string{"agent1", "agent2", "coordinator", "project-critic-council"},
+			expected: []string{"agent1", "agent2", "coordinator"},
 		},
 		{
 			name: "multipleAgents",
@@ -684,7 +685,7 @@ flow: |
 retrospective: false
 ---
 # Test Goal`,
-			expected: []string{"agent1", "agent2", "agent3", "agent4", "coordinator", "project-critic-council"},
+			expected: []string{"agent1", "agent2", "agent3", "agent4", "coordinator"},
 		},
 		{
 			name: "branchingFlow",
@@ -697,7 +698,7 @@ flow: |
 retrospective: false
 ---
 # Test Goal`,
-			expected: []string{"agent1", "agent2", "agent3", "agent4", "coordinator", "project-critic-council"},
+			expected: []string{"agent1", "agent2", "agent3", "agent4", "coordinator"},
 		},
 		{
 			name: "withRetrospective",
@@ -707,7 +708,7 @@ flow: |
 retrospective: true
 ---
 # Test Goal`,
-			expected: []string{"agent1", "agent2", "coordinator", "project-critic-council", "retrospective"},
+			expected: []string{"agent1", "agent2", "coordinator", "retrospective"},
 		},
 		{
 			name: "noFlow",
@@ -715,7 +716,7 @@ retrospective: true
 retrospective: false
 ---
 # Test Goal`,
-			expected: []string{"coordinator", "general-purpose", "project-critic-council"},
+			expected: []string{"coordinator", "general-purpose"},
 		},
 		{
 			name: "invalidYAML",
@@ -1952,15 +1953,15 @@ func TestOrderedModelStatuses(t *testing.T) {
 			},
 		},
 		{
-			name: "withGoalModels",
+			name: "withGoalModelsForAnyAgent",
 			modelStatuses: map[string]string{
-				"project-critic-council:model1": "running",
-				"project-critic-council:model2": "done",
+				"builder:model1": "running",
+				"builder:model2": "done",
 			},
 			setupFunc: func(t *testing.T, dir string) {
 				goalContent := `---
 models:
-  project-critic-council:
+  builder:
     - model1
     - model2
 ---
@@ -1969,8 +1970,8 @@ models:
 			},
 			validate: func(t *testing.T, displays []modelStatusDisplay) {
 				assert.Len(t, displays, 2)
-				assert.Equal(t, "project-critic-council:model1", displays[0].ModelID)
-				assert.Equal(t, "project-critic-council:model2", displays[1].ModelID)
+				assert.Equal(t, "builder:model1", displays[0].ModelID)
+				assert.Equal(t, "builder:model2", displays[1].ModelID)
 			},
 		},
 	}
@@ -3176,6 +3177,36 @@ func TestUnpackSkeleton(t *testing.T) {
 	err := unpackSkeleton(dir)
 	assert.NoError(t, err)
 	assert.DirExists(t, filepath.Join(dir, ".sgai"))
+}
+
+func TestUnpackSkeletonInstallsProjectCriticWrapper(t *testing.T) {
+	dir := t.TempDir()
+
+	require.NoError(t, unpackSkeleton(dir))
+
+	agentDir := filepath.Join(dir, ".sgai", "agent")
+	assert.NoFileExists(t, filepath.Join(agentDir, "project-critic-council.md"))
+	assert.FileExists(t, filepath.Join(agentDir, "project-critic.md"))
+	assert.FileExists(t, filepath.Join(agentDir, "project-critic-sibling-evaluator.md"))
+	assert.FileExists(t, filepath.Join(agentDir, "project-critic-minority-report.md"))
+
+	coordinator, errReadCoordinator := os.ReadFile(filepath.Join(agentDir, "coordinator.md"))
+	require.NoError(t, errReadCoordinator)
+	assert.Contains(t, string(coordinator), "ASK-PROJECT-CRITIC")
+	assert.Contains(t, string(coordinator), `toAgent: "project-critic"`)
+	assert.NotContains(t, string(coordinator), "project-critic-council")
+
+	paths := []string{
+		filepath.Join(dir, ".sgai", "skills", "product-design", "goal-md-composer", "REFERENCE.md"),
+		filepath.Join(dir, ".sgai", "skills", "product-design", "brainstorming", "SKILL.md"),
+		filepath.Join(dir, ".sgai", "agent", "stpa-analyst.md"),
+		filepath.Join(dir, ".sgai", "skills", "retrospective", "SKILL.md"),
+	}
+	for _, path := range paths {
+		content, errRead := os.ReadFile(path)
+		require.NoError(t, errRead)
+		assert.False(t, strings.Contains(string(content), "project-critic-council"), "%s still references retired council", path)
+	}
 }
 
 func TestRenderDotToSVGEmpty(t *testing.T) {

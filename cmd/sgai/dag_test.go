@@ -84,6 +84,16 @@ func TestParseFlow(t *testing.T) {
 				assert.Contains(t, d.Nodes, "coordinator")
 				assert.Contains(t, d.Nodes, "agent1")
 				assert.Contains(t, d.Nodes, "agent2")
+				assert.NotContains(t, d.Nodes, "project-critic-council")
+			},
+		},
+		{
+			name:     "explicitProjectCriticCouncilFlow",
+			flowSpec: `"agent1" -> "project-critic-council"`,
+			wantErr:  false,
+			validate: func(t *testing.T, d *dag) {
+				assert.Contains(t, d.Nodes, "coordinator")
+				assert.Contains(t, d.Nodes, "agent1")
 				assert.Contains(t, d.Nodes, "project-critic-council")
 			},
 		},

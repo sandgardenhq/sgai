@@ -52,14 +52,13 @@ var workflowTemplates = []workflowTemplate{
 	{
 		ID:          "research",
 		Name:        "Research & Analysis",
-		Description: "General-purpose agent with critical evaluation council",
+		Description: "General-purpose agent with coordinator-led project critique",
 		Icon:        "🔬",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 			{Name: "general-purpose", Selected: true, Model: defaultAgentModel},
-			{Name: "project-critic-council", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"general-purpose" -> "project-critic-council"`,
+		Flow: `"coordinator" -> "general-purpose"`,
 	},
 	{
 		ID:          "custom",

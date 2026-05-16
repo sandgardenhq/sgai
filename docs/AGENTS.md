@@ -94,18 +94,6 @@ Verifies that TypeScript OpenAI Agents SDK applications are properly configured 
 
 ---
 
-## project-critic-council
-
-A multi-model council that strictly evaluates whether GOAL.md items are truly complete. Multiple models collaborate in a debate-style evaluation, examining checked items against actual evidence (test results, code review, file contents). The council reaches consensus through structured communication, then requests checkbox reverts through the coordinator if work was not genuinely complete. This agent enforces extremely strict standards - "mostly done" or "should work" does not count as complete. It is the last line of defense against incomplete work being marked complete.
-
----
-
-## react
-
-Primary React wrapper agent that coordinates React implementation and review by delegating implementation to react-developer and review to react-reviewer. This agent breaks broad React requests into independent activities, uses multi_tool_use.parallel to dispatch safe independent subagent tasks in parallel, and ensures review feedback is resolved before completion.
-
----
-
 ## retrospective-applier
 
 Reads SUGGESTIONS.md (or IMPROVEMENTS.md) files and applies only the approved suggestions by delegating to appropriate agents. This agent parses approved suggestions, determines whether they are skills or snippets, then delegates creation to the skill-writer or snippet-writer agents respectively. It reports a summary of what was created after processing all approved items. Use this agent to apply retrospective improvements after human review and approval.

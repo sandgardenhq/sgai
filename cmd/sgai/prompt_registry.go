@@ -66,9 +66,9 @@ You are running in Building mode. The brainstorming and work-gate phases are com
 - During the retrospective, the system will re-enable human interaction tools automatically
 `
 
-const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify → ask project-critic-council → run retrospective → complete
-- When delegated work is done, send a message to project-critic-council to verify all GOAL.md checkboxes are genuinely complete
-- After project-critic-council approves, send a message to the retrospective agent to start analysis
+const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify with project-critic → run retrospective → complete
+- When delegated work is done, invoke the project-critic wrapper subagent to verify all GOAL.md checkboxes are genuinely complete
+- After project-critic approves, send a message to the retrospective agent to start analysis
 - IMPORTANT: The retrospective step is MANDATORY. You MUST send a message to the retrospective agent and wait for RETRO_COMPLETE before marking complete
 - Do NOT mark status:complete until the retrospective has finished
 `

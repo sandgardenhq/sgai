@@ -112,8 +112,17 @@ func (r *workflowRunner) resolveNextAgent(currentAgent string) string {
 		return "coordinator"
 	}
 
-	if currentAgent == "coordinator" && len(r.flowDag.EntryNodes) > 0 {
-		return r.flowDag.EntryNodes[0]
+	if currentAgent == "coordinator" {
+		for _, entryNode := range r.flowDag.parsedEntryNodes {
+			if entryNode != "coordinator" {
+				return entryNode
+			}
+		}
+		for _, successor := range r.flowDag.getSuccessors(currentAgent) {
+			if successor != "retrospective" {
+				return successor
+			}
+		}
 	}
 
 	return determineNextAgent(r.flowDag, currentAgent)
@@ -269,8 +278,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		flowDag.injectRetrospectiveEdge()
 	}
 
-	ensureImplicitAgentModel(flowDag, &metadata, "project-critic-council")
-	ensureImplicitAgentModel(flowDag, &metadata, "retrospective")
+	ensureImplicitRetrospectiveModel(flowDag, &metadata)
 
 	if errModels := validateModels(metadata.Models); errModels != nil {
 		log.Fatalln(errModels)

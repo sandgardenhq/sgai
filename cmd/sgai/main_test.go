@@ -38,12 +38,12 @@ func TestExtractModelFromArgs(t *testing.T) {
 	}
 }
 
-func TestEnsureImplicitAgentModel(t *testing.T) {
+func TestEnsureImplicitRetrospectiveModel(t *testing.T) {
 	t.Run("addsModelFromCoordinator", func(t *testing.T) {
 		flowDag := &dag{Nodes: map[string]*dagNode{"retrospective": {}}}
 		metadata := &GoalMetadata{Models: map[string]any{"coordinator": "claude-opus-4"}}
 
-		ensureImplicitAgentModel(flowDag, metadata, "retrospective")
+		ensureImplicitRetrospectiveModel(flowDag, metadata)
 
 		assert.Equal(t, "claude-opus-4", metadata.Models["retrospective"])
 	})
@@ -55,7 +55,7 @@ func TestEnsureImplicitAgentModel(t *testing.T) {
 			"retrospective": "gpt-4",
 		}}
 
-		ensureImplicitAgentModel(flowDag, metadata, "retrospective")
+		ensureImplicitRetrospectiveModel(flowDag, metadata)
 
 		assert.Equal(t, "gpt-4", metadata.Models["retrospective"])
 	})
@@ -64,7 +64,7 @@ func TestEnsureImplicitAgentModel(t *testing.T) {
 		flowDag := &dag{Nodes: map[string]*dagNode{}}
 		metadata := &GoalMetadata{Models: map[string]any{"coordinator": "claude-opus-4"}}
 
-		ensureImplicitAgentModel(flowDag, metadata, "retrospective")
+		ensureImplicitRetrospectiveModel(flowDag, metadata)
 
 		_, exists := metadata.Models["retrospective"]
 		assert.False(t, exists)
@@ -74,7 +74,7 @@ func TestEnsureImplicitAgentModel(t *testing.T) {
 		flowDag := &dag{Nodes: map[string]*dagNode{"retrospective": {}}}
 		metadata := &GoalMetadata{Models: map[string]any{}}
 
-		ensureImplicitAgentModel(flowDag, metadata, "retrospective")
+		ensureImplicitRetrospectiveModel(flowDag, metadata)
 
 		_, exists := metadata.Models["retrospective"]
 		assert.False(t, exists)
@@ -84,10 +84,33 @@ func TestEnsureImplicitAgentModel(t *testing.T) {
 		flowDag := &dag{Nodes: map[string]*dagNode{"retrospective": {}}}
 		metadata := &GoalMetadata{}
 
-		ensureImplicitAgentModel(flowDag, metadata, "retrospective")
+		ensureImplicitRetrospectiveModel(flowDag, metadata)
 
 		assert.NotNil(t, metadata.Models)
 	})
+}
+
+func TestTryReloadGoalMetadataDefaultsRetrospectiveOnly(t *testing.T) {
+	dir := t.TempDir()
+	goalPath := filepath.Join(dir, "GOAL.md")
+	goalContent := `---
+flow: |
+  "coordinator" -> "project-critic-council"
+models:
+  coordinator: claude-opus-4
+---
+# Goal`
+	require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
+	flowDag := &dag{Nodes: map[string]*dagNode{
+		"project-critic-council": {},
+		"retrospective":          {},
+	}}
+
+	metadata, err := tryReloadGoalMetadata(goalPath, GoalMetadata{}, flowDag)
+
+	require.NoError(t, err)
+	assert.Equal(t, "claude-opus-4", metadata.Models["retrospective"])
+	assert.NotContains(t, metadata.Models, "project-critic-council")
 }
 
 func TestAddRetrospectiveRedirectMessage(t *testing.T) {
@@ -686,7 +709,7 @@ func TestValidateModelsPartial(t *testing.T) {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			t.Skip("opencode not found in PATH")
 		}
-		models := map[string]any{"coordinator": []any{"openai/gpt-5.5", "openai/gpt-5.5"}}
+		models := map[string]any{"coordinator": []any{"openai/gpt-5.5", "openai/gpt-5.5-pro"}}
 		err := validateModels(models)
 		assert.NoError(t, err)
 	})
@@ -727,7 +750,7 @@ func TestCopyLayerSubfolder(t *testing.T) {
 	require.NoError(t, os.MkdirAll(subDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(subDir, "file.txt"), []byte("content"), 0o644))
 
-	require.NoError(t, copyLayerSubfolder(srcDir, dstDir, "sub"))
+	require.NoError(t, copyLayerSubfolder(srcDir, dstDir))
 
 	data, errRead := os.ReadFile(filepath.Join(dstDir, "sub", "file.txt"))
 	require.NoError(t, errRead)
@@ -738,7 +761,7 @@ func TestCopyLayerSubfolderNonExistent(t *testing.T) {
 	srcDir := t.TempDir()
 	dstDir := t.TempDir()
 
-	require.NoError(t, copyLayerSubfolder(srcDir, dstDir, "nonexistent"))
+	require.NoError(t, copyLayerSubfolder(srcDir, dstDir))
 	_, err := os.Stat(filepath.Join(dstDir, "nonexistent"))
 	assert.True(t, os.IsNotExist(err))
 }
@@ -872,47 +895,6 @@ func TestIsExistingDirectory(t *testing.T) {
 			testPath := filepath.Join(dir, "test")
 			tt.setupFunc(t, testPath)
 			result := isExistingDirectory(testPath)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestIsProtectedFile(t *testing.T) {
-	tests := []struct {
-		name      string
-		subfolder string
-		relPath   string
-		expected  bool
-	}{
-		{
-			name:      "protectedCoordinator",
-			subfolder: "agent",
-			relPath:   "coordinator.md",
-			expected:  true,
-		},
-		{
-			name:      "nonProtectedAgent",
-			subfolder: "agent",
-			relPath:   "other.md",
-			expected:  false,
-		},
-		{
-			name:      "nonProtectedSubfolder",
-			subfolder: "skills",
-			relPath:   "coordinator.md",
-			expected:  false,
-		},
-		{
-			name:      "emptyPath",
-			subfolder: "agent",
-			relPath:   "",
-			expected:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isProtectedFile(tt.subfolder, tt.relPath)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -2101,12 +2083,12 @@ func TestApplyLayerFolderOverlay(t *testing.T) {
 		assert.Equal(t, "# Skill Content", string(content))
 	})
 
-	t.Run("protectsCoordinatorMD", func(t *testing.T) {
+	t.Run("copiesCoordinatorMD", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		srcAgentDir := filepath.Join(tmpDir, "sgai", "agent")
 		require.NoError(t, os.MkdirAll(srcAgentDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(srcAgentDir, "coordinator.md"), []byte("SHOULD NOT COPY"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(srcAgentDir, "coordinator.md"), []byte("SHOULD COPY COORDINATOR"), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(srcAgentDir, "developer.md"), []byte("SHOULD COPY"), 0644))
 
 		dstAgentDir := filepath.Join(tmpDir, ".sgai", "agent")
@@ -2118,7 +2100,7 @@ func TestApplyLayerFolderOverlay(t *testing.T) {
 
 		content, err := os.ReadFile(filepath.Join(dstAgentDir, "coordinator.md"))
 		require.NoError(t, err)
-		assert.Equal(t, "ORIGINAL", string(content))
+		assert.Equal(t, "SHOULD COPY COORDINATOR", string(content))
 
 		content, err = os.ReadFile(filepath.Join(dstAgentDir, "developer.md"))
 		require.NoError(t, err)
@@ -3979,7 +3961,7 @@ func TestApplyLayerFolderOverlayWithFiles(t *testing.T) {
 	assert.Equal(t, "# My Skill", string(content))
 }
 
-func TestApplyLayerFolderOverlayProtectedCoordinator(t *testing.T) {
+func TestApplyLayerFolderOverlayCopiesCoordinator(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai", "agent"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".sgai", "agent", "coordinator.md"), []byte("# Original"), 0644))
@@ -3990,10 +3972,10 @@ func TestApplyLayerFolderOverlayProtectedCoordinator(t *testing.T) {
 	assert.NoError(t, err)
 	content, errRead := os.ReadFile(filepath.Join(dir, ".sgai", "agent", "coordinator.md"))
 	require.NoError(t, errRead)
-	assert.Equal(t, "# Original", string(content))
+	assert.Equal(t, "# Overlay", string(content))
 }
 
-func TestCopyLayerSubfolderWithProtected(t *testing.T) {
+func TestCopyLayerSubfolderCopiesCoordinator(t *testing.T) {
 	dir := t.TempDir()
 	srcDir := filepath.Join(dir, "src", "agent")
 	dstDir := filepath.Join(dir, "dst", "agent")
@@ -4002,11 +3984,13 @@ func TestCopyLayerSubfolderWithProtected(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "coordinator.md"), []byte("# Override"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "builder.md"), []byte("# Builder"), 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(dstDir, "coordinator.md"), []byte("# Original"), 0644))
-	err := copyLayerSubfolder(srcDir, dstDir, "agent")
+	err := copyLayerSubfolder(srcDir, dstDir)
 	require.NoError(t, err)
-	coordContent, _ := os.ReadFile(filepath.Join(dstDir, "coordinator.md"))
-	assert.Equal(t, "# Original", string(coordContent))
-	builderContent, _ := os.ReadFile(filepath.Join(dstDir, "builder.md"))
+	coordContent, errReadCoordinator := os.ReadFile(filepath.Join(dstDir, "coordinator.md"))
+	require.NoError(t, errReadCoordinator)
+	assert.Equal(t, "# Override", string(coordContent))
+	builderContent, errReadBuilder := os.ReadFile(filepath.Join(dstDir, "builder.md"))
+	require.NoError(t, errReadBuilder)
 	assert.Equal(t, "# Builder", string(builderContent))
 }
 

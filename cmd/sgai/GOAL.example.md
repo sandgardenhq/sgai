@@ -3,7 +3,6 @@ flow: |
   "go"
   "react"
   "general-purpose"
-  "project-critic-council"
   "skill-writer"
   "stpa-analyst"
 alias:
@@ -14,7 +13,6 @@ models:
   "general-purpose": "openai/gpt-5.5"
   "react": "openai/gpt-5.5"
   "stpa-analyst": "openai/gpt-5.5"
-  "project-critic-council": ["openai/gpt-5.5"]
   "skill-writer": "openai/gpt-5.5 (xhigh)"
   # "go-lite": "openai/gpt-5.4-mini"
 ---
