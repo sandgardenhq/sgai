@@ -1016,19 +1016,21 @@ func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAg
 		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(dagAgents, ", ")), nil
 	}
 
+	fromAgent := callerAgent
+	if currentModel := coord.State().CurrentModel; currentModel != "" {
+		fromAgent = currentModel
+	}
+	if messageTargetsSender(fromAgent, toAgent) {
+		return fmt.Sprintf("Error: Agent '%s' cannot send a message to itself.", fromAgent), nil
+	}
+
 	var (
-		fromAgent string
-		result    string
+		result string
 	)
 
 	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
 		if currentState.Messages == nil {
 			currentState.Messages = []state.Message{}
-		}
-
-		fromAgent = callerAgent
-		if currentState.CurrentModel != "" {
-			fromAgent = currentState.CurrentModel
 		}
 
 		message := state.Message{
@@ -1053,6 +1055,24 @@ func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAg
 	}
 
 	return result, nil
+}
+
+func messageTargetsSender(fromAgent, toAgent string) bool {
+	if fromAgent == "" || toAgent == "" {
+		return false
+	}
+	if fromAgent == toAgent {
+		return true
+	}
+	fromBase := extractAgentFromModelID(fromAgent)
+	toBase := extractAgentFromModelID(toAgent)
+	if !strings.Contains(fromAgent, ":") && fromBase == toBase {
+		return true
+	}
+	if !strings.Contains(toAgent, ":") && fromBase == toBase {
+		return true
+	}
+	return false
 }
 
 func checkInbox(coord *state.Coordinator, callerAgent string) (string, error) {

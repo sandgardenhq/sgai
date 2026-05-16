@@ -123,9 +123,12 @@ const flowSectionTailCoordinator = `IMPORTANT: You are the SOLE owner of GOAL.md
 const flowSectionTailNonCoordinator = `IMPORTANT: When you complete a task listed in GOAL.md, you MUST notify the coordinator: sgai_send_message({toAgent: "coordinator", body: "GOAL COMPLETE: [exact checkbox text from GOAL.md]"}). Do NOT attempt to edit GOAL.md yourself - only the coordinator can mark checkboxes.`
 
 const flowSectionCommonTail = `IMPORTANT: use CALL sgai_send_message({ toAgent: "name-of-the-agent", body: "your message here"}) to communicate with other agents
-IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate with other agents
 IMPORTANT: You must to search for known skills with skills({"name":""}) (for all skills), skills({"name":"skill-name"}) (for specific skills) before doing any work and skills({"name":"keywords"}) (for skills by keywords) to get the skill content and use skills when available.
 IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()`
+
+const flowSectionCoordinatorMessagingTail = `IMPORTANT: As coordinator, never call sgai_send_message with toAgent: "coordinator". Record your own status with sgai_update_workflow_state or .sgai/PROJECT_MANAGEMENT.md instead.`
+
+const flowSectionNonCoordinatorMessagingTail = `IMPORTANT: use CALL sgai_send_message({ toAgent: "coordinator", body: "here you write a status update of the progress of your job"}) to communicate status updates to the coordinator.`
 
 const flowSectionBrainstormingMode = "CRITICAL: think hard and ASK ME QUESTIONS BEFORE BUILDING\n"
 

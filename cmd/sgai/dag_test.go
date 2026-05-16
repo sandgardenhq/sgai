@@ -29,6 +29,8 @@ func TestComposeFlowTemplate(t *testing.T) {
 				assert.Contains(t, result, flowSectionGuidelines)
 				assert.Contains(t, result, flowSectionTailCoordinator)
 				assert.Contains(t, result, flowSectionCommonTail)
+				assert.Contains(t, result, flowSectionCoordinatorMessagingTail)
+				assert.NotContains(t, result, flowSectionNonCoordinatorMessagingTail)
 			},
 		},
 		{
@@ -45,6 +47,8 @@ func TestComposeFlowTemplate(t *testing.T) {
 				assert.Contains(t, result, flowSectionGuidelines)
 				assert.Contains(t, result, flowSectionTailNonCoordinator)
 				assert.Contains(t, result, flowSectionCommonTail)
+				assert.NotContains(t, result, flowSectionCoordinatorMessagingTail)
+				assert.Contains(t, result, flowSectionNonCoordinatorMessagingTail)
 			},
 		},
 	}

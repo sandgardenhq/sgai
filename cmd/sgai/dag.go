@@ -60,6 +60,14 @@ func composeFlowTemplate(currentAgent string) string {
 	sb.WriteString(flowSectionCommonTail)
 	sb.WriteString("\n")
 
+	switch currentAgent {
+	case "coordinator":
+		sb.WriteString(flowSectionCoordinatorMessagingTail)
+	default:
+		sb.WriteString(flowSectionNonCoordinatorMessagingTail)
+	}
+	sb.WriteString("\n")
+
 	return sb.String()
 }
 
