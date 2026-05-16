@@ -142,6 +142,10 @@ func TestPrepareAgent(t *testing.T) {
 		wfState: state.Workflow{
 			Status:      state.StatusWorking,
 			VisitCounts: map[string]int{},
+			Todos:       []state.TodoItem{{ID: "agent-1", Content: "stale agent todo", Status: "pending", Priority: "high"}},
+			ProjectTodos: []state.TodoItem{
+				{ID: "project-1", Content: "project todo", Status: "pending", Priority: "medium"},
+			},
 		},
 	}
 
@@ -155,6 +159,7 @@ func TestPrepareAgent(t *testing.T) {
 	assert.Equal(t, "builder", r.wfState.CurrentAgent)
 	assert.Equal(t, 1, r.wfState.VisitCounts["builder"])
 	assert.Empty(t, r.wfState.Todos)
+	assert.Equal(t, []state.TodoItem{{ID: "project-1", Content: "project todo", Status: "pending", Priority: "medium"}}, r.wfState.ProjectTodos)
 }
 
 func TestHandleTrigger(t *testing.T) {
