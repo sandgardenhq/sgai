@@ -3193,7 +3193,8 @@ func TestUnpackSkeletonInstallsProjectCriticWrapper(t *testing.T) {
 	coordinator, errReadCoordinator := os.ReadFile(filepath.Join(agentDir, "coordinator.md"))
 	require.NoError(t, errReadCoordinator)
 	assert.Contains(t, string(coordinator), "ASK-PROJECT-CRITIC")
-	assert.Contains(t, string(coordinator), `toAgent: "project-critic"`)
+	assert.Contains(t, string(coordinator), `subagent_type: "project-critic"`)
+	assert.NotContains(t, string(coordinator), `toAgent: "project-critic"`)
 	assert.NotContains(t, string(coordinator), "project-critic-council")
 
 	paths := []string{

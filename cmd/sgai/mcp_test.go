@@ -867,6 +867,7 @@ func TestSendMessage(t *testing.T) {
 	tests := []struct {
 		name         string
 		callerAgent  string
+		currentModel string
 		toAgent      string
 		body         string
 		wantContains string
@@ -899,6 +900,43 @@ func TestSendMessage(t *testing.T) {
 			body:         "done with review",
 			wantContains: "IMPORTANT: To receive a response",
 		},
+		{
+			name:         "rejectCoordinatorSelfMessage",
+			callerAgent:  "coordinator",
+			toAgent:      "coordinator",
+			body:         "status update",
+			wantContains: "cannot send a message to itself",
+		},
+		{
+			name:         "rejectBaseAgentSelfMessage",
+			callerAgent:  "go",
+			toAgent:      "go",
+			body:         "status update",
+			wantContains: "cannot send a message to itself",
+		},
+		{
+			name:         "rejectModelToBaseAgentSelfMessage",
+			callerAgent:  "go",
+			currentModel: "go:model-a",
+			toAgent:      "go",
+			body:         "status update",
+			wantContains: "cannot send a message to itself",
+		},
+		{
+			name:         "rejectBaseAgentToModelSelfMessage",
+			callerAgent:  "go",
+			toAgent:      "go:model-a",
+			body:         "status update",
+			wantContains: "cannot send a message to itself",
+		},
+		{
+			name:         "allowModelSiblingMessage",
+			callerAgent:  "go",
+			currentModel: "go:model-a",
+			toAgent:      "go:model-b",
+			body:         "sibling note",
+			wantContains: "Message sent successfully",
+		},
 	}
 
 	for _, tt := range tests {
@@ -913,8 +951,9 @@ func TestSendMessage(t *testing.T) {
 			tmpDir := t.TempDir()
 			statePath := filepath.Join(tmpDir, "state.json")
 			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				Status:   state.StatusWorking,
-				Messages: []state.Message{},
+				Status:       state.StatusWorking,
+				Messages:     []state.Message{},
+				CurrentModel: tt.currentModel,
 			})
 			require.NoError(t, err)
 

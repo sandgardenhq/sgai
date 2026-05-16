@@ -289,17 +289,24 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
   A step that looks at the generated code and cleans it up by asking why certain things are there, cross-referencing with GOAL.md, and cleaning up based on good taste. Create the corresponding SKILL.md.
 
 - Step Name: ASK-PROJECT-CRITIC
-  BEFORE you can mark the workflow as complete, you SHOULD send a message to project-critic asking them to verify all GOAL.md checkboxes are genuinely complete. This is VERY STRONGLY ENCOURAGED.
+  BEFORE you can mark the workflow as complete, you SHOULD invoke the project-critic Task subagent asking it to verify all GOAL.md checkboxes are genuinely complete. This is VERY STRONGLY ENCOURAGED.
 
   ```
-  sgai_send_message({
-    toAgent: "project-critic",
-    body: "Please verify all checked items in GOAL.md are genuinely complete before I mark the workflow as finished."
+  task({
+    subagent_type: "project-critic",
+    description: "Verify project completion",
+    prompt: "Please verify all checked items in GOAL.md are genuinely complete before I mark the workflow as finished. Read GOAL.md and .sgai/PROJECT_MANAGEMENT.md, inspect the available evidence, and return a PROJECT CRITIC VERDICT: Pass | Concern | Block with required coordinator actions."
   })
   ```
 
-  Then set status to "agent-done" to let project-critic evaluate.
-  When project-critic responds, review their verdict before proceeding to MARK-COMPLETE.
+  Do NOT send a workflow message to project-critic. Project-critic is a Task subagent, not a workflow message recipient.
+
+  When project-critic returns its verdict, review it before proceeding:
+  - `Pass`: proceed to RUN-RETROSPECTIVE or MARK-COMPLETE as appropriate.
+  - `Concern`: gather the missing evidence yourself if it is read-only, or delegate evidence generation to the right non-coordinator agent.
+  - `Block`: delegate the required fixes to the right non-coordinator agent and do not proceed to MARK-COMPLETE.
+
+  Never echo or forward a project-critic verdict to `coordinator` with `sgai_send_message`. You are the coordinator; record your own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`.
 
 ## IRON LAW: RETRO_QUESTION Relay
 

@@ -118,6 +118,7 @@ In flow mode, navigation between agents is driven by inter-agent messages using 
 - Messages drive the workflow - send a message to an agent to have work routed to them
 - Only coordinator can set `status: "complete"` to end the entire workflow
 - The DAG (flow definition) represents intention and provides predecessor/successor information for context
-- Any agent can message any other agent
+- Agents can message other agents, never themselves
+- The coordinator must never send a message to `coordinator`; it should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
 
 ---
