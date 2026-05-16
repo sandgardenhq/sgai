@@ -101,7 +101,7 @@ function renderEditGoal(workspaceName = "test-workspace") {
 }
 
 function getSaveButton() {
-  const buttons = screen.getAllByRole("button", { name: /Save GOAL\.md|Saving\.\.\.|Saved!/ });
+  const buttons = screen.getAllByRole("button", { name: /Save GOAL\.md|Saving|Saved!/ });
   return buttons[buttons.length - 1];
 }
 
@@ -163,7 +163,7 @@ describe("EditGoal", () => {
       await user.click(getSaveButton());
 
       await waitFor(() => {
-        const savingButtons = screen.queryAllByText("Saving...");
+        const savingButtons = screen.queryAllByText(/Saving/);
         expect(savingButtons.length).toBeGreaterThan(0);
       });
     });
@@ -214,7 +214,7 @@ describe("EditGoal", () => {
       await user.click(getSaveButton());
 
       await waitFor(() => {
-        const savingButtons = screen.queryAllByText("Saving...");
+        const savingButtons = screen.queryAllByText(/Saving/);
         expect(savingButtons.length).toBeGreaterThan(0);
       });
     });

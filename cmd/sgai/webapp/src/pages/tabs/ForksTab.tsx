@@ -43,8 +43,8 @@ interface ForksTabProps {
 function ForksTabSkeleton() {
   return (
     <div className="space-y-2">
-      {Array.from({ length: 3 }, (_, i) => (
-        <Skeleton key={i} className="h-10 w-full rounded" />
+      {["fork-1", "fork-2", "fork-3"].map((key) => (
+        <Skeleton key={key} className="h-10 w-full rounded" />
       ))}
     </div>
   );
@@ -62,7 +62,7 @@ function StatusDot({ running, needsInput }: { running: boolean; needsInput: bool
   }
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full shrink-0 ${colorClass}`}
+      className={`inline-block size-2 rounded-full shrink-0 ${colorClass}`}
       aria-label={label}
       title={label}
     />
@@ -184,8 +184,8 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
               disabled={!hasCommits}
             >
               {isOpen
-                ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                ? <ChevronDown className="size-3.5 text-muted-foreground" />
+                : <ChevronRight className="size-3.5 text-muted-foreground" />
               }
             </button>
           </CollapsibleTrigger>
@@ -208,12 +208,12 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
                   type="button"
                   size="icon"
                   variant={needsInput ? "default" : "ghost"}
-                  className="h-7 w-7"
+                  className="size-7"
                   onClick={handleRespond}
                   disabled={isActionPending || !needsInput}
                   aria-label="Respond"
                 >
-                  <Mail className="h-3.5 w-3.5" />
+                  <Mail className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Respond</TooltipContent>
@@ -225,12 +225,12 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7"
+                  className="size-7"
                   onClick={handleOpenEditor}
                   disabled={isActionPending}
                   aria-label="Open in Editor"
                 >
-                  <SquarePen className="h-3.5 w-3.5" />
+                  <SquarePen className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Open in Editor</TooltipContent>
@@ -242,12 +242,12 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7"
+                  className="size-7"
                   onClick={handleOpenInSgai}
                   disabled={isActionPending}
                   aria-label="Open in sgai"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="size-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Open in sgai</TooltipContent>
@@ -261,11 +261,11 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      className="size-7 text-destructive hover:text-destructive"
                       disabled={isActionPending}
                       aria-label="Delete fork"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </AlertDialogTrigger>
                 </TooltipTrigger>
@@ -441,7 +441,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
               variant="destructive"
               onClick={stopRun}
             >
-              <Square className="mr-2 h-4 w-4" />
+              <Square className="mr-2 size-4" />
               Stop
             </Button>
           ) : (
@@ -449,7 +449,7 @@ function InlineRunBox({ workspaceName }: { workspaceName: string }) {
               type="submit"
               disabled={!selectedModel || !prompt.trim()}
             >
-              Submit
+              Run prompt
             </Button>
           )}
         </div>

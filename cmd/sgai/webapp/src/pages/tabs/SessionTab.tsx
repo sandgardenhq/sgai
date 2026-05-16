@@ -329,7 +329,7 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
               <p className="text-sm text-primary">Steering instruction sent.</p>
             )}
             <Button type="submit" disabled={isSteering || !steerMessage.trim()}>
-              Submit
+              Send steering instruction
             </Button>
           </form>
         </CardContent>
@@ -409,7 +409,7 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
         <details className="group">
           <summary className="cursor-pointer font-semibold text-sm mb-2 flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
+              className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
               aria-hidden="true"
             />
             <span>PROJECT_MANAGEMENT.md</span>

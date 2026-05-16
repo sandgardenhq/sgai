@@ -63,7 +63,7 @@ export function QuestionBlock({
         <div className={choiceSpacingClass}>
           {choices.map((choice, cIndex) => (
             <ChoiceItem
-              key={cIndex}
+              key={`${cIndex}-${choice}`}
               choice={choice}
               multiSelect={multiSelect}
               questionIndex={questionIndex}

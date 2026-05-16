@@ -42,16 +42,12 @@ export function WizardFinish() {
     goToStep,
   } = useComposeWizard({ workspace, currentStep: 4 });
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   // Fetch preview on mount
   useEffect(() => {
-    if (!isLoading) {
+    if (workspace && !isLoading) {
       fetchPreview();
     }
-  }, [isLoading, fetchPreview]);
+  }, [workspace, isLoading, fetchPreview]);
 
   const handleSave = useCallback(async () => {
     const success = await saveGoal();
@@ -63,9 +59,17 @@ export function WizardFinish() {
     }
   }, [saveGoal, navigate, workspace]);
 
-  const selectedTechNames = techStackItems
-    .filter((item) => wizardData.techStack.includes(item.id))
-    .map((item) => item.name);
+  const selectedTechNames: string[] = [];
+  const selectedTechIDs = new Set(wizardData.techStack);
+  for (const item of techStackItems) {
+    if (selectedTechIDs.has(item.id)) {
+      selectedTechNames.push(item.name);
+    }
+  }
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
 
   if (isLoading) {
     return (
@@ -93,10 +97,10 @@ export function WizardFinish() {
       {/* Success notification */}
       {saveSuccess ? (
         <Alert className="mb-4 border-primary/50 bg-primary/5 text-primary">
-          <CheckCircle2 className="h-4 w-4" />
+          <CheckCircle2 className="size-4" />
           <AlertTitle>GOAL.md Saved Successfully!</AlertTitle>
           <AlertDescription>
-            Redirecting to workspace...
+            Redirecting to workspace&hellip;
           </AlertDescription>
         </Alert>
       ) : null}
@@ -104,7 +108,7 @@ export function WizardFinish() {
       {/* Error notification */}
       {saveError ? (
         <Alert className="mb-4 border-destructive/50 text-destructive">
-          <AlertTriangle className="h-4 w-4" />
+          <AlertTriangle className="size-4" />
           <AlertTitle>Save Failed</AlertTitle>
           <AlertDescription>{saveError}</AlertDescription>
         </Alert>
@@ -119,7 +123,7 @@ export function WizardFinish() {
           {/* Description */}
           <Card className="py-3">
             <CardContent className="flex items-start gap-3 px-4 py-0">
-              <FileText className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <FileText className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-muted-foreground mb-1">Project Description</div>
                 {wizardData.description ? (
@@ -136,7 +140,7 @@ export function WizardFinish() {
           {/* Tech Stack / Agents */}
           <Card className="py-3">
             <CardContent className="flex items-start gap-3 px-4 py-0">
-              <Users className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <Users className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-muted-foreground mb-1">Selected Technologies</div>
                 {selectedTechNames.length > 0 ? (
@@ -157,7 +161,7 @@ export function WizardFinish() {
           {/* Safety Analysis */}
           <Card className="py-3">
             <CardContent className="flex items-start gap-3 px-4 py-0">
-              <ShieldCheck className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <ShieldCheck className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-muted-foreground mb-1">Safety Analysis</div>
                 <div className="font-semibold text-sm">
@@ -171,7 +175,7 @@ export function WizardFinish() {
           {wizardData.completionGate ? (
             <Card className="py-3">
               <CardContent className="flex items-start gap-3 px-4 py-0">
-                <Terminal className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <Terminal className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs text-muted-foreground mb-1">Completion Gate</div>
                   <code className="font-semibold text-sm" title={wizardData.completionGate}>
@@ -185,7 +189,7 @@ export function WizardFinish() {
           {/* Draft saved indicator */}
           {draftSavedAt ? (
             <p className="text-xs text-muted-foreground text-center">
-              {isSavingDraft ? "Saving draft..." : `Draft saved at ${draftSavedAt}`}
+              {isSavingDraft ? <>Saving draft&hellip;</> : `Draft saved at ${draftSavedAt}`}
             </p>
           ) : null}
 
@@ -196,7 +200,7 @@ export function WizardFinish() {
               onClick={() => goToStep(1)}
               className="min-w-[120px]"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 size-4" />
               Edit Wizard
             </Button>
             <Button
@@ -206,12 +210,12 @@ export function WizardFinish() {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Saving&hellip;
                 </>
               ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" />
+                  <Save className="mr-2 size-4" />
                   Save GOAL.md
                 </>
               )}

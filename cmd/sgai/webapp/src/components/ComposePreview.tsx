@@ -19,7 +19,7 @@ export function ComposePreview({
     <Card className="sticky top-0 max-h-[calc(100vh-10rem)] overflow-hidden flex flex-col">
       <CardHeader className="border-b py-3 px-4 flex-shrink-0">
         <CardTitle className="text-sm flex items-center gap-2">
-          <FileText className="h-4 w-4" />
+          <FileText className="size-4" />
           {title}
         </CardTitle>
       </CardHeader>
@@ -38,7 +38,7 @@ export function ComposePreview({
             </pre>
             {preview?.flowError ? (
               <Alert className="mt-3 border-destructive/50 text-destructive">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="size-4" />
                 <AlertDescription>{preview.flowError}</AlertDescription>
               </Alert>
             ) : null}

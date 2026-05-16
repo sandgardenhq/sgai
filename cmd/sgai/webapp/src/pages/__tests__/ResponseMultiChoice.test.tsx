@@ -30,6 +30,12 @@ const mockQuestion = {
   ],
 };
 
+const responseStorageKey = "sgai-response-test-workspace:v1";
+
+function getStoredResponse() {
+  return sessionStorage.getItem(responseStorageKey);
+}
+
 const mockWorkspace = {
   name: "test-workspace",
   dir: "/path/to/test-workspace",
@@ -455,14 +461,15 @@ describe("ResponseMultiChoice", () => {
 
       await waitFor(() => {
         expect((otherTextareas[0] as HTMLTextAreaElement).value).toBe("Test response");
-        const stored = JSON.parse(sessionStorage.getItem("sgai-response-test-workspace") || "{}");
+        const storedValue = getStoredResponse() || "{}";
+        const stored = JSON.parse(storedValue);
         expect(stored.otherText).toBe("Test response");
       });
     });
 
     it("clears sessionStorage on successful submit", async () => {
       const user = userEvent.setup();
-      sessionStorage.setItem("sgai-response-test-workspace", JSON.stringify({ selections: {}, otherText: "saved content", questionId: "q-123" }));
+      sessionStorage.setItem(responseStorageKey, JSON.stringify({ selections: {}, otherText: "saved content", questionId: "q-123" }));
 
       renderResponseMultiChoice();
 
@@ -476,7 +483,7 @@ describe("ResponseMultiChoice", () => {
 
       await waitFor(() => {
         expect(mockRespond).toHaveBeenCalled();
-        expect(sessionStorage.getItem("sgai-response-test-workspace")).toBeNull();
+        expect(getStoredResponse()).toBeNull();
       });
     });
   });

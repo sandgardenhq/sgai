@@ -47,7 +47,7 @@ export function NewWorkspace() {
         to="/"
         className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6"
       >
-        <ArrowLeft className="h-3 w-3" />
+        <ArrowLeft className="size-3" />
         Back to Dashboard
       </Link>
 
@@ -70,7 +70,6 @@ export function NewWorkspace() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="my-project"
-            autoFocus
             disabled={isSubmitting}
           />
           <p className="text-xs text-muted-foreground">
@@ -85,12 +84,12 @@ export function NewWorkspace() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating...
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Creating&hellip;
             </>
           ) : (
             <>
-              <FolderPlus className="mr-2 h-4 w-4" />
+              <FolderPlus className="mr-2 size-4" />
               Create Workspace
             </>
           )}

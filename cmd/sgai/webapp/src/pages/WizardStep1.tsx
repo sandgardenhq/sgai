@@ -23,10 +23,6 @@ export function WizardStep1() {
     goBack,
   } = useComposeWizard({ workspace, currentStep: 1 });
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   const handleDescriptionChange = useCallback(
     (value: string | undefined) => {
       setWizardData((prev) => ({ ...prev, description: value ?? "" }));
@@ -36,12 +32,16 @@ export function WizardStep1() {
 
   // Debounced preview update on description change
   useEffect(() => {
-    if (isLoading) return;
+    if (!workspace || isLoading) return;
     const timer = setTimeout(() => {
       fetchPreview();
     }, 500);
     return () => clearTimeout(timer);
-  }, [wizardData.description, isLoading, fetchPreview]);
+  }, [workspace, wizardData.description, isLoading, fetchPreview]);
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
 
   if (isLoading) {
     return (

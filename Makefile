@@ -7,7 +7,11 @@ webapp-build:
 webapp-test:
 	cd cmd/sgai/webapp && bun install && bun test
 
-test: webapp-test webapp-build
+webapp-doctor:
+	cd cmd/sgai/webapp && bun install && npx -y react-doctor@latest . --offline --full --fail-on error
+	cd cmd/sgai/webapp && score=$$(npx -y react-doctor@latest . --offline --full --score | tail -n 1); test "$$score" -ge 100
+
+test: webapp-doctor webapp-test webapp-build
 	go test -v ./...
 	$(MAKE) lint
 

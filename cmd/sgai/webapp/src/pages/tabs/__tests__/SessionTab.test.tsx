@@ -131,7 +131,7 @@ describe("SessionTab", () => {
       renderSessionTab();
 
       await waitFor(() => {
-        expect(screen.getByText("Submit")).toBeTruthy();
+        expect(screen.getByText("Send steering instruction")).toBeTruthy();
       });
     });
 
@@ -139,7 +139,7 @@ describe("SessionTab", () => {
       renderSessionTab();
 
       await waitFor(() => {
-        const submitButton = screen.getByText("Submit");
+        const submitButton = screen.getByText("Send steering instruction");
         expect(submitButton.hasAttribute("disabled")).toBe(true);
       });
     });
@@ -151,7 +151,7 @@ describe("SessionTab", () => {
       fireEvent.change(textarea, { target: { value: "go faster" } });
 
       await waitFor(() => {
-        const submitButton = screen.getByText("Submit");
+        const submitButton = screen.getByText("Send steering instruction");
         expect(submitButton.hasAttribute("disabled")).toBe(false);
       });
     });
@@ -163,7 +163,7 @@ describe("SessionTab", () => {
       const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
       fireEvent.change(textarea, { target: { value: "go faster" } });
 
-      const submitButton = screen.getByText("Submit");
+      const submitButton = screen.getByText("Send steering instruction");
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -178,7 +178,7 @@ describe("SessionTab", () => {
       const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
       fireEvent.change(textarea, { target: { value: "go faster" } });
 
-      const submitButton = screen.getByText("Submit");
+      const submitButton = screen.getByText("Send steering instruction");
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -195,7 +195,7 @@ describe("SessionTab", () => {
       const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
       fireEvent.change(textarea, { target: { value: "go faster" } });
 
-      const submitButton = screen.getByText("Submit");
+      const submitButton = screen.getByText("Send steering instruction");
       await user.click(submitButton);
 
       await waitFor(() => {

@@ -11,8 +11,8 @@ interface LogTabProps {
 function LogTabSkeleton() {
   return (
     <div className="space-y-1">
-      {Array.from({ length: 10 }, (_, i) => (
-        <Skeleton key={i} className="h-5 w-full rounded" />
+      {["log-1", "log-2", "log-3", "log-4", "log-5", "log-6", "log-7", "log-8", "log-9", "log-10"].map((key) => (
+        <Skeleton key={key} className="h-5 w-full rounded" />
       ))}
     </div>
   );
@@ -57,12 +57,17 @@ export function LogTab({ workspaceName }: LogTabProps) {
     return <p className="text-sm italic text-muted-foreground">No logs available</p>;
   }
 
+  const lineOccurrences = new Map<string, number>();
+
   return (
     <ScrollArea ref={scrollRef} className="max-h-[calc(100vh-16rem)] bg-muted/20 rounded-lg p-3 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
       <div id="log-lines">
-        {lines.map((line, index) => (
-          <LogLine key={index} line={line} />
-        ))}
+        {lines.map((line) => {
+          const lineKey = `${line.prefix}:${line.text}`;
+          const occurrence = lineOccurrences.get(lineKey) ?? 0;
+          lineOccurrences.set(lineKey, occurrence + 1);
+          return <LogLine key={`${lineKey}:${occurrence}`} line={line} />;
+        })}
       </div>
     </ScrollArea>
   );

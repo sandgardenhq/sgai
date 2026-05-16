@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useReducer, useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import type { ApiComposePreviewResponse } from "@/types";
 export function ComposePreviewPage() {
   const [searchParams] = useSearchParams();
   const workspace = searchParams.get("workspace") ?? "";
-  const [preview, setPreview] = useState<ApiComposePreviewResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [{ preview, isLoading }, setPreviewState] = useReducer(
+    (_: { preview: ApiComposePreviewResponse | null; isLoading: boolean }, state: { preview: ApiComposePreviewResponse | null; isLoading: boolean }) => state,
+    { preview: null, isLoading: true },
+  );
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -21,18 +23,14 @@ export function ComposePreviewPage() {
     let cancelled = false;
 
     async function loadPreview() {
-      setIsLoading(true);
+      let nextPreview: ApiComposePreviewResponse | null = null;
       try {
-        const resp = await api.compose.preview(workspace);
-        if (!cancelled) {
-          setPreview(resp);
-        }
+        nextPreview = await api.compose.preview(workspace);
       } catch {
         // Silently handle
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+      }
+      if (!cancelled) {
+        setPreviewState({ preview: nextPreview, isLoading: false });
       }
     }
 
@@ -58,18 +56,18 @@ export function ComposePreviewPage() {
           to={`/compose?workspace=${encodeURIComponent(workspace)}`}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="inline h-4 w-4 mr-1" />
+          <ArrowLeft className="inline size-4 mr-1" />
           Back to Composer
         </Link>
         <Button variant="outline" size="sm" onClick={handleCopy} disabled={!preview?.content}>
           {copied ? (
             <>
-              <Check className="h-4 w-4 mr-1" />
+              <Check className="size-4 mr-1" />
               Copied!
             </>
           ) : (
             <>
-              <Copy className="h-4 w-4 mr-1" />
+              <Copy className="size-4 mr-1" />
               Copy
             </>
           )}
@@ -79,7 +77,7 @@ export function ComposePreviewPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+            <FileText className="size-5" />
             GOAL.md Preview
           </CardTitle>
         </CardHeader>
@@ -99,7 +97,7 @@ export function ComposePreviewPage() {
               </pre>
               {preview?.flowError ? (
                 <Alert className="mt-4 border-destructive/50 text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="size-4" />
                   <AlertDescription>{preview.flowError}</AlertDescription>
                 </Alert>
               ) : null}

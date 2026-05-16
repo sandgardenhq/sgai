@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router";
 import {
   Card,
@@ -18,12 +18,12 @@ import type { SnippetsResponse } from "@/types";
 function SnippetListSkeleton() {
   return (
     <div>
-      {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="mb-6">
+      {["language-1", "language-2", "language-3"].map((languageKey) => (
+        <div key={languageKey} className="mb-6">
           <Skeleton className="mb-3 h-6 w-40" />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-            {Array.from({ length: 4 }, (_, j) => (
-              <Card key={j}>
+            {["snippet-1", "snippet-2", "snippet-3", "snippet-4"].map((snippetKey) => (
+              <Card key={`${languageKey}-${snippetKey}`}>
                 <CardHeader>
                   <Skeleton className="h-5 w-32" />
                 </CardHeader>
@@ -43,28 +43,28 @@ export function SnippetList() {
   const { name } = useParams<{ name: string }>();
   const workspaceName = name ?? "";
 
-  const [data, setData] = useState<SnippetsResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [{ data, error, loading, refreshKey }, updateState] = useReducer(
+    (
+      state: { data: SnippetsResponse | null; error: Error | null; loading: boolean; refreshKey: number },
+      update: Partial<{ data: SnippetsResponse | null; error: Error | null; loading: boolean; refreshKey: number }>,
+    ) => ({ ...state, ...update }),
+    { data: null, error: null, loading: true, refreshKey: 0 },
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    updateState({ loading: true, error: null });
 
     api.snippets
       .list(workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setData(response);
-          setLoading(false);
+          updateState({ data: response, loading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          updateState({ error: err instanceof Error ? err : new Error(String(err)), loading: false });
         }
       });
 
@@ -74,8 +74,8 @@ export function SnippetList() {
   }, [workspaceName, refreshKey]);
 
   const handleRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
+    updateState({ refreshKey: refreshKey + 1 });
+  }, [refreshKey]);
 
   return (
     <div>

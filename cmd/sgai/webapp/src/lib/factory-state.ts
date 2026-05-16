@@ -3,7 +3,7 @@ import type { ApiWorkspaceEntry } from "../types";
 
 export type { ApiWorkspaceEntry };
 
-export type FetchStatus = "idle" | "fetching" | "error";
+type FetchStatus = "idle" | "fetching" | "error";
 
 export interface FactoryStateSnapshot {
   workspaces: ApiWorkspaceEntry[];

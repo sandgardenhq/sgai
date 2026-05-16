@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router";
 import {
   Card,
@@ -18,12 +18,12 @@ import type { SkillsResponse } from "@/types";
 function SkillListSkeleton() {
   return (
     <div>
-      {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="mb-6">
+      {["category-1", "category-2", "category-3"].map((categoryKey) => (
+        <div key={categoryKey} className="mb-6">
           <Skeleton className="mb-3 h-6 w-40" />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-            {Array.from({ length: 4 }, (_, j) => (
-              <Card key={j}>
+            {["skill-1", "skill-2", "skill-3", "skill-4"].map((skillKey) => (
+              <Card key={`${categoryKey}-${skillKey}`}>
                 <CardHeader>
                   <Skeleton className="h-5 w-32" />
                 </CardHeader>
@@ -43,28 +43,28 @@ export function SkillList() {
   const { name } = useParams<{ name: string }>();
   const workspaceName = name ?? "";
 
-  const [data, setData] = useState<SkillsResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [{ data, error, loading, refreshKey }, updateState] = useReducer(
+    (
+      state: { data: SkillsResponse | null; error: Error | null; loading: boolean; refreshKey: number },
+      update: Partial<{ data: SkillsResponse | null; error: Error | null; loading: boolean; refreshKey: number }>,
+    ) => ({ ...state, ...update }),
+    { data: null, error: null, loading: true, refreshKey: 0 },
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    updateState({ loading: true, error: null });
 
     api.skills
       .list(workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setData(response);
-          setLoading(false);
+          updateState({ data: response, loading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          updateState({ error: err instanceof Error ? err : new Error(String(err)), loading: false });
         }
       });
 
@@ -74,8 +74,8 @@ export function SkillList() {
   }, [workspaceName, refreshKey]);
 
   const handleRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
+    updateState({ refreshKey: refreshKey + 1 });
+  }, [refreshKey]);
 
   return (
     <div>

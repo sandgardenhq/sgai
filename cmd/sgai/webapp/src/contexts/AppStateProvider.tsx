@@ -1,11 +1,10 @@
 import {
   createContext,
-  useContext,
   useReducer,
   type ReactNode,
 } from "react";
 
-export interface AppState {
+interface AppState {
   selectedWorkspace: string | null;
   ui: {
     panelCollapsed: boolean;
@@ -13,7 +12,7 @@ export interface AppState {
   };
 }
 
-export type AppAction =
+type AppAction =
   | { type: "workspace/select"; workspace: string }
   | { type: "ui/togglePanel" }
   | { type: "ui/setTab"; tab: string };
@@ -75,20 +74,4 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>
   );
-}
-
-export function useAppState(): AppState {
-  const context = useContext(AppStateContext);
-  if (context === undefined) {
-    throw new Error("useAppState must be used within an AppStateProvider");
-  }
-  return context;
-}
-
-export function useAppDispatch(): React.Dispatch<AppAction> {
-  const context = useContext(AppDispatchContext);
-  if (context === undefined) {
-    throw new Error("useAppDispatch must be used within an AppStateProvider");
-  }
-  return context;
 }

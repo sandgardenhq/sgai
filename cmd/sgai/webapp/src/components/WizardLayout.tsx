@@ -33,7 +33,7 @@ export function ProgressDots({ currentStep }: { currentStep: number }) {
           <div
             key={step}
             className={cn(
-              "h-2.5 w-2.5 rounded-full transition-colors",
+              "size-2.5 rounded-full transition-colors",
               isActive && "bg-primary",
               isCompleted && "bg-primary/60",
               !isActive && !isCompleted && "bg-muted-foreground/20",
@@ -79,10 +79,10 @@ export function WizardLayout({
         <div className="flex items-center gap-3">
           {draftSavedAt ? (
             <span className="text-xs text-muted-foreground">
-              {isSavingDraft ? "Saving draft..." : `Draft saved at ${draftSavedAt}`}
+              {isSavingDraft ? <>Saving draft&hellip;</> : `Draft saved at ${draftSavedAt}`}
             </span>
           ) : isSavingDraft ? (
-            <span className="text-xs text-muted-foreground">Saving draft...</span>
+            <span className="text-xs text-muted-foreground">Saving draft&hellip;</span>
           ) : null}
           <ProgressDots currentStep={currentStep} />
         </div>
@@ -99,19 +99,19 @@ export function WizardLayout({
           {/* Navigation */}
           <div className="flex justify-between pt-4 border-t mt-auto">
             <Button variant="outline" onClick={onBack} className="min-w-[120px]">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 size-4" />
               {resolvedBackLabel}
             </Button>
 
             {isFinish ? (
               <Button onClick={onNext} className="min-w-[120px]">
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 size-4" />
                 {resolvedNextLabel}
               </Button>
             ) : (
               <Button onClick={onNext} className="min-w-[120px]">
                 {resolvedNextLabel}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 size-4" />
               </Button>
             )}
           </div>

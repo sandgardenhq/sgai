@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
 import { Link, useParams, useLocation } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -32,27 +32,28 @@ export function SkillDetail() {
     ? location.pathname.slice(prefix.length)
     : "";
 
-  const [skill, setSkill] = useState<Skill | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [{ skill, error, loading }, updateState] = useReducer(
+    (
+      state: { skill: Skill | null; error: Error | null; loading: boolean },
+      update: Partial<{ skill: Skill | null; error: Error | null; loading: boolean }>,
+    ) => ({ ...state, ...update }),
+    { skill: null, error: null, loading: true },
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    updateState({ loading: true, error: null });
 
     api.skills
       .get(fullPath, workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setSkill(response);
-          setLoading(false);
+          updateState({ skill: response, loading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          updateState({ error: err instanceof Error ? err : new Error(String(err)), loading: false });
         }
       });
 
