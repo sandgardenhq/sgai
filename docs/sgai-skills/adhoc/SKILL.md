@@ -17,7 +17,7 @@ curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Review the authentication code and identify any security issues",
-    "model": "anthropic/claude-opus-4-6"
+    "model": "openai/gpt-5.5"
   }'
 ```
 
@@ -25,7 +25,7 @@ Request:
 ```json
 {
   "prompt": "Review the authentication code and identify any security issues",
-  "model": "anthropic/claude-opus-4-6"
+  "model": "openai/gpt-5.5"
 }
 ```
 
@@ -42,7 +42,7 @@ If already running:
 ```json
 {
   "running": true,
-  "output": "$ opencode run -m anthropic/claude-opus-4-6...\nprompt: Review the...",
+  "output": "$ opencode run -m openai/gpt-5.5...\nprompt: Review the...",
   "message": "ad-hoc prompt already running"
 }
 ```
@@ -50,8 +50,8 @@ If already running:
 ### Model Format
 
 The model parameter accepts the same format as GOAL.md models:
-- `"anthropic/claude-opus-4-6"` — standard model
-- `"anthropic/claude-opus-4-6 (max)"` — model with variant
+- `"openai/gpt-5.5"` — standard model
+- `"openai/gpt-5.5 (xhigh)"` — model with variant
 - Use `GET /api/v1/models` to list available models
 
 ### How Ad-hoc Works
@@ -72,7 +72,7 @@ Response (running):
 ```json
 {
   "running": true,
-  "output": "$ opencode run -m anthropic/claude-opus-4-6 --agent build --title \"adhoc [anthropic/claude-opus-4-6]\"\nprompt: Review the authentication code...\n\nAnalyzing the codebase...\n\nFound 3 potential issues:\n1. JWT tokens lack expiration...",
+  "output": "$ opencode run -m openai/gpt-5.5 --agent build --title \"adhoc [openai/gpt-5.5]\"\nprompt: Review the authentication code...\n\nAnalyzing the codebase...\n\nFound 3 potential issues:\n1. JWT tokens lack expiration...",
   "message": "adhoc status"
 }
 ```
@@ -94,19 +94,19 @@ WORKSPACE="my-project"
 # Start the prompt
 curl -X POST $BASE_URL/api/v1/workspaces/$WORKSPACE/adhoc \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Summarize the GOAL.md", "model": "anthropic/claude-sonnet-4-6"}'
+  -d '{"prompt": "Summarize the GOAL.md", "model": "openai/gpt-5.5"}'
 
 # Poll until done
 while true; do
   STATUS=$(curl -s $BASE_URL/api/v1/workspaces/$WORKSPACE/adhoc)
   RUNNING=$(echo $STATUS | jq '.running')
-  
+
   if [ "$RUNNING" = "false" ]; then
     echo "Ad-hoc complete!"
     echo $STATUS | jq -r '.output'
     break
   fi
-  
+
   echo "Still running..."
   sleep 3
 done
@@ -148,17 +148,17 @@ Response:
 ```bash
 # Code review
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Review all Go files for potential race conditions", "model": "anthropic/claude-opus-4-6"}'
+  -d '{"prompt": "Review all Go files for potential race conditions", "model": "openai/gpt-5.5"}'
 
 # Documentation generation
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Generate a README.md for this project", "model": "anthropic/claude-sonnet-4-6"}'
+  -d '{"prompt": "Generate a README.md for this project", "model": "openai/gpt-5.5"}'
 
 # Quick fix
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Fix the failing test in auth_test.go", "model": "anthropic/claude-sonnet-4-6"}'
+  -d '{"prompt": "Fix the failing test in auth_test.go", "model": "openai/gpt-5.5"}'
 
 # Analysis
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "List all TODO comments in the codebase", "model": "anthropic/claude-haiku-4-5"}'
+  -d '{"prompt": "List all TODO comments in the codebase", "model": "openai/gpt-5.4-mini"}'
 ```

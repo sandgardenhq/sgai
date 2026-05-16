@@ -46,7 +46,7 @@ A local AI software factory.
 ```bash
 opencode upgrade
 opencode auth login
-opencode --model anthropic/claude-opus-4-6 run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+opencode --model openai/gpt-5.5 run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
 
 This runs the official installation guide automatically and launches a demo workspace.
@@ -128,7 +128,7 @@ flow: |
 alias:
   "backend-go-developer-lite": "backend-go-developer"
 models:
-  "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
+  "backend-go-developer-lite": "openai/gpt-5.4-mini"
 ---
 ```
 

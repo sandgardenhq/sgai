@@ -667,7 +667,7 @@ func TestValidateModelsPartial(t *testing.T) {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			t.Skip("opencode not found in PATH")
 		}
-		models := map[string]any{"coordinator": "anthropic/claude-opus-4-6"}
+		models := map[string]any{"coordinator": "openai/gpt-5.5"}
 		err := validateModels(models)
 		assert.NoError(t, err)
 	})
@@ -686,7 +686,7 @@ func TestValidateModelsPartial(t *testing.T) {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			t.Skip("opencode not found in PATH")
 		}
-		models := map[string]any{"coordinator": []any{"anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6"}}
+		models := map[string]any{"coordinator": []any{"openai/gpt-5.5", "openai/gpt-5.5"}}
 		err := validateModels(models)
 		assert.NoError(t, err)
 	})
@@ -695,7 +695,7 @@ func TestValidateModelsPartial(t *testing.T) {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			t.Skip("opencode not found in PATH")
 		}
-		models := map[string]any{"coordinator": []any{"anthropic/claude-opus-4-6", "fake-model-abc"}}
+		models := map[string]any{"coordinator": []any{"openai/gpt-5.5", "fake-model-abc"}}
 		err := validateModels(models)
 		assert.Error(t, err)
 	})
@@ -1821,14 +1821,14 @@ func TestParseModelAndVariant(t *testing.T) {
 	}{
 		{
 			name:          "modelWithVariant",
-			modelSpec:     "anthropic/claude-opus-4-6 (max)",
-			expectedModel: "anthropic/claude-opus-4-6",
-			expectedVar:   "max",
+			modelSpec:     "openai/gpt-5.5 (xhigh)",
+			expectedModel: "openai/gpt-5.5",
+			expectedVar:   "xhigh",
 		},
 		{
 			name:          "modelWithoutVariant",
-			modelSpec:     "anthropic/claude-opus-4-6",
-			expectedModel: "anthropic/claude-opus-4-6",
+			modelSpec:     "openai/gpt-5.5",
+			expectedModel: "openai/gpt-5.5",
 			expectedVar:   "",
 		},
 		{
@@ -1839,8 +1839,8 @@ func TestParseModelAndVariant(t *testing.T) {
 		},
 		{
 			name:          "variantOnly",
-			modelSpec:     "(max)",
-			expectedModel: "(max)",
+			modelSpec:     "(xhigh)",
+			expectedModel: "(xhigh)",
 			expectedVar:   "",
 		},
 		{
@@ -2283,7 +2283,7 @@ func TestBuildAgentEnvWithModel(t *testing.T) {
 	}
 	wfState := state.Workflow{}
 
-	env := buildAgentEnv(cfg, wfState, "anthropic/claude-opus-4-6 (max)")
+	env := buildAgentEnv(cfg, wfState, "openai/gpt-5.5 (xhigh)")
 
 	identityValues := make(map[string]string)
 	for _, e := range env {
@@ -2295,7 +2295,7 @@ func TestBuildAgentEnvWithModel(t *testing.T) {
 		}
 	}
 
-	assert.Contains(t, identityValues["SGAI_AGENT_IDENTITY"], "anthropic/claude-opus-4-6")
+	assert.Contains(t, identityValues["SGAI_AGENT_IDENTITY"], "openai/gpt-5.5")
 }
 
 func TestMarkCurrentAgentInSequence(t *testing.T) {
