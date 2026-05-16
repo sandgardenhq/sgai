@@ -31,7 +31,7 @@ import (
 
 const workGateApprovalText = "DEFINITION IS COMPLETE, BUILD MAY BEGIN"
 
-const maxConsecutiveWorkingIterations = 10
+const maxConsecutiveWorkingIterations = 50
 
 var modelVariantPattern = regexp.MustCompile(`^(.+?)\s*\(([^)]+)\)$`)
 
