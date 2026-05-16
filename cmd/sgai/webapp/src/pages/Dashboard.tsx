@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useTransition, type ReactNode, type CSSProperties } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode, type CSSProperties } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -78,12 +78,13 @@ function DeleteWorkspaceDialog({
 }: DeleteWorkspaceDialogProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [isDeleting, startDeleteTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = useCallback(() => {
     setDeleteError(null);
-    startDeleteTransition(async () => {
+    setIsDeleting(true);
+    void (async () => {
       try {
         if (isFork) {
           await api.workspaces.deleteFork(workspaceName, "");
@@ -99,8 +100,10 @@ function DeleteWorkspaceDialog({
         }
       } catch (err) {
         setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
+      } finally {
+        setIsDeleting(false);
       }
-    });
+    })();
   }, [isFork, workspaceName, selectedName, rootName, navigate]);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
