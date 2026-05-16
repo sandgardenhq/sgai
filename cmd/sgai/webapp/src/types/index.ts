@@ -44,7 +44,7 @@ export interface ApiWorkspaceEntry {
   external?: boolean;
 }
 
-export interface ApiAgentSequenceEntry {
+interface ApiAgentSequenceEntry {
   agent: string;
   model: string;
   elapsedTime: string;
@@ -76,13 +76,13 @@ export interface AgentsResponse {
   agents: Agent[];
 }
 
-export interface SkillSummary {
+interface SkillSummary {
   name: string;
   fullPath: string;
   description: string;
 }
 
-export interface SkillCategory {
+interface SkillCategory {
   name: string;
   skills: SkillSummary[];
 }
@@ -99,7 +99,7 @@ export interface Skill {
   rawContent: string;
 }
 
-export interface SnippetSummary {
+interface SnippetSummary {
   name: string;
   fileName: string;
   fullPath: string;
@@ -107,7 +107,7 @@ export interface SnippetSummary {
   language: string;
 }
 
-export interface SnippetLanguage {
+interface SnippetLanguage {
   name: string;
   snippets: SnippetSummary[];
 }
@@ -125,7 +125,7 @@ export interface Snippet {
   content: string;
 }
 
-export interface MultiChoiceQuestion {
+interface MultiChoiceQuestion {
   question: string;
   choices: string[];
   multiSelect: boolean;
@@ -172,7 +172,7 @@ export interface ApiModelsResponse {
   defaultModel?: string;
 }
 
-export interface ApiSessionCost {
+interface ApiSessionCost {
   totalCost: number;
   meteredReportedCost?: number;
   apiEquivalentCost?: number;
@@ -183,7 +183,7 @@ export interface ApiSessionCost {
   bySession?: ApiSessionUsage[];
 }
 
-export interface ApiTokenUsage {
+interface ApiTokenUsage {
   input: number;
   output: number;
   reasoning: number;
@@ -215,7 +215,7 @@ export interface ApiAgentCost {
   steps: ApiStepCost[];
 }
 
-export interface ApiSessionUsage {
+interface ApiSessionUsage {
   sessionId: string;
   parentSessionId?: string;
   agent: string;
@@ -258,7 +258,7 @@ export interface ApiDiffLine {
   class: string;
 }
 
-export interface ApiChangesData {
+interface ApiChangesData {
   description: string;
   diffLines: ApiDiffLine[];
 }

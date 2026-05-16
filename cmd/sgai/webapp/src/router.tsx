@@ -76,8 +76,8 @@ function PageSkeleton() {
     <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-        {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-32 rounded-xl" />
+        {["page-1", "page-2", "page-3", "page-4", "page-5", "page-6"].map((key) => (
+          <Skeleton key={key} className="h-32 rounded-xl" />
         ))}
       </div>
     </div>
@@ -88,8 +88,8 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col md:flex-row gap-0 h-[calc(100vh-4rem)]">
       <aside className="w-full md:w-[280px] border-b md:border-b-0 md:border-r p-2 space-y-2">
-        {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-8 w-full rounded" />
+        {["dashboard-1", "dashboard-2", "dashboard-3", "dashboard-4", "dashboard-5", "dashboard-6"].map((key) => (
+          <Skeleton key={key} className="h-8 w-full rounded" />
         ))}
       </aside>
       <main className="flex-1 pt-4 md:pt-0 md:pl-4">

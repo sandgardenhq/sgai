@@ -125,10 +125,10 @@ function DeleteWorkspaceDialog({
           variant="ghost"
           size="icon"
           onClick={(e) => { e.stopPropagation(); }}
-          className="opacity-0 group-hover/row:opacity-100 focus:opacity-100 h-6 w-6 p-0.5 rounded hover:bg-destructive/20 transition-opacity shrink-0"
+          className="opacity-0 group-hover/row:opacity-100 focus:opacity-100 size-6 p-0.5 rounded hover:bg-destructive/20 transition-opacity shrink-0"
           aria-label={`Delete ${workspaceName}`}
         >
-          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+          <Trash2 className="size-3 text-muted-foreground hover:text-destructive" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -157,8 +157,8 @@ function DeleteWorkspaceDialog({
 function WorkspaceTreeSkeleton() {
   return (
     <div className="space-y-2 p-2">
-      {Array.from({ length: 5 }, (_, i) => (
-        <Skeleton key={i} className="h-8 w-full rounded" />
+      {["workspace-1", "workspace-2", "workspace-3", "workspace-4", "workspace-5"].map((key) => (
+        <Skeleton key={key} className="h-8 w-full rounded" />
       ))}
     </div>
   );
@@ -184,18 +184,18 @@ function WorkspaceIndicators({ workspace }: WorkspaceIndicatorsProps) {
       {workspace.external && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <LinkIcon className="h-3 w-3 text-muted-foreground" aria-label="External workspace" title="External workspace" />
+            <LinkIcon className="size-3 text-muted-foreground" aria-label="External workspace" title="External workspace" />
           </TooltipTrigger>
           <TooltipContent>External workspace</TooltipContent>
         </Tooltip>
       )}
       {isActive && (
-        <Loader2 className="h-3 w-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
+        <Loader2 className="size-3 text-primary animate-spin" aria-label={runningLabel} title={runningLabel} />
       )}
       {workspace.needsInput && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Inbox className="h-3 w-3 text-primary" aria-label="Waiting for response" title="Waiting for response" />
+            <Inbox className="size-3 text-primary" aria-label="Waiting for response" title="Waiting for response" />
           </TooltipTrigger>
           <TooltipContent>Waiting for response</TooltipContent>
         </Tooltip>
@@ -308,7 +308,7 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
             {expanded ? "−" : "+"}
           </Button>
         ) : (
-          <span className="w-5 h-5 inline-block shrink-0 mr-1" />
+          <span className="size-5 inline-block shrink-0 mr-1" />
         )}
         <SidebarMenuButton
           asChild
@@ -458,7 +458,7 @@ function PinnedTreeItem({ workspace, selectedName, workspaceLookup, pinnedForks 
             {expanded ? "−" : "+"}
           </Button>
         ) : (
-          <span className="w-5 h-5 inline-block shrink-0 mr-1" />
+          <span className="size-5 inline-block shrink-0 mr-1" />
         )}
         <SidebarMenuButton
           asChild
@@ -530,7 +530,7 @@ function OrphanPinnedForkItem({ fork, rootName, selectedName, workspaceLookup }:
   return (
     <SidebarMenuItem>
       <div className="flex items-center gap-0 group/row">
-        <span className="w-5 h-5 inline-block shrink-0 mr-1" />
+        <span className="size-5 inline-block shrink-0 mr-1" />
         <SidebarMenuButton
           asChild
           isActive={forkSelected}
@@ -689,6 +689,16 @@ function WorkspaceList({ workspaces, selectedName }: WorkspaceListProps) {
     return deduplicateWorkspacesByName(workspaces);
   }, [workspaces]);
 
+  const rootWorkspaces = useMemo(() => {
+    const roots: ApiWorkspaceSummary[] = [];
+    for (const workspace of deduplicatedWorkspaces) {
+      if (!workspace.isFork) {
+        roots.push(workspace);
+      }
+    }
+    return roots;
+  }, [deduplicatedWorkspaces]);
+
   return (
     <>
       <PinnedSection
@@ -703,8 +713,8 @@ function WorkspaceList({ workspaces, selectedName }: WorkspaceListProps) {
         workspaceLookup={workspaceLookup}
       />
       <SidebarMenu>
-        {deduplicatedWorkspaces.length > 0 ? (
-          deduplicatedWorkspaces.filter((w) => !w.isFork).map((workspace) => (
+        {rootWorkspaces.length > 0 ? (
+          rootWorkspaces.map((workspace) => (
             <WorkspaceTreeItem
               key={workspace.name}
               workspace={workspace}
@@ -798,7 +808,7 @@ function SidebarHeaderIndicators({ workspaces }: SidebarHeaderIndicatorsProps) {
                 : `${needsInputCount} workspaces waiting for response`}
               className="relative inline-flex items-center text-primary bg-transparent border-0 p-0 h-auto w-auto"
             >
-              <Inbox className="h-4 w-4" />
+              <Inbox className="size-4" />
               <Badge
                 variant="destructive"
                 className="absolute -top-2 -right-2.5 h-4 min-w-4 px-1 text-[0.6rem] leading-none flex items-center justify-center rounded-full"
@@ -853,25 +863,32 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
   const navigate = useNavigate();
   const { setOpenMobile } = useSidebar();
 
+  const closeMobileSidebar = useCallback(() => {
+    setOpenMobile(false);
+  }, [setOpenMobile]);
+
   const { workspaces, fetchStatus } = useFactoryState();
   const loading = fetchStatus === "fetching" && workspaces.length === 0;
   const error = fetchStatus === "error" && workspaces.length === 0
     ? new Error("Failed to load workspaces")
     : null;
 
-  useEffect(() => {
-    if (selectedName) {
-      setOpenMobile(false);
+  const handleSidebarNavigation = useCallback((event: React.MouseEvent) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("a")) {
+      closeMobileSidebar();
     }
-  }, [selectedName, setOpenMobile]);
+  }, [closeMobileSidebar]);
 
   const handleNewWorkspace = useCallback(() => {
+    closeMobileSidebar();
     navigate("/workspaces/new");
-  }, [navigate]);
+  }, [closeMobileSidebar, navigate]);
 
   const handleAttachExternal = useCallback(() => {
+    closeMobileSidebar();
     navigate("/workspaces/attach");
-  }, [navigate]);
+  }, [closeMobileSidebar, navigate]);
 
   return (
     <>
@@ -887,7 +904,7 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
           </div>
         </SidebarHeader>
         <Separator />
-        <SidebarContent>
+        <SidebarContent onClickCapture={handleSidebarNavigation}>
           <ScrollArea className="flex-1 px-1 py-2">
             {loading && <WorkspaceTreeSkeleton />}
 
@@ -912,12 +929,12 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="center" className="w-48">
               <DropdownMenuItem onClick={handleNewWorkspace}>
-                <FolderPlus className="mr-2 h-4 w-4" />
+                <FolderPlus className="mr-2 size-4" />
                 New Workspace
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleAttachExternal}>
-                <LinkIcon className="mr-2 h-4 w-4" />
+                <LinkIcon className="mr-2 size-4" />
                 Attach External
               </DropdownMenuItem>
             </DropdownMenuContent>

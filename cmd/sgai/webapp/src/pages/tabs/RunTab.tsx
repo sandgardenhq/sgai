@@ -117,7 +117,7 @@ export function RunTab({ workspaceName, currentModel }: RunTabProps): JSX.Elemen
               variant="destructive"
               onClick={stopRun}
             >
-              <Square className="mr-2 h-4 w-4" />
+              <Square className="mr-2 size-4" />
               Stop
             </Button>
           ) : (
@@ -125,7 +125,7 @@ export function RunTab({ workspaceName, currentModel }: RunTabProps): JSX.Elemen
               type="submit"
               disabled={!selectedModel || !prompt.trim()}
             >
-              Submit
+              Run prompt
             </Button>
           )}
         </div>

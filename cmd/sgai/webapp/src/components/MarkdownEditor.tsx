@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
-import type * as MonacoTypes from "monaco-editor";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Agent, ApiModelEntry } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -42,7 +40,13 @@ interface MarkdownEditorProps {
   fillHeight?: boolean;
 }
 
-type IStandaloneCodeEditor = MonacoTypes.editor.IStandaloneCodeEditor;
+type MonacoTypes = typeof import("monaco-editor");
+type IStandaloneCodeEditor = import("monaco-editor").editor.IStandaloneCodeEditor;
+type MonacoRange = import("monaco-editor").IRange;
+type MonacoCompletionItem = import("monaco-editor").languages.CompletionItem;
+type MonacoDisposable = import("monaco-editor").IDisposable;
+
+const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 interface ToolbarAction {
   icon: React.ReactNode;
@@ -142,52 +146,52 @@ function insertAtCursor(
 
 const TOOLBAR_ACTIONS: ToolbarAction[] = [
   {
-    icon: <Bold className="h-4 w-4" />,
+    icon: <Bold className="size-4" />,
     label: "Bold",
     action: (editor) => wrapSelection(editor, "**", "**"),
   },
   {
-    icon: <Italic className="h-4 w-4" />,
+    icon: <Italic className="size-4" />,
     label: "Italic",
     action: (editor) => wrapSelection(editor, "_", "_"),
   },
   {
-    icon: <Strikethrough className="h-4 w-4" />,
+    icon: <Strikethrough className="size-4" />,
     label: "Strikethrough",
     action: (editor) => wrapSelection(editor, "~~", "~~"),
   },
   {
-    icon: <Heading1 className="h-4 w-4" />,
+    icon: <Heading1 className="size-4" />,
     label: "Heading 1",
     action: (editor) => insertAtLineStart(editor, "# "),
   },
   {
-    icon: <Heading2 className="h-4 w-4" />,
+    icon: <Heading2 className="size-4" />,
     label: "Heading 2",
     action: (editor) => insertAtLineStart(editor, "## "),
   },
   {
-    icon: <Heading3 className="h-4 w-4" />,
+    icon: <Heading3 className="size-4" />,
     label: "Heading 3",
     action: (editor) => insertAtLineStart(editor, "### "),
   },
   {
-    icon: <List className="h-4 w-4" />,
+    icon: <List className="size-4" />,
     label: "Bullet List",
     action: (editor) => insertAtLineStart(editor, "- "),
   },
   {
-    icon: <ListOrdered className="h-4 w-4" />,
+    icon: <ListOrdered className="size-4" />,
     label: "Numbered List",
     action: (editor) => insertAtLineStart(editor, "1. "),
   },
   {
-    icon: <ListChecks className="h-4 w-4" />,
+    icon: <ListChecks className="size-4" />,
     label: "Checkbox List",
     action: (editor) => insertAtLineStart(editor, "- [ ] "),
   },
   {
-    icon: <Code2 className="h-4 w-4" />,
+    icon: <Code2 className="size-4" />,
     label: "Code Block",
     action: (editor) => {
       const selection = editor.getSelection();
@@ -205,28 +209,28 @@ const TOOLBAR_ACTIONS: ToolbarAction[] = [
     },
   },
   {
-    icon: <Quote className="h-4 w-4" />,
+    icon: <Quote className="size-4" />,
     label: "Blockquote",
     action: (editor) => insertAtLineStart(editor, "> "),
   },
   {
-    icon: <Link className="h-4 w-4" />,
+    icon: <Link className="size-4" />,
     label: "Link",
     action: (editor) => insertLink(editor),
   },
   {
-    icon: <Image className="h-4 w-4" />,
+    icon: <Image className="size-4" />,
     label: "Image",
     action: (editor) =>
       insertAtCursor(editor, "![alt text](image-url)"),
   },
   {
-    icon: <Minus className="h-4 w-4" />,
+    icon: <Minus className="size-4" />,
     label: "Horizontal Rule",
     action: (editor) => insertAtCursor(editor, "\n---\n"),
   },
   {
-    icon: <Table className="h-4 w-4" />,
+    icon: <Table className="size-4" />,
     label: "Table",
     action: (editor) =>
       insertAtCursor(
@@ -235,6 +239,130 @@ const TOOLBAR_ACTIONS: ToolbarAction[] = [
       ),
   },
 ];
+
+type EditorMode = "write" | "preview";
+
+function MarkdownEditorModeBar({ mode, onModeChange, modeBarRef }: {
+  mode: EditorMode;
+  onModeChange: (mode: EditorMode) => void;
+  modeBarRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div
+      ref={modeBarRef}
+      className="flex gap-1 p-1 border-b bg-muted/30"
+    >
+      <Button
+        type="button"
+        variant={mode === "write" ? "secondary" : "ghost"}
+        size="sm"
+        className="h-7 px-3 text-xs"
+        onClick={() => onModeChange("write")}
+        aria-pressed={mode === "write"}
+      >
+        <Pencil className="size-3.5 mr-1" />
+        Write
+      </Button>
+      <Button
+        type="button"
+        variant={mode === "preview" ? "secondary" : "ghost"}
+        size="sm"
+        className="h-7 px-3 text-xs"
+        onClick={() => onModeChange("preview")}
+        aria-pressed={mode === "preview"}
+      >
+        <Eye className="size-3.5 mr-1" />
+        Preview
+      </Button>
+    </div>
+  );
+}
+
+function MarkdownEditorToolbar({ disabled, toolbarRef, onAction }: {
+  disabled: boolean;
+  toolbarRef: React.RefObject<HTMLDivElement | null>;
+  onAction: (action: (editor: IStandaloneCodeEditor) => void) => void;
+}) {
+  return (
+    <div ref={toolbarRef} className="flex flex-wrap gap-0.5 p-1 border-b bg-muted/50">
+      {TOOLBAR_ACTIONS.map((item) => (
+        <Tooltip key={item.label}>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              disabled={disabled}
+              onClick={() => onAction(item.action)}
+              aria-label={item.label}
+            >
+              {item.icon}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{item.label}</TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
+  );
+}
+
+function MarkdownEditorPane({ editorHeight, value, onChange, onMount, disabled, workspaceName }: {
+  editorHeight: number;
+  value: string;
+  onChange: (value: string | undefined) => void;
+  onMount: (editor: IStandaloneCodeEditor, monaco: MonacoTypes) => void;
+  disabled: boolean;
+  workspaceName?: string;
+}) {
+  return (
+    <Suspense fallback={<div style={{ height: `${editorHeight}px` }} />}>
+      <MonacoEditor
+        height={`${editorHeight}px`}
+        language="markdown"
+        value={value}
+        onChange={onChange}
+        onMount={onMount}
+        options={{
+          wordWrap: "on",
+          automaticLayout: true,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+          lineNumbers: "off",
+          glyphMargin: false,
+          folding: false,
+          renderLineHighlight: "none",
+          overviewRulerBorder: false,
+          hideCursorInOverviewRuler: true,
+          readOnly: disabled,
+          domReadOnly: disabled,
+          padding: { top: 8, bottom: 8 },
+          quickSuggestions: workspaceName ? { other: true, strings: true } : false,
+          wordBasedSuggestions: "off" as const,
+          suggestOnTriggerCharacters: !!workspaceName,
+          acceptSuggestionOnEnter: workspaceName ? "on" : "off",
+        }}
+      />
+    </Suspense>
+  );
+}
+
+function MarkdownPreviewPane({ editorHeight, value }: { editorHeight: number; value: string }) {
+  return (
+    <ScrollArea
+      style={{ height: `${editorHeight}px` }}
+      className="p-4"
+    >
+      {value ? (
+        <MarkdownContent content={value} />
+      ) : (
+        <p className="text-muted-foreground text-sm italic">
+          Nothing to preview
+        </p>
+      )}
+    </ScrollArea>
+  );
+}
 
 export function MarkdownEditor({
   value,
@@ -247,18 +375,18 @@ export function MarkdownEditor({
   fillHeight = false,
 }: MarkdownEditorProps) {
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof MonacoTypes | null>(null);
+  const monacoRef = useRef<MonacoTypes | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const modeBarRef = useRef<HTMLDivElement>(null);
-  const completionDisposableRef = useRef<MonacoTypes.IDisposable | null>(null);
+  const completionDisposableRef = useRef<MonacoDisposable | null>(null);
   const agentsRef = useRef<Agent[]>([]);
   const modelsRef = useRef<ApiModelEntry[]>([]);
 
   const baseHeight = defaultHeight ?? minHeight;
   const [editorHeight, setEditorHeight] = useState(baseHeight);
   const [mode, setMode] = useState<"write" | "preview">("write");
-  const [monacoReady, setMonacoReady] = useState(false);
+  const [monacoReady, setMonacoReady] = useReducer((_: boolean, value: boolean) => value, false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -299,8 +427,8 @@ export function MarkdownEditor({
     return () => { cancelled = true; };
   }, [workspaceName]);
 
-  const handleMount: OnMount = useCallback(
-    (editor, monaco) => {
+  const handleMount = useCallback(
+    (editor: IStandaloneCodeEditor, monaco: MonacoTypes) => {
       editorRef.current = editor;
       monacoRef.current = monaco;
       setMonacoReady(true);
@@ -423,14 +551,14 @@ export function MarkdownEditor({
         const replaceStart = quoteMatch
           ? position.column - quoteMatch[0].length
           : position.column;
-        const range: MonacoTypes.IRange = {
+        const range: MonacoRange = {
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
           startColumn: replaceStart,
           endColumn: position.column,
         };
 
-        const suggestions: MonacoTypes.languages.CompletionItem[] = [];
+        const suggestions: MonacoCompletionItem[] = [];
 
         if (currentSection === "flow") {
           for (const agent of agentsRef.current) {
@@ -498,97 +626,22 @@ export function MarkdownEditor({
       style={fillHeight ? undefined : { minHeight: `${minHeight}px`, resize: "vertical", overflow: "hidden" }}
       data-testid="markdown-editor"
     >
-      <div
-        ref={modeBarRef}
-        className="flex gap-1 p-1 border-b bg-muted/30"
-      >
-        <Button
-          type="button"
-          variant={mode === "write" ? "secondary" : "ghost"}
-          size="sm"
-          className="h-7 px-3 text-xs"
-          onClick={() => setMode("write")}
-          aria-pressed={mode === "write"}
-        >
-          <Pencil className="h-3.5 w-3.5 mr-1" />
-          Write
-        </Button>
-        <Button
-          type="button"
-          variant={mode === "preview" ? "secondary" : "ghost"}
-          size="sm"
-          className="h-7 px-3 text-xs"
-          onClick={() => setMode("preview")}
-          aria-pressed={mode === "preview"}
-        >
-          <Eye className="h-3.5 w-3.5 mr-1" />
-          Preview
-        </Button>
-      </div>
+      <MarkdownEditorModeBar mode={mode} onModeChange={setMode} modeBarRef={modeBarRef} />
 
       {mode === "write" ? (
         <>
-          <div ref={toolbarRef} className="flex flex-wrap gap-0.5 p-1 border-b bg-muted/50">
-            {TOOLBAR_ACTIONS.map((item) => (
-              <Tooltip key={item.label}>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    disabled={disabled}
-                    onClick={() => handleToolbarAction(item.action)}
-                    aria-label={item.label}
-                  >
-                    {item.icon}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{item.label}</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-
-          <Editor
-            height={`${editorHeight}px`}
-            language="markdown"
+          <MarkdownEditorToolbar disabled={disabled} toolbarRef={toolbarRef} onAction={handleToolbarAction} />
+          <MarkdownEditorPane
+            editorHeight={editorHeight}
             value={value}
             onChange={onChange}
             onMount={handleMount}
-            options={{
-              wordWrap: "on",
-              automaticLayout: true,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              lineNumbers: "off",
-              glyphMargin: false,
-              folding: false,
-              renderLineHighlight: "none",
-              overviewRulerBorder: false,
-              hideCursorInOverviewRuler: true,
-              readOnly: disabled,
-              domReadOnly: disabled,
-              padding: { top: 8, bottom: 8 },
-              quickSuggestions: workspaceName ? { other: true, strings: true } : false,
-              wordBasedSuggestions: "off" as const,
-              suggestOnTriggerCharacters: !!workspaceName,
-              acceptSuggestionOnEnter: workspaceName ? "on" : "off",
-            }}
+            disabled={disabled}
+            workspaceName={workspaceName}
           />
         </>
       ) : (
-        <ScrollArea
-          style={{ height: `${editorHeight}px` }}
-          className="p-4"
-        >
-          {value ? (
-            <MarkdownContent content={value} />
-          ) : (
-            <p className="text-muted-foreground text-sm italic">
-              Nothing to preview
-            </p>
-          )}
-        </ScrollArea>
+        <MarkdownPreviewPane editorHeight={editorHeight} value={value} />
       )}
     </div>
   );

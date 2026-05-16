@@ -1,19 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useReducer, useEffect, useCallback, useRef } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import type { ApiPendingQuestionResponse, ApiWorkspaceEntry } from "@/types";
 
-export interface StoredResponseState {
+interface StoredResponseState {
   selections: Record<string, string[]>;
   otherText: string;
   questionId: string;
 }
 
 function getStorageKey(prefix: string, workspaceName: string): string {
-  return `${prefix}${workspaceName}`;
+  return `${prefix}${workspaceName}:v1`;
 }
 
-export function loadStoredState(prefix: string, workspaceName: string): StoredResponseState | null {
+function loadStoredState(prefix: string, workspaceName: string): StoredResponseState | null {
   try {
     const stored = sessionStorage.getItem(getStorageKey(prefix, workspaceName));
     if (stored) {
@@ -25,7 +25,7 @@ export function loadStoredState(prefix: string, workspaceName: string): StoredRe
   return null;
 }
 
-export function saveStoredState(prefix: string, workspaceName: string, state: StoredResponseState): void {
+function saveStoredState(prefix: string, workspaceName: string, state: StoredResponseState): void {
   try {
     sessionStorage.setItem(getStorageKey(prefix, workspaceName), JSON.stringify(state));
   } catch {
@@ -33,7 +33,7 @@ export function saveStoredState(prefix: string, workspaceName: string, state: St
   }
 }
 
-export function clearStoredState(prefix: string, workspaceName: string): void {
+function clearStoredState(prefix: string, workspaceName: string): void {
   try {
     sessionStorage.removeItem(getStorageKey(prefix, workspaceName));
   } catch {
@@ -70,10 +70,13 @@ export function useResponseForm({
   onQuestionMissing,
   onSubmitSuccess,
 }: UseResponseFormOptions): UseResponseFormReturn {
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [selections, setSelections] = useState<Record<string, string[]>>({});
-  const [otherText, setOtherText] = useState("");
+  const [{ submitting, submitError, selections, otherText }, updateFormState] = useReducer(
+    (
+      state: { submitting: boolean; submitError: string | null; selections: Record<string, string[]>; otherText: string },
+      update: Partial<{ submitting: boolean; submitError: string | null; selections: Record<string, string[]>; otherText: string }>,
+    ) => ({ ...state, ...update }),
+    { submitting: false, submitError: null, selections: {}, otherText: "" },
+  );
   const hasUnsavedChangesRef = useRef(false);
   const previousQuestionIdRef = useRef<string | null>(null);
 
@@ -99,11 +102,9 @@ export function useResponseForm({
       previousQuestionIdRef.current = question.questionId;
       const stored = loadStoredState(storagePrefix, workspaceName);
       if (stored && stored.questionId === question.questionId) {
-        setSelections(stored.selections);
-        setOtherText(stored.otherText);
+        updateFormState({ selections: stored.selections, otherText: stored.otherText });
       } else {
-        setSelections({});
-        setOtherText("");
+        updateFormState({ selections: {}, otherText: "" });
       }
     }
   }, [active, workspaceName, storagePrefix, question, workspace, onQuestionMissing]);
@@ -135,23 +136,26 @@ export function useResponseForm({
     };
   }, [active]);
 
+  const setOtherText = useCallback((text: string) => {
+    updateFormState({ otherText: text });
+  }, []);
+
   const handleChoiceToggle = useCallback(
     (questionIndex: number, choice: string, multiSelect: boolean) => {
-      setSelections((prev) => {
-        const key = String(questionIndex);
-        const current = prev[key] ?? [];
+      const key = String(questionIndex);
+      const current = selections[key] ?? [];
 
-        if (multiSelect) {
-          const updated = current.includes(choice)
-            ? current.filter((c) => c !== choice)
-            : [...current, choice];
-          return { ...prev, [key]: updated };
-        }
+      if (multiSelect) {
+        const updated = current.includes(choice)
+          ? current.filter((c) => c !== choice)
+          : [...current, choice];
+        updateFormState({ selections: { ...selections, [key]: updated } });
+        return;
+      }
 
-        return { ...prev, [key]: [choice] };
-      });
+      updateFormState({ selections: { ...selections, [key]: [choice] } });
     },
-    [],
+    [selections],
   );
 
   const handleSubmit = useCallback(
@@ -160,8 +164,7 @@ export function useResponseForm({
 
       if (!question || submitting) return;
 
-      setSubmitting(true);
-      setSubmitError(null);
+      updateFormState({ submitting: true, submitError: null });
 
       const allSelectedChoices: string[] = [];
       for (const key of Object.keys(selections)) {
@@ -181,14 +184,12 @@ export function useResponseForm({
         onSubmitSuccess?.();
       } catch (err: unknown) {
         if (err instanceof ApiError && err.status === 409) {
-          setSubmitError("This question has expired. The agent may have moved on.");
+          updateFormState({ submitError: "This question has expired. The agent may have moved on." });
         } else {
-          setSubmitError(
-            err instanceof Error ? err.message : "Failed to submit response",
-          );
+          updateFormState({ submitError: err instanceof Error ? err.message : "Failed to submit response" });
         }
       } finally {
-        setSubmitting(false);
+        updateFormState({ submitting: false });
       }
     },
     [question, submitting, selections, otherText, workspaceName, storagePrefix, onSubmitSuccess],

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useEffectEvent, useRef, useCallback } from "react";
 
 const STORAGE_KEY = "sidebar-width";
 const MIN_WIDTH = 192;
@@ -23,6 +23,17 @@ function readStoredWidth(): number {
   return DEFAULT_WIDTH;
 }
 
+function setBodyResizeStyle(enabled: boolean): void {
+  const style = document.body.style;
+  if (enabled) {
+    style.cssText = `${style.cssText}; cursor: col-resize; user-select: none;`;
+    return;
+  }
+  style.cssText = style.cssText
+    .replace(/(?:^|;)\s*cursor\s*:[^;]*/g, "")
+    .replace(/(?:^|;)\s*user-select\s*:[^;]*/g, "");
+}
+
 export interface SidebarResizeResult {
   sidebarWidth: number;
   handleMouseDown: (e: React.MouseEvent) => void;
@@ -34,18 +45,17 @@ export function useSidebarResize(): SidebarResizeResult {
   const startX = useRef(0);
   const startWidth = useRef(0);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const moveSidebarResize = useEffectEvent((e: MouseEvent) => {
     if (!isDragging.current) return;
     const delta = e.clientX - startX.current;
     const newWidth = clampWidth(startWidth.current + delta);
     setSidebarWidth(newWidth);
-  }, []);
+  });
 
-  const handleMouseUp = useCallback(() => {
+  const stopSidebarResize = useEffectEvent(() => {
     if (!isDragging.current) return;
     isDragging.current = false;
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
+    setBodyResizeStyle(false);
     setSidebarWidth((w) => {
       try {
         localStorage.setItem(STORAGE_KEY, String(w));
@@ -53,24 +63,25 @@ export function useSidebarResize(): SidebarResizeResult {
       }
       return w;
     });
-  }, []);
+  });
 
   useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => moveSidebarResize(event);
+    const handleMouseUp = () => stopSidebarResize();
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
     startX.current = e.clientX;
     startWidth.current = sidebarWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
+    setBodyResizeStyle(true);
   }, [sidebarWidth]);
 
   return { sidebarWidth, handleMouseDown };

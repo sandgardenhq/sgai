@@ -22,4 +22,3 @@ function ScrollArea({
 }
 
 export { ScrollArea }
-export type { ScrollAreaProps }

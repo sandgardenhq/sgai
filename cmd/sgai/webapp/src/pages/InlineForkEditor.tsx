@@ -102,12 +102,12 @@ export function InlineForkEditor({ workspaceName }: InlineForkEditorProps) {
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating Fork...
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Creating Fork&hellip;
             </>
           ) : (
             <>
-              <GitFork className="mr-2 h-4 w-4" />
+              <GitFork className="mr-2 size-4" />
               Create Fork
             </>
           )}

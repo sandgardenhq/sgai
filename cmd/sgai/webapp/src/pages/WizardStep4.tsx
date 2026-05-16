@@ -23,10 +23,6 @@ export function WizardStep4() {
     goToFinish,
   } = useComposeWizard({ workspace, currentStep: 4 });
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   const handleCompletionGateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setWizardData((prev) => ({ ...prev, completionGate: e.target.value }));
@@ -36,12 +32,16 @@ export function WizardStep4() {
 
   // Update preview when settings change
   useEffect(() => {
-    if (isLoading) return;
+    if (!workspace || isLoading) return;
     const timer = setTimeout(() => {
       fetchPreview();
     }, 500);
     return () => clearTimeout(timer);
-  }, [wizardData.completionGate, isLoading, fetchPreview]);
+  }, [workspace, wizardData.completionGate, isLoading, fetchPreview]);
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
 
   if (isLoading) {
     return (

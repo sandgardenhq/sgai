@@ -60,13 +60,6 @@ describe("factory-state store", () => {
     });
   });
 
-  describe("FetchStatus type", () => {
-    it("exports FetchStatus type (verified by TypeScript compilation)", () => {
-      const status: import("@/lib/factory-state").FetchStatus = "idle";
-      expect(status).toBe("idle");
-    });
-  });
-
   describe("FactoryStateSnapshot type", () => {
     it("has correct shape", () => {
       const snapshot: import("@/lib/factory-state").FactoryStateSnapshot = {

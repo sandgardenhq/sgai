@@ -16,8 +16,8 @@ interface MessagesTabProps {
 function MessagesTabSkeleton() {
   return (
     <div className="space-y-3">
-      {Array.from({ length: 5 }, (_, i) => (
-        <Skeleton key={i} className="h-12 w-full rounded" />
+      {["message-1", "message-2", "message-3", "message-4", "message-5"].map((key) => (
+        <Skeleton key={key} className="h-12 w-full rounded" />
       ))}
     </div>
   );
@@ -56,7 +56,7 @@ function MessageItem({ message, workspaceName, onDelete, isDeleting }: MessageIt
           type="button"
           variant="ghost"
           size="icon"
-          className="ml-auto h-6 w-6 shrink-0"
+          className="ml-auto size-6 shrink-0"
           disabled={isDeleting}
           onClick={(e) => {
             e.preventDefault();
@@ -65,7 +65,7 @@ function MessageItem({ message, workspaceName, onDelete, isDeleting }: MessageIt
           }}
           aria-label={`Delete message from ${message.fromAgent}`}
         >
-          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+          <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />
         </Button>
       </summary>
       {message.body && (

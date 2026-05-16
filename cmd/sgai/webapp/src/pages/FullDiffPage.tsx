@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
 import { useParams } from "react-router";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -38,28 +38,37 @@ function parseDiff(rawDiff: string): ParsedDiffLine[] {
 
 type LoadState = "loading" | "loaded" | "error";
 
+interface DiffPageState {
+  diffLines: ParsedDiffLine[];
+  loadState: LoadState;
+}
+
 export function FullDiffPage() {
   const { name: workspaceName } = useParams<{ name: string }>();
-  const [diffLines, setDiffLines] = useState<ParsedDiffLine[]>([]);
-  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [{ diffLines, loadState }, setDiffState] = useReducer(
+    (_: DiffPageState, state: DiffPageState) => state,
+    { diffLines: [], loadState: "loading" as LoadState },
+  );
 
   useEffect(() => {
     if (!workspaceName) return;
 
     let cancelled = false;
 
-    api.workspaces.getDiff(workspaceName)
-      .then((data) => {
-        if (!cancelled) {
-          setDiffLines(parseDiff(data.diff ?? ""));
-          setLoadState("loaded");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoadState("error");
-        }
-      });
+    async function loadDiff() {
+      let nextState: DiffPageState;
+      try {
+        const data = await api.workspaces.getDiff(workspaceName);
+        nextState = { diffLines: parseDiff(data.diff ?? ""), loadState: "loaded" };
+      } catch {
+        nextState = { diffLines: [], loadState: "error" };
+      }
+      if (!cancelled) {
+        setDiffState(nextState);
+      }
+    }
+
+    loadDiff();
 
     return () => {
       cancelled = true;

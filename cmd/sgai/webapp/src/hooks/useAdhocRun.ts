@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { ApiModelsResponse } from "@/types";
 
@@ -6,7 +6,7 @@ const MAX_HISTORY_ENTRIES = 20;
 const POLL_INTERVAL_MS = 2000;
 
 function storageKey(workspaceName: string, suffix: string): string {
-  return `adhoc-${suffix}-${workspaceName}`;
+  return `adhoc-${suffix}-${workspaceName}:v1`;
 }
 
 function readLocalStorage<T>(key: string, fallback: T): T {
@@ -60,9 +60,13 @@ export function useAdhocRun({
   currentModel,
   skipModelsFetch = false,
 }: UseAdhocRunOptions): UseAdhocRunResult {
-  const [models, setModels] = useState<ApiModelsResponse | null>(null);
-  const [modelsLoading, setModelsLoading] = useState(!skipModelsFetch);
-  const [modelsError, setModelsError] = useState<Error | null>(null);
+  const [{ models, modelsLoading, modelsError }, updateModelsState] = useReducer(
+    (
+      state: { models: ApiModelsResponse | null; modelsLoading: boolean; modelsError: Error | null },
+      update: Partial<{ models: ApiModelsResponse | null; modelsLoading: boolean; modelsError: Error | null }>,
+    ) => ({ ...state, ...update }),
+    { models: null, modelsLoading: !skipModelsFetch, modelsError: null },
+  );
 
   const [selectedModel, setSelectedModelState] = useState(() =>
     readLocalStorage(storageKey(workspaceName, "model"), ""),
@@ -70,9 +74,13 @@ export function useAdhocRun({
   const [prompt, setPromptState] = useState(() =>
     readLocalStorage(storageKey(workspaceName, "prompt"), ""),
   );
-  const [output, setOutput] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
-  const [runError, setRunError] = useState<string | null>(null);
+  const [{ output, isRunning, runError }, updateRunState] = useReducer(
+    (
+      state: { output: string; isRunning: boolean; runError: string | null },
+      update: Partial<{ output: string; isRunning: boolean; runError: string | null }>,
+    ) => ({ ...state, ...update }),
+    { output: "", isRunning: false, runError: null },
+  );
   const [promptHistory, setPromptHistory] = useState<string[]>(() =>
     readLocalStorage<string[]>(storageKey(workspaceName, "history"), []),
   );
@@ -143,9 +151,7 @@ export function useAdhocRun({
   // reset running state when workspace changes
   useEffect(() => {
     stopPolling();
-    setIsRunning(false);
-    setOutput("");
-    setRunError(null);
+    updateRunState({ isRunning: false, output: "", runError: null });
   }, [workspaceName, stopPolling]);
 
   // auto-scroll output
@@ -161,22 +167,18 @@ export function useAdhocRun({
     if (skipModelsFetch || !workspaceName) return;
 
     let cancelled = false;
-    setModels(null);
-    setModelsLoading(true);
-    setModelsError(null);
+    updateModelsState({ models: null, modelsLoading: true, modelsError: null });
 
     api.models
       .list(workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setModels(response);
-          setModelsLoading(false);
+          updateModelsState({ models: response, modelsLoading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setModelsError(err instanceof Error ? err : new Error(String(err)));
-          setModelsLoading(false);
+          updateModelsState({ modelsError: err instanceof Error ? err : new Error(String(err)), modelsLoading: false });
         }
       });
 
@@ -200,11 +202,11 @@ export function useAdhocRun({
       try {
         const poll = await api.workspaces.adhocStatus(workspaceName);
         if (!mountedRef.current) return;
-        if (poll.output) setOutput(poll.output);
-        if (!poll.running) { stopPolling(); setIsRunning(false); }
+        if (poll.output) updateRunState({ output: poll.output });
+        if (!poll.running) { stopPolling(); updateRunState({ isRunning: false }); }
       } catch {
         stopPolling();
-        setIsRunning(false);
+        updateRunState({ isRunning: false });
       }
     }, POLL_INTERVAL_MS);
   }, [workspaceName, stopPolling]);
@@ -214,8 +216,8 @@ export function useAdhocRun({
     let cancelled = false;
     api.workspaces.adhocStatus(workspaceName).then((status) => {
       if (cancelled) return;
-      if (status.output) setOutput(status.output);
-      if (status.running) { setIsRunning(true); startStatusPolling(); }
+      if (status.output) updateRunState({ output: status.output });
+      if (status.running) { updateRunState({ isRunning: true }); startStatusPolling(); }
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [workspaceName, startStatusPolling]);
@@ -227,23 +229,21 @@ export function useAdhocRun({
       if (!workspaceName || isRunning || !trimmedPrompt || !trimmedModel) return;
 
       stopPolling();
-      setIsRunning(true);
-      setRunError(null);
-      setOutput("");
+      updateRunState({ isRunning: true, runError: null, output: "" });
       addToHistory(trimmedPrompt);
 
       try {
         const result = await api.workspaces.adhoc(workspaceName, trimmedPrompt, trimmedModel);
-        if (result.output) setOutput(result.output);
-        if (!result.running) { setIsRunning(false); return; }
+        if (result.output) updateRunState({ output: result.output });
+        if (!result.running) { updateRunState({ isRunning: false }); return; }
         startStatusPolling();
       } catch (err) {
         if (err instanceof ApiError) {
-          setRunError(err.message);
+          updateRunState({ runError: err.message });
         } else {
-          setRunError("Failed to execute ad-hoc prompt");
+          updateRunState({ runError: "Failed to execute ad-hoc prompt" });
         }
-        setIsRunning(false);
+        updateRunState({ isRunning: false });
       }
     },
     [workspaceName, isRunning, prompt, selectedModel, stopPolling, addToHistory, startStatusPolling],
@@ -255,16 +255,15 @@ export function useAdhocRun({
     try {
       await api.workspaces.adhocStop(workspaceName);
       stopPolling();
-      setIsRunning(false);
-      setOutput((prev) => (prev ? prev + "\n\nStopped." : "Stopped."));
+      updateRunState({ isRunning: false, output: output ? output + "\n\nStopped." : "Stopped." });
     } catch (err) {
       if (err instanceof ApiError) {
-        setRunError(err.message);
+        updateRunState({ runError: err.message });
       } else {
-        setRunError("Failed to stop ad-hoc prompt");
+        updateRunState({ runError: "Failed to stop ad-hoc prompt" });
       }
     }
-  }, [workspaceName, isRunning, stopPolling]);
+  }, [workspaceName, isRunning, stopPolling, output]);
 
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {

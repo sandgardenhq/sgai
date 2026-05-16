@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useReducer, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,44 +15,64 @@ const DEBOUNCE_MS = 300;
 
 export function AttachExternal() {
   const navigate = useNavigate();
-  const [path, setPath] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<ApiBrowseDirectoryEntry[]>([]);
-  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [{ path, isSubmitting, error, suggestions, isFetchingSuggestions, showSuggestions, activeIndex }, updateState] = useReducer(
+    (
+      state: {
+        path: string;
+        isSubmitting: boolean;
+        error: string | null;
+        suggestions: ApiBrowseDirectoryEntry[];
+        isFetchingSuggestions: boolean;
+        showSuggestions: boolean;
+        activeIndex: number;
+      },
+      update: Partial<{
+        path: string;
+        isSubmitting: boolean;
+        error: string | null;
+        suggestions: ApiBrowseDirectoryEntry[];
+        isFetchingSuggestions: boolean;
+        showSuggestions: boolean;
+        activeIndex: number;
+      }>,
+    ) => ({ ...state, ...update }),
+    {
+      path: "",
+      isSubmitting: false,
+      error: null,
+      suggestions: [],
+      isFetchingSuggestions: false,
+      showSuggestions: false,
+      activeIndex: -1,
+    },
+  );
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  const fetchSuggestions = useCallback(async (currentPath: string) => {
+  const fetchDirectorySuggestions = useEffectEvent(async (currentPath: string) => {
     if (!currentPath.trim()) {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      updateState({ suggestions: [], showSuggestions: false });
       return;
     }
-    setIsFetchingSuggestions(true);
+    updateState({ isFetchingSuggestions: true });
     try {
       const result = await api.browse.directories(currentPath);
-      setSuggestions(result.entries ?? []);
-      setShowSuggestions((result.entries ?? []).length > 0);
-      setActiveIndex(-1);
+      const entries = result.entries ?? [];
+      updateState({ suggestions: entries, showSuggestions: entries.length > 0, activeIndex: -1 });
     } catch {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setActiveIndex(-1);
+      updateState({ suggestions: [], showSuggestions: false, activeIndex: -1 });
     } finally {
-      setIsFetchingSuggestions(false);
+      updateState({ isFetchingSuggestions: false });
     }
-  }, []);
+  });
 
   useEffect(() => {
     if (debounceTimerRef.current !== null) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      void fetchSuggestions(path);
+      void fetchDirectorySuggestions(path);
     }, DEBOUNCE_MS);
 
     return () => {
@@ -60,13 +80,10 @@ export function AttachExternal() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [path, fetchSuggestions]);
+  }, [path]);
 
   const handleSelectSuggestion = useCallback((entry: ApiBrowseDirectoryEntry) => {
-    setPath(entry.path);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    setActiveIndex(-1);
+    updateState({ path: entry.path, suggestions: [], showSuggestions: false, activeIndex: -1 });
     inputRef.current?.focus();
   }, []);
 
@@ -76,16 +93,15 @@ export function AttachExternal() {
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+        updateState({ activeIndex: activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0 });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+        updateState({ activeIndex: activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1 });
       } else if (e.key === "Enter" && activeIndex >= 0) {
         e.preventDefault();
         handleSelectSuggestion(suggestions[activeIndex]);
       } else if (e.key === "Escape") {
-        setShowSuggestions(false);
-        setActiveIndex(-1);
+        updateState({ showSuggestions: false, activeIndex: -1 });
       }
     },
     [showSuggestions, suggestions, activeIndex, handleSelectSuggestion],
@@ -97,10 +113,7 @@ export function AttachExternal() {
       const trimmed = path.trim();
       if (!trimmed || isSubmitting) return;
 
-      setIsSubmitting(true);
-      setError(null);
-      setSuggestions([]);
-      setShowSuggestions(false);
+      updateState({ isSubmitting: true, error: null, suggestions: [], showSuggestions: false });
 
       try {
         const result = await api.workspaces.attach(trimmed);
@@ -112,27 +125,27 @@ export function AttachExternal() {
         }
       } catch (err) {
         if (err instanceof ApiError) {
-          setError(err.message);
+          updateState({ error: err.message });
         } else {
-          setError("Failed to attach workspace");
+          updateState({ error: "Failed to attach workspace" });
         }
       } finally {
-        setIsSubmitting(false);
+        updateState({ isSubmitting: false });
       }
     },
     [path, isSubmitting, navigate],
   );
 
-  const handleBlur = useCallback((e: React.FocusEvent) => {
+  const hideSuggestionsAfterFocusLeaves = useCallback((e: React.FocusEvent) => {
     if (suggestionsRef.current?.contains(e.relatedTarget as Node)) {
       return;
     }
-    setShowSuggestions(false);
+    updateState({ showSuggestions: false });
   }, []);
 
-  const handleFocus = useCallback(() => {
+  const revealSuggestionsIfAvailable = useCallback(() => {
     if (suggestions.length > 0) {
-      setShowSuggestions(true);
+      updateState({ showSuggestions: true });
     }
   }, [suggestions.length]);
 
@@ -142,7 +155,7 @@ export function AttachExternal() {
         to="/"
         className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6"
       >
-        <ArrowLeft className="h-3 w-3" />
+        <ArrowLeft className="size-3" />
         Back to Dashboard
       </Link>
 
@@ -165,12 +178,11 @@ export function AttachExternal() {
               id="workspace-path"
               ref={inputRef}
               value={path}
-              onChange={(e) => setPath(e.target.value)}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
+              onChange={(e) => updateState({ path: e.target.value })}
+              onFocus={revealSuggestionsIfAvailable}
+              onBlur={hideSuggestionsAfterFocusLeaves}
               onKeyDown={handleKeyDown}
               placeholder="/home/user/my-project"
-              autoFocus
               disabled={isSubmitting}
               autoComplete="off"
               role="combobox"
@@ -181,7 +193,7 @@ export function AttachExternal() {
             />
             {isFetchingSuggestions && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                <Loader2 className="size-3 animate-spin text-muted-foreground" />
               </div>
             )}
             {showSuggestions && suggestions.length > 0 && (
@@ -227,12 +239,12 @@ export function AttachExternal() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Attaching...
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Attaching&hellip;
             </>
           ) : (
             <>
-              <FolderInput className="mr-2 h-4 w-4" />
+              <FolderInput className="mr-2 size-4" />
               Attach Workspace
             </>
           )}

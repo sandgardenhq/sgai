@@ -24,10 +24,6 @@ export function WizardStep3() {
     goToStep,
   } = useComposeWizard({ workspace, currentStep: 3 });
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   const handleToggleSafety = useCallback(
     (checked: boolean) => {
       setWizardData((prev) => ({ ...prev, safetyAnalysis: checked }));
@@ -37,12 +33,16 @@ export function WizardStep3() {
 
   // Update preview when safety analysis changes
   useEffect(() => {
-    if (isLoading) return;
+    if (!workspace || isLoading) return;
     const timer = setTimeout(() => {
       fetchPreview();
     }, 300);
     return () => clearTimeout(timer);
-  }, [wizardData.safetyAnalysis, isLoading, fetchPreview]);
+  }, [workspace, wizardData.safetyAnalysis, isLoading, fetchPreview]);
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
 
   if (isLoading) {
     return (
@@ -89,7 +89,7 @@ export function WizardStep3() {
           <Card className="bg-primary/5 border-primary/20 py-4">
             <CardContent className="px-4 py-0">
               <div className="flex items-start gap-3">
-                <ShieldCheck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <ShieldCheck className="size-5 text-primary mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-sm mb-2">What STPA provides:</p>
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">

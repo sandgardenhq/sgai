@@ -63,8 +63,10 @@ This is a test goal for the workspace.
     const pinnedSection = page.locator('[role="region"][aria-label="Pinned"]');
     const inProgressSection = page.locator('[role="region"][aria-label="In progress"]');
 
-    const hasPinned = await pinnedSection.isVisible().catch(() => false);
-    const hasInProgress = await inProgressSection.isVisible().catch(() => false);
+    const [hasPinned, hasInProgress] = await Promise.all([
+      pinnedSection.isVisible().catch(() => false),
+      inProgressSection.isVisible().catch(() => false),
+    ]);
 
     expect(hasPinned || hasInProgress).toBe(true);
   });

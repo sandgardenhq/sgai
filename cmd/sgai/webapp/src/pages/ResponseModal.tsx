@@ -77,7 +77,7 @@ export function ResponseModal({
                 Agent: {question.agentName}
               </Badge>
             ) : (
-              <span>Loading agent question...</span>
+              <span>Loading agent question&hellip;</span>
             )}
           </DialogDescription>
         </DialogHeader>
@@ -101,20 +101,23 @@ export function ResponseModal({
             <ScrollArea className="flex-1 pr-2">
               {question.questions && question.questions.length > 0 ? (
                 <div className="space-y-4">
-                  {question.questions.map((q, qIndex) => (
-                    <QuestionBlock
-                      key={qIndex}
-                      question={q.question}
-                      choices={q.choices}
-                      multiSelect={q.multiSelect}
-                      questionIndex={qIndex}
-                      totalQuestions={question.questions?.length ?? 0}
-                      selectedChoices={selections[String(qIndex)] ?? []}
-                      onChoiceToggle={handleChoiceToggle}
-                      compact
-                      idPrefix="modal-"
-                    />
-                  ))}
+                  {question.questions.map((q, qIndex) => {
+                    const questionKey = `${qIndex}-${question.questionId}-${q.question}-${q.choices.join("|")}-${q.multiSelect ? "multi" : "single"}`;
+                    return (
+                      <QuestionBlock
+                        key={questionKey}
+                        question={q.question}
+                        choices={q.choices}
+                        multiSelect={q.multiSelect}
+                        questionIndex={qIndex}
+                        totalQuestions={question.questions?.length ?? 0}
+                        selectedChoices={selections[String(qIndex)] ?? []}
+                        onChoiceToggle={handleChoiceToggle}
+                        compact
+                        idPrefix="modal-"
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 question.message && (
@@ -160,7 +163,7 @@ export function ResponseModal({
                 Cancel
               </Button>
               <Button type="submit" disabled={submitting}>
-                {submitting ? "Sending..." : "Send Response"}
+                {submitting ? <>Sending&hellip;</> : "Send Response"}
               </Button>
             </DialogFooter>
           </form>

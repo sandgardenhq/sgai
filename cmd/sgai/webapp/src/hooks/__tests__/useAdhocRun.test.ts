@@ -38,6 +38,10 @@ beforeEach(() => {
   mockModelsList.mockImplementation(() => Promise.resolve({ models: [{ id: "model-1" }], defaultModel: "model-1" }));
 });
 
+function adhocStorageKey(suffix: string) {
+  return `adhoc-${suffix}-test-ws:v1`;
+}
+
 describe("useAdhocRun", () => {
   describe("initial state", () => {
     it("returns initial state values", () => {
@@ -83,7 +87,7 @@ describe("useAdhocRun", () => {
         result.current.setPrompt("saved prompt");
       });
 
-      expect(localStorage.getItem("adhoc-prompt-test-ws")).toBe('"saved prompt"');
+      expect(localStorage.getItem(adhocStorageKey("prompt"))).toBe('"saved prompt"');
     });
   });
 
@@ -109,13 +113,13 @@ describe("useAdhocRun", () => {
         result.current.setSelectedModel("model-2");
       });
 
-      expect(localStorage.getItem("adhoc-model-test-ws")).toBe('"model-2"');
+      expect(localStorage.getItem(adhocStorageKey("model"))).toBe('"model-2"');
     });
   });
 
   describe("clearHistory", () => {
     it("clears prompt history", () => {
-      localStorage.setItem("adhoc-history-test-ws", JSON.stringify(["old prompt"]));
+      localStorage.setItem(adhocStorageKey("history"), JSON.stringify(["old prompt"]));
 
       const { result } = renderHook(() =>
         useAdhocRun({ workspaceName: "test-ws", skipModelsFetch: true })
@@ -126,7 +130,7 @@ describe("useAdhocRun", () => {
       });
 
       expect(result.current.promptHistory).toEqual([]);
-      expect(JSON.parse(localStorage.getItem("adhoc-history-test-ws") || "[]")).toEqual([]);
+      expect(JSON.parse(localStorage.getItem(adhocStorageKey("history")) || "[]")).toEqual([]);
     });
   });
 
@@ -342,7 +346,7 @@ describe("useAdhocRun", () => {
 
   describe("localStorage persistence", () => {
     it("restores prompt from localStorage", () => {
-      localStorage.setItem("adhoc-prompt-test-ws", '"saved prompt"');
+      localStorage.setItem(adhocStorageKey("prompt"), '"saved prompt"');
 
       const { result } = renderHook(() =>
         useAdhocRun({ workspaceName: "test-ws", skipModelsFetch: true })
@@ -352,7 +356,7 @@ describe("useAdhocRun", () => {
     });
 
     it("restores model from localStorage", () => {
-      localStorage.setItem("adhoc-model-test-ws", '"saved-model"');
+      localStorage.setItem(adhocStorageKey("model"), '"saved-model"');
 
       const { result } = renderHook(() =>
         useAdhocRun({ workspaceName: "test-ws", skipModelsFetch: true })
@@ -362,7 +366,7 @@ describe("useAdhocRun", () => {
     });
 
     it("restores history from localStorage", () => {
-      localStorage.setItem("adhoc-history-test-ws", '["prompt1","prompt2"]');
+      localStorage.setItem(adhocStorageKey("history"), '["prompt1","prompt2"]');
 
       const { result } = renderHook(() =>
         useAdhocRun({ workspaceName: "test-ws", skipModelsFetch: true })

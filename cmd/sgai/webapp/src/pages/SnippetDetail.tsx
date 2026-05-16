@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
@@ -29,27 +29,28 @@ export function SnippetDetail() {
   const snippetLang = lang ?? "";
   const snippetFileName = fileName ?? "";
 
-  const [snippet, setSnippet] = useState<Snippet | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [{ snippet, error, loading }, updateState] = useReducer(
+    (
+      state: { snippet: Snippet | null; error: Error | null; loading: boolean },
+      update: Partial<{ snippet: Snippet | null; error: Error | null; loading: boolean }>,
+    ) => ({ ...state, ...update }),
+    { snippet: null, error: null, loading: true },
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    updateState({ loading: true, error: null });
 
     api.snippets
       .get(snippetLang, snippetFileName, workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setSnippet(response);
-          setLoading(false);
+          updateState({ snippet: response, loading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          updateState({ error: err instanceof Error ? err : new Error(String(err)), loading: false });
         }
       });
 

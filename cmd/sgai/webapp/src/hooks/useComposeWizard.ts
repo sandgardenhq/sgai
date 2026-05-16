@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useReducer, useRef } from "react";
 import { useNavigate } from "react-router";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -13,7 +13,7 @@ const STORAGE_KEY_PREFIX = "compose-wizard-step-";
 const AUTO_SAVE_INTERVAL_MS = 30_000;
 const WIZARD_STEPS = [1, 2, 3, 4] as const;
 
-export interface WizardStepData {
+interface WizardStepData {
   description: string;
   techStack: string[];
   safetyAnalysis: boolean;
@@ -62,7 +62,7 @@ function validateStoredStepData(
   }
 }
 
-export function loadStepFromStorage(
+function loadStepFromStorage(
   step: number,
   storage: Pick<Storage, "getItem"> = sessionStorage,
 ): StorageLoadResult {
@@ -103,7 +103,7 @@ export function loadStepFromStorage(
   return { data: validated, error: null };
 }
 
-export function saveStepToStorage(
+function saveStepToStorage(
   step: number,
   data: Partial<WizardStepData>,
   storage: Pick<Storage, "setItem"> = sessionStorage,
@@ -117,7 +117,7 @@ export function saveStepToStorage(
   }
 }
 
-export function clearAllWizardStorage(
+function clearAllWizardStorage(
   storage: Pick<Storage, "removeItem"> = sessionStorage,
 ): string | null {
   for (const step of WIZARD_STEPS) {
@@ -218,9 +218,13 @@ function computeAgentsAndFlowFromTechStack(
     for (const tech of techStack) {
       const mapping = TECH_STACK_AGENT_MAP[tech];
       if (!mapping) continue;
-      const reviewers = mapping.agents.filter(
-        (a) => a.includes("reviewer") || a.includes("verifier"),
-      );
+      const reviewerNamePattern = /reviewer|verifier/;
+      const reviewers: string[] = [];
+      for (const agent of mapping.agents) {
+        if (reviewerNamePattern.test(agent)) {
+          reviewers.push(agent);
+        }
+      }
       for (const reviewer of reviewers) {
         flowLines.push(`"${reviewer}" -> "stpa-analyst"`);
       }
@@ -330,22 +334,40 @@ const DEFAULT_WIZARD_DATA: WizardStepData = {
   completionGate: "",
 };
 
+interface ComposeWizardState {
+  techStackItems: ApiTechStackItem[];
+  preview: ApiComposePreviewResponse | null;
+  isLoading: boolean;
+  isInitialLoadDone: boolean;
+  isSaving: boolean;
+  isSavingDraft: boolean;
+  saveError: string | null;
+  draftSavedAt: string | null;
+  etag: string | null;
+  isDirty: boolean;
+}
+
 export function useComposeWizard({
   workspace,
   currentStep,
 }: UseComposeWizardOptions): UseComposeWizardReturn {
   const navigate = useNavigate();
   const [wizardData, setWizardData] = useState<WizardStepData>(DEFAULT_WIZARD_DATA);
-  const [techStackItems, setTechStackItems] = useState<ApiTechStackItem[]>([]);
-  const [preview, setPreview] = useState<ApiComposePreviewResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const [etag, setEtag] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [{ techStackItems, preview, isLoading, isInitialLoadDone, isSaving, isSavingDraft, saveError, draftSavedAt, etag, isDirty }, updateState] = useReducer(
+    (state: ComposeWizardState, update: Partial<ComposeWizardState>) => ({ ...state, ...update }),
+    {
+      techStackItems: [],
+      preview: null,
+      isLoading: true,
+      isInitialLoadDone: false,
+      isSaving: false,
+      isSavingDraft: false,
+      saveError: null,
+      draftSavedAt: null,
+      etag: null,
+      isDirty: false,
+    },
+  );
   const serverStateRef = useRef<ApiComposerState | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveDraftRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -358,11 +380,10 @@ export function useComposeWizard({
     if (!workspace) return;
 
     let cancelled = false;
-    setIsInitialLoadDone(false);
+    updateState({ isInitialLoadDone: false });
 
     async function loadState() {
-      setIsLoading(true);
-      setSaveError(null);
+      updateState({ isLoading: true, saveError: null });
       try {
         const [stateResp, previewResp] = await Promise.all([
           api.compose.get(workspace),
@@ -372,9 +393,6 @@ export function useComposeWizard({
         if (cancelled) return;
 
         serverStateRef.current = stateResp.state;
-        setTechStackItems(stateResp.techStackItems);
-        setEtag(previewResp.etag);
-        setPreview(previewResp);
 
         // Merge sessionStorage data per step with server state
         const merged: WizardStepData = {
@@ -414,16 +432,22 @@ export function useComposeWizard({
 
         setWizardData(merged);
         cleanBaselineRef.current = serializeWizardData(merged);
-        setIsDirty(false);
-        if (storageErrors.length > 0) {
-          setSaveError(storageErrors[0]);
-        }
+        updateState({
+          techStackItems: stateResp.techStackItems,
+          etag: previewResp.etag,
+          preview: previewResp,
+          isDirty: false,
+          saveError: storageErrors[0] ?? null,
+          isLoading: false,
+          isInitialLoadDone: true,
+        });
       } catch (err) {
-        setSaveError(getErrorMessage(err, "Failed to load compose wizard state"));
-      } finally {
         if (!cancelled) {
-          setIsLoading(false);
-          setIsInitialLoadDone(true);
+          updateState({
+            saveError: getErrorMessage(err, "Failed to load compose wizard state"),
+            isLoading: false,
+            isInitialLoadDone: true,
+          });
         }
       }
     }
@@ -459,10 +483,10 @@ export function useComposeWizard({
     }
 
     if (storageError) {
-      setSaveError(storageError);
+      updateState({ saveError: storageError });
     }
 
-    setIsDirty(serializeWizardData(wizardData) !== cleanBaselineRef.current);
+    updateState({ isDirty: serializeWizardData(wizardData) !== cleanBaselineRef.current });
   }, [currentStep, isInitialLoadDone, wizardData]);
 
   // beforeunload warning when wizard has unsaved progress (R-9)
@@ -483,7 +507,7 @@ export function useComposeWizard({
 
     const savedSnapshot = serializeWizardData(wizardData);
 
-    setIsSavingDraft(true);
+    updateState({ isSavingDraft: true });
     try {
       const draftRequest = buildDraftRequest(
         wizardData,
@@ -494,17 +518,14 @@ export function useComposeWizard({
       await api.compose.saveDraft(workspace, draftRequest);
 
       const now = new Date();
-      setDraftSavedAt(
-        now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      );
+      const savedAt = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       cleanBaselineRef.current = savedSnapshot;
       const latestSnapshot = serializeWizardData(wizardDataRef.current);
-      setIsDirty(latestSnapshot !== savedSnapshot);
-      setSaveError(null);
+      updateState({ draftSavedAt: savedAt, isDirty: latestSnapshot !== savedSnapshot, saveError: null });
     } catch (err) {
-      setSaveError(getErrorMessage(err, "Failed to save draft"));
+      updateState({ saveError: getErrorMessage(err, "Failed to save draft") });
     } finally {
-      setIsSavingDraft(false);
+      updateState({ isSavingDraft: false });
     }
   }, [workspace, wizardData, currentStep, isSavingDraft]);
 
@@ -549,19 +570,16 @@ export function useComposeWizard({
       await api.compose.saveDraft(workspace, draftRequest);
 
       const previewResp = await api.compose.preview(workspace);
-      setPreview(previewResp);
-      setEtag(previewResp.etag);
-      setSaveError(null);
+      updateState({ preview: previewResp, etag: previewResp.etag, saveError: null });
     } catch (err) {
-      setSaveError(getErrorMessage(err, "Failed to refresh preview"));
+      updateState({ saveError: getErrorMessage(err, "Failed to refresh preview") });
     }
   }, [workspace, wizardData, currentStep]);
 
   const saveGoal = useCallback(async (): Promise<boolean> => {
     if (!workspace) return false;
 
-    setIsSaving(true);
-    setSaveError(null);
+    updateState({ isSaving: true, saveError: null });
 
     try {
       // Save draft first to ensure server state is up to date
@@ -577,22 +595,22 @@ export function useComposeWizard({
 
       const clearStorageError = clearAllWizardStorage();
       if (clearStorageError) {
-        setSaveError(clearStorageError);
+        updateState({ saveError: clearStorageError });
       }
       const savedSnapshot = serializeWizardData(wizardData);
       cleanBaselineRef.current = savedSnapshot;
       const latestSnapshot = serializeWizardData(wizardDataRef.current);
-      setIsDirty(latestSnapshot !== savedSnapshot);
+      updateState({ isDirty: latestSnapshot !== savedSnapshot });
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 412) {
-        setSaveError("GOAL.md has been modified by another session. Please reload and try again.");
+        updateState({ saveError: "GOAL.md has been modified by another session. Please reload and try again." });
       } else {
-        setSaveError(getErrorMessage(err, "Failed to save GOAL.md"));
+        updateState({ saveError: getErrorMessage(err, "Failed to save GOAL.md") });
       }
       return false;
     } finally {
-      setIsSaving(false);
+      updateState({ isSaving: false });
     }
   }, [workspace, wizardData, currentStep, etag]);
 

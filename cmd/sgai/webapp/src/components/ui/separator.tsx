@@ -28,4 +28,3 @@ function Separator({
 }
 
 export { Separator }
-export type { SeparatorProps }

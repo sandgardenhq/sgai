@@ -49,7 +49,7 @@ export function AdhocOutput(): JSX.Element {
         to={`/workspaces/${encodeURIComponent(workspaceName)}`}
         className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-6"
       >
-        <ArrowLeft className="h-3 w-3" />
+        <ArrowLeft className="size-3" />
         Back to {workspaceName}
       </Link>
 
@@ -104,7 +104,7 @@ export function AdhocOutput(): JSX.Element {
               variant="destructive"
               onClick={stopRun}
             >
-              <Square className="mr-2 h-4 w-4" />
+              <Square className="mr-2 size-4" />
               Stop
             </Button>
           ) : (
@@ -112,7 +112,7 @@ export function AdhocOutput(): JSX.Element {
               type="submit"
               disabled={!prompt.trim() || !model.trim()}
             >
-              <Play className="mr-2 h-4 w-4" />
+              <Play className="mr-2 size-4" />
               Execute Prompt
             </Button>
           )}

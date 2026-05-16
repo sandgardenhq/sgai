@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,12 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isPinPending, startPinTransition] = useTransition();
   const [isEditorPending, startEditorTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
-  const [execTimeSeconds, setExecTimeSeconds] = useState<number | null>(null);
+  const [execTimeSeconds, setExecTimeSeconds] = useReducer(
+    (state: number | null, update: number | null | ((value: number | null) => number | null)) => (
+      typeof update === "function" ? update(state) : update
+    ),
+    null,
+  );
 
   const { workspaces, fetchStatus } = useFactoryState();
 
@@ -168,19 +173,17 @@ export function WorkspaceDetail(): JSX.Element | null {
   useEffect(() => {
     if (!detail) return;
     const parsed = parseExecTime(totalExecTimeRaw ?? "");
-    if (parsed !== null) {
-      setExecTimeSeconds(parsed);
-    } else if (detailRunning) {
-      setExecTimeSeconds(0);
-    } else {
-      setExecTimeSeconds(null);
-    }
+    const nextExecTime = parsed !== null ? parsed : detailRunning ? 0 : null;
+    setExecTimeSeconds(nextExecTime);
+  }, [detail, totalExecTimeRaw, detailRunning]);
+
+  useEffect(() => {
     if (!detailRunning) return;
     const timer = setInterval(() => {
       setExecTimeSeconds((prev) => (prev === null ? prev : prev + 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [totalExecTimeRaw, detailRunning]);
+  }, [detailRunning]);
 
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
@@ -347,23 +350,373 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   return (
     <div className="sticky-header-wrapper">
-      <div className="sticky top-0 z-10 bg-background">
-        <header className="flex flex-wrap items-start gap-3 mb-3 pb-3 border-b">
-          <div className="flex-shrink min-w-0 max-w-fit">
+      <WorkspaceDetailHeader
+        detail={detail}
+        isForkedRoot={isForkedRoot}
+        displayExecTime={displayExecTime}
+        effectiveRunning={effectiveRunning}
+        agentModelLabel={agentModelLabel}
+        fullAgentModelLabel={fullAgentModelLabel}
+        statusLine={statusLine}
+        showStatusLine={showStatusLine}
+        actionError={actionError}
+        activeTab={activeTab}
+        hasForks={hasForks}
+        encodedWorkspace={encodedWorkspace}
+        selfDriveLabel={selfDriveLabel}
+        showComposeGoalAction={showComposeGoalAction}
+        showEditGoalAction={showEditGoalAction}
+        showOpenEditorAction={showOpenEditorAction}
+        showDeleteAction={showDeleteAction}
+        isActionDisabled={isActionDisabled}
+        isEditorPending={isEditorPending}
+        isPinPending={isPinPending}
+        isStartStopPending={isStartStopPending}
+        isDeletePending={isDeletePending}
+        navigate={navigate}
+        handleStart={handleStart}
+        handleStop={handleStop}
+        handleSelfDrive={handleSelfDrive}
+        handlePinToggle={handlePinToggle}
+        handleOpenEditor={handleOpenEditor}
+        handleDelete={handleDelete}
+      />
+
+      <div className="pt-4">
+        {detail.isRoot && !detail.isFork && (
+          <div className="mb-6">
+            <InlineForkEditor workspaceName={detail.name} />
+          </div>
+        )}
+        {isForkedRoot ? (
+          <ForkedRootActionOutput
+            actionRunError={actionRunError}
+            isActionRunning={isActionRunning}
+            actionOutput={actionOutput}
+            actionOutputOpen={actionOutputOpen}
+            actionOutputRef={actionOutputRef}
+            setActionOutputOpen={setActionOutputOpen}
+            stopActionRun={stopActionRun}
+          />
+        ) : null}
+        <Suspense fallback={<TabSkeleton />}>
+          <TabContent
+            activeTab={activeTab}
+            workspaceName={detail.name}
+            currentModel={detail.currentModel}
+            goalContent={detail.goalContent}
+            pmContent={detail.pmContent}
+            hasProjectMgmt={detail.hasProjectMgmt}
+            actions={detail.actions}
+            onActionClick={isForkedRoot ? handleActionClick : undefined}
+          />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+
+interface WorkspaceDetailActionsConfig {
+  isForkedRoot: boolean;
+  effectiveRunning: boolean;
+  encodedWorkspace: string;
+  selfDriveLabel: string;
+  showComposeGoalAction: boolean;
+  showEditGoalAction: boolean;
+  showOpenEditorAction: boolean;
+  showDeleteAction: boolean;
+  isActionDisabled: boolean;
+  isEditorPending: boolean;
+  isPinPending: boolean;
+  isStartStopPending: boolean;
+  isDeletePending: boolean;
+  navigate: (to: string) => void;
+  handleStart: () => void;
+  handleStop: () => void;
+  handleSelfDrive: () => void;
+  handlePinToggle: () => void;
+  handleOpenEditor: () => void;
+  handleDelete: () => void;
+}
+
+interface WorkspaceDetailActionsProps {
+  detail: ApiWorkspaceEntry;
+  actions: WorkspaceDetailActionsConfig;
+}
+
+function WorkspaceDetailActions({
+  detail,
+  actions,
+}: WorkspaceDetailActionsProps) {
+  const {
+  isForkedRoot,
+  effectiveRunning,
+  encodedWorkspace,
+  selfDriveLabel,
+  showComposeGoalAction,
+  showEditGoalAction,
+  showOpenEditorAction,
+  showDeleteAction,
+  isActionDisabled,
+  isEditorPending,
+  isPinPending,
+  isStartStopPending,
+  isDeletePending,
+  navigate,
+  handleStart,
+  handleStop,
+  handleSelfDrive,
+  handlePinToggle,
+  handleOpenEditor,
+  handleDelete,
+  } = actions;
+  if (isForkedRoot) {
+    return (
+      <>
+        {showOpenEditorAction && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleOpenEditor}
+            disabled={isEditorPending}
+          >
+            Open in Editor
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="sm"
+          variant={detail.pinned ? "secondary" : "outline"}
+          onClick={handlePinToggle}
+          disabled={isPinPending}
+          aria-pressed={detail.pinned}
+        >
+          {detail.pinned ? "Unpin" : "Pin"}
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {detail.needsInput && (
+        <Button
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => navigate(`/workspaces/${encodedWorkspace}/respond`)}
+        >
+          Respond
+        </Button>
+      )}
+      {detail.continuousMode ? (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
+            onClick={handleSelfDrive}
+            disabled={isActionDisabled}
+            aria-pressed={effectiveRunning && detail.interactiveAuto}
+          >
+            Continuous Self-Drive
+          </Button>
+          {effectiveRunning && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleStop}
+              disabled={isStartStopPending}
+            >
+              Stop
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
+            onClick={handleSelfDrive}
+            disabled={isActionDisabled}
+            aria-pressed={effectiveRunning && detail.interactiveAuto}
+          >
+            {selfDriveLabel}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={(effectiveRunning && !detail.interactiveAuto) ? "default" : "outline"}
+            onClick={handleStart}
+            disabled={isActionDisabled}
+            aria-pressed={effectiveRunning && !detail.interactiveAuto}
+          >
+            Start
+          </Button>
+          {effectiveRunning && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleStop}
+              disabled={isStartStopPending}
+            >
+              Stop
+            </Button>
+          )}
+        </>
+      )}
+      {showComposeGoalAction && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => navigate(`/compose?workspace=${encodedWorkspace}`)}
+        >
+          Compose GOAL
+        </Button>
+      )}
+      {showEditGoalAction && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => navigate(`/workspaces/${encodedWorkspace}/goal/edit`)}
+        >
+          Edit GOAL
+        </Button>
+      )}
+      {showOpenEditorAction && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleOpenEditor}
+          disabled={isEditorPending}
+        >
+          Open in Editor
+        </Button>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => navigate(`/workspaces/${encodedWorkspace}/skills`)}
+      >
+        Skills
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => navigate(`/workspaces/${encodedWorkspace}/snippets`)}
+      >
+        Snippets
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => navigate(`/workspaces/${encodedWorkspace}/agents`)}
+      >
+        Agents
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={detail.pinned ? "secondary" : "outline"}
+        onClick={handlePinToggle}
+        disabled={isPinPending}
+        aria-pressed={detail.pinned}
+      >
+        {detail.pinned ? "Unpin" : "Pin"}
+      </Button>
+      {showDeleteAction && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={isDeletePending}
+            >
+              Delete
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete workspace</AlertDialogTitle>
+              <AlertDialogDescription>
+                {(!detail.external || detail.isFork)
+                  ? <>This will permanently delete the workspace directory from disk. This action cannot be undone.</>
+                  : <>This will remove &lsquo;{detail.name}&rsquo; from the interface. The directory and its contents will NOT be deleted.</>
+                }
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeletePending}
+                className="bg-destructive text-white hover:bg-destructive/90"
+              >
+                {(!detail.external || detail.isFork) ? "Delete" : "Remove"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </>
+  );
+}
+
+interface WorkspaceDetailHeaderProps extends WorkspaceDetailActionsConfig {
+  detail: ApiWorkspaceEntry;
+  displayExecTime: string;
+  agentModelLabel: string;
+  fullAgentModelLabel: string;
+  statusLine: string | undefined;
+  showStatusLine: boolean;
+  actionError: string | null;
+  activeTab: string;
+  hasForks: boolean;
+}
+
+function WorkspaceDetailHeader({
+  detail,
+  isForkedRoot,
+  displayExecTime,
+  effectiveRunning,
+  agentModelLabel,
+  fullAgentModelLabel,
+  statusLine,
+  showStatusLine,
+  actionError,
+  activeTab,
+  hasForks,
+  ...actionsProps
+}: WorkspaceDetailHeaderProps) {
+  return (
+    <div className="sticky top-0 z-10 bg-background">
+      <header className="flex flex-wrap items-start gap-3 mb-3 pb-3 border-b">
+        <div className="flex-shrink min-w-0 max-w-fit">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h3 className="m-0 text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
+                {detail.description || detail.name}
+              </h3>
+            </TooltipTrigger>
+            <TooltipContent>{detail.isFork ? detail.name : detail.dir}</TooltipContent>
+          </Tooltip>
+        </div>
+
+        {!isForkedRoot && (
+          <div className="flex items-center gap-2 shrink-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <h3 className="m-0 text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
-                  {detail.description || detail.name}
-                </h3>
-              </TooltipTrigger>
-              <TooltipContent>{detail.isFork ? detail.name : detail.dir}</TooltipContent>
-            </Tooltip>
-          </div>
-
-          {!isForkedRoot && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
                 <Badge
                   variant="secondary"
                   className="font-mono"
@@ -372,310 +725,116 @@ export function WorkspaceDetail(): JSX.Element | null {
                 >
                   {displayExecTime}
                 </Badge>
-                </TooltipTrigger>
-                <TooltipContent>Total execution time</TooltipContent>
-              </Tooltip>
-              <Badge variant={effectiveRunning ? "default" : "secondary"}>
-                {effectiveRunning ? "running" : "stopped"}
-              </Badge>
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:ml-auto mt-2 md:mt-0 justify-start md:justify-end">
-              {isForkedRoot ? (
-                <>
-                  {showOpenEditorAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleOpenEditor}
-                      disabled={isEditorPending}
-                    >
-                      Open in Editor
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={detail.pinned ? "secondary" : "outline"}
-                    onClick={handlePinToggle}
-                    disabled={isPinPending}
-                    aria-pressed={detail.pinned}
-                  >
-                    {detail.pinned ? "Unpin" : "Pin"}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {detail?.needsInput && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="default"
-                      onClick={() => navigate(`/workspaces/${encodedWorkspace}/respond`)}
-                    >
-                      Respond
-                    </Button>
-                  )}
-                  {detail.continuousMode ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
-                        onClick={handleSelfDrive}
-                        disabled={isActionDisabled}
-                        aria-pressed={effectiveRunning && detail.interactiveAuto}
-                      >
-                        Continuous Self-Drive
-                      </Button>
-                      {effectiveRunning && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleStop}
-                          disabled={isStartStopPending}
-                        >
-                          Stop
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={(effectiveRunning && detail.interactiveAuto) ? "default" : "outline"}
-                        onClick={handleSelfDrive}
-                        disabled={isActionDisabled}
-                        aria-pressed={effectiveRunning && detail.interactiveAuto}
-                      >
-                        {selfDriveLabel}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={(effectiveRunning && !detail.interactiveAuto) ? "default" : "outline"}
-                        onClick={handleStart}
-                        disabled={isActionDisabled}
-                        aria-pressed={effectiveRunning && !detail.interactiveAuto}
-                      >
-                        Start
-                      </Button>
-                      {effectiveRunning && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleStop}
-                          disabled={isStartStopPending}
-                        >
-                          Stop
-                        </Button>
-                      )}
-                    </>
-                  )}
-                  {showComposeGoalAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/compose?workspace=${encodedWorkspace}`)}
-                    >
-                      Compose GOAL
-                    </Button>
-                  )}
-                  {showEditGoalAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`/workspaces/${encodedWorkspace}/goal/edit`)}
-                    >
-                      Edit GOAL
-                    </Button>
-                  )}
-                  {showOpenEditorAction && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleOpenEditor}
-                      disabled={isEditorPending}
-                    >
-                      Open in Editor
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/workspaces/${encodedWorkspace}/skills`)}
-                  >
-                    Skills
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/workspaces/${encodedWorkspace}/snippets`)}
-                  >
-                    Snippets
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/workspaces/${encodedWorkspace}/agents`)}
-                  >
-                    Agents
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={detail.pinned ? "secondary" : "outline"}
-                    onClick={handlePinToggle}
-                    disabled={isPinPending}
-                    aria-pressed={detail.pinned}
-                  >
-                    {detail.pinned ? "Unpin" : "Pin"}
-                  </Button>
-                  {showDeleteAction && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          disabled={isDeletePending}
-                        >
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete workspace</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {(!detail.external || detail.isFork)
-                              ? <>This will permanently delete the workspace directory from disk. This action cannot be undone.</>
-                              : <>This will remove &lsquo;{detail.name}&rsquo; from the interface. The directory and its contents will NOT be deleted.</>
-                            }
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleDelete}
-                            disabled={isDeletePending}
-                            className="bg-destructive text-white hover:bg-destructive/90"
-                          >
-                            {(!detail.external || detail.isFork) ? "Delete" : "Remove"}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </>
-              )}
-          </div>
-        </header>
-
-        {showStatusLine && (
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            {agentModelLabel && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="font-mono">
-                    {agentModelLabel}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>{fullAgentModelLabel || agentModelLabel}</TooltipContent>
-              </Tooltip>
-            )}
-            {statusLine && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm text-muted-foreground truncate max-w-[320px] md:max-w-[520px]">
-                    {statusLine}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{statusLine}</TooltipContent>
-              </Tooltip>
-            )}
+              </TooltipTrigger>
+              <TooltipContent>Total execution time</TooltipContent>
+            </Tooltip>
+            <Badge variant={effectiveRunning ? "default" : "secondary"}>
+              {effectiveRunning ? "running" : "stopped"}
+            </Badge>
           </div>
         )}
 
-          {actionError && (
-            <p className="text-sm text-destructive mb-2" role="alert">
-              {actionError}
-            </p>
-          )}
-          <TabNav
-            workspaceName={detail.name}
-            activeTab={activeTab}
-            isRoot={detail.isRoot}
-            hasForks={hasForks}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:ml-auto mt-2 md:mt-0 justify-start md:justify-end">
+          <WorkspaceDetailActions
+            detail={detail}
+            actions={{ isForkedRoot, effectiveRunning, ...actionsProps }}
           />
-
         </div>
+      </header>
 
-        <div className="pt-4">
-          {detail.isRoot && !detail.isFork && (
-            <div className="mb-6">
-              <InlineForkEditor workspaceName={detail.name} />
-            </div>
+      {showStatusLine && (
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          {agentModelLabel && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="secondary" className="font-mono">
+                  {agentModelLabel}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>{fullAgentModelLabel || agentModelLabel}</TooltipContent>
+            </Tooltip>
           )}
-          {isForkedRoot && (actionRunError || isActionRunning || actionOutput) ? (
-            <div className="space-y-3 mb-4">
-              {actionRunError ? (
-                <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
-              ) : null}
-              {(isActionRunning || actionOutput) ? (
-                <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
-                  <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
-                    <ChevronRight
-                      className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
-                      aria-hidden="true"
-                    />
-                    Output
-                    {isActionRunning && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => { e.preventDefault(); stopActionRun(); }}
-                        className="ml-auto"
-                      >
-                        <Square className="mr-1 h-3 w-3" />
-                        Stop
-                      </Button>
-                    )}
-                  </summary>
-                  <pre
-                    ref={actionOutputRef}
-                    className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
-                  >
-                    {actionOutput || (isActionRunning ? "Running..." : "")}
-                  </pre>
-                </details>
-              ) : null}
-            </div>
-          ) : null}
-          <Suspense fallback={<TabSkeleton />}>
-            <TabContent
-              activeTab={activeTab}
-              workspaceName={detail.name}
-              currentModel={detail.currentModel}
-              goalContent={detail.goalContent}
-              pmContent={detail.pmContent}
-              hasProjectMgmt={detail.hasProjectMgmt}
-              actions={detail.actions}
-              onActionClick={isForkedRoot ? handleActionClick : undefined}
-            />
-          </Suspense>
+          {statusLine && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-sm text-muted-foreground truncate max-w-[320px] md:max-w-[520px]">
+                  {statusLine}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{statusLine}</TooltipContent>
+            </Tooltip>
+          )}
         </div>
+      )}
+
+      {actionError && (
+        <p className="text-sm text-destructive mb-2" role="alert">
+          {actionError}
+        </p>
+      )}
+      <TabNav
+        workspaceName={detail.name}
+        activeTab={activeTab}
+        isRoot={detail.isRoot}
+        hasForks={hasForks}
+      />
+    </div>
+  );
+}
+
+function ForkedRootActionOutput({
+  actionRunError,
+  isActionRunning,
+  actionOutput,
+  actionOutputOpen,
+  actionOutputRef,
+  setActionOutputOpen,
+  stopActionRun,
+}: {
+  actionRunError: string | null;
+  isActionRunning: boolean;
+  actionOutput: string;
+  actionOutputOpen: boolean;
+  actionOutputRef: React.RefObject<HTMLPreElement | null>;
+  setActionOutputOpen: (open: boolean) => void;
+  stopActionRun: () => void;
+}) {
+  if (!actionRunError && !isActionRunning && !actionOutput) return null;
+
+  return (
+    <div className="space-y-3 mb-4">
+      {actionRunError ? (
+        <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
+      ) : null}
+      {(isActionRunning || actionOutput) ? (
+        <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
+          <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+            <ChevronRight
+              className="size-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
+              aria-hidden="true"
+            />
+            Output
+            {isActionRunning && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={(e) => { e.preventDefault(); stopActionRun(); }}
+                className="ml-auto"
+              >
+                <Square className="mr-1 size-3" />
+                Stop
+              </Button>
+            )}
+          </summary>
+          <pre
+            ref={actionOutputRef}
+            className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
+          >
+            {actionOutput || (isActionRunning ? "Running..." : "")}
+          </pre>
+        </details>
+      ) : null}
     </div>
   );
 }

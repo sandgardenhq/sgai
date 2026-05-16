@@ -110,17 +110,25 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
   const { frontmatter, body } = useMemo(() => extractFrontmatter(content), [content]);
 
   const components = {
-    h1: (props: HTMLAttributes<HTMLHeadingElement>) => (
-      <h1 className="text-2xl font-semibold mt-4 mb-2" {...props} />
+    h1: ({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h1 className={cn("text-2xl font-semibold mt-4 mb-2", className)} {...props}>
+        {children}
+      </h1>
     ),
-    h2: (props: HTMLAttributes<HTMLHeadingElement>) => (
-      <h2 className="text-xl font-semibold mt-4 mb-2" {...props} />
+    h2: ({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h2 className={cn("text-xl font-semibold mt-4 mb-2", className)} {...props}>
+        {children}
+      </h2>
     ),
-    h3: (props: HTMLAttributes<HTMLHeadingElement>) => (
-      <h3 className="text-lg font-semibold mt-3 mb-2" {...props} />
+    h3: ({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h3 className={cn("text-lg font-semibold mt-3 mb-2", className)} {...props}>
+        {children}
+      </h3>
     ),
-    h4: (props: HTMLAttributes<HTMLHeadingElement>) => (
-      <h4 className="text-base font-semibold mt-3 mb-1.5" {...props} />
+    h4: ({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+      <h4 className={cn("text-base font-semibold mt-3 mb-1.5", className)} {...props}>
+        {children}
+      </h4>
     ),
     p: (props: HTMLAttributes<HTMLParagraphElement>) => (
       <p className="leading-relaxed" {...props} />

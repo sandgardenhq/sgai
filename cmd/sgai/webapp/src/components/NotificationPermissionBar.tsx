@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useReducer, useCallback } from "react";
 import { Button } from "./ui/button";
 
 const DISMISSED_KEY = "notification-permission-dismissed";
@@ -30,7 +30,7 @@ function shouldShowBar(): boolean {
 }
 
 export function NotificationPermissionBar() {
-  const [visible, setVisible] = useState(shouldShowBar);
+  const [visible, setVisible] = useReducer((_: boolean, value: boolean) => value, shouldShowBar());
 
   const handleEnable = useCallback(async () => {
     if (!("Notification" in window)) {

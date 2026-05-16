@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router";
 import {
   Card,
@@ -13,8 +13,8 @@ import type { AgentsResponse } from "@/types";
 function AgentListSkeleton() {
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-      {Array.from({ length: 6 }, (_, i) => (
-        <Card key={i}>
+      {["agent-1", "agent-2", "agent-3", "agent-4", "agent-5", "agent-6"].map((key) => (
+        <Card key={key}>
           <CardHeader>
             <Skeleton className="h-5 w-32" />
           </CardHeader>
@@ -32,28 +32,28 @@ export function AgentList() {
   const { name } = useParams<{ name: string }>();
   const workspaceName = name ?? "";
 
-  const [data, setData] = useState<AgentsResponse | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [{ data, error, loading, refreshKey }, updateState] = useReducer(
+    (
+      state: { data: AgentsResponse | null; error: Error | null; loading: boolean; refreshKey: number },
+      update: Partial<{ data: AgentsResponse | null; error: Error | null; loading: boolean; refreshKey: number }>,
+    ) => ({ ...state, ...update }),
+    { data: null, error: null, loading: true, refreshKey: 0 },
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    updateState({ loading: true, error: null });
 
     api.agents
       .list(workspaceName)
       .then((response) => {
         if (!cancelled) {
-          setData(response);
-          setLoading(false);
+          updateState({ data: response, loading: false });
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
+          updateState({ error: err instanceof Error ? err : new Error(String(err)), loading: false });
         }
       });
 
@@ -63,8 +63,8 @@ export function AgentList() {
   }, [workspaceName, refreshKey]);
 
   const handleRefresh = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
+    updateState({ refreshKey: refreshKey + 1 });
+  }, [refreshKey]);
 
   return (
     <div>

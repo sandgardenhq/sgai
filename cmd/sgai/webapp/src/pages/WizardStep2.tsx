@@ -21,12 +21,7 @@ export function WizardStep2() {
     isSavingDraft,
     fetchPreview,
     goToStep,
-    goBack,
   } = useComposeWizard({ workspace, currentStep: 2 });
-
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
 
   const handleToggleTech = useCallback(
     (techId: string) => {
@@ -45,12 +40,16 @@ export function WizardStep2() {
 
   // Update preview when tech stack changes
   useEffect(() => {
-    if (isLoading) return;
+    if (!workspace || isLoading) return;
     const timer = setTimeout(() => {
       fetchPreview();
     }, 300);
     return () => clearTimeout(timer);
-  }, [wizardData.techStack, isLoading, fetchPreview]);
+  }, [workspace, wizardData.techStack, isLoading, fetchPreview]);
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
+  }
 
   if (isLoading) {
     return (
@@ -58,8 +57,8 @@ export function WizardStep2() {
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-64" />
         <div className="grid grid-cols-3 gap-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-16 rounded-lg" />
+          {["tech-1", "tech-2", "tech-3", "tech-4", "tech-5", "tech-6"].map((key) => (
+            <Skeleton key={key} className="h-16 rounded-lg" />
           ))}
         </div>
       </div>

@@ -37,7 +37,7 @@ export function PromptHistory({ history, onSelect, onClear, disabled }: PromptHi
               disabled={disabled}
               className="gap-1.5"
             >
-              <History className="h-3.5 w-3.5" />
+              <History className="size-3.5" />
               History ({history.length})
             </Button>
           </DialogTrigger>
@@ -55,8 +55,8 @@ export function PromptHistory({ history, onSelect, onClear, disabled }: PromptHi
 
         <ScrollArea className="max-h-[300px]">
           <ul className="space-y-2">
-            {history.map((entry, idx) => (
-              <li key={`${idx}-${entry.slice(0, 20)}`}>
+            {history.map((entry) => (
+              <li key={entry}>
                 <DialogClose asChild>
                   <button
                     type="button"
@@ -84,7 +84,7 @@ export function PromptHistory({ history, onSelect, onClear, disabled }: PromptHi
               setOpen(false);
             }}
           >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            <Trash2 className="mr-1.5 size-3.5" />
             Clear History
           </Button>
         </div>

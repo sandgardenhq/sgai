@@ -24,8 +24,8 @@ function EventsTabSkeleton() {
     <div className="space-y-4">
       <Skeleton className="h-24 w-full rounded-xl" />
       <div className="space-y-3">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-10 w-full rounded" />
+        {["event-1", "event-2", "event-3", "event-4", "event-5"].map((key) => (
+          <Skeleton key={key} className="h-10 w-full rounded" />
         ))}
       </div>
     </div>
@@ -168,7 +168,7 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
             )}
             <div className="flex gap-3 py-1.5">
               <div className="flex flex-col items-center w-3 shrink-0 pt-1.5">
-                <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_rgba(var(--primary),0.2)]" />
+                <span className="size-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_rgba(var(--primary),0.2)]" />
                 {index < events.length - 1 && (
                   <span className="w-0.5 flex-1 min-h-[20px] bg-border mt-1" />
                 )}
@@ -259,7 +259,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
             <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
               <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
                 <ChevronRight
-                  className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
+                  className="size-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
                   aria-hidden="true"
                 />
                 Output
@@ -271,7 +271,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
                     onClick={(e) => { e.preventDefault(); stopActionRun(); }}
                     className="ml-auto"
                   >
-                    <Square className="mr-1 h-3 w-3" />
+                    <Square className="mr-1 size-3" />
                     Stop
                   </Button>
                 )}
@@ -299,7 +299,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
         <details className="group">
           <summary className="cursor-pointer font-semibold text-sm mb-2 flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
+              className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
               aria-hidden="true"
             />
             <span>GOAL.md</span>
