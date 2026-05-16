@@ -633,7 +633,7 @@ func TestCollectAgentModelsVariants(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"),
-			[]byte("---\nmodels:\n  coordinator: anthropic/claude-opus-4-6\n---\n# Goal"), 0o644))
+			[]byte("---\nmodels:\n  coordinator: openai/gpt-5.5\n---\n# Goal"), 0o644))
 
 		result := collectAgentModels(dir)
 		assert.NotNil(t, result)
@@ -661,13 +661,13 @@ func TestBuildAdhocArgs(t *testing.T) {
 	})
 
 	t.Run("withVariantAddsFlag", func(t *testing.T) {
-		args := buildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
+		args := buildAdhocArgs("openai/gpt-5.5 (thinking)")
 		assert.Contains(t, args, "--variant")
 		assert.Contains(t, args, "thinking")
 	})
 
 	t.Run("withoutVariantNoFlag", func(t *testing.T) {
-		args := buildAdhocArgs("anthropic/claude-sonnet-4-6")
+		args := buildAdhocArgs("openai/gpt-5.5")
 		for _, arg := range args {
 			assert.NotEqual(t, "--variant", arg)
 		}
@@ -712,10 +712,10 @@ func TestCoordinatorModelFromWorkspace(t *testing.T) {
 	t.Run("withModelsConfig", func(t *testing.T) {
 		server, rootDir := setupTestServer(t)
 		wsDir := setupTestWorkspace(t, rootDir, "test-ws-model")
-		goalContent := "---\nmodels:\n  coordinator: anthropic/claude-sonnet-4-6\nflow: |\n  \"coordinator\"\n---\n# Test"
+		goalContent := "---\nmodels:\n  coordinator: openai/gpt-5.5\nflow: |\n  \"coordinator\"\n---\n# Test"
 		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte(goalContent), 0644))
 		result := server.coordinatorModelFromWorkspace("test-ws-model")
-		assert.Equal(t, "anthropic/claude-sonnet-4-6", result)
+		assert.Equal(t, "openai/gpt-5.5", result)
 	})
 }
 
@@ -2909,7 +2909,7 @@ func TestBuildWorkspaceFullStateWithTodos(t *testing.T) {
 func TestHandleAPIStateFullIntegration(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "full-int")
-	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nflow: |\n  digraph G {\n    \"coordinator\" -> \"builder\"\n    \"builder\" -> \"reviewer\"\n  }\nmodels:\n  coordinator: anthropic/claude-opus-4-6\n---\n# Full Integration\n\nBuild a comprehensive test suite."), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nflow: |\n  digraph G {\n    \"coordinator\" -> \"builder\"\n    \"builder\" -> \"reviewer\"\n  }\nmodels:\n  coordinator: openai/gpt-5.5\n---\n# Full Integration\n\nBuild a comprehensive test suite."), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "PROJECT_MANAGEMENT.md"), []byte("# PM\n\n## Progress\n- Step 1 done"), 0o644))
 
 	agentDir := filepath.Join(wsDir, ".sgai", "agent")
@@ -3084,13 +3084,13 @@ func TestHandleAPIStateWithCaching(t *testing.T) {
 }
 
 func TestBuildAdhocArgsWithVariantAddsFlag(t *testing.T) {
-	args := buildAdhocArgs("anthropic/claude-sonnet-4-6 (thinking)")
+	args := buildAdhocArgs("openai/gpt-5.5 (thinking)")
 	assert.Contains(t, args, "--variant")
 	assert.Contains(t, args, "thinking")
 }
 
 func TestBuildAdhocArgsWithoutVariantNoFlag(t *testing.T) {
-	args := buildAdhocArgs("anthropic/claude-sonnet-4-6")
+	args := buildAdhocArgs("openai/gpt-5.5")
 	for _, arg := range args {
 		assert.NotEqual(t, "--variant", arg)
 	}
@@ -3403,7 +3403,7 @@ func TestCollectAgentModelsWithGoal(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"),
-		[]byte("---\nmodels:\n  coordinator: anthropic/claude-opus-4-6\n---\n# Goal"), 0o644))
+		[]byte("---\nmodels:\n  coordinator: openai/gpt-5.5\n---\n# Goal"), 0o644))
 
 	result := collectAgentModels(dir)
 	assert.NotNil(t, result)
@@ -3438,10 +3438,10 @@ func TestCoordinatorModelFromWorkspaceNotFoundReturnsEmpty(t *testing.T) {
 func TestCoordinatorModelFromWorkspaceWithModelsConfig(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-	goalContent := "---\nmodels:\n  coordinator: anthropic/claude-sonnet-4-6\nflow: |\n  \"coordinator\"\n---\n# Test"
+	goalContent := "---\nmodels:\n  coordinator: openai/gpt-5.5\nflow: |\n  \"coordinator\"\n---\n# Test"
 	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte(goalContent), 0644))
 	result := server.coordinatorModelFromWorkspace("test-ws")
-	assert.Equal(t, "anthropic/claude-sonnet-4-6", result)
+	assert.Equal(t, "openai/gpt-5.5", result)
 }
 
 func TestHandleAPIAdhocAlreadyRunningReturnsOutput(t *testing.T) {
@@ -3452,7 +3452,7 @@ func TestHandleAPIAdhocAlreadyRunningReturnsOutput(t *testing.T) {
 	st.running = true
 	st.output.WriteString("already running output")
 	st.mu.Unlock()
-	w := serveHTTP(server, "POST", "/api/v1/workspaces/test-ws/adhoc", `{"prompt":"test","model":"anthropic/claude-sonnet-4-6"}`)
+	w := serveHTTP(server, "POST", "/api/v1/workspaces/test-ws/adhoc", `{"prompt":"test","model":"openai/gpt-5.5"}`)
 	assert.Equal(t, http.StatusOK, w.Code)
 	var resp apiAdhocResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
@@ -3595,7 +3595,7 @@ func TestHandleAPIComposeStateFull(t *testing.T) {
 	cs.mu.Lock()
 	cs.state.Description = "test"
 	cs.state.Agents = []composerAgentConf{
-		{Name: "coordinator", Selected: true, Model: "anthropic/claude-opus-4-6"},
+		{Name: "coordinator", Selected: true, Model: "openai/gpt-5.5"},
 	}
 	cs.state.Flow = `digraph G { "coordinator" -> "builder" }`
 	cs.state.CompletionGate = "make test"
@@ -6235,7 +6235,7 @@ func TestHandleAPIStartSessionAlreadyRunningViaHTTP(t *testing.T) {
 func TestHandleAPIListModelsWithWorkspaceParam(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "models-ws")
-	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nmodels:\n  coordinator: [\"anthropic/claude-opus-4-6\"]\n---\n# Models Test"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nmodels:\n  coordinator: [\"openai/gpt-5.5\"]\n---\n# Models Test"), 0644))
 	w := serveHTTP(server, "GET", "/api/v1/models?workspace=models-ws", "")
 	assert.Equal(t, http.StatusOK, w.Code)
 }

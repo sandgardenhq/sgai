@@ -72,7 +72,7 @@ export function AdhocOutput(): JSX.Element {
               id="adhoc-model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="e.g., anthropic/claude-opus-4-6"
+              placeholder="e.g., openai/gpt-5.5"
               disabled={isRunning}
             />
           </div>

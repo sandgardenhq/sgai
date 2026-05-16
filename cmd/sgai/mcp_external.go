@@ -624,7 +624,7 @@ func registerAdhocTools(server *mcp.Server, ctx *externalMCPContext) {
 	type startAdhocArgs struct {
 		Workspace string `json:"workspace" jsonschema:"The workspace name"`
 		Prompt    string `json:"prompt" jsonschema:"The prompt text to run"`
-		Model     string `json:"model" jsonschema:"The model to use (e.g. 'anthropic/claude-opus-4-6')"`
+		Model     string `json:"model" jsonschema:"The model to use (e.g. 'openai/gpt-5.5')"`
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "start_adhoc",

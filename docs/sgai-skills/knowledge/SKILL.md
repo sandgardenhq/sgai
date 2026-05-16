@@ -204,11 +204,11 @@ Response:
 ```json
 {
   "models": [
-    {"id": "anthropic/claude-opus-4-6", "name": "anthropic/claude-opus-4-6"},
-    {"id": "anthropic/claude-sonnet-4-6", "name": "anthropic/claude-sonnet-4-6"},
+    {"id": "openai/gpt-5.5", "name": "openai/gpt-5.5"},
+    {"id": "openai/gpt-5.5", "name": "openai/gpt-5.5"},
     {"id": "openai/gpt-4o", "name": "openai/gpt-4o"}
   ],
-  "defaultModel": "anthropic/claude-opus-4-6"
+  "defaultModel": "openai/gpt-5.5"
 }
 ```
 
