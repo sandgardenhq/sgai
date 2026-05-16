@@ -134,6 +134,12 @@ mock.module("@/lib/factory-state", () => ({
 
 const mockDeleteFork = mock(() => Promise.resolve({ deleted: true }));
 const mockDeleteWorkspace = mock(() => Promise.resolve({ deleted: true }));
+const mockNavigate = mock(() => {});
+
+mock.module("react-router", () => ({
+  ...require("react-router"),
+  useNavigate: () => mockNavigate,
+}));
 
 mock.module("@/lib/api", () => ({
   api: {
@@ -180,6 +186,7 @@ describe("Dashboard", () => {
   beforeEach(() => {
     mockDeleteFork.mockClear();
     mockDeleteWorkspace.mockClear();
+    mockNavigate.mockClear();
   });
 
   afterEach(() => {
@@ -567,9 +574,7 @@ describe("Dashboard", () => {
       });
 
       await waitFor(() => {
-        const redirectTarget = screen.queryByTestId("redirect-target");
-        expect(redirectTarget).not.toBeNull();
-        expect(redirectTarget?.textContent).toBe("Redirected to forks");
+        expect(mockNavigate).toHaveBeenCalledWith("/workspaces/workspace-2/forks");
       });
     });
   });
