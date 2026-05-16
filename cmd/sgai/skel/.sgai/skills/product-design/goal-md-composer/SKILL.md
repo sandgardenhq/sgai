@@ -46,28 +46,28 @@ Understand what the user is building.
 
 Based on project description, recommend appropriate agents.
 
-**CRITICAL - Mandatory Reviewer Pairing Rules:**
-When selecting a development agent, you MUST automatically include its paired reviewer:
+**CRITICAL - Mandatory Coding Wrapper Rules:**
+When selecting a coding capability, you MUST select the public wrapper agent. Wrapper agents handle their developer and reviewer subagents internally; do not add hidden subagents to the GOAL.md flow or model assignments.
 
-| Development Agent | Required Reviewer |
+| Coding Capability | Public Wrapper |
 |-------------------|-------------------|
-| `backend-go-developer` | `go-readability-reviewer` |
-| `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
-| `react-developer` | `react-reviewer` |
-| `shell-script-coder` | `shell-script-reviewer` |
+| Go | `go` |
+| HTMX/PicoCSS | `htmx-picocss` |
+| React | `react` |
+| Shell scripts | `shell-script` |
+| Websites | `webmaster` |
 
 **Process:**
 
 1. Based on Phase 1 answers, present recommended agents organized by category
-2. For each development agent recommended, show: "This will automatically include [reviewer] for code review"
+2. For each coding wrapper recommended, show: "This wrapper delegates implementation and review internally"
 3. Present the full agent list with descriptions (see REFERENCE.md)
 4. Ask: "Do you want to add or remove any agents from this selection?"
 
 **Example recommendation for Go Backend API:**
 ```
 Recommended agents for your Go Backend API:
-- backend-go-developer (Go development)
-- go-readability-reviewer (automatically paired)
+- go (Go implementation and review wrapper)
 - general-purpose (cross-domain tasks)
 - stpa-analyst (safety analysis)
 
@@ -84,14 +84,17 @@ Generate the DOT syntax DAG defining agent execution order and dependencies.
 
 **Auto-generation rules:**
 
-1. Development agents always flow into their paired reviewers:
+1. Coding work should use wrapper agents:
    ```
-   "backend-go-developer" -> "go-readability-reviewer"
+   "go"
+   "react"
+   "htmx-picocss"
+   "shell-script"
    ```
 
-2. Reviewers typically flow into terminal analysis agents:
+2. Wrapper agents typically flow into terminal analysis agents:
    ```
-   "go-readability-reviewer" -> "stpa-analyst"
+   "go" -> "stpa-analyst"
    ```
 
 3. Standalone agents (no dependencies) are listed without arrows:
@@ -102,8 +105,7 @@ Generate the DOT syntax DAG defining agent execution order and dependencies.
 **Present the generated flow:**
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
 ```
 
@@ -136,8 +138,7 @@ Configure per-agent model assignments.
 ```yaml
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "backend-go-developer": "openai/gpt-5.5"
-  "go-readability-reviewer": "openai/gpt-5.5"
+  "go": "openai/gpt-5.5"
   "general-purpose": "openai/gpt-5.5"
 ```
 
@@ -236,7 +237,7 @@ completionGateScript: [from Phase 6, if set]
 
 **Validation checklist (present to user):**
 
-- [ ] All development agents have paired reviewers in the flow
+- [ ] Coding work uses public wrapper agents, not hidden developer or reviewer subagents
 - [ ] Flow has no cycles (DAG is valid)
 - [ ] Coordinator is NOT in the flow (it's always present automatically)
 - [ ] Models are assigned to agents that appear in the flow
@@ -281,13 +282,11 @@ interactive: yes
 ---
 completionGateScript: make test
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "backend-go-developer": "openai/gpt-5.5"
-  "go-readability-reviewer": "openai/gpt-5.5"
+  "go": "openai/gpt-5.5"
   "general-purpose": "openai/gpt-5.5"
   "stpa-analyst": "openai/gpt-5.5"
 interactive: yes

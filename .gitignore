@@ -10,3 +10,5 @@ trees_dump.html
 verification/
 vendor/
 cover*.out
+.playwright-mcp/
+folding-agents-compose.png

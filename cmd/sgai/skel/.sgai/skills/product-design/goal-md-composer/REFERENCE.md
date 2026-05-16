@@ -44,19 +44,16 @@ DOT-format DAG defining which agents run and their dependencies.
 **Example:**
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "backend-go-developer" -> "stpa-analyst"
-  "go-readability-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
-  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-  "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+  "htmx-picocss" -> "stpa-analyst"
 ```
 
 **Standalone agents (no dependencies):**
 ```yaml
 flow: |
   "general-purpose"
-  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
+  "htmx-picocss"
 ```
 
 **Rules:**
@@ -74,10 +71,9 @@ Per-agent model assignments. Supports variant syntax in parentheses.
 ```yaml
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "backend-go-developer": "openai/gpt-5.5"
-  "go-readability-reviewer": "openai/gpt-5.5"
+  "go": "openai/gpt-5.5"
   "general-purpose": "openai/gpt-5.5"
-  "htmx-picocss-frontend-developer": "openai/gpt-5.5"
+  "htmx-picocss": "openai/gpt-5.5"
 ```
 
 **Notes:**
@@ -162,22 +158,12 @@ not implementation. Focus on outcomes.
 
 | Agent | Description | Paired Reviewer |
 |-------|-------------|-----------------|
-| `backend-go-developer` | Expert Go backend developer for APIs, CLI tools, and services with idiomatic Go patterns. Works with go-readability-reviewer for code quality. | `go-readability-reviewer` |
-| `htmx-picocss-frontend-developer` | Frontend developer using HTMX and PicoCSS for lightweight web interfaces. No custom JavaScript. | `htmx-picocss-frontend-reviewer` |
-| `shell-script-coder` | Production-quality POSIX/bash shell scripts with proper error handling. | `shell-script-reviewer` |
-| `react-developer` | Frontend developer specializing in React for building modern, component-based web applications. TypeScript, hooks, modern patterns. | `react-reviewer` |
+| `go` | Primary Go wrapper that delegates implementation to `go-developer` and review to `go-reviewer`. | Handled internally |
+| `htmx-picocss` | Primary HTMX/PicoCSS wrapper that delegates implementation to `htmx-picocss-developer` and review to `htmx-picocss-reviewer`. | Handled internally |
+| `shell-script` | Primary shell script wrapper that delegates implementation to `shell-script-developer` and review to `shell-script-reviewer`. | Handled internally |
+| `react` | Primary React wrapper that delegates implementation to `react-developer` and review to `react-reviewer`. | Handled internally |
 | `general-purpose` | Cross-domain tasks, research, multi-step operations. No dedicated reviewer. | None |
 | `webmaster` | Marketing sites, landing pages with Bootstrap/Tailwind/PicoCSS. SEO and accessibility focus. | None |
-
-### Review Agents
-
-| Agent | Description |
-|-------|-------------|
-| `go-readability-reviewer` | Reviews Go code for readability, idioms, and best practices. Read-only - sends fixes via messaging. |
-| `htmx-picocss-frontend-reviewer` | UI polish, accessibility, visual consistency for HTMX/PicoCSS interfaces. Read-only. |
-| `react-reviewer` | React code review for best practices, performance, accessibility, hooks usage, and anti-patterns. Read-only. |
-| `shell-script-reviewer` | Shell script correctness, portability, security review. Read-only. |
-| `project-critic-council` | Multi-model council that validates completion claims with strict standards. |
 
 ### Analysis Agents
 
@@ -188,6 +174,7 @@ not implementation. Focus on outcomes.
 | `c4-component` | C4 Component-level architecture synthesis from code documentation. |
 | `c4-container` | C4 Container-level deployment documentation. |
 | `c4-context` | C4 System context diagrams for stakeholders (highest C4 level). |
+| `project-critic-council` | Multi-model council that validates completion claims with strict standards. |
 
 ### Coordination
 
@@ -212,30 +199,31 @@ not implementation. Focus on outcomes.
 
 ---
 
-## Mandatory Reviewer Pairing
+## Mandatory Coding Wrappers
 
-> **CRITICAL CONSTRAINT:** Every coding agent **must** be paired with its corresponding reviewer agent.
+> **CRITICAL CONSTRAINT:** Coding work must use public wrapper agents. Wrapper agents delegate to hidden developer and reviewer subagents internally.
 
-| Development Agent | Required Reviewer |
+| Coding Capability | Public Wrapper |
 |-------------------|-------------------|
-| `backend-go-developer` | `go-readability-reviewer` |
-| `htmx-picocss-frontend-developer` | `htmx-picocss-frontend-reviewer` |
-| `react-developer` | `react-reviewer` |
-| `shell-script-coder` | `shell-script-reviewer` |
+| Go | `go` |
+| HTMX/PicoCSS | `htmx-picocss` |
+| React | `react` |
+| Shell scripts | `shell-script` |
+| Websites | `webmaster` |
 
 ### Enforcement Rules
 
-When selecting a development agent:
-1. **Auto-add** the paired reviewer to the agent selection
-2. **Auto-create** the dependency edge in the flow DAG
-3. **Show notice** explaining why the reviewer was added
-4. **Warn** if user tries to remove reviewer while developer is selected
+When selecting a coding capability:
+1. **Select** the public wrapper agent only
+2. **Do not add** hidden developer or reviewer subagents to the GOAL.md flow
+3. **Do not assign** models to hidden developer or reviewer subagents in GOAL.md
+4. **Show notice** explaining that implementation and review are handled internally by the wrapper
 
 ### Flow Pattern
 
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
+  "go"
 ```
 
 ### Exception: `general-purpose`
@@ -283,11 +271,10 @@ The `general-purpose` agent does not have a dedicated reviewer since it handles 
 ```markdown
 ---
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
+  "go"
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "backend-go-developer": "openai/gpt-5.5"
-  "go-readability-reviewer": "openai/gpt-5.5"
+  "go": "openai/gpt-5.5"
 interactive: yes
 completionGateScript: go test ./...
 ---
@@ -319,17 +306,13 @@ Create a command-line tool that validates JSON files against a schema.
 ---
 completionGateScript: make test
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
-  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-  "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
+  "htmx-picocss" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "backend-go-developer": "openai/gpt-5.5"
-  "go-readability-reviewer": "openai/gpt-5.5"
-  "htmx-picocss-frontend-developer": "openai/gpt-5.5"
-  "htmx-picocss-frontend-reviewer": "openai/gpt-5.5"
+  "go": "openai/gpt-5.5"
+  "htmx-picocss": "openai/gpt-5.5"
   "general-purpose": "openai/gpt-5.5"
   "stpa-analyst": "openai/gpt-5.5"
 interactive: yes
@@ -402,11 +385,10 @@ Research and document best practices for REST API versioning.
 ```markdown
 ---
 flow: |
-  "shell-script-coder" -> "shell-script-reviewer"
+  "shell-script"
 models:
   "coordinator": "openai/gpt-5.5 (xhigh)"
-  "shell-script-coder": "openai/gpt-5.5"
-  "shell-script-reviewer": "openai/gpt-5.5"
+  "shell-script": "openai/gpt-5.5"
 interactive: yes
 completionGateScript: shellcheck scripts/*.sh
 ---
@@ -440,8 +422,8 @@ Before finalizing a GOAL.md, verify:
 
 - [ ] **Flow DAG is valid** - No cycles, all edges point forward
 - [ ] **Coordinator not in flow** - It's always present automatically
-- [ ] **Reviewer pairing enforced** - Every developer agent has its reviewer
-- [ ] **Reviewer edges exist** - Developer flows into reviewer (e.g., `"backend-go-developer" -> "go-readability-reviewer"`)
+- [ ] **Wrapper pairing enforced** - Coding work uses wrapper agents that handle implementation and review internally
+- [ ] **Review path exists** - Coding wrapper agents delegate to hidden developer and reviewer subagents internally
 - [ ] **Models assigned correctly** - All agents in flow have model assignments (or use defaults)
 - [ ] **Interactive mode set** - Explicitly set to `yes`, `no`, or `auto`
 - [ ] **Specification complete** - Has Goal description, Requirements, and Tasks
@@ -456,44 +438,39 @@ Before finalizing a GOAL.md, verify:
 ### Go Backend Only
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
+  "go"
 ```
 
 ### Go Backend with Safety Analysis
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
 ```
 
 ### HTMX Frontend Only
 ```yaml
 flow: |
-  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
+  "htmx-picocss"
 ```
 
 ### Full-Stack Go + HTMX
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
-  "htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-  "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
+  "htmx-picocss" -> "stpa-analyst"
 ```
 
 ### React Frontend Only
 ```yaml
 flow: |
-  "react-developer" -> "react-reviewer"
+  "react"
 ```
 
 ### Full-Stack Go + React
 ```yaml
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
-  "go-readability-reviewer" -> "stpa-analyst"
-  "react-developer" -> "react-reviewer"
-  "react-reviewer" -> "stpa-analyst"
+  "go" -> "stpa-analyst"
+  "react" -> "stpa-analyst"
 ```
 
 ### Research/Exploration
@@ -521,7 +498,7 @@ flow: |
 
 ### "Cycle detected" Error
 - Review the flow for circular dependencies
-- Ensure reviewers don't flow back to developers
+- Ensure terminal analysis agents do not flow back to coding wrappers
 - Use a topological sort tool to verify DAG validity
 
 ### "Model not available" Error

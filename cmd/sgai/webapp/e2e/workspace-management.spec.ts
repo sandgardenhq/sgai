@@ -20,7 +20,7 @@ test.describe("Workspace Management Workflow", () => {
 
     await page.fill('[data-testid="markdown-editor"] textarea', `---
 flow: |
-  "coordinator" -> "backend-go-developer"
+  "go"
 ---
 
 # Test Goal

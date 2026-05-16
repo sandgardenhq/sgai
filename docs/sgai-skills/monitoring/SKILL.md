@@ -35,7 +35,7 @@ Response:
       "status": "working",
       "badgeClass": "badge-running",
       "badgeText": "Running",
-      "currentAgent": "backend-go-developer",
+      "currentAgent": "go",
       "currentModel": "openai/gpt-5.5",
       "task": "Writing authentication endpoints",
       "latestProgress": "Created JWT middleware",
@@ -105,7 +105,7 @@ Response:
   {
     "id": 42,
     "fromAgent": "coordinator",
-    "toAgent": "backend-go-developer",
+    "toAgent": "go",
     "body": "Please implement the authentication module",
     "subject": "Implement auth",
     "read": true,
@@ -216,7 +216,7 @@ Response:
     "isCurrent": false
   },
   {
-    "agent": "backend-go-developer",
+    "agent": "go",
     "model": "openai/gpt-5.5",
     "elapsedTime": "8m 42s",
     "isCurrent": true

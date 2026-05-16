@@ -176,7 +176,7 @@ After reading all artifacts in Step 1, write a structured analysis summary to yo
 ```
 Analysis Summary:
 - Files: Read 15/15 session JSONs, session state.json (from .sgai/retrospectives/<session-id>/state.json), GOAL.md, PROJECT_MANAGEMENT.md, stdout.log, stderr.log
-- Visits: coordinator(8), backend-go-developer(3), go-readability-reviewer(2), react-developer(1), project-critic-council(1)
+- Visits: coordinator(8), go(3), go-reviewer(2), react(1), project-critic-council(1)
 - Messages: 19 inter-agent messages, 3 reviewer feedback rounds
 - Efficiency: Backend developer visited 3 times due to reviewer feedback — could skills reduce this?
 - Quality: Reviewer caught SQL formatting issues 3 times — suggests missing skill
@@ -204,7 +204,7 @@ Analyze the artifacts for these signal types:
 - [ ] **Iteration depth** — How many iterations did the workflow take? What drove the iteration count?
 
 #### Quality Signals
-- [ ] **Reviewer feedback** — What did reviewers (go-readability-reviewer, react-reviewer) find? Are there patterns in what they catch?
+- [ ] **Reviewer feedback** — What did reviewers (go-reviewer, react-reviewer, htmx-picocss-reviewer, shell-script-reviewer, webmaster-reviewer) find? Are there patterns in what they catch?
 - [ ] **Test failures** — Were there build or test failures? What caused them?
 - [ ] **Backtracks** — Did any agent need to undo or redo work? Why?
 
@@ -294,7 +294,7 @@ Before presenting any suggestion, verify the target path:
 **New/Modified Agent Prompts** (`sgai/agent/<name>.md`)
 - An agent's behavior needs adjustment
 - An agent's permissions were too broad or too narrow
-- Example: "Add explicit instruction to backend-go-developer about running make lint before marking done"
+- Example: "Add explicit instruction to go-developer about running make lint before marking done"
 
 **Update AGENTS.md**
 - A style rule emerged from reviewer feedback

@@ -19,25 +19,21 @@ var workflowTemplates = []workflowTemplate{
 		Icon:        "⚙️",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "go", Selected: true, Model: defaultAgentModel},
 			{Name: "stpa-analyst", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"backend-go-developer" -> "go-readability-reviewer"
-"backend-go-developer" -> "stpa-analyst"
-"go-readability-reviewer" -> "stpa-analyst"`,
+		Flow: `"go" -> "stpa-analyst"`,
 	},
 	{
 		ID:          "frontend",
 		Name:        "Frontend — HTMX",
-		Description: "HTMX/PicoCSS developer with UI reviewer",
+		Description: "HTMX/PicoCSS implementation and review wrapper",
 		Icon:        "🎨",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "htmx-picocss", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"`,
+		Flow: `"htmx-picocss"`,
 	},
 	{
 		ID:          "fullstack",
@@ -46,17 +42,12 @@ var workflowTemplates = []workflowTemplate{
 		Icon:        "🚀",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "go", Selected: true, Model: defaultAgentModel},
+			{Name: "htmx-picocss", Selected: true, Model: defaultAgentModel},
 			{Name: "stpa-analyst", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"backend-go-developer" -> "go-readability-reviewer"
-"backend-go-developer" -> "stpa-analyst"
-"go-readability-reviewer" -> "stpa-analyst"
-"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"
-"htmx-picocss-frontend-reviewer" -> "stpa-analyst"`,
+		Flow: `"go" -> "stpa-analyst"
+"htmx-picocss" -> "stpa-analyst"`,
 	},
 	{
 		ID:          "research",
@@ -83,38 +74,35 @@ var workflowTemplates = []workflowTemplate{
 	{
 		ID:          "react",
 		Name:        "Frontend — React",
-		Description: "React developer with code reviewer",
+		Description: "React implementation and review wrapper",
 		Icon:        "⚛️",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "react-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "react-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "react", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"react-developer" -> "react-reviewer"`,
+		Flow: `"react"`,
 	},
 	{
 		ID:          "shell",
 		Name:        "Shell Scripting",
-		Description: "Shell script developer with reviewer",
+		Description: "Shell script implementation and review wrapper",
 		Icon:        "🐚",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "shell-script-coder", Selected: true, Model: defaultAgentModel},
-			{Name: "shell-script-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "shell-script", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"shell-script-coder" -> "shell-script-reviewer"`,
+		Flow: `"shell-script"`,
 	},
 	{
 		ID:          "website",
 		Name:        "Marketing Website",
-		Description: "Webmaster with frontend reviewer",
+		Description: "Website implementation and review wrapper",
 		Icon:        "🌐",
 		Agents: []composerAgentConf{
 			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
 			{Name: "webmaster", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
 		},
-		Flow: `"webmaster" -> "htmx-picocss-frontend-reviewer"`,
+		Flow: `"webmaster"`,
 	},
 	{
 		ID:          "c4docs",
@@ -218,16 +206,16 @@ func techStackFromAgents(agents []composerAgentConf) []string {
 	if selected["general-purpose"] {
 		stack = append(stack, "general-purpose")
 	}
-	if selected["backend-go-developer"] {
+	if selected["go"] {
 		stack = append(stack, "go")
 	}
-	if selected["htmx-picocss-frontend-developer"] {
+	if selected["htmx-picocss"] {
 		stack = append(stack, "htmx")
 	}
-	if selected["react-developer"] {
+	if selected["react"] {
 		stack = append(stack, "react")
 	}
-	if selected["shell-script-coder"] {
+	if selected["shell-script"] {
 		stack = append(stack, "shell")
 	}
 	if selected["agent-sdk-verifier-ts"] || selected["agent-sdk-verifier-py"] {

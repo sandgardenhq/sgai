@@ -150,18 +150,18 @@ interface TechStackMapping {
 
 const TECH_STACK_AGENT_MAP: Record<string, TechStackMapping> = {
   go: {
-    agents: ["backend-go-developer", "go-readability-reviewer"],
+    agents: ["go"],
     flow: [
-      '"backend-go-developer" -> "go-readability-reviewer"',
+      '"go"',
     ],
   },
   htmx: {
-    agents: ["htmx-picocss-frontend-developer", "htmx-picocss-frontend-reviewer"],
-    flow: ['"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"'],
+    agents: ["htmx-picocss"],
+    flow: ['"htmx-picocss"'],
   },
   react: {
-    agents: ["react-developer", "react-reviewer"],
-    flow: ['"react-developer" -> "react-reviewer"'],
+    agents: ["react"],
+    flow: ['"react"'],
   },
   python: {
     agents: ["general-purpose"],
@@ -172,8 +172,8 @@ const TECH_STACK_AGENT_MAP: Record<string, TechStackMapping> = {
     flow: [],
   },
   shell: {
-    agents: ["shell-script-coder", "shell-script-reviewer"],
-    flow: ['"shell-script-coder" -> "shell-script-reviewer"'],
+    agents: ["shell-script"],
+    flow: ['"shell-script"'],
   },
   "general-purpose": {
     agents: ["general-purpose"],
@@ -224,8 +224,10 @@ function computeAgentsAndFlowFromTechStack(
       for (const reviewer of reviewers) {
         flowLines.push(`"${reviewer}" -> "stpa-analyst"`);
       }
-      if (tech === "go") {
-        flowLines.push('"backend-go-developer" -> "stpa-analyst"');
+      if (tech === "go" || tech === "htmx" || tech === "react" || tech === "shell") {
+        for (const agent of mapping.agents) {
+          flowLines.push(`"${agent}" -> "stpa-analyst"`);
+        }
       }
       if (tech === "general-purpose") {
         flowLines.push('"general-purpose" -> "stpa-analyst"');

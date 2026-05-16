@@ -27,7 +27,7 @@ permission:
 
 ### ANTI-PATTERN: Coding Directly
 ❌ DON'T: Write code changes yourself
-✅ DO INSTEAD: Navigate to specialized agents (backend-go-developer, general-purpose, etc.)
+✅ DO INSTEAD: Navigate to specialized agents (go, general-purpose, etc.)
 
 ### DECISION TREE: When You See Code That Needs Changing
 1. READ it to understand the context

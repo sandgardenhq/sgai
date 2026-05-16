@@ -460,18 +460,18 @@ func TestParseAgentIdentityHeader(t *testing.T) {
 		},
 		{
 			name:     "simpleAgentName",
-			header:   "backend-go-developer",
-			expected: "backend-go-developer",
+			header:   "go",
+			expected: "go",
 		},
 		{
 			name:     "agentWithModelAndVariant",
-			header:   "backend-go-developer|openai/gpt-5.5|max",
-			expected: "backend-go-developer",
+			header:   "go|openai/gpt-5.5|max",
+			expected: "go",
 		},
 		{
 			name:     "agentWithPipeSeparator",
-			header:   "react-developer|opencode/model1|",
-			expected: "react-developer",
+			header:   "react|opencode/model1|",
+			expected: "react",
 		},
 		{
 			name:     "onlyPipes",
@@ -501,15 +501,15 @@ func TestResolveCallerAgent(t *testing.T) {
 	}{
 		{
 			name:         "nonCoordinatorHeader",
-			headerAgent:  "backend-go-developer",
-			currentAgent: "react-developer",
-			expected:     "backend-go-developer",
+			headerAgent:  "go",
+			currentAgent: "react",
+			expected:     "go",
 		},
 		{
 			name:         "coordinatorHeaderWithCurrentAgent",
 			headerAgent:  "coordinator",
-			currentAgent: "backend-go-developer",
-			expected:     "backend-go-developer",
+			currentAgent: "go",
+			expected:     "go",
 		},
 		{
 			name:         "coordinatorHeaderWithCoordinatorCurrent",
@@ -551,35 +551,35 @@ func messageMatchCases() []messageMatchTest {
 	return []messageMatchTest{
 		{
 			name:         "matchesAgent",
-			agentField:   "backend-go-developer",
-			currentAgent: "backend-go-developer",
+			agentField:   "go",
+			currentAgent: "go",
 			currentModel: "",
 			expected:     true,
 		},
 		{
 			name:         "matchesModel",
 			agentField:   "opencode/glm-5",
-			currentAgent: "backend-go-developer",
+			currentAgent: "go",
 			currentModel: "opencode/glm-5",
 			expected:     true,
 		},
 		{
 			name:         "noMatch",
-			agentField:   "react-developer",
-			currentAgent: "backend-go-developer",
+			agentField:   "react",
+			currentAgent: "go",
 			currentModel: "",
 			expected:     false,
 		},
 		{
 			name:         "emptyAgentField",
 			agentField:   "",
-			currentAgent: "backend-go-developer",
+			currentAgent: "go",
 			currentModel: "",
 			expected:     false,
 		},
 		{
 			name:         "emptyCurrentAgent",
-			agentField:   "backend-go-developer",
+			agentField:   "go",
 			currentAgent: "",
 			currentModel: "",
 			expected:     false,
@@ -587,7 +587,7 @@ func messageMatchCases() []messageMatchTest {
 		{
 			name:         "modelMatchWithEmptyModel",
 			agentField:   "opencode/glm-5",
-			currentAgent: "backend-go-developer",
+			currentAgent: "go",
 			currentModel: "",
 			expected:     false,
 		},
@@ -862,7 +862,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 }
 
 func TestSendMessage(t *testing.T) {
-	dagAgents := []string{"coordinator", "backend-go-developer", "react-developer"}
+	dagAgents := []string{"coordinator", "go", "react"}
 
 	tests := []struct {
 		name         string
@@ -888,13 +888,13 @@ func TestSendMessage(t *testing.T) {
 		{
 			name:         "sendFromCoordinator",
 			callerAgent:  "coordinator",
-			toAgent:      "backend-go-developer",
+			toAgent:      "go",
 			body:         "please review this",
 			wantContains: "Message sent successfully",
 		},
 		{
 			name:         "sendFromNonCoordinator",
-			callerAgent:  "backend-go-developer",
+			callerAgent:  "go",
 			toAgent:      "coordinator",
 			body:         "done with review",
 			wantContains: "IMPORTANT: To receive a response",
