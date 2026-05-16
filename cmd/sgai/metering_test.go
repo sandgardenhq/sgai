@@ -13,6 +13,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExportSessionBytesUsesFileBackedStdout(t *testing.T) {
+	originalExport := exportSessionBytes
+	binDir := t.TempDir()
+	opencodePath := filepath.Join(binDir, "opencode")
+	require.NoError(t, os.WriteFile(opencodePath, []byte(`#!/bin/sh
+if [ "$1" != "export" ]; then
+	exit 2
+fi
+if [ -p /dev/stdout ]; then
+	printf '{"truncated"'
+else
+	printf '{"sessionID":"%s"}' "$2"
+fi
+`), 0755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	data, err := originalExport(t.TempDir(), "session-1")
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"sessionID":"session-1"}`, string(data))
+}
+
 func TestParseExportedSessionCollectsStepFinish(t *testing.T) {
 	data := []byte(`[
 		{"type":"step_finish","sessionID":"session-1","timestamp":1700000000000,"part":{"cost":0.02,"model":"openai/gpt-5.5","tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}}
