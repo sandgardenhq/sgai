@@ -3,7 +3,11 @@ description: Reviews websites for visual polish, accessibility, SEO, content qua
 mode: subagent
 hidden: true
 permission:
-  bash: deny
+  bash:
+    "*": deny
+    "jj st*": allow
+    "jj status*": allow
+    "jj diff*": allow
   edit: deny
   doom_loop: deny
   external_directory: deny

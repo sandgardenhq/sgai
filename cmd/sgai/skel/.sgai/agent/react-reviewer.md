@@ -3,7 +3,11 @@ description: React code reviewer ensuring best practices, performance, accessibi
 mode: subagent
 hidden: true
 permission:
-  bash: deny
+  bash:
+    "*": deny
+    "jj st*": allow
+    "jj status*": allow
+    "jj diff*": allow
   edit: deny
   doom_loop: deny
   external_directory: deny

@@ -4,7 +4,11 @@ mode: subagent
 hidden: true
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "jj st*": allow
+    "jj status*": allow
+    "jj diff*": allow
   skill: deny
   webfetch: deny
   doom_loop: deny

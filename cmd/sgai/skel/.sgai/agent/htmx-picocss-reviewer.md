@@ -3,7 +3,11 @@ description: UI OCD Web Agent - frontend interface reviewer for interfaces done 
 mode: subagent
 hidden: true
 permission:
-  bash: deny
+  bash:
+    "*": deny
+    "jj st*": allow
+    "jj status*": allow
+    "jj diff*": allow
   edit: deny
   doom_loop: deny
   external_directory: deny
