@@ -3445,7 +3445,7 @@ func TestModelsForAgentFromGoalNoGoal(t *testing.T) {
 
 func TestModelsForAgentFromGoalWithGoal(t *testing.T) {
 	dir := t.TempDir()
-	goalContent := "---\nmodels:\n  builder: anthropic/claude-opus-4-6\n---\n# Goal"
+	goalContent := "---\nmodels:\n  builder: openai/gpt-5.5\n---\n# Goal"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644))
 	result := modelsForAgentFromGoal(dir, "builder")
 	assert.NotNil(t, result)

@@ -36,7 +36,7 @@ Response:
       "badgeClass": "badge-running",
       "badgeText": "Running",
       "currentAgent": "backend-go-developer",
-      "currentModel": "anthropic/claude-sonnet-4-6",
+      "currentModel": "openai/gpt-5.5",
       "task": "Writing authentication endpoints",
       "latestProgress": "Created JWT middleware",
       "cost": {
@@ -211,13 +211,13 @@ Response:
 [
   {
     "agent": "coordinator",
-    "model": "anthropic/claude-opus-4-6",
+    "model": "openai/gpt-5.5",
     "elapsedTime": "2m 15s",
     "isCurrent": false
   },
   {
     "agent": "backend-go-developer",
-    "model": "anthropic/claude-sonnet-4-6",
+    "model": "openai/gpt-5.5",
     "elapsedTime": "8m 42s",
     "isCurrent": true
   }

@@ -73,11 +73,11 @@ Per-agent model assignments. Supports variant syntax in parentheses.
 **Example:**
 ```yaml
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-6"
-  "go-readability-reviewer": "anthropic/claude-opus-4-6"
-  "general-purpose": "anthropic/claude-opus-4-6"
-  "htmx-picocss-frontend-developer": "anthropic/claude-sonnet-4-5"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "backend-go-developer": "openai/gpt-5.5"
+  "go-readability-reviewer": "openai/gpt-5.5"
+  "general-purpose": "openai/gpt-5.5"
+  "htmx-picocss-frontend-developer": "openai/gpt-5.5"
 ```
 
 **Notes:**
@@ -246,15 +246,6 @@ The `general-purpose` agent does not have a dedicated reviewer since it handles 
 
 ## Available Models
 
-### Anthropic Models
-
-| Model | Variant | Cost | Description |
-|-------|---------|------|-------------|
-| `anthropic/claude-opus-4-6` | - | $$$$ | Most capable, best reasoning |
-| `anthropic/claude-opus-4-6` | `(max)` | $$$$ | Extended thinking for complex tasks |
-| `anthropic/claude-sonnet-4-5` | - | $$$ | Balanced capability and cost |
-| `anthropic/claude-sonnet-4-5` | `(max)` | $$$ | Extended thinking variant |
-
 ### Google Models
 
 | Model | Cost | Description |
@@ -266,22 +257,22 @@ The `general-purpose` agent does not have a dedicated reviewer since it handles 
 
 | Model | Cost | Description |
 |-------|------|-------------|
-| `openai/gpt-4.1` | $$$ | High capability, good reasoning |
-| `openai/gpt-4.1-mini` | $$ | Faster, lower cost |
-| `openai/o3` | $$$$ | Advanced reasoning model |
+| `openai/gpt-5.5` | $$$ | High capability, good reasoning |
+| `openai/gpt-5.4-mini` | $$ | Faster, lower cost |
+| `openai/gpt-5.5 (xhigh)` | $$$$ | Advanced reasoning model |
 
 ### Model Selection Guidelines
 
 | Agent Type | Recommended Model | Reason |
 |------------|-------------------|--------|
-| Coordinator | `anthropic/claude-opus-4-6 (max)` | Needs best reasoning for orchestration |
-| Go Developer | `anthropic/claude-opus-4-6` | Complex code generation |
-| Go Reviewer | `anthropic/claude-opus-4-6` | Thorough code analysis |
-| Frontend Dev | `anthropic/claude-sonnet-4-5` | Good balance for UI work |
-| Frontend Reviewer | `anthropic/claude-opus-4-6` | Detailed visual analysis |
-| General Purpose | `anthropic/claude-opus-4-6` | Varied complex tasks |
-| STPA Analyst | `anthropic/claude-opus-4-6` | Safety-critical analysis |
-| Utility Agents | `anthropic/claude-sonnet-4-5` | Cost-effective for simple tasks |
+| Coordinator | `openai/gpt-5.5 (xhigh)` | Needs best reasoning for orchestration |
+| Go Developer | `openai/gpt-5.5` | Complex code generation |
+| Go Reviewer | `openai/gpt-5.5` | Thorough code analysis |
+| Frontend Dev | `openai/gpt-5.5` | Good balance for UI work |
+| Frontend Reviewer | `openai/gpt-5.5` | Detailed visual analysis |
+| General Purpose | `openai/gpt-5.5` | Varied complex tasks |
+| STPA Analyst | `openai/gpt-5.5` | Safety-critical analysis |
+| Utility Agents | `openai/gpt-5.5` | Cost-effective for simple tasks |
 
 ---
 
@@ -294,9 +285,9 @@ The `general-purpose` agent does not have a dedicated reviewer since it handles 
 flow: |
   "backend-go-developer" -> "go-readability-reviewer"
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-6"
-  "go-readability-reviewer": "anthropic/claude-opus-4-6"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "backend-go-developer": "openai/gpt-5.5"
+  "go-readability-reviewer": "openai/gpt-5.5"
 interactive: yes
 completionGateScript: go test ./...
 ---
@@ -334,13 +325,13 @@ flow: |
   "htmx-picocss-frontend-reviewer" -> "stpa-analyst"
   "general-purpose" -> "stpa-analyst"
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-6"
-  "go-readability-reviewer": "anthropic/claude-opus-4-6"
-  "htmx-picocss-frontend-developer": "anthropic/claude-sonnet-4-5"
-  "htmx-picocss-frontend-reviewer": "anthropic/claude-opus-4-6"
-  "general-purpose": "anthropic/claude-opus-4-6"
-  "stpa-analyst": "anthropic/claude-opus-4-6"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "backend-go-developer": "openai/gpt-5.5"
+  "go-readability-reviewer": "openai/gpt-5.5"
+  "htmx-picocss-frontend-developer": "openai/gpt-5.5"
+  "htmx-picocss-frontend-reviewer": "openai/gpt-5.5"
+  "general-purpose": "openai/gpt-5.5"
+  "stpa-analyst": "openai/gpt-5.5"
 interactive: yes
 ---
 
@@ -381,8 +372,8 @@ Build a web-based task management application for small teams.
 flow: |
   "general-purpose"
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "general-purpose": "anthropic/claude-opus-4-6"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "general-purpose": "openai/gpt-5.5"
 interactive: yes
 ---
 
@@ -413,9 +404,9 @@ Research and document best practices for REST API versioning.
 flow: |
   "shell-script-coder" -> "shell-script-reviewer"
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "shell-script-coder": "anthropic/claude-opus-4-6"
-  "shell-script-reviewer": "anthropic/claude-opus-4-6"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "shell-script-coder": "openai/gpt-5.5"
+  "shell-script-reviewer": "openai/gpt-5.5"
 interactive: yes
 completionGateScript: shellcheck scripts/*.sh
 ---

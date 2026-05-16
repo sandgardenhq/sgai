@@ -465,7 +465,7 @@ func TestParseAgentIdentityHeader(t *testing.T) {
 		},
 		{
 			name:     "agentWithModelAndVariant",
-			header:   "backend-go-developer|anthropic/claude-opus-4-6|max",
+			header:   "backend-go-developer|openai/gpt-5.5|max",
 			expected: "backend-go-developer",
 		},
 		{

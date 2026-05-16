@@ -31,7 +31,7 @@ func TestLoadProjectConfig(t *testing.T) {
 			name: "validConfig",
 			setupFunc: func(t *testing.T, dir string) {
 				config := projectConfig{
-					DefaultModel: "anthropic/claude-opus-4-6",
+					DefaultModel: "openai/gpt-5.5",
 					Editor:       "code",
 				}
 				data, err := json.Marshal(config)
@@ -41,7 +41,7 @@ func TestLoadProjectConfig(t *testing.T) {
 			wantErr: false,
 			validate: func(t *testing.T, config *projectConfig) {
 				require.NotNil(t, config)
-				assert.Equal(t, "anthropic/claude-opus-4-6", config.DefaultModel)
+				assert.Equal(t, "openai/gpt-5.5", config.DefaultModel)
 				assert.Equal(t, "code", config.Editor)
 			},
 		},
@@ -66,7 +66,7 @@ func TestLoadProjectConfig(t *testing.T) {
 			name: "configWithActions",
 			setupFunc: func(t *testing.T, dir string) {
 				config := projectConfig{
-					DefaultModel: "anthropic/claude-opus-4-6",
+					DefaultModel: "openai/gpt-5.5",
 					Actions: []actionConfig{
 						{Name: "Test Action", Model: "test-model", Prompt: "test prompt"},
 					},
@@ -86,7 +86,7 @@ func TestLoadProjectConfig(t *testing.T) {
 			name: "configWithMCP",
 			setupFunc: func(t *testing.T, dir string) {
 				config := projectConfig{
-					DefaultModel: "anthropic/claude-opus-4-6",
+					DefaultModel: "openai/gpt-5.5",
 					MCP: map[string]json.RawMessage{
 						"test-server": json.RawMessage(`{"command": "test"}`),
 					},
@@ -149,7 +149,7 @@ func TestValidateProjectConfig(t *testing.T) {
 		{
 			name: "validDefaultModel",
 			config: &projectConfig{
-				DefaultModel: "anthropic/claude-opus-4-6",
+				DefaultModel: "openai/gpt-5.5",
 			},
 			wantErr: false,
 		},

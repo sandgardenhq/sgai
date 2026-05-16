@@ -234,7 +234,7 @@ describe("EventsTab", () => {
       mockWorkspaces = [createMockWorkspace({
         agentModels: [
           { agent: "coordinator", models: ["opencode/glm-5"] },
-          { agent: "developer", models: ["anthropic/claude-opus-4-6"] },
+          { agent: "developer", models: ["openai/gpt-5.5"] },
         ],
       })];
 

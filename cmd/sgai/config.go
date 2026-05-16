@@ -14,19 +14,19 @@ func defaultActionConfigs() []actionConfig {
 	return []actionConfig{
 		{
 			Name:        "Create PR",
-			Model:       "anthropic/claude-opus-4-6 (max)",
+			Model:       "openai/gpt-5.5 (xhigh)",
 			Prompt:      "copy GOAL.md into GOALS/ following the instructions from README.md; store the git path (by querying jj) into GIT_DIR, and using GH, make a draft PR for the commit at @ (jj); CRITICAL: commit message, the PR title and body, must adhere to the standard of previous commits - update all of these if necessary; once you are done, using bash(`open`), open the PR for me.",
 			Description: "Create a draft pull request from current changes",
 		},
 		{
 			Name:        "Upstream Sync",
-			Model:       "anthropic/claude-opus-4-6 (max)",
+			Model:       "openai/gpt-5.5 (xhigh)",
 			Prompt:      "`jj git fetch --all-remotes`; rebase against main@origin (`jj rebase -d main@origin`), fix merge conflicts, and push",
 			Description: "Fetch and rebase against upstream main branch",
 		},
 		{
 			Name:        "Start Application",
-			Model:       "anthropic/claude-opus-4-6 (max)",
+			Model:       "openai/gpt-5.5 (xhigh)",
 			Prompt:      "start the application server and ensure it is running properly; use the instructions inside `.deploy/` if available; if this is a networked application, and it starts at localhost, use 'localhost:0' to randomize the application start.",
 			Description: "Start the application locally",
 		},

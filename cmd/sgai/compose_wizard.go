@@ -9,7 +9,7 @@ type workflowTemplate struct {
 	Flow        string
 }
 
-const defaultAgentModel = "anthropic/claude-opus-4-6"
+const defaultAgentModel = "openai/gpt-5.5"
 
 var workflowTemplates = []workflowTemplate{
 	{

@@ -9,16 +9,16 @@ flow: |
 alias:
   # "backend-go-developer-lite": "backend-go-developer"
 models:
-  "coordinator": "anthropic/claude-opus-4-6 (max)"
-  "backend-go-developer": "anthropic/claude-opus-4-6"
-  "go-readability-reviewer": "anthropic/claude-opus-4-6"
-  "general-purpose": "anthropic/claude-opus-4-6"
-  "react-developer": "anthropic/claude-opus-4-6"
-  "react-reviewer": "anthropic/claude-opus-4-6"
-  "stpa-analyst": "anthropic/claude-opus-4-6"
-  "project-critic-council": ["anthropic/claude-opus-4-6"]
-  "skill-writer": "anthropic/claude-opus-4-6 (max)"
-  # "backend-go-developer-lite": "anthropic/claude-haiku-4-5"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "backend-go-developer": "openai/gpt-5.5"
+  "go-readability-reviewer": "openai/gpt-5.5"
+  "general-purpose": "openai/gpt-5.5"
+  "react-developer": "openai/gpt-5.5"
+  "react-reviewer": "openai/gpt-5.5"
+  "stpa-analyst": "openai/gpt-5.5"
+  "project-critic-council": ["openai/gpt-5.5"]
+  "skill-writer": "openai/gpt-5.5 (xhigh)"
+  # "backend-go-developer-lite": "openai/gpt-5.4-mini"
 ---
 
 # Title of your Goal
