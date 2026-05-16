@@ -174,8 +174,13 @@ export interface ApiModelsResponse {
 
 export interface ApiSessionCost {
   totalCost: number;
+  meteredReportedCost?: number;
+  apiEquivalentCost?: number;
+  apiEquivalentCostAvailable?: boolean;
+  apiEquivalentCostUnavailable?: string;
   totalTokens: ApiTokenUsage;
   byAgent: ApiAgentCost[];
+  bySession?: ApiSessionUsage[];
 }
 
 export interface ApiTokenUsage {
@@ -189,7 +194,12 @@ export interface ApiTokenUsage {
 export interface ApiStepCost {
   stepId: string;
   agent: string;
+  sessionId?: string;
   cost: number;
+  meteredReportedCost?: number;
+  apiEquivalentCost?: number;
+  apiEquivalentCostAvailable?: boolean;
+  apiEquivalentCostUnavailable?: string;
   tokens: ApiTokenUsage;
   timestamp: string;
 }
@@ -197,7 +207,25 @@ export interface ApiStepCost {
 export interface ApiAgentCost {
   agent: string;
   cost: number;
+  meteredReportedCost?: number;
+  apiEquivalentCost?: number;
+  apiEquivalentCostAvailable?: boolean;
+  apiEquivalentCostUnavailable?: string;
   tokens: ApiTokenUsage;
+  steps: ApiStepCost[];
+}
+
+export interface ApiSessionUsage {
+  sessionId: string;
+  parentSessionId?: string;
+  agent: string;
+  model?: string;
+  childSessionIds?: string[];
+  tokens: ApiTokenUsage;
+  meteredReportedCost: number;
+  apiEquivalentCost?: number;
+  apiEquivalentCostAvailable?: boolean;
+  apiEquivalentCostUnavailable?: string;
   steps: ApiStepCost[];
 }
 
@@ -425,4 +453,3 @@ export interface ApiBrowseDirectoryEntry {
 export interface ApiBrowseDirectoriesResponse {
   entries: ApiBrowseDirectoryEntry[];
 }
-

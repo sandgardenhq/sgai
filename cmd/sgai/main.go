@@ -387,6 +387,12 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, baseAgent) {
 			exportAgentSession(cfg, capturedSessionID, *iterationCounter)
 		}
+		if capturedSessionID != "" {
+			if err := reconcileAgentUsage(cfg.dir, cfg.coord, cfg.agent, capturedSessionID, modelSpec); err != nil {
+				log.Println("failed to reconcile opencode usage:", err)
+			}
+			newState = cfg.coord.State()
+		}
 
 		if newState.VisitCounts == nil {
 			newState.VisitCounts = make(map[string]int)
@@ -1265,6 +1271,7 @@ type streamEvent struct {
 	Type      string `json:"type"`
 	Timestamp int64  `json:"timestamp"`
 	SessionID string `json:"sessionID"`
+	Model     string `json:"model,omitempty"`
 	Part      part   `json:"part"`
 }
 
@@ -1272,6 +1279,7 @@ type part struct {
 	Type   string     `json:"type"`
 	Text   string     `json:"text,omitempty"`
 	Tool   string     `json:"tool,omitempty"`
+	Model  string     `json:"model,omitempty"`
 	State  *toolState `json:"state,omitempty"`
 	Cost   float64    `json:"cost,omitempty"`
 	Tokens partTokens `json:"tokens"`
@@ -1745,12 +1753,9 @@ func copyFinalStateToRetrospective(dir, retrospectiveDir string) error {
 }
 
 func exportSession(dir, sessionID, outputPath string) error {
-	cmd := exec.Command("opencode", "export", sessionID)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
-	output, err := cmd.Output()
+	output, err := exportSessionBytes(dir, sessionID)
 	if err != nil {
-		return fmt.Errorf("opencode export failed: %w", err)
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return err

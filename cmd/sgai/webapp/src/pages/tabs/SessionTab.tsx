@@ -9,7 +9,7 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
-import type { ApiAgentCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
+import type { ApiAgentCost, ApiSessionCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
   workspaceName: string;
@@ -56,8 +56,9 @@ function formatStepCost(cost: number): string {
   return `$${cost.toFixed(6)}`;
 }
 
-function CostSection({ cost }: { cost: { totalCost: number; totalTokens?: { input?: number; output?: number; cacheRead?: number }; byAgent?: ApiAgentCost[] } }) {
+function CostSection({ cost }: { cost: ApiSessionCost }) {
   const totalInput = (cost.totalTokens?.input ?? 0) + (cost.totalTokens?.cacheRead ?? 0);
+  const displayedCostLabel = cost.apiEquivalentCostAvailable ? "API-Equivalent Cost" : "Total Cost";
 
   return (
     <Card>
@@ -65,11 +66,17 @@ function CostSection({ cost }: { cost: { totalCost: number; totalTokens?: { inpu
         <CardTitle className="text-base">Cost Tracking</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-4 text-sm">
           <div>
-            <span className="text-muted-foreground text-xs">Total Cost</span>
+            <span className="text-muted-foreground text-xs">{displayedCostLabel}</span>
             <div className="font-semibold">{formatCost(cost.totalCost)}</div>
           </div>
+          {cost.meteredReportedCost !== undefined && (
+            <div>
+              <span className="text-muted-foreground text-xs">Reported Cost</span>
+              <div className="font-semibold">{formatCost(cost.meteredReportedCost)}</div>
+            </div>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="cursor-help">
@@ -92,6 +99,10 @@ function CostSection({ cost }: { cost: { totalCost: number; totalTokens?: { inpu
             <span className="text-muted-foreground text-xs">Output Tokens</span>
             <div className="font-semibold">{(cost.totalTokens?.output ?? 0).toLocaleString()}</div>
           </div>
+          <div>
+            <span className="text-muted-foreground text-xs">Reasoning</span>
+            <div className="font-semibold">{(cost.totalTokens?.reasoning ?? 0).toLocaleString()}</div>
+          </div>
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="cursor-help">
@@ -101,7 +112,20 @@ function CostSection({ cost }: { cost: { totalCost: number; totalTokens?: { inpu
             </TooltipTrigger>
             <TooltipContent>Tokens served from prompt cache</TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-help">
+                <span className="text-muted-foreground text-xs">Cache Write</span>
+                <div className="font-semibold">{(cost.totalTokens?.cacheWrite ?? 0).toLocaleString()}</div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Tokens written into prompt cache</TooltipContent>
+          </Tooltip>
         </div>
+
+        {!cost.apiEquivalentCostAvailable && cost.apiEquivalentCostUnavailable && (
+          <p className="mt-3 text-xs text-muted-foreground">API-equivalent cost unavailable: {cost.apiEquivalentCostUnavailable}</p>
+        )}
 
         {cost.byAgent && cost.byAgent.length > 0 && (
           <details className="mt-4">
@@ -131,6 +155,9 @@ function AgentCostDetail({ agentCost }: { agentCost: ApiAgentCost }) {
           <TooltipContent>{agentCost.agent}</TooltipContent>
         </Tooltip>
         <span className="text-muted-foreground">{formatCost(agentCost.cost)}</span>
+        {agentCost.meteredReportedCost !== undefined && agentCost.apiEquivalentCostAvailable && (
+          <span className="text-xs text-muted-foreground">reported {formatCost(agentCost.meteredReportedCost)}</span>
+        )}
         <span className="text-xs text-muted-foreground">({agentCost.steps?.length ?? 0} steps)</span>
       </summary>
       {agentCost.steps && agentCost.steps.length > 0 && (
@@ -144,7 +171,7 @@ function AgentCostDetail({ agentCost }: { agentCost: ApiAgentCost }) {
                 <TooltipContent>{step.stepId}</TooltipContent>
               </Tooltip>
               <span>{formatStepCost(step.cost)}</span>
-              <span>({step.tokens.input} in, {step.tokens.output} out)</span>
+              <span>({step.tokens.input} in, {step.tokens.output} out, {step.tokens.reasoning} reasoning, {step.tokens.cacheRead} cache read, {step.tokens.cacheWrite} cache write)</span>
             </div>
           ))}
         </div>
