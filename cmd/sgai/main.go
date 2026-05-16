@@ -1203,6 +1203,10 @@ func generateRetrospectiveDirName() string {
 }
 
 func openRetrospectiveLogs(retrospectiveDir string) (io.WriteCloser, io.WriteCloser, error) {
+	if retrospectiveDir == "" {
+		return nil, nil, nil
+	}
+
 	stdoutLogPath := filepath.Join(retrospectiveDir, "stdout.log")
 	stderrLogPath := filepath.Join(retrospectiveDir, "stderr.log")
 
@@ -1845,9 +1849,9 @@ func isExistingDirectory(path string) bool {
 	return fi.IsDir()
 }
 
-func isFalsish(s string) bool {
+func isTruthy(s string) bool {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "no", "false", "0", "off":
+	case "yes", "true", "1", "on":
 		return true
 	default:
 		return false
@@ -1855,5 +1859,5 @@ func isFalsish(s string) bool {
 }
 
 func retrospectiveEnabled(metadata GoalMetadata) bool {
-	return !isFalsish(metadata.Retrospective)
+	return isTruthy(metadata.Retrospective)
 }

@@ -13,11 +13,12 @@ const STORAGE_KEY_PREFIX = "compose-wizard-step-";
 const AUTO_SAVE_INTERVAL_MS = 30_000;
 const WIZARD_STEPS = [1, 2, 3, 4] as const;
 
-interface WizardStepData {
+export interface WizardStepData {
   description: string;
   techStack: string[];
   safetyAnalysis: boolean;
   completionGate: string;
+  retrospective: boolean;
 }
 
 interface StorageLoadResult {
@@ -54,15 +55,19 @@ function validateStoredStepData(
         ? { safetyAnalysis: candidate.safetyAnalysis }
         : null;
     case 4:
-      return typeof candidate.completionGate === "string"
-        ? { completionGate: candidate.completionGate }
+      return typeof candidate.completionGate === "string" &&
+        (candidate.retrospective === undefined || typeof candidate.retrospective === "boolean")
+        ? {
+            completionGate: candidate.completionGate,
+            retrospective: candidate.retrospective ?? false,
+          }
         : null;
     default:
       return null;
   }
 }
 
-function loadStepFromStorage(
+export function loadStepFromStorage(
   step: number,
   storage: Pick<Storage, "getItem"> = sessionStorage,
 ): StorageLoadResult {
@@ -103,7 +108,7 @@ function loadStepFromStorage(
   return { data: validated, error: null };
 }
 
-function saveStepToStorage(
+export function saveStepToStorage(
   step: number,
   data: Partial<WizardStepData>,
   storage: Pick<Storage, "setItem"> = sessionStorage,
@@ -138,6 +143,7 @@ function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizard
     techStack: data.techStack,
     safetyAnalysis: data.safetyAnalysis,
     completionGate: data.completionGate,
+    retrospective: data.retrospective,
   };
 }
 
@@ -248,6 +254,7 @@ function buildComposerStateFromData(
   return {
     description: data.description,
     completionGate: data.completionGate,
+    retrospective: data.retrospective,
     agents: sanitizeComposerAgents(hasUserAgents ? agents : (serverState?.agents ?? [])),
     flow: sanitizeComposerFlow(hasUserAgents ? flow : (serverState?.flow ?? "")),
     tasks: serverState?.tasks ?? "",
@@ -310,6 +317,7 @@ function serializeWizardData(data: WizardStepData): string {
     techStack: data.techStack,
     safetyAnalysis: data.safetyAnalysis,
     completionGate: data.completionGate,
+    retrospective: data.retrospective,
   });
 }
 
@@ -318,6 +326,7 @@ const DEFAULT_WIZARD_DATA: WizardStepData = {
   techStack: [],
   safetyAnalysis: false,
   completionGate: "",
+  retrospective: false,
 };
 
 interface ComposeWizardState {
@@ -383,6 +392,7 @@ export function useComposeWizard({
           techStack: stateResp.wizard.techStack ?? [],
           safetyAnalysis: stateResp.wizard.safetyAnalysis ?? false,
           completionGate: stateResp.wizard.completionGate ?? stateResp.state.completionGate ?? "",
+          retrospective: stateResp.wizard.retrospective ?? stateResp.state.retrospective ?? false,
         };
 
         // Override with any sessionStorage persisted data per step (R-14)
@@ -408,6 +418,9 @@ export function useComposeWizard({
             if (step === 4) {
               if (storedStep.completionGate !== undefined) {
                 merged.completionGate = storedStep.completionGate;
+              }
+              if (storedStep.retrospective !== undefined) {
+                merged.retrospective = storedStep.retrospective;
               }
             }
           }
@@ -466,6 +479,7 @@ export function useComposeWizard({
       case 4:
         storageError = saveStepToStorage(4, {
           completionGate: wizardData.completionGate,
+          retrospective: wizardData.retrospective,
         });
         break;
     }

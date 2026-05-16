@@ -17,6 +17,7 @@ import {
   Users,
   ShieldCheck,
   Terminal,
+  History,
   CheckCircle2,
   AlertTriangle,
   Loader2,
@@ -65,6 +66,10 @@ export function WizardFinish() {
     if (selectedTechIDs.has(item.id)) {
       selectedTechNames.push(item.name);
     }
+  }
+
+  if (!workspace) {
+    return <MissingWorkspaceNotice />;
   }
 
   if (!workspace) {
@@ -194,6 +199,18 @@ export function WizardFinish() {
               </CardContent>
             </Card>
           ) : null}
+
+          <Card className="py-3">
+            <CardContent className="flex items-start gap-3 px-4 py-0">
+              <History className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-muted-foreground mb-1">Retrospective</div>
+                <div className="font-semibold text-sm">
+                  {wizardData.retrospective ? "Enabled" : "Disabled"}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Draft saved indicator */}
           {draftSavedAt ? (

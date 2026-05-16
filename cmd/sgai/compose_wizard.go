@@ -156,6 +156,7 @@ type wizardState struct {
 	Description    string
 	TechStack      []string
 	SafetyAnalysis bool
+	Retrospective  bool
 	CompletionGate string
 }
 
@@ -191,6 +192,7 @@ func syncWizardState(wizard wizardState, st composerState) wizardState {
 	if !wizard.SafetyAnalysis {
 		wizard.SafetyAnalysis = st.SafetyAnalysis
 	}
+	wizard.Retrospective = st.Retrospective
 	return wizard
 }
 

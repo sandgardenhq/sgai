@@ -27,12 +27,6 @@ Notes:
 
 - `defaultModel` is validated using the base model name. If the value includes a variant in parentheses (for example, `provider/model (variant)`), only the base model is validated.
 
-### `disable_retrospective`
-
-Type: boolean
-
-If `true`, `sgai` does not create or resume a retrospective directory for the workflow run.
-
 ### `editor`
 
 Type: string

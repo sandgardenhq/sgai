@@ -62,15 +62,12 @@ You are running in Building mode. The brainstorming and work-gate phases are com
 - Skip the BRAINSTORMING step entirely - it is already done
 - Skip the WORK-GATE step entirely - it is already approved
 - Do NOT use ask_user_question or ask_user_work_gate during the building phase
-- The retrospective phase is STILL ACTIVE — you must run it when all work is complete
-- During the retrospective, the system will re-enable human interaction tools automatically
+- If GOAL.md enables retrospective with retrospective: true, the system will route to the retrospective agent before completion
 `
 
-const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify with project-critic → run retrospective → complete
+const flowSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify with project-critic → complete
 - When delegated work is done, invoke the project-critic wrapper subagent to verify all GOAL.md checkboxes are genuinely complete
-- After project-critic approves, send a message to the retrospective agent to start analysis
-- IMPORTANT: The retrospective step is MANDATORY. You MUST send a message to the retrospective agent and wait for RETRO_COMPLETE before marking complete
-- Do NOT mark status:complete until the retrospective has finished
+- If GOAL.md enables retrospective with retrospective: true, wait for the system's retrospective routing before final completion
 `
 
 const flowSectionRetrospectiveMode = `# RETROSPECTIVE MODE ACTIVE
@@ -78,7 +75,7 @@ You are running in Retrospective mode. The building phase is complete.
 - Human interaction tools (ask_user_question) are re-enabled
 - If you are the retrospective agent: analyze session artifacts and send RETRO_QUESTION messages to coordinator
 - If you are the coordinator: you MUST relay RETRO_QUESTION messages to the human using ask_user_question, then send the human's answer back to the retrospective agent
-- Do NOT skip the retrospective - it is a mandatory step
+- This phase runs only when GOAL.md explicitly opts in with retrospective: true
 `
 
 const flowSectionRetrospectiveModeCoordinator = `- You are in the RETRO_QUESTION relay phase

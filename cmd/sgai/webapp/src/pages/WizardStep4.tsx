@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WizardLayout } from "@/components/WizardLayout";
 import { useComposeWizard } from "@/hooks/useComposeWizard";
@@ -30,6 +31,13 @@ export function WizardStep4() {
     [setWizardData],
   );
 
+  const handleRetrospectiveChange = useCallback(
+    (checked: boolean) => {
+      setWizardData((prev) => ({ ...prev, retrospective: checked }));
+    },
+    [setWizardData],
+  );
+
   // Update preview when settings change
   useEffect(() => {
     if (!workspace || isLoading) return;
@@ -37,7 +45,7 @@ export function WizardStep4() {
       fetchPreview();
     }, 500);
     return () => clearTimeout(timer);
-  }, [workspace, wizardData.completionGate, isLoading, fetchPreview]);
+  }, [workspace, wizardData.completionGate, wizardData.retrospective, isLoading, fetchPreview]);
 
   if (!workspace) {
     return <MissingWorkspaceNotice />;
@@ -82,6 +90,21 @@ export function WizardStep4() {
             <p className="text-xs text-muted-foreground">
               A command that must pass before the workflow is considered complete (optional)
             </p>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="retrospective">Run a retrospective after completion</Label>
+              <p id="retrospective-help" className="text-xs text-muted-foreground">
+                Capture lessons and factory improvements after the build finishes. Optional and off by default.
+              </p>
+            </div>
+            <Switch
+              id="retrospective"
+              checked={wizardData.retrospective}
+              onCheckedChange={handleRetrospectiveChange}
+              aria-describedby="retrospective-help"
+            />
           </div>
         </div>
       </div>
