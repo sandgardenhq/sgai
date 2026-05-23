@@ -346,43 +346,6 @@ func (d *dag) toDOT() string {
 	return strings.Join(lines, "\n")
 }
 
-// buildMultiModelSection generates a multi-model awareness section for the continuation message.
-// Returns empty string if currentModel is empty (not in multi-model mode).
-// When in multi-model mode, shows the current model's identity and lists sibling models.
-func buildMultiModelSection(currentModel string, models map[string]any, currentAgent string) string {
-	if currentModel == "" {
-		return ""
-	}
-
-	agentModels := getModelsForAgent(models, currentAgent)
-	if len(agentModels) <= 1 {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString("\n## Multi-Model Agent Context\n\n")
-	sb.WriteString("You are running as part of a multi-model agent. Multiple models collaborate within this agent.\n\n")
-	sb.WriteString("**Your identity:** ")
-	sb.WriteString(currentModel)
-	sb.WriteString("\n\n")
-	sb.WriteString("**Sibling models in this agent:**\n")
-
-	for _, modelSpec := range agentModels {
-		modelID := formatModelID(currentAgent, modelSpec)
-		sb.WriteString("  - ")
-		sb.WriteString(modelID)
-		if modelID == currentModel {
-			sb.WriteString("  <-- YOU")
-		}
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("\nUse `sgai_send_message({toAgent: \"<sibling-model-id>\", body: \"...\"})` to message siblings.\n")
-	sb.WriteString("Use `sgai_check_inbox()` to read messages from siblings.\n")
-
-	return sb.String()
-}
-
 func buildFlowMessage(d *dag, currentAgent string, visitCounts map[string]int, dir string, interactionMode string, alias map[string]string) string {
 	predecessors := d.getPredecessors(currentAgent)
 	predecessorsStr := strings.Join(predecessors, ", ")

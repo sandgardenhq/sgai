@@ -36,7 +36,6 @@ Response:
       "badgeClass": "badge-running",
       "badgeText": "Running",
       "currentAgent": "go",
-      "currentModel": "openai/gpt-5.5",
       "task": "Writing authentication endpoints",
       "latestProgress": "Created JWT middleware",
       "cost": {
@@ -46,7 +45,6 @@ Response:
         "cacheReadInputTokens": 32000
       },
       "events": [...],
-      "messages": [...],
       "projectTodos": [...],
       "agentTodos": [...],
       "commits": [...],
@@ -94,23 +92,6 @@ Response:
     "description": "Planning implementation",
     "showDateDivider": false,
     "dateDivider": ""
-  }
-]
-```
-
-### Agent Messages
-
-```json
-"messages": [
-  {
-    "id": 42,
-    "fromAgent": "coordinator",
-    "toAgent": "go",
-    "body": "Please implement the authentication module",
-    "subject": "Implement auth",
-    "read": true,
-    "readAt": "2026-02-27T17:00:01Z",
-    "createdAt": "2026-02-27T17:00:00Z"
   }
 ]
 ```

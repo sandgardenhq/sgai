@@ -73,7 +73,7 @@ If already stopped: `"message": "session already stopped"`
 
 ## Steer an Agent
 
-Inject a steering instruction into a running session without stopping it. The message is delivered to the coordinator agent via the message queue.
+Inject a steering instruction into a running session without stopping it. The instruction is recorded in `.sgai/PROJECT_MANAGEMENT.md` and workflow state navigates to the coordinator.
 
 **Endpoint:** `POST /api/v1/workspaces/{name}/steer`
 
@@ -97,9 +97,9 @@ Response:
 ```
 
 Notes:
-- The steering message is prefixed with "Re-steering instruction: " internally
-- Messages are inserted at the front of the unread message queue so they are processed next
-- This works while a session is running or even when stopped (message queued for next run)
+- The steering instruction is recorded as a human steering entry internally
+- Workflow state requests coordinator as the next agent so the instruction is processed next
+- This works while a session is running or even when stopped; it is picked up on the next run
 
 ## Get Workflow SVG
 
@@ -133,7 +133,6 @@ Key workspace state fields for session monitoring:
 | `running` | bool | Is session active? |
 | `inProgress` | bool | Is work actively happening? |
 | `currentAgent` | string | Which agent is currently running |
-| `currentModel` | string | Which model is being used |
 | `task` | string | Current task description |
 | `status` | string | Workflow status string |
 | `latestProgress` | string | Most recent progress note |

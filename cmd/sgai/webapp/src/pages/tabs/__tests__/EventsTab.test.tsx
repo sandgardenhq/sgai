@@ -26,7 +26,6 @@ const createMockWorkspace = (overrides = {}) => ({
   interactiveAuto: false,
   continuousMode: false,
   currentAgent: "",
-  currentModel: "",
   task: "",
   goalContent: "",
   rawGoalContent: "",
@@ -38,10 +37,7 @@ const createMockWorkspace = (overrides = {}) => ({
   humanMessage: "",
   agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-  modelStatuses: [],
-  agentModels: [],
   events: [],
-  messages: [],
   projectTodos: [],
   agentTodos: [],
   changes: { description: "", diffLines: [] },
@@ -227,36 +223,6 @@ describe("EventsTab", () => {
         const img = screen.getByAltText("Workflow graph");
         expect(img).toBeTruthy();
         expect(img.getAttribute("src")).toContain("workflow.svg");
-      });
-    });
-
-    it("shows agent models table when available", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        agentModels: [
-          { agent: "coordinator", models: ["opencode/glm-5"] },
-          { agent: "developer", models: ["openai/gpt-5.5"] },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Agent")).toBeTruthy();
-        expect(screen.getByText("Model(s)")).toBeTruthy();
-      });
-    });
-
-    it("shows model status list when available", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        modelStatuses: [
-          { modelId: "opencode/glm-5", status: "model-working" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Model Consensus:")).toBeTruthy();
       });
     });
 

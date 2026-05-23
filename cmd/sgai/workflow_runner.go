@@ -89,9 +89,6 @@ func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runR
 	}
 
 	if r.wfState.Status == state.StatusComplete {
-		if redirectToPendingMessageAgent(&r.wfState, r.coord, r.paddedsgai) {
-			return resultContinue
-		}
 		fmt.Println("["+r.paddedsgai+"]", "complete:", r.wfState.Task)
 		return resultComplete
 	}
@@ -102,10 +99,17 @@ func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runR
 }
 
 func (r *workflowRunner) resolveNextAgent(currentAgent string) string {
-	pendingAgent := findFirstPendingMessageAgent(r.wfState)
-	if pendingAgent != "" {
-		fmt.Println("["+r.paddedsgai+"]", "pending messages for", pendingAgent, "- redirecting")
-		return pendingAgent
+	if r.wfState.Navigate != nil && r.wfState.Navigate.To != "" {
+		nextAgent := r.wfState.Navigate.To
+		fmt.Println("["+r.paddedsgai+"]", "navigating to", nextAgent)
+		r.wfState.Navigate = nil
+		snapshot := r.wfState
+		if errUpdate := r.coord.UpdateState(func(wf *state.Workflow) {
+			*wf = snapshot
+		}); errUpdate != nil {
+			log.Println("failed to clear navigation request:", errUpdate)
+		}
+		return nextAgent
 	}
 
 	if r.flowDag.isTerminal(currentAgent) {
@@ -153,7 +157,7 @@ func (r *workflowRunner) prepareAgent(currentAgent string) {
 }
 
 func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) state.Workflow {
-	cfg := multiModelConfig{
+	cfg := agentRunConfig{
 		dir:              r.dir,
 		goalPath:         r.goalPath,
 		agent:            currentAgent,
@@ -168,7 +172,8 @@ func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) 
 		stdoutLog:        r.retroLogs.stdout,
 		stderrLog:        r.retroLogs.stderr,
 	}
-	return runMultiModelAgent(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter)
+	modelSpec := getModelForAgent(r.metadata.Models, currentAgent)
+	return runSingleModelIteration(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter, modelSpec)
 }
 
 func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt string) {
@@ -225,15 +230,13 @@ func (r *workflowRunner) handleTrigger(trigger triggerKind, goalPath string) {
 	if trigger != triggerSteering {
 		return
 	}
-	wfState := r.coord.State()
-	found, msg := hasHumanPartnerMessage(wfState.Messages)
-	if !found || msg == nil {
+	steeringMessage := readPendingSteeringMessage(r.dir)
+	if steeringMessage == "" {
 		return
 	}
-	if errPrepend := prependSteeringMessage(goalPath, msg.Body); errPrepend != nil {
+	if errPrepend := prependSteeringMessage(goalPath, steeringMessage); errPrepend != nil {
 		log.Println("failed to prepend steering message:", errPrepend)
 	}
-	markMessageAsRead(r.coord, msg.ID)
 }
 
 func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) (*workflowRunner, func(), bool) {
@@ -351,7 +354,6 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		preservedMode := wfState.InteractionMode
 		freshState := state.Workflow{
 			Status:          state.StatusWorking,
-			Messages:        []state.Message{},
 			GoalChecksum:    newChecksum,
 			VisitCounts:     initVisitCounts(allAgents),
 			InteractionMode: preservedMode,
@@ -412,21 +414,8 @@ func sanitizeDisabledRetrospectiveState(wfState state.Workflow) (state.Workflow,
 		delete(wfState.VisitCounts, "retrospective")
 		changed = true
 	}
-	if extractAgentFromModelID(wfState.CurrentModel) == "retrospective" {
-		wfState.CurrentModel = ""
-		changed = true
-	}
-	for modelID := range wfState.ModelStatuses {
-		if extractAgentFromModelID(modelID) == "retrospective" {
-			delete(wfState.ModelStatuses, modelID)
-			changed = true
-		}
-	}
-	messages := slices.DeleteFunc(wfState.Messages, func(msg state.Message) bool {
-		return !msg.Read && (extractAgentFromModelID(msg.ToAgent) == "retrospective" || extractAgentFromModelID(msg.FromAgent) == "retrospective")
-	})
-	if len(messages) != len(wfState.Messages) {
-		wfState.Messages = messages
+	if wfState.Navigate != nil && wfState.Navigate.To == "retrospective" {
+		wfState.Navigate = nil
 		changed = true
 	}
 	agentSequence := slices.DeleteFunc(wfState.AgentSequence, func(entry state.AgentSequenceEntry) bool {

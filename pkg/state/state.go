@@ -156,14 +156,14 @@ type SessionCost struct {
 }
 
 // Workflow represents the complete workflow state for a sgai session.
-// It tracks progress, inter-agent messaging, and workflow status.
+// It tracks progress and workflow status.
 type Workflow struct {
 	Status              string               `json:"status"`
 	Task                string               `json:"task"`
 	Progress            []ProgressEntry      `json:"progress"`
 	HumanMessage        string               `json:"humanMessage"`
 	MultiChoiceQuestion *MultiChoiceQuestion `json:"multiChoiceQuestion,omitempty"`
-	Messages            []Message            `json:"messages"`
+	Navigate            *NavigationRequest   `json:"navigate,omitempty"`
 	GoalChecksum        string               `json:"goalChecksum"`
 	VisitCounts         map[string]int       `json:"visitCounts,omitempty"`
 	CurrentAgent        string               `json:"currentAgent,omitempty"`
@@ -176,15 +176,6 @@ type Workflow struct {
 
 	InteractionMode string `json:"interactionMode,omitempty"`
 
-	// ModelStatuses tracks per-model status in multi-model agents.
-	// Key is model ID (agent:modelSpec), value is "model-working", "model-done", or "model-error".
-	// This field is ephemeral and cleared when the agent transitions.
-	ModelStatuses map[string]string `json:"modelStatuses,omitempty"`
-
-	// CurrentModel tracks the currently executing model in multi-model agents.
-	// Format is "agentName:modelSpec".
-	CurrentModel string `json:"currentModel,omitempty"`
-
 	// Summary is a single-sentence summary of the project goal.
 	// Generated automatically when GOAL.md is saved or workspace starts,
 	// unless SummaryManual is true (indicating user has manually edited it).
@@ -195,22 +186,16 @@ type Workflow struct {
 	SummaryManual bool `json:"summaryManual,omitempty"`
 }
 
+// NavigationRequest asks the runner to route to another DAG agent.
+type NavigationRequest struct {
+	To     string `json:"to"`
+	Reason string `json:"reason,omitempty"`
+}
+
 // ToolsAllowed reports whether the current interaction mode permits
 // human-interaction tools (ask_user_question, ask_user_work_gate).
 func (w Workflow) ToolsAllowed() bool {
 	return w.InteractionMode == ModeBrainstorming || w.InteractionMode == ModeRetrospective
-}
-
-// Message represents an inter-agent message in the workflow system.
-type Message struct {
-	ID        int    `json:"id"`
-	FromAgent string `json:"fromAgent"`
-	ToAgent   string `json:"toAgent"`
-	Body      string `json:"body"`
-	Read      bool   `json:"read"`
-	ReadAt    string `json:"readAt,omitempty"`
-	ReadBy    string `json:"readBy,omitempty"`
-	CreatedAt string `json:"createdAt,omitempty"` // ISO 8601 format (e.g., "2025-12-19T14:30:00Z")
 }
 
 func load(path string) (Workflow, error) {
@@ -224,9 +209,6 @@ func load(path string) (Workflow, error) {
 	}
 	if wf.VisitCounts == nil {
 		wf.VisitCounts = make(map[string]int)
-	}
-	if wf.ModelStatuses == nil {
-		wf.ModelStatuses = make(map[string]string)
 	}
 	return wf, nil
 }

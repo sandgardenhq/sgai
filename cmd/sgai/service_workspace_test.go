@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -770,115 +769,6 @@ func TestDeleteForkByPathService(t *testing.T) {
 	}
 }
 
-func TestDeleteMessageService(t *testing.T) {
-	tests := []struct {
-		name        string
-		messageID   int
-		setupFunc   func(*testing.T, string)
-		wantErr     bool
-		errContains string
-		validate    func(*testing.T, deleteMessageResult)
-	}{
-		{
-			name:      "deleteNonExistentMessage",
-			messageID: 999,
-			setupFunc: func(t *testing.T, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-			},
-			wantErr:     true,
-			errContains: "message not found",
-		},
-		{
-			name:      "deleteExistingMessage",
-			messageID: 1,
-			setupFunc: func(t *testing.T, workspacePath string) {
-				sgaiDir := filepath.Join(workspacePath, ".sgai")
-				require.NoError(t, os.MkdirAll(sgaiDir, 0755))
-
-				stateData := `{
-					"status": "working",
-					"messages": [
-						{
-							"id": 1,
-							"fromAgent": "agent1",
-							"toAgent": "agent2",
-							"body": "test message",
-							"read": false,
-							"createdAt": "2026-03-05T10:00:00Z"
-						}
-					]
-				}`
-				statePath := filepath.Join(sgaiDir, "state.json")
-				require.NoError(t, os.WriteFile(statePath, []byte(stateData), 0644))
-			},
-			wantErr: false,
-			validate: func(t *testing.T, result deleteMessageResult) {
-				assert.True(t, result.Deleted)
-				assert.Equal(t, 1, result.ID)
-			},
-		},
-		{
-			name:      "deleteReadMessage",
-			messageID: 2,
-			setupFunc: func(t *testing.T, workspacePath string) {
-				sgaiDir := filepath.Join(workspacePath, ".sgai")
-				require.NoError(t, os.MkdirAll(sgaiDir, 0755))
-
-				stateData := `{
-					"status": "working",
-					"messages": [
-						{
-							"id": 2,
-							"fromAgent": "agent1",
-							"toAgent": "agent2",
-							"body": "read message",
-							"read": true,
-							"readAt": "2026-03-05T11:00:00Z",
-							"readBy": "agent2",
-							"createdAt": "2026-03-05T10:00:00Z"
-						}
-					]
-				}`
-				statePath := filepath.Join(sgaiDir, "state.json")
-				require.NoError(t, os.WriteFile(statePath, []byte(stateData), 0644))
-			},
-			wantErr: false,
-			validate: func(t *testing.T, result deleteMessageResult) {
-				assert.True(t, result.Deleted)
-				assert.Equal(t, 2, result.ID)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rootDir := t.TempDir()
-			server := NewServer(rootDir)
-
-			workspacePath := filepath.Join(rootDir, "test-workspace")
-			require.NoError(t, os.MkdirAll(workspacePath, 0755))
-			require.NoError(t, initializeWorkspace(workspacePath))
-
-			tt.setupFunc(t, workspacePath)
-
-			result, err := server.deleteMessageService(workspacePath, tt.messageID)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-				return
-			}
-
-			require.NoError(t, err)
-			if tt.validate != nil {
-				tt.validate(t, result)
-			}
-		})
-	}
-}
-
 func TestDeleteForkByPathServiceNonExistent(t *testing.T) {
 	rootDir := t.TempDir()
 	server := NewServer(rootDir)
@@ -953,16 +843,6 @@ func TestWriteGoalContent(t *testing.T) {
 	data, err := os.ReadFile(goalPath)
 	require.NoError(t, err)
 	assert.Equal(t, content, string(data))
-}
-
-func TestDeleteMessageServiceNotFoundError(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "test-ws-delmsg-nf")
-	sp := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(sp, state.Workflow{})
-	require.NoError(t, errCoord)
-	_, errDelete := server.deleteMessageService(wsDir, 999)
-	assert.Error(t, errDelete)
 }
 
 func TestGenerateRandomForkName(t *testing.T) {

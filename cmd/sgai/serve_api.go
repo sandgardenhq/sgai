@@ -100,7 +100,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
-	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/messages/{id}", s.handleAPIDeleteMessage)
 	mux.HandleFunc("GET /api/v1/models", s.handleAPIListModels)
 	mux.HandleFunc("GET /api/v1/compose", s.handleAPIComposeState)
 	mux.HandleFunc("POST /api/v1/compose", s.handleAPIComposeSave)
@@ -167,7 +166,6 @@ type apiWorkspaceFullState struct {
 	InteractiveAuto bool                        `json:"interactiveAuto"`
 	ContinuousMode  bool                        `json:"continuousMode"`
 	CurrentAgent    string                      `json:"currentAgent"`
-	CurrentModel    string                      `json:"currentModel"`
 	Task            string                      `json:"task"`
 	GoalContent     string                      `json:"goalContent"`
 	Description     string                      `json:"description"`
@@ -181,10 +179,7 @@ type apiWorkspaceFullState struct {
 	HumanMessage    string                      `json:"humanMessage"`
 	AgentSequence   []apiAgentSequenceEntry     `json:"agentSequence"`
 	Cost            state.SessionCost           `json:"cost"`
-	ModelStatuses   []apiModelStatusEntry       `json:"modelStatuses,omitempty"`
-	AgentModels     []apiAgentModelEntry        `json:"agentModels,omitempty"`
 	Events          []apiEventEntry             `json:"events"`
-	Messages        []apiMessageEntry           `json:"messages"`
 	ProjectTodos    []apiTodoEntry              `json:"projectTodos"`
 	AgentTodos      []apiTodoEntry              `json:"agentTodos"`
 	Changes         apiChangesResponse          `json:"changes"`
@@ -301,13 +296,9 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 	)
 	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress))
 
-	modelStatuses := convertModelStatuses(orderedModelStatuses(ws.Directory, wfState.ModelStatuses))
-
 	reversedProgress := slices.Clone(wfState.Progress)
 	slices.Reverse(reversedProgress)
 	events := convertEventsForAPI(formatProgressForDisplay(reversedProgress))
-
-	messages := convertMessagesForAPI(wfState.Messages)
 
 	var logLines []apiLogEntry
 	s.mu.Lock()
@@ -379,7 +370,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		InteractiveAuto: interactiveAuto,
 		ContinuousMode:  readContinuousModePrompt(ws.Directory) != "",
 		CurrentAgent:    currentAgent,
-		CurrentModel:    resolveCurrentModel(ws.Directory, wfState),
 		Task:            wfState.Task,
 		GoalContent:     goalContent,
 		Description:     description,
@@ -393,10 +383,7 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		HumanMessage:    wfState.HumanMessage,
 		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
-		ModelStatuses:   modelStatuses,
-		AgentModels:     collectAgentModels(ws.Directory),
 		Events:          events,
-		Messages:        messages,
 		ProjectTodos:    convertTodosForAPI(wfState.ProjectTodos),
 		AgentTodos:      convertTodosForAPI(wfState.Todos),
 		Changes:         changes,
@@ -968,58 +955,6 @@ func (s *Server) resolveWorkspaceFromPath(w http.ResponseWriter, r *http.Request
 	return workspacePath, true
 }
 
-type apiModelStatusEntry struct {
-	ModelID string `json:"modelId"`
-	Status  string `json:"status"`
-}
-
-func convertModelStatuses(displays []modelStatusDisplay) []apiModelStatusEntry {
-	if len(displays) == 0 {
-		return nil
-	}
-	result := make([]apiModelStatusEntry, 0, len(displays))
-	for _, d := range displays {
-		result = append(result, apiModelStatusEntry(d))
-	}
-	return result
-}
-
-type apiMessageEntry struct {
-	ID        int    `json:"id"`
-	FromAgent string `json:"fromAgent"`
-	ToAgent   string `json:"toAgent"`
-	Body      string `json:"body"`
-	Subject   string `json:"subject"`
-	Read      bool   `json:"read"`
-	ReadAt    string `json:"readAt,omitempty"`
-	CreatedAt string `json:"createdAt,omitempty"`
-}
-
-const maxMessageBodyBytes = 10 * 1024
-
-func convertMessagesForAPI(messages []state.Message) []apiMessageEntry {
-	result := make([]apiMessageEntry, 0, len(messages))
-	for i := len(messages) - 1; i >= 0; i-- {
-		msg := messages[i]
-		subject := extractSubject(msg.Body)
-		body := msg.Body
-		if len(body) > maxMessageBodyBytes {
-			body = body[:maxMessageBodyBytes] + "...[truncated]"
-		}
-		result = append(result, apiMessageEntry{
-			ID:        msg.ID,
-			FromAgent: msg.FromAgent,
-			ToAgent:   msg.ToAgent,
-			Body:      body,
-			Subject:   subject,
-			Read:      msg.Read,
-			ReadAt:    msg.ReadAt,
-			CreatedAt: msg.CreatedAt,
-		})
-	}
-	return result
-}
-
 type apiTodoEntry struct {
 	ID       string `json:"id"`
 	Content  string `json:"content"`
@@ -1130,11 +1065,6 @@ type apiEventEntry struct {
 	Description     string `json:"description"`
 	ShowDateDivider bool   `json:"showDateDivider"`
 	DateDivider     string `json:"dateDivider"`
-}
-
-type apiAgentModelEntry struct {
-	Agent  string   `json:"agent"`
-	Models []string `json:"models"`
 }
 
 func convertEventsForAPI(displays []eventsProgressDisplay) []apiEventEntry {
@@ -2308,37 +2238,13 @@ func (s *Server) handleAPISteer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	coord := s.workspaceCoordinator(workspacePath)
-	steerBody := "Re-steering instruction: " + strings.TrimSpace(req.Message)
-	steerCreatedAt := time.Now().UTC().Format(time.RFC3339)
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		newMsg := state.Message{
-			ID:        nextMessageID(wf.Messages),
-			FromAgent: "Human Partner",
-			ToAgent:   "coordinator",
-			Body:      steerBody,
-			CreatedAt: steerCreatedAt,
-		}
-		insertIdx := findSteerInsertPosition(wf.Messages)
-		wf.Messages = slices.Insert(wf.Messages, insertIdx, newMsg)
-	}); errUpdate != nil {
-		http.Error(w, "failed to save state", http.StatusInternalServerError)
+	result, errSteer := s.steerService(workspacePath, req.Message)
+	if errSteer != nil {
+		http.Error(w, errSteer.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	s.notifyStateChange()
-
-	writeJSON(w, apiSteerResponse{Success: true, Message: "steering instruction added"})
-}
-
-func findSteerInsertPosition(messages []state.Message) int {
-	for i, msg := range messages {
-		if !msg.Read {
-			return i
-		}
-	}
-	return 0
+	writeJSON(w, apiSteerResponse(result))
 }
 
 type apiTogglePinResponse struct {
@@ -2479,85 +2385,6 @@ func (s *Server) coordinatorModelFromWorkspace(workspace string) string {
 	}
 	baseModel, _ := parseModelAndVariant(models[0])
 	return baseModel
-}
-
-func resolveCurrentModel(workspacePath string, wfState state.Workflow) string {
-	if wfState.CurrentModel != "" {
-		return wfState.CurrentModel
-	}
-	agent := wfState.CurrentAgent
-	if agent == "" {
-		return ""
-	}
-	models := modelsForAgentFromGoal(workspacePath, agent)
-	if len(models) == 0 {
-		return ""
-	}
-	return models[0]
-}
-
-func collectAgentModels(workspacePath string) []apiAgentModelEntry {
-	goalPath := filepath.Join(workspacePath, "GOAL.md")
-	goalData, errRead := os.ReadFile(goalPath)
-	if errRead != nil {
-		return nil
-	}
-	metadata, errParse := parseYAMLFrontmatter(goalData)
-	if errParse != nil || len(metadata.Models) == 0 {
-		return nil
-	}
-	agents := slices.Sorted(maps.Keys(metadata.Models))
-	result := make([]apiAgentModelEntry, 0, len(agents))
-	for _, agent := range agents {
-		models := getModelsForAgent(metadata.Models, agent)
-		if len(models) == 0 {
-			continue
-		}
-		result = append(result, apiAgentModelEntry{
-			Agent:  agent,
-			Models: models,
-		})
-	}
-	return result
-}
-
-// apiDeleteMessageResponse represents the response from deleting a message.
-type apiDeleteMessageResponse struct {
-	Deleted bool   `json:"deleted"`
-	ID      int    `json:"id"`
-	Message string `json:"message"`
-}
-
-// handleAPIDeleteMessage handles DELETE requests to remove a message from a workspace.
-func (s *Server) handleAPIDeleteMessage(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	idStr := r.PathValue("id")
-	if idStr == "" {
-		http.Error(w, "message id is required", http.StatusBadRequest)
-		return
-	}
-
-	var messageID int
-	if _, errScan := fmt.Sscanf(idStr, "%d", &messageID); errScan != nil {
-		http.Error(w, "invalid message id", http.StatusBadRequest)
-		return
-	}
-
-	deleteResult, errDelete := s.deleteMessageService(workspacePath, messageID)
-	if errDelete != nil {
-		if errors.Is(errDelete, errMessageNotFound) {
-			http.Error(w, "message not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, "failed to save workspace state", http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, apiDeleteMessageResponse(deleteResult))
 }
 
 type apiBrowseDirectoriesResponse struct {

@@ -112,9 +112,7 @@ func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, 
 		if errFresh == nil {
 			coord = freshCoord
 		}
-		wfState := coord.State()
-		found, _ := hasHumanPartnerMessage(wfState.Messages)
-		if found {
+		if coord.State().Navigate != nil {
 			return triggerSteering
 		}
 
@@ -165,18 +163,6 @@ func prependSteeringMessage(goalPath string, message string) error {
 	return os.WriteFile(goalPath, buf.Bytes(), 0644)
 }
 
-func hasHumanPartnerMessage(messages []state.Message) (bool, *state.Message) {
-	for i := range messages {
-		if messages[i].Read {
-			continue
-		}
-		if messages[i].FromAgent == "Human Partner" {
-			return true, &messages[i]
-		}
-	}
-	return false, nil
-}
-
 func updateContinuousModeState(coord *state.Coordinator, task, agent, progressMsg string) {
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
@@ -205,27 +191,12 @@ func updateContinuousModeProgress(coord *state.Coordinator, progressMsg string) 
 	}
 }
 
-func markMessageAsRead(coord *state.Coordinator, messageID int) {
-	readAt := time.Now().UTC().Format(time.RFC3339)
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		for i := range wf.Messages {
-			if wf.Messages[i].ID == messageID {
-				wf.Messages[i].Read = true
-				wf.Messages[i].ReadAt = readAt
-				wf.Messages[i].ReadBy = "continuous-mode"
-				break
-			}
-		}
-	}); errUpdate != nil {
-		log.Println("failed to mark message as read:", errUpdate)
-	}
-}
-
 func resetWorkflowForNextCycle(coord *state.Coordinator) {
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Status = state.StatusWorking
 		wf.InteractionMode = state.ModeContinuous
 		wf.CurrentAgent = "coordinator"
+		wf.Navigate = nil
 	}); errUpdate != nil {
 		log.Println("failed to reset workflow for next cycle:", errUpdate)
 	}

@@ -216,11 +216,12 @@ type updateWorkflowStateArgs struct {
 	Status      workflowStatus `json:"status" jsonschema:"Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete"`
 	Task        string         `json:"task" jsonschema:"Current task being worked on (e.g. 'Writing tests for auth endpoints'). Use empty string to clear. Be specific about what you're doing."`
 	AddProgress string         `json:"addProgress" jsonschema:"Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps."`
+	Navigate    *navigateArgs  `json:"navigate,omitempty" jsonschema:"Optional navigation request. Only valid with status 'agent-done'. The target must be an agent in the workflow DAG."`
 }
 
-type sendMessageArgs struct {
-	ToAgent string `json:"toAgent" jsonschema:"The agent who will receive this message. Must be one of the agents in the workflow."`
-	Body    string `json:"body" jsonschema:"The content of the message to send."`
+type navigateArgs struct {
+	To     string `json:"to" jsonschema:"The workflow DAG agent to run next."`
+	Reason string `json:"reason,omitempty" jsonschema:"Why this navigation is needed."`
 }
 
 type projectTodoWriteArgs struct {
@@ -252,7 +253,6 @@ func mustSchema[T any]() *jsonschema.Schema {
 var (
 	schemaFindSkills       = mustSchema[findSkillsArgs]()
 	schemaFindSnippets     = mustSchema[findSnippetsArgs]()
-	schemaSendMessage      = mustSchema[sendMessageArgs]()
 	schemaEmpty            = mustSchema[struct{}]()
 	schemaProjectTodoWrite = mustSchema[projectTodoWriteArgs]()
 	schemaAskUserQuestion  = mustSchema[askUserQuestionArgs]()
@@ -350,32 +350,9 @@ func registerCommonTools(server *mcp.Server, mcpCtx *mcpContext, agentName strin
 		InputSchema: updateWorkflowStateSchema,
 	}, mcpCtx.updateWorkflowStateHandler)
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "send_message",
-		Description: "Send a message to another agent in the workflow. The message will be stored and delivered when the target agent starts.",
-		InputSchema: schemaSendMessage,
-	}, mcpCtx.sendMessageHandler)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "check_inbox",
-		Description: "Check for messages sent to the current agent. Returns all unread messages from other agents.",
-		InputSchema: schemaEmpty,
-	}, mcpCtx.checkInboxHandler)
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "check_outbox",
-		Description: "Check for messages you have already sent. Returns all messages sent by the current agent.",
-		InputSchema: schemaEmpty,
-	}, mcpCtx.checkOutboxHandler)
 }
 
 func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, _ string) {
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "peek_message_bus",
-		Description: "Check all messages in the system (both pending and read). Returns all messages in reverse chronological order (most recent first). Coordinator-only tool for monitoring inter-agent communication.",
-		InputSchema: schemaEmpty,
-	}, mcpCtx.peekMessageBusHandler)
-
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "project_todowrite",
 		Description: todoWriteDescription,
@@ -438,47 +415,7 @@ func (c *mcpContext) findSnippetsHandler(_ context.Context, _ *mcp.CallToolReque
 }
 
 func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := updateWorkflowState(c.coord, c.agentName, args)
-	if err != nil {
-		return nil, emptyResult{}, err
-	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
-}
-
-func (c *mcpContext) sendMessageHandler(_ context.Context, _ *mcp.CallToolRequest, args sendMessageArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := sendMessage(c.coord, c.dagAgents, c.agentName, args.ToAgent, args.Body)
-	if err != nil {
-		return nil, emptyResult{}, err
-	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
-}
-
-func (c *mcpContext) checkInboxHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := checkInbox(c.coord, c.agentName)
-	if err != nil {
-		return nil, emptyResult{}, err
-	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
-}
-
-func (c *mcpContext) checkOutboxHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := checkOutbox(c.coord, c.agentName)
-	if err != nil {
-		return nil, emptyResult{}, err
-	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
-}
-
-func (c *mcpContext) peekMessageBusHandler(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := peekMessageBus(c.coord)
+	result, err := updateWorkflowState(c.coord, c.agentName, c.dagAgents, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -924,7 +861,7 @@ func findSnippetsByFuzzyMatch(langDir string, entries []os.DirEntry, query strin
 	return strings.Join(matches, "\n"), nil
 }
 
-func updateWorkflowState(coord *state.Coordinator, callerAgent string, args updateWorkflowStateArgs) (string, error) {
+func updateWorkflowState(coord *state.Coordinator, callerAgent string, dagAgents []string, args updateWorkflowStateArgs) (string, error) {
 	var (
 		response        string
 		statusPreserved bool
@@ -934,12 +871,20 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, args upda
 		return "Error: workflow coordinator not available.", nil
 	}
 
+	if errNavigate := validateNavigationRequest(args, dagAgents); errNavigate != "" {
+		return errNavigate, nil
+	}
+
 	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
 		if currentState.Progress == nil {
 			currentState.Progress = []state.ProgressEntry{}
 		}
 
 		statusPreserved = state.IsHumanPending(currentState.Status)
+		if hasNavigationRequest(args.Navigate) && statusPreserved {
+			response = "Error: navigate cannot be used while waiting for human response."
+			return
+		}
 
 		if args.Status != "" && !statusPreserved {
 			status := strings.Trim(string(args.Status), "\"'")
@@ -973,6 +918,15 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, args upda
 			currentState.Task = ""
 		}
 
+		if hasNavigationRequest(args.Navigate) && response == "" {
+			currentState.Navigate = &state.NavigationRequest{
+				To:     strings.TrimSpace(args.Navigate.To),
+				Reason: strings.TrimSpace(args.Navigate.Reason),
+			}
+		} else if response == "" {
+			currentState.Navigate = nil
+		}
+
 		if response == "" {
 			if statusPreserved {
 				response = fmt.Sprintf("Status is currently '%s'. Waiting for human response. Your task and progress notes were updated but status was preserved.\n", currentState.Status)
@@ -985,6 +939,9 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, args upda
 			}
 			if args.AddProgress != "" {
 				response += fmt.Sprintf("  Added progress note: %s\n", args.AddProgress)
+			}
+			if currentState.Navigate != nil {
+				response += fmt.Sprintf("  Navigate to: %s\n", currentState.Navigate.To)
 			}
 			response += fmt.Sprintf("  Total progress notes: %d", len(currentState.Progress))
 		}
@@ -1006,201 +963,29 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, args upda
 	return response, nil
 }
 
-func sendMessage(coord *state.Coordinator, dagAgents []string, callerAgent, toAgent, body string) (string, error) {
-	if coord == nil {
-		return "Error: Could not read state.json. Has the workflow been initialized?", nil
+func validateNavigationRequest(args updateWorkflowStateArgs, dagAgents []string) string {
+	if !hasNavigationRequest(args.Navigate) {
+		return ""
 	}
-
-	targetAgentName := extractAgentFromModelID(toAgent)
-	if !slices.Contains(dagAgents, targetAgentName) {
-		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", toAgent, strings.Join(dagAgents, ", ")), nil
+	status := strings.Trim(string(args.Status), "\"'")
+	if status != state.StatusAgentDone {
+		return "Error: navigate is only valid with status 'agent-done'."
 	}
-
-	fromAgent := callerAgent
-	if currentModel := coord.State().CurrentModel; currentModel != "" {
-		fromAgent = currentModel
+	targetAgent := strings.TrimSpace(args.Navigate.To)
+	if targetAgent == "" {
+		return "Error: navigate.to is required."
 	}
-	if messageTargetsSender(fromAgent, toAgent) {
-		return fmt.Sprintf("Error: Agent '%s' cannot send a message to itself.", fromAgent), nil
+	if !slices.Contains(dagAgents, targetAgent) {
+		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", targetAgent, strings.Join(dagAgents, ", "))
 	}
-
-	var (
-		result string
-	)
-
-	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
-		if currentState.Messages == nil {
-			currentState.Messages = []state.Message{}
-		}
-
-		message := state.Message{
-			ID:        nextMessageID(currentState.Messages),
-			FromAgent: fromAgent,
-			ToAgent:   toAgent,
-			Body:      body,
-			Read:      false,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		}
-
-		currentState.Messages = append(currentState.Messages, message)
-
-		result = fmt.Sprintf("Message sent successfully to %s.\nFrom: %s\nTo: %s\nBody: %s", toAgent, fromAgent, toAgent, body)
-		if callerAgent != "coordinator" {
-			result += "\n\nIMPORTANT: To receive a response from the target agent, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). The target agent cannot run until you yield."
-		}
-	})
-
-	if errUpdate != nil {
-		return "", fmt.Errorf("failed to save state: %w", errUpdate)
-	}
-
-	return result, nil
+	return ""
 }
 
-func messageTargetsSender(fromAgent, toAgent string) bool {
-	if fromAgent == "" || toAgent == "" {
+func hasNavigationRequest(navigate *navigateArgs) bool {
+	if navigate == nil {
 		return false
 	}
-	if fromAgent == toAgent {
-		return true
-	}
-	fromBase := extractAgentFromModelID(fromAgent)
-	toBase := extractAgentFromModelID(toAgent)
-	if !strings.Contains(fromAgent, ":") && fromBase == toBase {
-		return true
-	}
-	if !strings.Contains(toAgent, ":") && fromBase == toBase {
-		return true
-	}
-	return false
-}
-
-func checkInbox(coord *state.Coordinator, callerAgent string) (string, error) {
-	if coord == nil {
-		return "Error: Could not read state.json. Has the workflow been initialized?", nil
-	}
-
-	snapshot := coord.State()
-	currentModel := snapshot.CurrentModel
-
-	var unreadMessages []state.Message
-	for _, msg := range snapshot.Messages {
-		if messageMatchesRecipient(msg, callerAgent, currentModel) && !msg.Read {
-			unreadMessages = append(unreadMessages, msg)
-		}
-	}
-
-	if len(unreadMessages) == 0 {
-		return "You have no messages.", nil
-	}
-
-	timestamp := time.Now().Format(time.RFC3339)
-	errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		for i := range wf.Messages {
-			if messageMatchesRecipient(wf.Messages[i], callerAgent, currentModel) && !wf.Messages[i].Read {
-				wf.Messages[i].Read = true
-				wf.Messages[i].ReadAt = timestamp
-				wf.Messages[i].ReadBy = callerAgent
-			}
-		}
-	})
-	if errUpdate != nil {
-		return "", fmt.Errorf("failed to save state: %w", errUpdate)
-	}
-
-	var result strings.Builder
-	fmt.Fprintf(&result, "You have %d message(s):\n\n", len(unreadMessages))
-	for i := 0; i < len(unreadMessages); i++ {
-		msg := unreadMessages[i]
-		fmt.Fprintf(&result, "Message %d:\n  From: %s\n  Body: %s\n\n", i+1, msg.FromAgent, msg.Body)
-	}
-
-	return strings.TrimSpace(result.String()), nil
-}
-
-//nolint:unparam // error is always nil by design - errors are handled by returning user-friendly messages
-func checkOutbox(coord *state.Coordinator, callerAgent string) (string, error) {
-	if coord == nil {
-		return "Error: Could not read state.json. Has the workflow been initialized?", nil
-	}
-
-	snapshot := coord.State()
-	currentModel := snapshot.CurrentModel
-
-	var unreadMessages []state.Message
-	var readMessages []state.Message
-	for _, msg := range snapshot.Messages {
-		if messageMatchesSender(msg, callerAgent, currentModel) {
-			if msg.Read {
-				readMessages = append(readMessages, msg)
-			} else {
-				unreadMessages = append(unreadMessages, msg)
-			}
-		}
-	}
-
-	if len(unreadMessages) == 0 && len(readMessages) == 0 {
-		return "You have not sent any messages.", nil
-	}
-
-	var result strings.Builder
-
-	if len(unreadMessages) > 0 {
-		fmt.Fprintf(&result, "Pending messages (%d):\n", len(unreadMessages))
-		for i, msg := range unreadMessages {
-			subject := strings.Split(msg.Body, "\n")[0]
-			fmt.Fprintf(&result, "  %d. To: %s | Subject: %s\n", i+1, msg.ToAgent, subject)
-		}
-		result.WriteString("\n")
-	}
-
-	if len(readMessages) > 0 {
-		fmt.Fprintf(&result, "Delivered messages (%d):\n", len(readMessages))
-		for i, msg := range readMessages {
-			subject := strings.Split(msg.Body, "\n")[0]
-			readStatus := "Unread"
-			if msg.ReadAt != "" {
-				readStatus = fmt.Sprintf("Read at %s", msg.ReadAt)
-			}
-			fmt.Fprintf(&result, "  %d. To: %s | Subject: %s | %s\n", i+1, msg.ToAgent, subject, readStatus)
-		}
-	}
-
-	return strings.TrimSpace(result.String()), nil
-}
-
-//nolint:unparam // error is always nil by design - errors are handled by returning user-friendly messages
-func peekMessageBus(coord *state.Coordinator) (string, error) {
-	if coord == nil {
-		return "Error: Could not read state.json. Has the workflow been initialized?", nil
-	}
-
-	snapshot := coord.State()
-
-	if len(snapshot.Messages) == 0 {
-		return "No messages in the system.", nil
-	}
-
-	var result strings.Builder
-	fmt.Fprintf(&result, "Total messages: %d\n\n", len(snapshot.Messages))
-
-	for i := 0; i < len(snapshot.Messages); i++ {
-		msg := snapshot.Messages[i]
-		fmt.Fprintf(&result, "Message %d (ID: %d):\n", i+1, msg.ID)
-		fmt.Fprintf(&result, "  From: %s\n", msg.FromAgent)
-		fmt.Fprintf(&result, "  To: %s\n", msg.ToAgent)
-		if msg.Read {
-			result.WriteString("  Status: read\n")
-			if msg.ReadAt != "" {
-				fmt.Fprintf(&result, "  Read At: %s\n", msg.ReadAt)
-			}
-		} else {
-			result.WriteString("  Status: pending\n")
-		}
-		fmt.Fprintf(&result, "  Body: %s\n\n", msg.Body)
-	}
-
-	return strings.TrimSpace(result.String()), nil
+	return strings.TrimSpace(navigate.To) != "" || strings.TrimSpace(navigate.Reason) != ""
 }
 
 func projectTodoWrite(coord *state.Coordinator, todos []state.TodoItem) (string, error) {
@@ -1243,26 +1028,6 @@ func projectTodoRead(coord *state.Coordinator) (string, error) {
 	return formatTodoList(coord.State().ProjectTodos), nil
 }
 
-func messageMatchesRecipient(msg state.Message, currentAgent, currentModel string) bool {
-	if msg.ToAgent == currentAgent {
-		return true
-	}
-	if currentModel != "" && msg.ToAgent == currentModel {
-		return true
-	}
-	return false
-}
-
-func messageMatchesSender(msg state.Message, currentAgent, currentModel string) bool {
-	if msg.FromAgent == currentAgent {
-		return true
-	}
-	if currentModel != "" && msg.FromAgent == currentModel {
-		return true
-	}
-	return false
-}
-
 func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
 	statusEnum := []any{"working", "agent-done"}
 	description := "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done."
@@ -1286,6 +1051,21 @@ func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, st
 			"addProgress": {
 				Type:        "string",
 				Description: "Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps.",
+			},
+			"navigate": {
+				Type:        "object",
+				Description: "Optional navigation request. Only valid with status 'agent-done'. The target must be an agent in the workflow DAG.",
+				Properties: map[string]*jsonschema.Schema{
+					"to": {
+						Type:        "string",
+						Description: "The workflow DAG agent to run next.",
+					},
+					"reason": {
+						Type:        "string",
+						Description: "Why this navigation is needed.",
+					},
+				},
+				Required: []string{"to"},
 			},
 		},
 		Required: []string{"status", "task", "addProgress"},

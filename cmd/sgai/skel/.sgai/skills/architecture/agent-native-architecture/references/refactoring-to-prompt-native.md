@@ -65,9 +65,9 @@ For each workflow tool, identify the underlying primitives:
 
 | Workflow Tool | Hidden Primitives |
 |---------------|-------------------|
-| `process_feedback` | `store_item`, `sgai_send_message` |
+| `process_feedback` | `store_item`, `post_notification` |
 | `generate_report` | `read_file`, `write_file` |
-| `deploy_and_notify` | `git_push`, `sgai_send_message` |
+| `deploy_and_notify` | `git_push`, `post_notification` |
 
 **Step 3: Move behavior to the prompt**
 
@@ -106,7 +106,7 @@ tool("process_feedback", { message, category, priority }, ...complex logic...)
 
 // After: 2 primitive tools
 tool("store_item", { key: z.string(), value: z.any() }, ...simple storage...)
-tool("sgai_send_message", { channel: z.string(), content: z.string() }, ...simple send...)
+tool("post_notification", { channel: z.string(), content: z.string() }, ...simple send...)
 ```
 
 **Step 5: Remove artificial limits**
@@ -175,7 +175,7 @@ tool("store_feedback", async ({ item }) => {
 });
 
 // Simple message primitive
-tool("sgai_send_message", async ({ channel, content }) => {
+tool("post_notification", async ({ channel, content }) => {
   await discord.send(channel, content);
   return { text: "Sent" };
 });

@@ -51,7 +51,6 @@ func NewCoordinatorEmpty(path string) *Coordinator {
 		wf: Workflow{
 			Status:   StatusWorking,
 			Progress: []ProgressEntry{},
-			Messages: []Message{},
 		},
 		savePath: path,
 	}

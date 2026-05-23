@@ -3,15 +3,13 @@ import { ChevronRight, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import { ActionBar } from "./SessionTab";
-import type { ApiEventEntry, ApiModelStatusEntry, ApiAgentModelEntry, ApiActionEntry } from "@/types";
+import type { ApiEventEntry, ApiActionEntry } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
@@ -32,10 +30,8 @@ function EventsTabSkeleton() {
   );
 }
 
-function WorkflowSection({ svgHash, agentModels, modelStatuses, needsInput, humanMessage, currentAgent, workspaceName }: {
+function WorkflowSection({ svgHash, needsInput, humanMessage, currentAgent, workspaceName }: {
   svgHash: string;
-  agentModels?: ApiAgentModelEntry[];
-  modelStatuses?: ApiModelStatusEntry[];
   needsInput: boolean;
   humanMessage: string;
   currentAgent: string;
@@ -46,25 +42,11 @@ function WorkflowSection({ svgHash, agentModels, modelStatuses, needsInput, huma
   return (
     <Card>
       <CardContent className="space-y-3">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1 min-w-0">
-            <img
-              src={svgUrl}
-              alt="Workflow graph"
-              className="max-w-full h-auto"
-            />
-          </div>
-
-          {agentModels && agentModels.length > 0 && (
-            <div className="lg:w-80 xl:w-96 shrink-0">
-              <AgentModelsTable entries={agentModels} />
-            </div>
-          )}
-        </div>
-
-        {modelStatuses && modelStatuses.length > 0 && (
-          <ModelStatusList statuses={modelStatuses} />
-        )}
+        <img
+          src={svgUrl}
+          alt="Workflow graph"
+          className="max-w-full h-auto"
+        />
 
         {needsInput && humanMessage && (
           <div className="mt-3 p-3 border rounded-lg bg-yellow-50">
@@ -78,73 +60,6 @@ function WorkflowSection({ svgHash, agentModels, modelStatuses, needsInput, huma
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function AgentModelsTable({ entries }: { entries: ApiAgentModelEntry[] }) {
-  return (
-    <div className="text-sm">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-muted-foreground">Agent</TableHead>
-            <TableHead className="text-muted-foreground">Model(s)</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.map((entry) => (
-            <TableRow key={entry.agent}>
-              <TableCell className="whitespace-nowrap">{entry.agent}</TableCell>
-              <TableCell>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {entry.models.map((model) => {
-                    const shortModel = model.split("/").pop() ?? model;
-                    return (
-                      <li key={model}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help">
-                              {shortModel}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>{model}</TooltipContent>
-                        </Tooltip>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function ModelStatusList({ statuses }: { statuses: ApiModelStatusEntry[] }) {
-  return (
-    <div className="text-sm">
-      <strong>Model Consensus:</strong>
-      <ul className="mt-1 space-y-1">
-        {statuses.map((ms) => (
-          <li key={ms.modelId} className="flex items-center gap-2">
-            <span>
-              {ms.status === "model-working" ? "◐" : ms.status === "model-done" ? "●" : "✕"}
-            </span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help truncate max-w-[200px]">
-                  {ms.modelId.split("/").pop() ?? ms.modelId}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{ms.modelId}</TooltipContent>
-            </Tooltip>
-            <span className="text-xs text-muted-foreground">({ms.status})</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -288,8 +203,6 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
       )}
       <WorkflowSection
         svgHash={workspace.svgHash}
-        agentModels={workspace.agentModels}
-        modelStatuses={workspace.modelStatuses}
         needsInput={workspace.needsInput}
         humanMessage={workspace.humanMessage}
         currentAgent={workspace.currentAgent}

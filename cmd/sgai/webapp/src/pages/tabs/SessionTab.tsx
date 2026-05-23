@@ -252,7 +252,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
 
   const agentSequence = workspace?.agentSequence ?? [];
   const cost = workspace?.cost;
-  const modelStatuses = workspace?.modelStatuses;
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
 
@@ -376,34 +375,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
           )}
         </CardContent>
       </Card>
-
-      {modelStatuses && modelStatuses.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Model Consensus</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1 text-sm">
-              {modelStatuses.map((ms) => (
-                <li key={`${ms.modelId}-${ms.status}`} className="flex items-center gap-2">
-                  <span>
-                    {ms.status === "model-working" ? "◐" : ms.status === "model-done" ? "●" : "✕"}
-                  </span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="truncate max-w-[200px] cursor-help">
-                        {ms.modelId.split("/").pop() ?? ms.modelId}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{ms.modelId}</TooltipContent>
-                  </Tooltip>
-                  <Badge variant="secondary" className="text-xs">{ms.status}</Badge>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       {hasProjectMgmt && (
         <details className="group">

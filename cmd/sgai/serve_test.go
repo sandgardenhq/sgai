@@ -1529,12 +1529,6 @@ func TestStopSessionIdempotent(t *testing.T) {
 	srv.stopSession(wsDir)
 }
 
-func TestOrderedModelStatusesEmpty(t *testing.T) {
-	dir := t.TempDir()
-	result := orderedModelStatuses(dir, nil)
-	assert.Empty(t, result)
-}
-
 func TestDoScanWorkspaceGroupsWithStandalone(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := filepath.Join(rootDir, "standalone-ws")
@@ -1903,91 +1897,6 @@ func TestLinesWithTrailingEmpty(t *testing.T) {
 	}
 }
 
-func TestOrderedModelStatuses(t *testing.T) {
-	tests := []struct {
-		name          string
-		modelStatuses map[string]string
-		setupFunc     func(*testing.T, string)
-		validate      func(*testing.T, []modelStatusDisplay)
-	}{
-		{
-			name:          "emptyStatuses",
-			modelStatuses: map[string]string{},
-			setupFunc: func(_ *testing.T, _ string) {
-			},
-			validate: func(t *testing.T, displays []modelStatusDisplay) {
-				assert.Nil(t, displays)
-			},
-		},
-		{
-			name: "singleStatus",
-			modelStatuses: map[string]string{
-				"model1": "running",
-			},
-			setupFunc: func(_ *testing.T, _ string) {
-			},
-			validate: func(t *testing.T, displays []modelStatusDisplay) {
-				assert.Len(t, displays, 1)
-				assert.Equal(t, "model1", displays[0].ModelID)
-				assert.Equal(t, "running", displays[0].Status)
-			},
-		},
-		{
-			name: "multipleStatuses",
-			modelStatuses: map[string]string{
-				"model1": "running",
-				"model2": "done",
-				"model3": "error",
-			},
-			setupFunc: func(_ *testing.T, _ string) {
-			},
-			validate: func(t *testing.T, displays []modelStatusDisplay) {
-				assert.Len(t, displays, 3)
-				modelIDs := make([]string, len(displays))
-				for i, d := range displays {
-					modelIDs[i] = d.ModelID
-				}
-				assert.Contains(t, modelIDs, "model1")
-				assert.Contains(t, modelIDs, "model2")
-				assert.Contains(t, modelIDs, "model3")
-			},
-		},
-		{
-			name: "withGoalModelsForAnyAgent",
-			modelStatuses: map[string]string{
-				"builder:model1": "running",
-				"builder:model2": "done",
-			},
-			setupFunc: func(t *testing.T, dir string) {
-				goalContent := `---
-models:
-  builder:
-    - model1
-    - model2
----
-# Goal`
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644))
-			},
-			validate: func(t *testing.T, displays []modelStatusDisplay) {
-				assert.Len(t, displays, 2)
-				assert.Equal(t, "builder:model1", displays[0].ModelID)
-				assert.Equal(t, "builder:model2", displays[1].ModelID)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			tt.setupFunc(t, dir)
-			result := orderedModelStatuses(dir, tt.modelStatuses)
-			if tt.validate != nil {
-				tt.validate(t, result)
-			}
-		})
-	}
-}
-
 func TestModelsForAgentFromGoal(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -2014,21 +1923,6 @@ models:
 				require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644))
 			},
 			expected: []string{"model1"},
-		},
-		{
-			name:  "multipleModels",
-			agent: "agent1",
-			setupFunc: func(t *testing.T, dir string) {
-				goalContent := `---
-models:
-  agent1:
-    - model1
-    - model2
----
-# Goal`
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0644))
-			},
-			expected: []string{"model1", "model2"},
 		},
 		{
 			name:  "agentNotInModels",
@@ -3400,16 +3294,6 @@ func TestWriteGoalExample(t *testing.T) {
 	content, errRead := os.ReadFile(filepath.Join(dir, "GOAL.md"))
 	require.NoError(t, errRead)
 	assert.Equal(t, goalExampleContent, string(content))
-}
-
-func TestOrderedModelStatusesWithEntries(t *testing.T) {
-	dir := t.TempDir()
-	statuses := map[string]string{
-		"model-a": "running",
-		"model-b": "completed",
-	}
-	result := orderedModelStatuses(dir, statuses)
-	assert.Len(t, result, 2)
 }
 
 func TestResolveBaseBookmarkNoJJ(t *testing.T) {

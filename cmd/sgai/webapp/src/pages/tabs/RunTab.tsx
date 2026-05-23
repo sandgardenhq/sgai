@@ -10,7 +10,6 @@ import { useAdhocRun } from "@/hooks/useAdhocRun";
 
 interface RunTabProps {
   workspaceName: string;
-  currentModel?: string;
 }
 
 function RunTabSkeleton() {
@@ -24,7 +23,7 @@ function RunTabSkeleton() {
   );
 }
 
-export function RunTab({ workspaceName, currentModel }: RunTabProps): JSX.Element | null {
+export function RunTab({ workspaceName }: RunTabProps): JSX.Element | null {
   const {
     models,
     modelsLoading,
@@ -43,7 +42,7 @@ export function RunTab({ workspaceName, currentModel }: RunTabProps): JSX.Elemen
     promptHistory,
     selectFromHistory,
     clearHistory,
-  } = useAdhocRun({ workspaceName, currentModel });
+  } = useAdhocRun({ workspaceName });
 
   if (modelsLoading && !models) return <RunTabSkeleton />;
 

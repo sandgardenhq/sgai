@@ -12,75 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHasHumanPartnerMessage(t *testing.T) {
-	tests := []struct {
-		name          string
-		messages      []state.Message
-		expectedFound bool
-		expectedID    int
-	}{
-		{
-			name:          "emptyMessages",
-			messages:      []state.Message{},
-			expectedFound: false,
-		},
-		{
-			name: "humanPartnerMessage",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "Human Partner", Read: false},
-			},
-			expectedFound: true,
-			expectedID:    1,
-		},
-		{
-			name: "humanPartnerMessageAlreadyRead",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "Human Partner", Read: true},
-			},
-			expectedFound: false,
-		},
-		{
-			name: "otherAgentMessage",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", Read: false},
-			},
-			expectedFound: false,
-		},
-		{
-			name: "mixedMessages",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", Read: false},
-				{ID: 2, FromAgent: "Human Partner", Read: false},
-				{ID: 3, FromAgent: "agent2", Read: false},
-			},
-			expectedFound: true,
-			expectedID:    2,
-		},
-		{
-			name: "multipleHumanPartnerMessages",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "Human Partner", Read: true},
-				{ID: 2, FromAgent: "Human Partner", Read: false},
-			},
-			expectedFound: true,
-			expectedID:    2,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			found, msg := hasHumanPartnerMessage(tt.messages)
-			assert.Equal(t, tt.expectedFound, found)
-			if tt.expectedFound {
-				assert.NotNil(t, msg)
-				assert.Equal(t, tt.expectedID, msg.ID)
-			} else {
-				assert.Nil(t, msg)
-			}
-		})
-	}
-}
-
 func TestReadContinuousModePrompt(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -235,44 +166,6 @@ func TestUpdateContinuousModeProgress(t *testing.T) {
 	assert.Len(t, snapshot.Progress, 2)
 	assert.Equal(t, "continuous-mode", snapshot.Progress[1].Agent)
 	assert.Equal(t, "completed phase 2", snapshot.Progress[1].Description)
-}
-
-func TestMarkMessageAsRead(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.json")
-	coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status: state.StatusWorking,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "Human Partner", ToAgent: "coordinator", Body: "run the tests", Read: false},
-			{ID: 2, FromAgent: "agent1", ToAgent: "agent2", Body: "other msg", Read: false},
-		},
-	})
-	require.NoError(t, err)
-
-	markMessageAsRead(coord, 1)
-
-	snapshot := coord.State()
-	assert.True(t, snapshot.Messages[0].Read)
-	assert.Equal(t, "continuous-mode", snapshot.Messages[0].ReadBy)
-	assert.NotEmpty(t, snapshot.Messages[0].ReadAt)
-	assert.False(t, snapshot.Messages[1].Read)
-}
-
-func TestMarkMessageAsReadNonExistent(t *testing.T) {
-	tmpDir := t.TempDir()
-	statePath := filepath.Join(tmpDir, "state.json")
-	coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status: state.StatusWorking,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "msg", Read: false},
-		},
-	})
-	require.NoError(t, err)
-
-	markMessageAsRead(coord, 999)
-
-	snapshot := coord.State()
-	assert.False(t, snapshot.Messages[0].Read)
 }
 
 func TestResetWorkflowForNextCycle(t *testing.T) {
@@ -434,9 +327,7 @@ func TestWatchForTriggerSteeringMessage(t *testing.T) {
 
 	statePath := filepath.Join(sgaiDir, "state.json")
 	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "Human Partner", ToAgent: "coordinator", Body: "please fix", Read: false},
-		},
+		Navigate: &state.NavigationRequest{To: "coordinator", Reason: "please fix"},
 	})
 	require.NoError(t, errCoord)
 
