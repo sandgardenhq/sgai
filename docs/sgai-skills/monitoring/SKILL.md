@@ -192,13 +192,13 @@ Response:
 [
   {
     "agent": "coordinator",
-    "model": "openai/gpt-5.5",
+    "model": "openai/gpt-5.5 (xhigh)",
     "elapsedTime": "2m 15s",
     "isCurrent": false
   },
   {
     "agent": "go",
-    "model": "openai/gpt-5.5",
+    "model": "openai/gpt-5.5 (low)",
     "elapsedTime": "8m 42s",
     "isCurrent": true
   }

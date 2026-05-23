@@ -205,14 +205,13 @@ Response:
 {
   "models": [
     {"id": "openai/gpt-5.5", "name": "openai/gpt-5.5"},
-    {"id": "openai/gpt-5.5", "name": "openai/gpt-5.5"},
     {"id": "openai/gpt-4o", "name": "openai/gpt-4o"}
   ],
   "defaultModel": "openai/gpt-5.5"
 }
 ```
 
-The `defaultModel` is the coordinator's model as defined in GOAL.md frontmatter.
+The `models` list comes from `opencode models` and contains base model IDs. The `defaultModel` is the coordinator's GOAL.md model with any parenthesized variant removed.
 
 ## Workspace Query Parameter
 

@@ -137,7 +137,7 @@ func TestBlockCompletionOnPendingTodos(t *testing.T) {
 		coord, err := state.NewCoordinatorWith(filepath.Join(dir, "state.json"), state.Workflow{})
 		require.NoError(t, err)
 
-		cfg := multiModelConfig{coord: coord, agent: "coordinator", paddedsgai: "sgai"}
+		cfg := multiModelConfig{coord: coord, agent: "coordinator", paddedsgai: "sgai", dir: dir}
 		newState := state.Workflow{Status: state.StatusComplete}
 		wfState := state.Workflow{
 			Todos: []state.TodoItem{
@@ -302,6 +302,7 @@ func TestBlockCompletionOnRetrospective(t *testing.T) {
 			coord:      coord,
 			agent:      "coordinator",
 			paddedsgai: "sgai",
+			dir:        dir,
 			flowDag:    &dag{Nodes: map[string]*dagNode{"retrospective": {}}},
 		}
 		metadata := GoalMetadata{Retrospective: "true"}
@@ -371,6 +372,7 @@ func TestHandleCompleteStatus(t *testing.T) {
 			coord:      coord,
 			agent:      "coordinator",
 			paddedsgai: "sgai",
+			dir:        dir,
 			flowDag:    &dag{Nodes: map[string]*dagNode{}},
 		}
 
@@ -416,6 +418,7 @@ func TestHandleCompleteStatus(t *testing.T) {
 			coord:      coord,
 			agent:      "coordinator",
 			paddedsgai: "sgai",
+			dir:        dir,
 			flowDag: &dag{Nodes: map[string]*dagNode{
 				"retrospective": {},
 			}},

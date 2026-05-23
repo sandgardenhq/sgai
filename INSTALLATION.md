@@ -279,14 +279,14 @@ mkdir -p ./sgai/TodoApp/.sgai
 ```markdown
 ---
 flow: |
-  "backend-go-developer" -> "go-readability-reviewer"
+  "go"
   "general-purpose"
   "project-critic-council"
 models:
-  "coordinator": "opencode/big-pickle"
-  "go": "opencode/big-pickle"
-  "general-purpose": "opencode/big-pickle"
-  "project-critic-council": "opencode/big-pickle"
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "go": "openai/gpt-5.5 (low)"
+  "general-purpose": "openai/gpt-5.5 (low)"
+  "project-critic-council": "openai/gpt-5.5 (low)"
 interactive: yes
 ---
 

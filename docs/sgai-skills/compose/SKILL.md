@@ -21,26 +21,29 @@ Response:
 {
   "workspace": "my-project",
   "state": {
+    "description": "User management REST API",
+    "completionGate": "make test",
+    "safetyAnalysis": false,
+    "retrospective": false,
+    "agents": [
+      {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
+      {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
+    ],
     "flow": "\"go\"",
-    "models": {
-      "coordinator": "openai/gpt-5.5",
-      "go": "openai/gpt-5.5"
-    },
-    "goals": "- [ ] Build a REST API for user management\n- [ ] Write tests with 80%+ coverage",
-    "completionGateScript": "make test"
+    "tasks": "- [ ] Build a REST API for user management\n- [ ] Write tests with 80%+ coverage"
   },
   "wizard": {
     "currentStep": 3,
-    "fromTemplate": "go-backend",
+    "fromTemplate": "backend",
     "description": "User management REST API",
-    "techStack": ["go", "postgresql"],
+    "techStack": ["go"],
     "safetyAnalysis": false,
     "completionGate": "make test"
   },
   "techStackItems": [
     {"id": "go", "name": "Go", "selected": true},
     {"id": "react", "name": "React", "selected": false},
-    {"id": "postgresql", "name": "PostgreSQL", "selected": true}
+    {"id": "shell", "name": "Shell/Bash", "selected": false}
   ],
   "flowError": ""
 }
@@ -49,10 +52,13 @@ Response:
 ### Compose State Fields
 
 **`state`** — the raw GOAL.md configuration:
+- `description` — markdown description that becomes the GOAL.md body before tasks
+- `completionGate` — shell command to verify completion
+- `safetyAnalysis` — whether to include Safety Analysis guidance in the GOAL.md body
+- `retrospective` — whether to enable retrospective flow metadata
+- `agents` — array of `{name, selected, model}` entries used to generate the `models:` frontmatter
 - `flow` — agent flow definition (quoted agent names with `->`)
-- `models` — map of agent name to model ID
-- `goals` — markdown goal checklist
-- `completionGateScript` — shell command to verify completion
+- `tasks` — markdown goal checklist written under `## Tasks`
 
 **`wizard`** — user-facing wizard state:
 - `currentStep` — which step in the wizard (1-based)
@@ -75,13 +81,13 @@ Response:
 {
   "templates": [
     {
-      "id": "go-backend",
-      "name": "Go Backend API",
-      "description": "REST API with Go, including code review and testing agents.",
+      "id": "backend",
+      "name": "Go Development",
+      "description": "Go implementation and review wrapper",
       "icon": "🔧",
       "agents": [
-        {"name": "coordinator", "model": "openai/gpt-5.5"},
-        {"name": "go", "model": "openai/gpt-5.5"}
+        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
+        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
       ],
       "flow": "\"go\""
     }
@@ -102,7 +108,7 @@ curl -s "$BASE_URL/api/v1/compose/preview?workspace=my-project"
 Response:
 ```json
 {
-  "content": "---\nflow: |\n  \"go\"\nmodels:\n  coordinator: openai/gpt-5.5\n  go: openai/gpt-5.5\ncompletionGateScript: make test\n---\n\n- [ ] Build a REST API\n",
+  "content": "---\nflow: |\n  \"go\"\nmodels:\n  \"coordinator\": \"openai/gpt-5.5 (xhigh)\"\n  \"go\": \"openai/gpt-5.5 (low)\"\ncompletionGateScript: make test\n---\n\nUser management REST API\n\n## Tasks\n\n- [ ] Build a REST API\n",
   "flowError": "",
   "etag": "\"abc123def456\""
 }
@@ -123,10 +129,16 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
   -H "Content-Type: application/json" \
   -d '{
     "state": {
+      "description": "Auth system",
+      "completionGate": "",
+      "safetyAnalysis": false,
+      "retrospective": false,
+      "agents": [
+        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
+        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
+      ],
       "flow": "\"go\"",
-      "models": {"coordinator": "openai/gpt-5.5"},
-      "goals": "- [ ] Build authentication\n",
-      "completionGateScript": ""
+      "tasks": "- [ ] Build authentication\n"
     },
     "wizard": {
       "currentStep": 2,
@@ -181,18 +193,21 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
   -H "Content-Type: application/json" \
   -d '{
     "state": {
+      "description": "User management API",
+      "completionGate": "make test",
+      "safetyAnalysis": false,
+      "retrospective": false,
+      "agents": [
+        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
+        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
+      ],
       "flow": "\"go\"",
-      "models": {
-        "coordinator": "openai/gpt-5.5",
-        "go": "openai/gpt-5.5"
-      },
-      "goals": "- [ ] Build REST API\n- [ ] Add authentication\n- [ ] Write tests\n",
-      "completionGateScript": "make test"
+      "tasks": "- [ ] Build REST API\n- [ ] Add authentication\n- [ ] Write tests\n"
     },
     "wizard": {
       "currentStep": 4,
       "description": "User management API",
-      "techStack": ["go", "postgresql"],
+      "techStack": ["go"],
       "safetyAnalysis": false,
       "completionGate": "make test"
     }

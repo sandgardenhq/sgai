@@ -76,6 +76,19 @@ function renderWizardStep3() {
   );
 }
 
+async function latestSavedDraftRequest() {
+  await waitFor(() => {
+    expect(mockComposeSaveDraft.mock.calls.length).toBeGreaterThan(0);
+  });
+  const latestCall = mockComposeSaveDraft.mock.calls.at(-1);
+  expect(latestCall).toBeDefined();
+  return latestCall?.[1];
+}
+
+function agentModelsByName(agents: Array<{ name: string; model: string }>) {
+  return Object.fromEntries(agents.map((agent) => [agent.name, agent.model]));
+}
+
 describe("WizardStep3", () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -100,6 +113,136 @@ describe("WizardStep3", () => {
     expect(await screen.findByText("Enable Safety Analysis")).toBeTruthy();
     expect(screen.getByText(/coordinator loads the STPA skill/i)).toBeTruthy();
     expect(screen.queryByText(/STPA analyst/i)).toBeNull();
+  });
+
+  it("creates React stack agents with xhigh coordinator and low React worker model defaults", async () => {
+    renderWizardStep3();
+
+    const draftRequest = await latestSavedDraftRequest();
+    const modelByAgent = agentModelsByName(draftRequest?.state.agents ?? []);
+
+    expect(modelByAgent).toEqual({
+      coordinator: "openai/gpt-5.5 (xhigh)",
+      react: "openai/gpt-5.5 (low)",
+    });
+  });
+
+  it("creates multi-agent stack agents with xhigh coordinator and low worker model defaults", async () => {
+    composeGetResponse = {
+      ...defaultComposeGetResponse(),
+      wizard: {
+        currentStep: 3,
+        description: "Build SDK verifier workflow",
+        techStack: ["claudesdk", "openaisdk", "shell"],
+        safetyAnalysis: false,
+        completionGate: "make test",
+      },
+      techStackItems: [
+        { id: "claudesdk", name: "Claude SDK", selected: true },
+        { id: "openaisdk", name: "OpenAI SDK", selected: true },
+        { id: "shell", name: "Shell", selected: true },
+      ],
+    };
+
+    renderWizardStep3();
+
+    const draftRequest = await latestSavedDraftRequest();
+    const modelByAgent = agentModelsByName(draftRequest?.state.agents ?? []);
+
+    expect(modelByAgent.coordinator).toBe("openai/gpt-5.5 (xhigh)");
+    for (const [agentName, model] of Object.entries(modelByAgent)) {
+      if (agentName !== "coordinator") {
+        expect(model).toBe("openai/gpt-5.5 (low)");
+      }
+    }
+    expect(Object.keys(modelByAgent).sort()).toEqual([
+      "agent-sdk-verifier-py",
+      "agent-sdk-verifier-ts",
+      "coordinator",
+      "general-purpose",
+      "openai-sdk-verifier-py",
+      "openai-sdk-verifier-ts",
+      "shell-script",
+    ]);
+  });
+
+  it("preserves custom TypeScript-only server state while sanitizing retired agents", async () => {
+    composeGetResponse = {
+      ...defaultComposeGetResponse(),
+      state: {
+        description: "Preserve custom TypeScript workflow",
+        completionGate: "make test",
+        agents: [
+          { name: "coordinator", selected: true, model: "custom/coordinator-model" },
+          { name: "custom-reviewer", selected: true, model: "custom/reviewer-model" },
+          { name: "stpa-analyst", selected: true, model: "custom/stpa-model" },
+        ],
+        flow: '"coordinator" -> "custom-reviewer"\n"coordinator" -> "stpa-analyst"',
+        tasks: "keep this task plan",
+      },
+      wizard: {
+        currentStep: 3,
+        description: "Preserve custom TypeScript workflow",
+        techStack: ["typescript"],
+        safetyAnalysis: false,
+        completionGate: "make test",
+      },
+      techStackItems: [
+        { id: "typescript", name: "TypeScript", selected: true },
+      ],
+    };
+
+    renderWizardStep3();
+
+    const draftRequest = await latestSavedDraftRequest();
+
+    expect(draftRequest?.state.agents).toEqual([
+      { name: "coordinator", selected: true, model: "custom/coordinator-model" },
+      { name: "custom-reviewer", selected: true, model: "custom/reviewer-model" },
+    ]);
+    expect(draftRequest?.state.flow).toBe('"coordinator" -> "custom-reviewer"');
+    expect(draftRequest?.state.tasks).toBe("keep this task plan");
+    expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
+  });
+
+  it("merges preserved server agents with generated React stack agents while keeping explicit models", async () => {
+    composeGetResponse = {
+      ...defaultComposeGetResponse(),
+      state: {
+        description: "Preserve custom React workflow",
+        completionGate: "make test",
+        agents: [
+          { name: "coordinator", selected: true, model: "custom/coordinator-model" },
+          { name: "custom-reviewer", selected: true, model: "custom/reviewer-model" },
+          { name: "stpa-analyst", selected: true, model: "custom/stpa-model" },
+        ],
+        flow: '"coordinator" -> "custom-reviewer"\n"coordinator" -> "stpa-analyst"',
+        tasks: "keep generated stack task plan",
+      },
+      wizard: {
+        currentStep: 3,
+        description: "Preserve custom React workflow",
+        techStack: ["react"],
+        safetyAnalysis: false,
+        completionGate: "make test",
+      },
+      techStackItems: [
+        { id: "react", name: "React", selected: true },
+      ],
+    };
+
+    renderWizardStep3();
+
+    const draftRequest = await latestSavedDraftRequest();
+
+    expect(draftRequest?.state.agents).toEqual([
+      { name: "coordinator", selected: true, model: "custom/coordinator-model" },
+      { name: "custom-reviewer", selected: true, model: "custom/reviewer-model" },
+      { name: "react", selected: true, model: "openai/gpt-5.5 (low)" },
+    ]);
+    expect(draftRequest?.state.flow).toBe('"coordinator" -> "custom-reviewer"\n"react"');
+    expect(draftRequest?.state.tasks).toBe("keep generated stack task plan");
+    expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
   });
 
   it("does not add stpa-analyst to draft agents or flow when safety analysis is enabled", async () => {

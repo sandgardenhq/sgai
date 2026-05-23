@@ -46,7 +46,7 @@ A local AI software factory.
 ```bash
 opencode upgrade
 opencode auth login
-opencode --model openai/gpt-5.5 run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
+opencode --model "openai/gpt-5.5 (xhigh)" run "install Sgai using the instructions from https://github.com/sandgardenhq/sgai/blob/main/INSTALLATION.md"
 ```
 
 This runs the official installation guide automatically and launches a demo workspace.
@@ -101,7 +101,12 @@ Goals are stored in `GOAL.md` and describe outcomes — not implementation steps
 ```markdown
 ---
 flow: |
-  "backend-developer" -> "code-reviewer"
+  "go"
+  "general-purpose"
+models:
+  "coordinator": "openai/gpt-5.5 (xhigh)"
+  "go": "openai/gpt-5.5 (low)"
+  "general-purpose": "openai/gpt-5.5 (low)"
 completionGateScript: make test
 interactive: yes
 ---
@@ -115,11 +120,13 @@ Create endpoints for user registration and login with JWT auth.
 - [ ] Tests pass before completion
 ```
 
-See [GOAL.example.md](GOAL.example.md) for full reference.
+See [GOAL.example.md](../cmd/sgai/GOAL.example.md) for full reference.
+
+**Model Selection:** For GPT-5.5, Sgai recommends assigning `openai/gpt-5.5 (xhigh)` to the always-present `coordinator` because orchestration quality dominates workflow quality. Implementation, reviewer, utility, and specialist agents should default to `openai/gpt-5.5 (low)`, which is the cost-conscious GPT-5.5 baseline for routine work. You can still override any agent in `models:` when a specific workflow warrants a higher tier.
 
 **Agent Aliases:**
 
-You can create agent aliases that reuse an existing agent's prompt and tools with a different model. This lets you run the same agent role at different cost/capability tiers:
+You can create agent aliases that reuse an existing agent's prompt and tools with a different model. This lets you run the same agent role at different cost/capability tiers while keeping the default worker tier low-cost:
 
 ```markdown
 ---
@@ -128,7 +135,7 @@ flow: |
 alias:
   "go-lite": "go"
 models:
-  "go-lite": "openai/gpt-5.4-mini"
+  "go-lite": "openai/gpt-5.5 (low)"
 ---
 ```
 
