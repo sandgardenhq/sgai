@@ -100,7 +100,7 @@ func bodyHasSafetyAnalysis(body string) bool {
 func defaultComposerState() composerState {
 	return composerState{
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
 		},
 	}
 }
@@ -201,7 +201,7 @@ func buildGOALContent(st composerState) string {
 			buf.WriteString("  \"")
 			buf.WriteString(a.Name)
 			buf.WriteString("\": \"")
-			buf.WriteString(a.Model)
+			buf.WriteString(modelForComposerAgent(a))
 			buf.WriteString("\"\n")
 		}
 	}
@@ -260,4 +260,11 @@ func activeComposerAgents(agents []composerAgentConf) []composerAgentConf {
 		active = append(active, agent)
 	}
 	return active
+}
+
+func modelForComposerAgent(agent composerAgentConf) string {
+	if agent.Model != "" {
+		return agent.Model
+	}
+	return defaultModelForAgent(agent.Name)
 }

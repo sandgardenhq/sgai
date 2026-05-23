@@ -17,7 +17,7 @@ curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Review the authentication code and identify any security issues",
-    "model": "openai/gpt-5.5"
+    "model": "openai/gpt-5.5 (low)"
   }'
 ```
 
@@ -25,7 +25,7 @@ Request:
 ```json
 {
   "prompt": "Review the authentication code and identify any security issues",
-  "model": "openai/gpt-5.5"
+  "model": "openai/gpt-5.5 (low)"
 }
 ```
 
@@ -42,7 +42,7 @@ If already running:
 ```json
 {
   "running": true,
-  "output": "$ opencode run -m openai/gpt-5.5...\nprompt: Review the...",
+  "output": "$ opencode run -m openai/gpt-5.5 --agent build --title adhoc [openai/gpt-5.5 (low)] --variant low...\nprompt: Review the...",
   "message": "ad-hoc prompt already running"
 }
 ```
@@ -50,13 +50,13 @@ If already running:
 ### Model Format
 
 The model parameter accepts the same format as GOAL.md models:
-- `"openai/gpt-5.5"` — standard model
-- `"openai/gpt-5.5 (xhigh)"` — model with variant
+- `"openai/gpt-5.5 (low)"` — cost-conscious GPT-5.5 baseline
+- `"openai/gpt-5.5 (xhigh)"` — high-reasoning GPT-5.5 variant
 - Use `GET /api/v1/models` to list available models
 
 ### How Ad-hoc Works
 
-Ad-hoc prompts run `opencode run -m {model} --agent build --title "adhoc [{model}]"` with your prompt piped as stdin. The workspace directory is used as the working directory.
+Ad-hoc prompts parse `provider/model (variant)` into `opencode run -m provider/model --agent build --title "adhoc [provider/model (variant)]" --variant variant` with your prompt piped as stdin. Without a parenthesized variant, SGAI omits `--variant`. The workspace directory is used as the working directory.
 
 ## Get Ad-hoc Status
 
@@ -72,7 +72,7 @@ Response (running):
 ```json
 {
   "running": true,
-  "output": "$ opencode run -m openai/gpt-5.5 --agent build --title \"adhoc [openai/gpt-5.5]\"\nprompt: Review the authentication code...\n\nAnalyzing the codebase...\n\nFound 3 potential issues:\n1. JWT tokens lack expiration...",
+  "output": "$ opencode run -m openai/gpt-5.5 --agent build --title adhoc [openai/gpt-5.5 (low)] --variant low\nprompt: Review the authentication code...\n\nAnalyzing the codebase...\n\nFound 3 potential issues:\n1. JWT tokens lack expiration...",
   "message": "adhoc status"
 }
 ```
@@ -94,7 +94,7 @@ WORKSPACE="my-project"
 # Start the prompt
 curl -X POST $BASE_URL/api/v1/workspaces/$WORKSPACE/adhoc \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Summarize the GOAL.md", "model": "openai/gpt-5.5"}'
+  -d '{"prompt": "Summarize the GOAL.md", "model": "openai/gpt-5.5 (low)"}'
 
 # Poll until done
 while true; do
@@ -148,17 +148,17 @@ Response:
 ```bash
 # Code review
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Review all Go files for potential race conditions", "model": "openai/gpt-5.5"}'
+  -d '{"prompt": "Review all Go files for potential race conditions", "model": "openai/gpt-5.5 (low)"}'
 
 # Documentation generation
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Generate a README.md for this project", "model": "openai/gpt-5.5"}'
+  -d '{"prompt": "Generate a README.md for this project", "model": "openai/gpt-5.5 (low)"}'
 
 # Quick fix
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "Fix the failing test in auth_test.go", "model": "openai/gpt-5.5"}'
+  -d '{"prompt": "Fix the failing test in auth_test.go", "model": "openai/gpt-5.5 (low)"}'
 
 # Analysis
 curl -X POST $BASE_URL/api/v1/workspaces/my-project/adhoc \
-  -d '{"prompt": "List all TODO comments in the codebase", "model": "openai/gpt-5.4-mini"}'
+  -d '{"prompt": "List all TODO comments in the codebase", "model": "openai/gpt-5.5 (low)"}'
 ```

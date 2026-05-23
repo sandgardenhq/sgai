@@ -12,6 +12,6 @@ Reference pages for the `sgai` CLI and its workspace file formats.
 
 ## Examples
 
-- [`GOAL.example.md`](../../GOAL.example.md)
+- [`GOAL.example.md`](../../cmd/sgai/GOAL.example.md)
 - [`sgai.example.json`](../../sgai.example.json)
 - [`opencode.json`](../../opencode.json)

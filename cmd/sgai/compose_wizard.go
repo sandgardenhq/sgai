@@ -9,20 +9,29 @@ type workflowTemplate struct {
 	Flow        string
 }
 
-const defaultAgentModel = "openai/gpt-5.5"
+const (
+	defaultCoordinatorModel = "openai/gpt-5.5 (xhigh)"
+	defaultWorkerModel      = "openai/gpt-5.5 (low)"
+)
+
+func defaultModelForAgent(name string) string {
+	if name == "coordinator" {
+		return defaultCoordinatorModel
+	}
+	return defaultWorkerModel
+}
 
 var workflowTemplates = []workflowTemplate{
 	{
 		ID:          "backend",
-		Name:        "Backend Development",
-		Description: "Go developer with code reviewer",
+		Name:        "Go Development",
+		Description: "Go implementation and review wrapper",
 		Icon:        "⚙️",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "go", Selected: true, Model: defaultModelForAgent("go")},
 		},
-		Flow: `"backend-go-developer" -> "go-readability-reviewer"`,
+		Flow: `"go"`,
 	},
 	{
 		ID:          "frontend",
@@ -30,25 +39,23 @@ var workflowTemplates = []workflowTemplate{
 		Description: "HTMX/PicoCSS implementation and review wrapper",
 		Icon:        "🎨",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "htmx-picocss", Selected: true, Model: defaultModelForAgent("htmx-picocss")},
 		},
 		Flow: `"htmx-picocss"`,
 	},
 	{
 		ID:          "fullstack",
 		Name:        "Full Stack",
-		Description: "Backend + Frontend developers with reviewers",
+		Description: "Go backend and HTMX frontend wrapper agents",
 		Icon:        "🚀",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "backend-go-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "go-readability-reviewer", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-developer", Selected: true, Model: defaultAgentModel},
-			{Name: "htmx-picocss-frontend-reviewer", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "go", Selected: true, Model: defaultModelForAgent("go")},
+			{Name: "htmx-picocss", Selected: true, Model: defaultModelForAgent("htmx-picocss")},
 		},
-		Flow: `"backend-go-developer" -> "go-readability-reviewer"
-"htmx-picocss-frontend-developer" -> "htmx-picocss-frontend-reviewer"`,
+		Flow: `"go"
+"htmx-picocss"`,
 	},
 	{
 		ID:          "research",
@@ -56,10 +63,10 @@ var workflowTemplates = []workflowTemplate{
 		Description: "General-purpose agent with coordinator-led project critique",
 		Icon:        "🔬",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "general-purpose", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "general-purpose", Selected: true, Model: defaultModelForAgent("general-purpose")},
 		},
-		Flow: `"coordinator" -> "general-purpose"`,
+		Flow: `"general-purpose"`,
 	},
 	{
 		ID:          "custom",
@@ -67,7 +74,7 @@ var workflowTemplates = []workflowTemplate{
 		Description: "Start with a blank slate — pick your own agents",
 		Icon:        "🛠️",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
 		},
 		Flow: "",
 	},
@@ -77,8 +84,8 @@ var workflowTemplates = []workflowTemplate{
 		Description: "React implementation and review wrapper",
 		Icon:        "⚛️",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "react", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "react", Selected: true, Model: defaultModelForAgent("react")},
 		},
 		Flow: `"react"`,
 	},
@@ -88,8 +95,8 @@ var workflowTemplates = []workflowTemplate{
 		Description: "Shell script implementation and review wrapper",
 		Icon:        "🐚",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "shell-script", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "shell-script", Selected: true, Model: defaultModelForAgent("shell-script")},
 		},
 		Flow: `"shell-script"`,
 	},
@@ -99,8 +106,8 @@ var workflowTemplates = []workflowTemplate{
 		Description: "Website implementation and review wrapper",
 		Icon:        "🌐",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "webmaster", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "webmaster", Selected: true, Model: defaultModelForAgent("webmaster")},
 		},
 		Flow: `"webmaster"`,
 	},
@@ -110,11 +117,11 @@ var workflowTemplates = []workflowTemplate{
 		Description: "C4 model documentation chain: code → component → container → context",
 		Icon:        "📐",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "c4-code", Selected: true, Model: defaultAgentModel},
-			{Name: "c4-component", Selected: true, Model: defaultAgentModel},
-			{Name: "c4-container", Selected: true, Model: defaultAgentModel},
-			{Name: "c4-context", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "c4-code", Selected: true, Model: defaultModelForAgent("c4-code")},
+			{Name: "c4-component", Selected: true, Model: defaultModelForAgent("c4-component")},
+			{Name: "c4-container", Selected: true, Model: defaultModelForAgent("c4-container")},
+			{Name: "c4-context", Selected: true, Model: defaultModelForAgent("c4-context")},
 		},
 		Flow: `"c4-code" -> "c4-component"
 "c4-component" -> "c4-container"
@@ -126,10 +133,10 @@ var workflowTemplates = []workflowTemplate{
 		Description: "Build with Claude Agent SDK, verified for TS and Python",
 		Icon:        "🤖",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "general-purpose", Selected: true, Model: defaultAgentModel},
-			{Name: "agent-sdk-verifier-ts", Selected: true, Model: defaultAgentModel},
-			{Name: "agent-sdk-verifier-py", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "general-purpose", Selected: true, Model: defaultModelForAgent("general-purpose")},
+			{Name: "agent-sdk-verifier-ts", Selected: true, Model: defaultModelForAgent("agent-sdk-verifier-ts")},
+			{Name: "agent-sdk-verifier-py", Selected: true, Model: defaultModelForAgent("agent-sdk-verifier-py")},
 		},
 		Flow: `"general-purpose" -> "agent-sdk-verifier-ts"
 "general-purpose" -> "agent-sdk-verifier-py"`,
@@ -140,10 +147,10 @@ var workflowTemplates = []workflowTemplate{
 		Description: "Build with OpenAI Agents SDK, verified for TS and Python",
 		Icon:        "🧠",
 		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultAgentModel},
-			{Name: "general-purpose", Selected: true, Model: defaultAgentModel},
-			{Name: "openai-sdk-verifier-ts", Selected: true, Model: defaultAgentModel},
-			{Name: "openai-sdk-verifier-py", Selected: true, Model: defaultAgentModel},
+			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
+			{Name: "general-purpose", Selected: true, Model: defaultModelForAgent("general-purpose")},
+			{Name: "openai-sdk-verifier-ts", Selected: true, Model: defaultModelForAgent("openai-sdk-verifier-ts")},
+			{Name: "openai-sdk-verifier-py", Selected: true, Model: defaultModelForAgent("openai-sdk-verifier-py")},
 		},
 		Flow: `"general-purpose" -> "openai-sdk-verifier-ts"
 "general-purpose" -> "openai-sdk-verifier-py"`,

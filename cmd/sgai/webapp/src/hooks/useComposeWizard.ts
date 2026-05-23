@@ -147,7 +147,12 @@ function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizard
   };
 }
 
-const DEFAULT_MODEL = "openai/gpt-5.5";
+const DEFAULT_COORDINATOR_MODEL = "openai/gpt-5.5 (xhigh)";
+const DEFAULT_WORKER_MODEL = "openai/gpt-5.5 (low)";
+
+function defaultModelForAgent(agentName: string): string {
+  return agentName === "coordinator" ? DEFAULT_COORDINATOR_MODEL : DEFAULT_WORKER_MODEL;
+}
 
 interface TechStackMapping {
   agents: string[];
@@ -217,6 +222,36 @@ function sanitizeComposerFlow(flow: string): string {
     .join("\n");
 }
 
+function mergeComposerAgents(
+  serverAgents: ApiComposerAgentConf[],
+  generatedAgents: ApiComposerAgentConf[],
+): ApiComposerAgentConf[] {
+  const mergedAgents = sanitizeComposerAgents(serverAgents);
+  const existingAgentNames = new Set(mergedAgents.map((agent) => agent.name));
+
+  for (const generatedAgent of generatedAgents) {
+    if (existingAgentNames.has(generatedAgent.name)) {
+      continue;
+    }
+    mergedAgents.push(generatedAgent);
+    existingAgentNames.add(generatedAgent.name);
+  }
+
+  return mergedAgents;
+}
+
+function mergeComposerFlow(serverFlow: string, generatedFlow: string): string {
+  const flowLines = [
+    ...sanitizeComposerFlow(serverFlow).split("\n"),
+    ...sanitizeComposerFlow(generatedFlow).split("\n"),
+  ].flatMap((line) => {
+    const trimmedLine = line.trim();
+    return trimmedLine ? [trimmedLine] : [];
+  });
+
+  return [...new Set(flowLines)].join("\n");
+}
+
 function computeAgentsAndFlowFromTechStack(
   techStack: string[],
 ): { agents: ApiComposerAgentConf[]; flow: string } {
@@ -236,7 +271,7 @@ function computeAgentsAndFlowFromTechStack(
 
   const agents: ApiComposerAgentConf[] = Array.from(agentSet)
     .sort()
-    .map((name) => ({ name, selected: true, model: DEFAULT_MODEL }));
+    .map((name) => ({ name, selected: true, model: defaultModelForAgent(name) }));
 
   const uniqueFlowLines = [...new Set(flowLines)];
 
@@ -249,14 +284,12 @@ function buildComposerStateFromData(
 ): ApiComposerState {
   const { agents, flow } = computeAgentsAndFlowFromTechStack(data.techStack);
 
-  const hasUserAgents = agents.length > 1;
-
   return {
     description: data.description,
     completionGate: data.completionGate,
     retrospective: data.retrospective,
-    agents: sanitizeComposerAgents(hasUserAgents ? agents : (serverState?.agents ?? [])),
-    flow: sanitizeComposerFlow(hasUserAgents ? flow : (serverState?.flow ?? "")),
+    agents: mergeComposerAgents(serverState?.agents ?? [], agents),
+    flow: mergeComposerFlow(serverState?.flow ?? "", flow),
     tasks: serverState?.tasks ?? "",
   };
 }

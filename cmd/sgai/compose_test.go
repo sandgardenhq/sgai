@@ -15,7 +15,26 @@ func TestDefaultComposerState(t *testing.T) {
 	assert.Len(t, state.Agents, 1)
 	assert.Equal(t, "coordinator", state.Agents[0].Name)
 	assert.True(t, state.Agents[0].Selected)
-	assert.NotEmpty(t, state.Agents[0].Model)
+	assert.Equal(t, "openai/gpt-5.5 (xhigh)", state.Agents[0].Model)
+}
+
+func TestDefaultModelForAgent(t *testing.T) {
+	tests := []struct {
+		name      string
+		agentName string
+		want      string
+	}{
+		{name: "coordinatorUsesXHigh", agentName: "coordinator", want: "openai/gpt-5.5 (xhigh)"},
+		{name: "workerUsesLow", agentName: "backend-go-developer", want: "openai/gpt-5.5 (low)"},
+		{name: "reviewerUsesLow", agentName: "go-readability-reviewer", want: "openai/gpt-5.5 (low)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := defaultModelForAgent(tt.agentName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestExtractDescriptionFromBody(t *testing.T) {
@@ -440,6 +459,23 @@ func TestBuildGOALContent(t *testing.T) {
 				assert.NotContains(t, content, "completionGateScript")
 			},
 		},
+		{
+			name: "buildGOALUsesDefaultsForMissingSelectedAgentModels",
+			state: composerState{
+				Description: "My Project",
+				Agents: []composerAgentConf{
+					{Name: "coordinator", Selected: true},
+					{Name: "builder", Selected: true},
+					{Name: "reviewer", Selected: false},
+				},
+			},
+			validate: func(t *testing.T, content string) {
+				assert.Contains(t, content, "models:")
+				assert.Contains(t, content, `"coordinator": "openai/gpt-5.5 (xhigh)"`)
+				assert.Contains(t, content, `"builder": "openai/gpt-5.5 (low)"`)
+				assert.NotContains(t, content, `"reviewer"`)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -546,8 +582,35 @@ func TestWorkflowTemplatesDoNotRouteSafetyAnalysisToSTPAAgent(t *testing.T) {
 	for _, tmpl := range workflowTemplates {
 		t.Run(tmpl.ID, func(t *testing.T) {
 			assert.NotContains(t, tmpl.Flow, "stpa-analyst")
+			assert.NotContains(t, tmpl.Flow, "coordinator")
 			for _, agent := range tmpl.Agents {
 				assert.NotEqual(t, "stpa-analyst", agent.Name)
+			}
+		})
+	}
+}
+
+func TestWorkflowTemplateAgentsExistInSkeleton(t *testing.T) {
+	for _, tmpl := range workflowTemplates {
+		t.Run(tmpl.ID, func(t *testing.T) {
+			for _, agent := range tmpl.Agents {
+				agentPath := filepath.Join("skel", ".sgai", "agent", agent.Name+".md")
+				_, errStat := os.Stat(agentPath)
+				require.NoError(t, errStat, "template agent %s must exist at %s", agent.Name, agentPath)
+			}
+		})
+	}
+}
+
+func TestWorkflowTemplatesUseDefaultModels(t *testing.T) {
+	for _, tmpl := range workflowTemplates {
+		t.Run(tmpl.ID, func(t *testing.T) {
+			for _, agent := range tmpl.Agents {
+				want := "openai/gpt-5.5 (low)"
+				if agent.Name == "coordinator" {
+					want = "openai/gpt-5.5 (xhigh)"
+				}
+				assert.Equal(t, want, agent.Model, "agent %s", agent.Name)
 			}
 		})
 	}
