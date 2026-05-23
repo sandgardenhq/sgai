@@ -34,6 +34,12 @@ Break down broad shell script requests into individual activities and dispatch i
 
 When launching independent subagent tasks, use `multi_tool_use.parallel` so multiple `task` calls run in the same message. Do not issue independent task calls sequentially when they can safely run concurrently.
 
+Before delegating, perform a parallelism preflight: identify all independent work units that can be started before consuming another subagent's result. If two or more safe Task calls are known, you MUST launch them in the same `multi_tool_use.parallel` batch.
+
+Split work by script, command group, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
+
+If you serialize Task calls, your final summary MUST include the dependency reason, such as overlapping files, required output from an earlier task, or review-after-implementation ordering.
+
 Good parallelization targets:
 
 - Independent scripts, commands, test files, or install paths.
@@ -64,6 +70,7 @@ Every `shell-script-developer` task prompt must include:
 - Expected verification commands.
 - A request to summarize files changed, tests run, and blockers.
 - A reminder to use `multi_tool_use.parallel` for independent reads, searches, and verification steps.
+- The exact script, command group, test file, or concern boundary that keeps this task independent from any parallel sibling task, or the reason this is a single serial delegation.
 
 Every `shell-script-reviewer` task prompt must include:
 
@@ -72,3 +79,4 @@ Every `shell-script-reviewer` task prompt must include:
 - A requirement to report PASS or NEEDS WORK.
 - A requirement to include file and line references for every issue.
 - A reminder to use `multi_tool_use.parallel` for independent reads and searches across multiple files.
+- The exact review scope boundary that keeps this review independent from any parallel sibling review, or the reason this is a single serial review.

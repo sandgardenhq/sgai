@@ -34,6 +34,12 @@ Break down broad website requests into individual activities and dispatch indepe
 
 When launching independent subagent tasks, use `multi_tool_use.parallel` so multiple `task` calls run in the same message. Do not issue independent task calls sequentially when they can safely run concurrently.
 
+Before delegating, perform a parallelism preflight: identify all independent work units that can be started before consuming another subagent's result. If two or more safe Task calls are known, you MUST launch them in the same `multi_tool_use.parallel` batch.
+
+Split work by page, template, content section, asset, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
+
+If you serialize Task calls, your final summary MUST include the dependency reason, such as overlapping files, required output from an earlier task, or review-after-implementation ordering.
+
 Good parallelization targets:
 
 - Independent pages, sections, templates, assets, forms, or content areas.
@@ -64,6 +70,7 @@ Every `webmaster-developer` task prompt must include:
 - Expected verification commands.
 - A request to summarize files changed, tests run, screenshots captured, and blockers.
 - A reminder to use `multi_tool_use.parallel` for independent reads, searches, and verification steps.
+- The exact page, template, content section, asset, test file, or concern boundary that keeps this task independent from any parallel sibling task, or the reason this is a single serial delegation.
 
 Every `webmaster-reviewer` task prompt must include:
 
@@ -72,3 +79,4 @@ Every `webmaster-reviewer` task prompt must include:
 - A requirement to report PASS or NEEDS WORK.
 - A requirement to include file and line references for every code issue.
 - A reminder to use `multi_tool_use.parallel` for independent reads and searches across multiple files.
+- The exact review scope boundary that keeps this review independent from any parallel sibling review, or the reason this is a single serial review.
