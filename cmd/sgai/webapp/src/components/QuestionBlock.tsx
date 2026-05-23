@@ -110,6 +110,7 @@ function ChoiceItem({
         value={choice}
         checked={checked}
         onChange={onToggle}
+        aria-label={choice}
         className="mt-1 shrink-0"
       />
       <Tooltip>

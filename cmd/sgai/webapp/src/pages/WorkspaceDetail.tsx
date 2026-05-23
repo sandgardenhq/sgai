@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useCallback, useReducer } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,8 +130,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const navigate = useNavigate();
 
   const [actionError, setActionError] = useState<string | null>(null);
-  const [runningOverride, setRunningOverride] = useState<boolean | null>(null);
-  const previousWorkspaceRef = useRef<string | null>(null);
+  const [runningOverride, setRunningOverride] = useState<{ workspaceName: string; running: boolean } | null>(null);
   const [isStartStopPending, startStartStopTransition] = useTransition();
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
   const [isPinPending, startPinTransition] = useTransition();
@@ -149,19 +148,6 @@ export function WorkspaceDetail(): JSX.Element | null {
   const detail: ApiWorkspaceEntry | null = workspaces.find((ws) => ws.name === workspaceName) ?? null;
   const loading = fetchStatus === "fetching" && detail === null;
   const error: Error | null = fetchStatus === "error" && detail === null ? new Error("Failed to load workspace state") : null;
-
-  useEffect(() => {
-    if (previousWorkspaceRef.current !== workspaceName) {
-      previousWorkspaceRef.current = workspaceName;
-      setRunningOverride(null);
-    }
-  }, [workspaceName]);
-
-  useEffect(() => {
-    if (runningOverride !== null && detail?.running === runningOverride) {
-      setRunningOverride(null);
-    }
-  }, [detail?.running, runningOverride]);
 
   useEffect(() => {
     if (!workspaceName) return;
@@ -237,7 +223,10 @@ export function WorkspaceDetail(): JSX.Element | null {
     return <NoWorkspaceState name={detail.name} dir={detail.dir} />;
   }
 
-  const effectiveRunning = runningOverride !== null ? runningOverride : (detail.running ?? false);
+  const runningOverrideValue = runningOverride?.workspaceName === workspaceName && detail.running !== runningOverride.running
+    ? runningOverride.running
+    : null;
+  const effectiveRunning = runningOverrideValue ?? (detail.running ?? false);
 
   const totalExecTime = detail.totalExecTime?.trim() ?? "";
   const fallbackExecTime = totalExecTime && totalExecTime !== "-" ? totalExecTime : "0s";
@@ -267,7 +256,7 @@ export function WorkspaceDetail(): JSX.Element | null {
         const result = await api.workspaces.start(workspaceName, false);
         triggerFactoryRefresh();
         if (result.running) {
-          setRunningOverride(true);
+          setRunningOverride({ workspaceName, running: true });
         }
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to start session");
@@ -278,7 +267,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const handleStop = () => {
     if (!workspaceName) return;
     setActionError(null);
-    setRunningOverride(false);
+    setRunningOverride({ workspaceName, running: false });
     startStartStopTransition(async () => {
       try {
         await api.workspaces.stop(workspaceName);

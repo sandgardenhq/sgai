@@ -13,6 +13,7 @@ function Button({
   size = "default",
   asChild = false,
   children,
+  type = "button",
   ...props
 }: ButtonProps) {
   const variantClasses: Record<string, string> = {
@@ -49,6 +50,7 @@ function Button({
   return (
     <button
       data-slot="button"
+      type={type}
       className={classes}
       {...props}
     >

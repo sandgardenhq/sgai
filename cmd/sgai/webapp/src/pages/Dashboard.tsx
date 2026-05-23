@@ -279,13 +279,8 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
   const hasForks = forks.length > 0;
   const isSelected = workspace.name === selectedName;
   const hasForkSelected = forks.some((f) => f.name === selectedName);
-  const [expanded, setExpanded] = useState(() => isSelected || hasForkSelected);
-
-  useEffect(() => {
-    if (isSelected || hasForkSelected) {
-      setExpanded(true);
-    }
-  }, [isSelected, hasForkSelected]);
+  const [userExpanded, setUserExpanded] = useState(false);
+  const expanded = isSelected || hasForkSelected || userExpanded;
 
   const isRoot = fullWorkspace?.isRoot ?? workspace.isRoot;
   const showDelete = !isRoot || !hasForks;
@@ -301,7 +296,7 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={() => setUserExpanded(!expanded)}
             className="w-5 h-6 p-0 text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors self-start mt-1"
             aria-label="Toggle forks"
           >
@@ -431,13 +426,8 @@ function PinnedTreeItem({ workspace, selectedName, workspaceLookup, pinnedForks 
   const fullWorkspace = workspaceLookup.get(workspace.name);
   const isSelected = workspace.name === selectedName;
   const hasForkSelected = pinnedForks.some((f) => f.name === selectedName);
-  const [expanded, setExpanded] = useState(() => isSelected || hasForkSelected);
-
-  useEffect(() => {
-    if (isSelected || hasForkSelected) {
-      setExpanded(true);
-    }
-  }, [isSelected, hasForkSelected]);
+  const [userExpanded, setUserExpanded] = useState(false);
+  const expanded = isSelected || hasForkSelected || userExpanded;
 
   const isRoot = fullWorkspace?.isRoot ?? workspace.isRoot;
   const description = workspace.description || null;
@@ -451,7 +441,7 @@ function PinnedTreeItem({ workspace, selectedName, workspaceLookup, pinnedForks 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={() => setUserExpanded(!expanded)}
             className="w-5 h-6 p-0 text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors self-start mt-1"
             aria-label="Toggle forks"
           >
@@ -607,7 +597,7 @@ function PinnedSection({ workspaces, selectedName, workspaceLookup, forkParentLo
   const { pinnedRoots, forkGroups, orphanForks } = pinnedRootsAndForks;
 
   return (
-    <div className="mb-3 pb-2 border-b" role="region" aria-label="Pinned">
+    <section className="mb-3 pb-2 border-b" aria-label="Pinned">
       <SidebarMenu>
         {pinnedRoots.map((root) => (
           <PinnedTreeItem
@@ -628,7 +618,7 @@ function PinnedSection({ workspaces, selectedName, workspaceLookup, forkParentLo
           />
         ))}
       </SidebarMenu>
-    </div>
+    </section>
   );
 }
 
@@ -646,13 +636,13 @@ function InProgressSection({ workspaces, selectedName, workspaceLookup }: InProg
   if (inProgress.length === 0) return null;
 
   return (
-    <div className="mb-3 pb-2 border-b" role="region" aria-label="In progress">
+    <section className="mb-3 pb-2 border-b" aria-label="In progress">
       <SidebarMenu>
         {inProgress.map((w) => (
           <InProgressItem key={w.name} workspace={w} selectedName={selectedName} workspaceLookup={workspaceLookup} />
         ))}
       </SidebarMenu>
-    </div>
+    </section>
   );
 }
 

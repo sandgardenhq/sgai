@@ -28,9 +28,10 @@ export function EditGoal(): JSX.Element {
   const dir = workspace?.dir || "";
 
   useEffect(() => {
+    const redirectTimeout = redirectTimeoutRef.current;
     return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
       }
     };
   }, []);

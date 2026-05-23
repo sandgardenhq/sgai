@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router";
+import { useParams, useNavigate, Link, Navigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,8 @@ const STORAGE_PREFIX = "sgai-response-";
 
 function ResponseSkeleton() {
   return (
-    <div
-      className="max-w-2xl mx-auto space-y-4"
-      role="status"
+    <output
+      className="block max-w-2xl mx-auto space-y-4"
       aria-live="polite"
       aria-labelledby="response-loading-label"
     >
@@ -30,7 +29,7 @@ function ResponseSkeleton() {
       <Skeleton className="h-48 w-full rounded-xl" />
       <Skeleton className="h-24 w-full rounded-xl" />
       <Skeleton className="h-10 w-32" />
-    </div>
+    </output>
   );
 }
 
@@ -38,14 +37,6 @@ export function ResponseMultiChoice() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const workspaceName = name ?? "";
-
-  const handleQuestionMissing = useCallback(() => {
-    if (!workspaceName) {
-      navigate("/", { replace: true });
-      return;
-    }
-    navigate(`/workspaces/${encodeURIComponent(workspaceName)}/progress`, { replace: true });
-  }, [navigate, workspaceName]);
 
   const handleSubmitSuccess = useCallback(() => {
     if (!workspaceName) {
@@ -71,11 +62,14 @@ export function ResponseMultiChoice() {
     workspaceName,
     storagePrefix: STORAGE_PREFIX,
     active: true,
-    onQuestionMissing: handleQuestionMissing,
     onSubmitSuccess: handleSubmitSuccess,
   });
 
   if (loading) return <ResponseSkeleton />;
+
+  if (workspaceName && workspaceDetail && !question) {
+    return <Navigate to={`/workspaces/${encodeURIComponent(workspaceName)}/progress`} replace />;
+  }
 
   if (!workspaceName) {
     return (

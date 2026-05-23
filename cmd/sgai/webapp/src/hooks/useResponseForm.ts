@@ -45,7 +45,6 @@ interface UseResponseFormOptions {
   workspaceName: string;
   storagePrefix: string;
   active: boolean;
-  onQuestionMissing?: () => void;
   onSubmitSuccess?: () => void;
 }
 
@@ -67,7 +66,6 @@ export function useResponseForm({
   workspaceName,
   storagePrefix,
   active,
-  onQuestionMissing,
   onSubmitSuccess,
 }: UseResponseFormOptions): UseResponseFormReturn {
   const [{ submitting, submitError, selections, otherText }, updateFormState] = useReducer(
@@ -87,14 +85,8 @@ export function useResponseForm({
   const error: Error | null = fetchStatus === "error" && workspace === null
     ? new Error("Failed to load workspace state")
     : null;
-
   useEffect(() => {
     if (!active || !workspaceName) return;
-
-    if (question === null && workspace !== null) {
-      onQuestionMissing?.();
-      return;
-    }
 
     if (!question) return;
 
@@ -107,7 +99,7 @@ export function useResponseForm({
         updateFormState({ selections: {}, otherText: "" });
       }
     }
-  }, [active, workspaceName, storagePrefix, question, workspace, onQuestionMissing]);
+  }, [active, workspaceName, storagePrefix, question]);
 
   useEffect(() => {
     if (!question) return;
