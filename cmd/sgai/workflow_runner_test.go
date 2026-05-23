@@ -77,25 +77,27 @@ func buildTestDag(edges map[string][]string, entryNodes []string) *dag {
 }
 
 func TestResolveNextAgent(t *testing.T) {
-	t.Run("redirectsToPendingMessages", func(t *testing.T) {
+	t.Run("navigatesToRequestedAgent", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Navigate: &state.NavigationRequest{To: "reviewer", Reason: "review please"}})
+		require.NoError(t, errCoord)
+
 		r := &workflowRunner{
 			paddedsgai: "test",
+			coord:      coord,
 			flowDag:    buildTestDag(map[string][]string{"coordinator": {"reviewer"}}, []string{"coordinator"}),
-			wfState: state.Workflow{
-				Messages: []state.Message{
-					{ID: 1, FromAgent: "coordinator", ToAgent: "reviewer", Body: "review please", Read: false},
-				},
-			},
+			wfState:    coord.State(),
 		}
 		got := r.resolveNextAgent("coordinator")
 		assert.Equal(t, "reviewer", got)
+		assert.Nil(t, coord.State().Navigate)
 	})
 
 	t.Run("terminalNodeReturnsCoordinator", func(t *testing.T) {
 		r := &workflowRunner{
 			paddedsgai: "test",
 			flowDag:    buildTestDag(map[string][]string{"coordinator": {"reviewer"}}, []string{"coordinator"}),
-			wfState:    state.Workflow{Messages: []state.Message{}},
+			wfState:    state.Workflow{},
 		}
 		got := r.resolveNextAgent("reviewer")
 		assert.Equal(t, "coordinator", got)
@@ -106,7 +108,7 @@ func TestResolveNextAgent(t *testing.T) {
 		require.NoError(t, errFlow)
 		require.Equal(t, []string{"coordinator"}, flowDag.EntryNodes)
 
-		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{Messages: []state.Message{}}}
+		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{}}
 		got := r.resolveNextAgent("coordinator")
 		assert.Equal(t, "builder", got)
 	})
@@ -116,7 +118,7 @@ func TestResolveNextAgent(t *testing.T) {
 		require.NoError(t, errFlow)
 		flowDag.injectRetrospectiveEdge()
 
-		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{Messages: []state.Message{}}}
+		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{}}
 		got := r.resolveNextAgent("coordinator")
 		assert.Equal(t, "worker", got)
 	})
@@ -178,12 +180,12 @@ func TestHandleTrigger(t *testing.T) {
 		r.handleTrigger(triggerGoal, goalPath)
 	})
 
-	t.Run("steeringNoMessages", func(t *testing.T) {
+	t.Run("steeringNoNavigate", func(t *testing.T) {
 		dir := t.TempDir()
 		sgaiDir := filepath.Join(dir, ".sgai")
 		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
 		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Messages: []state.Message{}})
+		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
 		require.NoError(t, errCoord)
 
 		r := &workflowRunner{coord: coord}
@@ -193,22 +195,12 @@ func TestHandleTrigger(t *testing.T) {
 		r.handleTrigger(triggerSteering, goalPath)
 	})
 
-	t.Run("steeringWithHumanMessage", func(t *testing.T) {
+	t.Run("steeringWithNavigate", func(t *testing.T) {
 		dir := t.TempDir()
 		sgaiDir := filepath.Join(dir, ".sgai")
 		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
 		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-			Messages: []state.Message{
-				{
-					ID:        1,
-					FromAgent: "Human Partner",
-					ToAgent:   "coordinator",
-					Body:      "Add logging",
-					Read:      false,
-				},
-			},
-		})
+		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Navigate: &state.NavigationRequest{To: "coordinator", Reason: "Add logging"}})
 		require.NoError(t, errCoord)
 
 		r := &workflowRunner{coord: coord}
@@ -216,10 +208,6 @@ func TestHandleTrigger(t *testing.T) {
 		require.NoError(t, os.WriteFile(goalPath, []byte("# Goal\n\nOriginal content"), 0o644))
 
 		r.handleTrigger(triggerSteering, goalPath)
-
-		goalContent, errRead := os.ReadFile(goalPath)
-		require.NoError(t, errRead)
-		assert.Contains(t, string(goalContent), "Add logging")
 	})
 }
 
@@ -384,16 +372,7 @@ models: {}
 		CurrentAgent:    "retrospective",
 		InteractionMode: state.ModeRetrospective,
 		VisitCounts:     map[string]int{"coordinator": 1, "retrospective": 1},
-		CurrentModel:    "retrospective:openai/gpt-5.5",
-		ModelStatuses: map[string]string{
-			"retrospective:openai/gpt-5.5": "model-working",
-			"coordinator:openai/gpt-5.5":   "model-done",
-		},
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "coordinator", ToAgent: "retrospective", Body: "run retrospective", Read: false},
-			{ID: 2, FromAgent: "retrospective", ToAgent: "worker", Body: "stale outgoing", Read: false},
-			{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false},
-		},
+		Navigate:        &state.NavigationRequest{To: "retrospective", Reason: "run retrospective"},
 	})
 	require.NoError(t, errCoord)
 
@@ -406,11 +385,7 @@ models: {}
 	assert.NotEqual(t, "retrospective", runner.wfState.CurrentAgent)
 	assert.NotEqual(t, state.ModeRetrospective, runner.wfState.InteractionMode)
 	assert.NotContains(t, runner.wfState.VisitCounts, "retrospective")
-	assert.Empty(t, runner.wfState.CurrentModel)
-	assert.NotContains(t, runner.wfState.ModelStatuses, "retrospective:openai/gpt-5.5")
-	assertNoUnreadRetrospectiveMessages(t, runner.wfState.Messages)
-	assert.Equal(t, []state.Message{{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false}}, runner.wfState.Messages)
-	assert.Equal(t, "worker", findFirstPendingMessageAgent(runner.wfState))
+	assert.Nil(t, runner.wfState.Navigate)
 	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
 	assert.NoFileExists(t, filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md"))
 
@@ -420,22 +395,7 @@ models: {}
 	assert.NotEqual(t, "retrospective", persisted.CurrentAgent)
 	assert.NotEqual(t, state.ModeRetrospective, persisted.InteractionMode)
 	assert.NotContains(t, persisted.VisitCounts, "retrospective")
-	assert.Empty(t, persisted.CurrentModel)
-	assert.NotContains(t, persisted.ModelStatuses, "retrospective:openai/gpt-5.5")
-	assertNoUnreadRetrospectiveMessages(t, persisted.Messages)
-	assert.Equal(t, []state.Message{{ID: 3, FromAgent: "worker", ToAgent: "worker", Body: "keep me", Read: false}}, persisted.Messages)
-	assert.Equal(t, "worker", findFirstPendingMessageAgent(persisted))
-}
-
-func assertNoUnreadRetrospectiveMessages(t *testing.T, messages []state.Message) {
-	t.Helper()
-	for _, msg := range messages {
-		if msg.Read {
-			continue
-		}
-		assert.NotEqual(t, "retrospective", extractAgentFromModelID(msg.FromAgent), "message ID %d FromAgent", msg.ID)
-		assert.NotEqual(t, "retrospective", extractAgentFromModelID(msg.ToAgent), "message ID %d ToAgent", msg.ID)
-	}
+	assert.Nil(t, persisted.Navigate)
 }
 
 func TestHandleWorkingLoop(t *testing.T) {

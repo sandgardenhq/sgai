@@ -290,26 +290,6 @@ func registerWorkspaceTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyResult{}, err
 	})
 
-	type deleteMessageArgs struct {
-		Workspace string `json:"workspace" jsonschema:"The workspace name"`
-		ID        int    `json:"id" jsonschema:"The message ID to delete"`
-	}
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "delete_message",
-		Description: "Delete a message from a workspace.",
-		InputSchema: mustSchema[deleteMessageArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args deleteMessageArgs) (*mcp.CallToolResult, emptyResult, error) {
-		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
-		if err != nil {
-			return nil, emptyResult{}, err
-		}
-		deleteResult, err := ctx.srv.deleteMessageService(workspacePath, args.ID)
-		if err != nil {
-			return textResult("error: " + err.Error()), emptyResult{}, nil
-		}
-		result, err := jsonResult(deleteResult)
-		return result, emptyResult{}, err
-	})
 }
 
 func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {

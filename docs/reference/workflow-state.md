@@ -38,29 +38,25 @@ Common fields include:
 - `task` (string)
 - `progress` (array of objects with `timestamp`, `agent`, `description`)
 - `multiChoiceQuestion` (object with `questions`, each with `question`, `choices`, `multiSelect`)
-- `messages` (array of inter-agent messages)
 - `visitCounts` (object map of agent name to integer)
 - `currentAgent` (string)
+- `navigate` (object with `to` and `reason`, consumed by the runner)
 - `todos` (array of todo items)
 - `projectTodos` (array of todo items)
 - `agentSequence` (array with `agent`, `startTime`, `isCurrent`)
 - `sessionId` (string)
 - `cost` (object with `totalCost`, `totalTokens`, and `byAgent`)
-- `modelStatuses` (object map of model ID to status string)
-- `currentModel` (string, format `agentName:modelSpec`)
 
-## Messages
+## Navigation
 
-A message entry includes:
+Agents request a specific next agent by setting `navigate` through the MCP `update_workflow_state` tool with `status: "agent-done"`.
 
-- `id` (number)
-- `fromAgent` (string)
-- `toAgent` (string)
-- `body` (string)
-- `read` (boolean)
-- `readAt` (string)
-- `readBy` (string)
-- `createdAt` (string)
+The `navigate` object includes:
+
+- `to` (string)
+- `reason` (string)
+
+The runner consumes and clears `navigate` after selecting the requested agent. Shared work notes and handoffs belong in `.sgai/PROJECT_MANAGEMENT.md`, not `.sgai/state.json`.
 
 ## TODO items
 
@@ -70,4 +66,3 @@ A todo item includes:
 - `content` (string)
 - `status` (string)
 - `priority` (string)
-

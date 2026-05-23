@@ -58,30 +58,6 @@ export const Workbench: Plugin = async ({ directory }) => {
       if (input.event.type === "session.compacted") {
         try {
           const sessionID = input.event.properties.sessionID;
-          const currentAgent = process.env.OPENCODE_AGENT_NAME || "unknown";
-
-          let currentState: any;
-          try {
-            const content = await readFile(stateFilePath, 'utf8');
-            currentState = JSON.parse(content);
-          } catch (error) {
-            currentState = { messages: [], messageHistory: [] };
-          }
-
-          const pendingMessages = (currentState.messages || []).filter(
-            (msg: any) => msg.toAgent === currentAgent
-          );
-
-          let inboxPeek = "";
-          if (pendingMessages.length > 0) {
-            inboxPeek = `\n\n**Inbox Preview (${pendingMessages.length} pending message(s)):**\n`;
-            inboxPeek += pendingMessages.map((msg: any) => {
-              const subject = msg.body.split('\n')[0];
-              return `- From: ${msg.fromAgent} | To: ${msg.toAgent} | Subject: ${subject}`;
-            }).join('\n');
-            inboxPeek += `\n\nYou MUST call \`check_inbox()\` to read these messages.`;
-          }
-
           await input.client.session.prompt({
             path: { id: sessionID },
             body: {
@@ -89,8 +65,7 @@ export const Workbench: Plugin = async ({ directory }) => {
                 type: "text",
                 text: `🔄 **Conversation Compacted**\n\n` +
                       `To maintain context within limits, earlier messages have been summarized.\n\n` +
-                      `You MUST re-read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md before continuing.` +
-                      inboxPeek,
+                      `You MUST re-read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md before continuing.`,
                 metadata: {
                   source: "compaction-detector",
                   timestamp: Date.now()
@@ -121,8 +96,7 @@ export const Workbench: Plugin = async ({ directory }) => {
         throw new Error(
           `GOAL.md is protected and can only be modified by the coordinator agent.\n\n` +
           `You are currently running as '${currentAgent}'.\n\n` +
-          `If you need to request changes to GOAL.md, use the send_message tool:\n` +
-          `  send_message({ toAgent: "coordinator", body: "Please update GOAL.md to ..." })\n\n` +
+          `If you need to request changes to GOAL.md, append the request to .sgai/PROJECT_MANAGEMENT.md and yield to coordinator with workflow navigation.\n\n` +
           `The coordinator will review your request and make the appropriate changes.`
         );
       }

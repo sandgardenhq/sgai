@@ -1581,68 +1581,6 @@ func (s *Server) resolveWorkspaceNameToPath(workspaceName string) string {
 	return ""
 }
 
-type modelStatusDisplay struct {
-	ModelID string
-	Status  string
-}
-
-func orderedModelStatuses(dir string, modelStatuses map[string]string) []modelStatusDisplay {
-	if len(modelStatuses) == 0 {
-		return nil
-	}
-
-	ordered := make([]modelStatusDisplay, 0, len(modelStatuses))
-	used := make(map[string]bool)
-
-	for _, agent := range orderedStatusAgents(modelStatuses) {
-		for _, modelSpec := range modelsForAgentFromGoal(dir, agent) {
-			modelID := formatModelID(agent, modelSpec)
-			status, ok := modelStatuses[modelID]
-			if !ok {
-				continue
-			}
-			ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: status})
-			used[modelID] = true
-		}
-	}
-
-	remaining := make([]string, 0, len(modelStatuses))
-	for modelID := range modelStatuses {
-		if used[modelID] {
-			continue
-		}
-		remaining = append(remaining, modelID)
-	}
-	if len(remaining) == 0 {
-		return ordered
-	}
-	if len(ordered) == 0 {
-		ordered = make([]modelStatusDisplay, 0, len(modelStatuses))
-	}
-	if len(remaining) > 1 {
-		slices.Sort(remaining)
-	}
-	for _, modelID := range remaining {
-		ordered = append(ordered, modelStatusDisplay{ModelID: modelID, Status: modelStatuses[modelID]})
-	}
-	return ordered
-}
-
-func orderedStatusAgents(modelStatuses map[string]string) []string {
-	agents := make([]string, 0, len(modelStatuses))
-	seen := make(map[string]bool)
-	for modelID := range modelStatuses {
-		agent := extractAgentFromModelID(modelID)
-		if seen[agent] {
-			continue
-		}
-		seen[agent] = true
-		agents = append(agents, agent)
-	}
-	slices.Sort(agents)
-	return agents
-}
-
 func modelsForAgentFromGoal(dir, agent string) []string {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	goalData, errRead := os.ReadFile(goalPath)

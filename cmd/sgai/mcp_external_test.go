@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -376,19 +375,6 @@ func TestMCPToolUpdateDescription(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-}
-
-func TestMCPToolDeleteMessage(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "delmsg-mcp")
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "delete_message",
-		Arguments: map[string]any{"workspace": "delmsg-mcp", "id": float64(999)},
-	})
-	require.NoError(t, err)
-	tc := result.Content[0].(*mcp.TextContent)
-	assert.Contains(t, tc.Text, "error:")
 }
 
 func TestMCPToolStartSessionWorkspaceNotFound(t *testing.T) {
@@ -895,17 +881,6 @@ func TestMCPToolGetWorkspaceDiffNotFound(t *testing.T) {
 	assert.True(t, result.IsError)
 }
 
-func TestMCPToolDeleteMessageNotFound(t *testing.T) {
-	srv, _ := setupTestServer(t)
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "delete_message",
-		Arguments: map[string]any{"workspace": "nonexistent-delmsg-mcp", "id": float64(1)},
-	})
-	require.NoError(t, err)
-	assert.True(t, result.IsError)
-}
-
 func TestMCPToolListAgentsNotFound(t *testing.T) {
 	srv, _ := setupTestServer(t)
 	cs := connectMCPClient(t, srv)
@@ -1128,18 +1103,6 @@ func TestMCPToolStopSessionExists(t *testing.T) {
 	require.NotNil(t, result)
 }
 
-func TestMCPToolDeleteMessageExists(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "delmsg2-mcp")
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "delete_message",
-		Arguments: map[string]any{"workspace": "delmsg2-mcp", "id": float64(999)},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-}
-
 func TestMCPToolGetGoalSuccess(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "getgoal-mcp")
@@ -1196,27 +1159,4 @@ func TestMCPToolUpdateGoalEmptyContentReturnsError(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, "error:")
-}
-
-func TestMCPToolDeleteMessageWithExistingMessage(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "delmsg-exist-mcp")
-
-	coord := srv.workspaceCoordinator(wsDir)
-	require.NoError(t, coord.UpdateState(func(wf *state.Workflow) {
-		wf.Messages = []state.Message{
-			{ID: 42, FromAgent: "agent1", ToAgent: "agent2", Body: "test message"},
-		}
-	}))
-
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "delete_message",
-		Arguments: map[string]any{"workspace": "delmsg-exist-mcp", "id": float64(42)},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.False(t, result.IsError)
-	tc := result.Content[0].(*mcp.TextContent)
-	assert.Contains(t, tc.Text, "deleted")
 }

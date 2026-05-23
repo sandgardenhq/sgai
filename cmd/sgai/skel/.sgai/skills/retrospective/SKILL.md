@@ -177,7 +177,7 @@ After reading all artifacts in Step 1, write a structured analysis summary to yo
 Analysis Summary:
 - Files: Read 15/15 session JSONs, session state.json (from .sgai/retrospectives/<session-id>/state.json), GOAL.md, PROJECT_MANAGEMENT.md, stdout.log, stderr.log
 - Visits: coordinator(8), backend-go-developer(3), go-readability-reviewer(2), react-developer(1), retrospective(1)
-- Messages: 19 inter-agent messages, 3 reviewer feedback rounds
+- Handoffs: 19 inter-agent handoffs, 3 reviewer feedback rounds
 - Efficiency: Backend developer visited 3 times due to reviewer feedback — could skills reduce this?
 - Quality: Reviewer caught SQL formatting issues 3 times — suggests missing skill
 - Knowledge gaps: Agent asked about migration workflow mid-session — no skill exists for this
@@ -333,21 +333,19 @@ Before presenting any suggestion, verify the target path:
 
 **PREREQUISITES — You may NOT invoke this case unless ALL of the following are true:**
 
-1. You have read the session `state.json` (via `.sgai/retrospectives/<session-id>/state.json`, or the `.sgai/state.json` fallback) and recorded visit counts and message counts in your analysis log
+1. You have read the session `state.json` (via `.sgai/retrospectives/<session-id>/state.json`, or the `.sgai/state.json` fallback) and recorded visit counts and navigation/handoff context in your analysis log
 2. You have read at least 3 session JSON files (or all of them if fewer than 3 exist)
 3. You have completed the Step 1.5 Mandatory Analysis Log with observations in all 5 signal categories (efficiency, quality, knowledge gaps, process gaps, AGENTS.md health)
 4. You have completed Steps 2-4 (Pattern Analysis, AGENTS.md Health Analysis, Generate Suggestions, Prioritize and Group)
 
-**If ALL prerequisites are met** and you genuinely have zero actionable suggestions after thorough analysis, send `RETRO_COMPLETE` and exit:
+**If ALL prerequisites are met** and you genuinely have zero actionable suggestions after thorough analysis, append `RETRO_COMPLETE` to `.sgai/PROJECT_MANAGEMENT.md` and exit:
 
 ```
-sgai_send_message({
-  toAgent: "coordinator",
-  body: "RETRO_COMPLETE: No actionable improvements identified for this session. Analysis summary: Read X/Y session JSONs, session state.json (from [path used]) showed Z agent visits and W messages. Per-category findings: [brief summary of each category observation from Step 1.5]."
-})
-sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No actionable suggestions found after thorough analysis. Sent RETRO_COMPLETE." })
+// append to .sgai/PROJECT_MANAGEMENT.md:
+// RETRO_COMPLETE: No actionable improvements identified for this session. Analysis summary: Read X/Y session JSONs, session state.json (from [path used]) showed Z agent visits and handoff context. Per-category findings: [brief summary of each category observation from Step 1.5].
+sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No actionable suggestions found after thorough analysis. Recorded RETRO_COMPLETE.", navigate: {to: "coordinator", reason: "retrospective complete"} })
 // STOP HERE. Make NO more tool calls. Your turn is OVER.
-// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+// This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
@@ -355,41 +353,38 @@ sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No ac
 
 ### Step 5: Present Changes for Approval
 
-**MANDATORY YIELD PROTOCOL:** After every `sgai_send_message()` call in this step, you MUST:
-1. Immediately call `sgai_update_workflow_state({status: "agent-done"})`
+**MANDATORY YIELD PROTOCOL:** After every `RETRO_QUESTION` entry appended to `.sgai/PROJECT_MANAGEMENT.md` in this step, you MUST:
+1. Immediately call `sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "retrospective question"}})`
 2. STOP making tool calls — your turn is over
-3. Do NOT call `check_inbox` or `check_outbox` — the coordinator cannot respond until you yield
 
-**MANDATORY:** You MUST send at least one `RETRO_QUESTION:` message to the coordinator during your run. This is NOT optional. If you found zero suggestions, follow the "No Suggestions Case" above instead.
+**MANDATORY:** You MUST append at least one `RETRO_QUESTION:` entry for the coordinator during your run. This is NOT optional. If you found zero suggestions, follow the "No Suggestions Case" above instead.
 
-Present proposed changes to the human partner by sending `RETRO_QUESTION:` messages to the coordinator, grouped by category. For each non-empty category bucket (Skills, Agent Prompts, AGENTS.md), send ONE message containing ALL proposals in that category.
+Present proposed changes to the human partner by appending `RETRO_QUESTION:` entries for the coordinator, grouped by category. For each non-empty category bucket (Skills, Agent Prompts, AGENTS.md), append ONE entry containing ALL proposals in that category.
 
 #### Presentation Format
 
-For each non-empty category, send a single `RETRO_QUESTION` with this structure:
+For each non-empty category, append a single `RETRO_QUESTION` with this structure:
 
 ```
-sgai_send_message({
-  toAgent: "coordinator",
-  body: "RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (N proposals)\n\n### 1. [Title of first proposal]\nEvidence: [1-line evidence from session artifacts]\n```diff\n--- a/[file path]\n+++ b/[file path]\n@@ ... @@\n[unified diff content]\n```\nRationale: [why this helps future sessions]\n\n### 2. [Title of second proposal]\nEvidence: [1-line evidence]\n[full proposed file content for new files, or diff for modifications]\nRationale: [why this helps]\n\nSelect which to approve (multi-select):\n- 1. [Title of first proposal]\n- 2. [Title of second proposal]"
-})
+// append to .sgai/PROJECT_MANAGEMENT.md:
+// RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (N proposals)
+// [include all proposals, evidence, diffs/content, rationale, and selection options]
 // Then yield immediately
-sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Sent Skills category RETRO_QUESTION to coordinator" })
-// STOP HERE. Make NO more tool calls. Do NOT check inbox or outbox. Your turn is OVER.
-// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills category RETRO_QUESTION for coordinator", navigate: {to: "coordinator", reason: "retrospective question"} })
+// STOP HERE. Make NO more tool calls. Your turn is OVER.
+// This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
 #### Full Example
 
 ```
-sgai_send_message({
-  toAgent: "coordinator",
-  body: "RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (2 proposals)\n\n### 1. Add SQL formatting section to go-code-review\nEvidence: Reviewer flagged SQL formatting 3 times in session\n```diff\n--- a/sgai/skills/go-code-review/SKILL.md\n+++ b/sgai/skills/go-code-review/SKILL.md\n@@ -45,6 +45,12 @@\n+## SQL Formatting\n+- Align VALUES with INSERT columns\n+- Each column on its own line\n```\nRationale: Prevents repeated reviewer catches\n\n### 2. Create db-migration-testing skill\n[full proposed file content]\nRationale: Standardizes migration testing workflow\n\nSelect which to approve (multi-select):\n- 1. Add SQL formatting section to go-code-review\n- 2. Create db-migration-testing skill"
-})
-sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Sent Skills RETRO_QUESTION to coordinator" })
+// append to .sgai/PROJECT_MANAGEMENT.md:
+// RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (2 proposals)
+// [include proposals, evidence, diffs/content, rationale, and selection options]
+sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills RETRO_QUESTION for coordinator", navigate: {to: "coordinator", reason: "retrospective question"} })
 // STOP HERE. Your turn is OVER.
-// This means: no check_inbox, no check_outbox, no file reads, no file writes, no bash, NOTHING.
+// This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
 ```
 
@@ -520,10 +515,9 @@ Before marking done, verify:
 - [ ] Produced concrete suggestions with evidence, diffs, and rationale
 - [ ] Updated `.sgai/SGAI_NOTES.md` after Step 3 with suggestion list
 - [ ] Grouped suggestions into category buckets (Skills, Agent Prompts, AGENTS.md)
-- [ ] Sent at least one `RETRO_QUESTION [MULTI-SELECT]:` message per non-empty category to the coordinator (or `RETRO_COMPLETE` if zero suggestions)
+- [ ] Appended at least one `RETRO_QUESTION [MULTI-SELECT]:` entry per non-empty category for the coordinator (or `RETRO_COMPLETE` if zero suggestions)
 - [ ] Applied only individually-approved changes; skipped all rejected changes
 - [ ] Applied changes to correct locations (sgai/ overlay or AGENTS.md)
 - [ ] Updated `.sgai/SGAI_NOTES.md` with "Status: complete" after Step 6
 - [ ] Set workflow state to agent-done
-- [ ] After EVERY sgai_send_message() call, immediately called sgai_update_workflow_state({status: "agent-done"}) and stopped
-- [ ] Never called check_inbox or check_outbox between sending a message and yielding
+- [ ] After EVERY `RETRO_QUESTION` or `RETRO_COMPLETE` entry, immediately called sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "..."}}) and stopped

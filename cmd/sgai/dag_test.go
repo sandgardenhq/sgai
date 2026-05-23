@@ -408,61 +408,6 @@ func TestDagDetectCycles(t *testing.T) {
 	}
 }
 
-func TestBuildMultiModelSection(t *testing.T) {
-	tests := []struct {
-		name         string
-		currentModel string
-		models       map[string]any
-		currentAgent string
-		expected     string
-	}{
-		{
-			name:         "emptyModel",
-			currentModel: "",
-			models:       map[string]any{"agent1": "model1"},
-			currentAgent: "agent1",
-			expected:     "",
-		},
-		{
-			name:         "singleModel",
-			currentModel: "model1",
-			models:       map[string]any{"agent1": "model1"},
-			currentAgent: "agent1",
-			expected:     "",
-		},
-		{
-			name:         "multiModel",
-			currentModel: "agent1/model1",
-			models: map[string]any{
-				"agent1": []any{"model1", "model2"},
-			},
-			currentAgent: "agent1",
-			expected:     "Multi-Model Agent Context",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := buildMultiModelSection(tt.currentModel, tt.models, tt.currentAgent)
-			if tt.expected == "" {
-				assert.Empty(t, result)
-			} else {
-				assert.Contains(t, result, "Multi-Model Agent Context")
-				assert.Contains(t, result, tt.currentModel)
-			}
-		})
-	}
-}
-
-func TestBuildMultiModelSectionYouMarker(t *testing.T) {
-	result := buildMultiModelSection("agent1:model1", map[string]any{
-		"agent1": []any{"model1", "model2"},
-	}, "agent1")
-	assert.Contains(t, result, "<-- YOU")
-	assert.Contains(t, result, "agent1:model1")
-	assert.Contains(t, result, "agent1:model2")
-}
-
 func TestBuildFlowMessageWithAgentDescription(t *testing.T) {
 	dir := t.TempDir()
 	agentDir := filepath.Join(dir, ".sgai", "agent")

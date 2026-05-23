@@ -172,64 +172,23 @@ func TestComputeEtag(t *testing.T) {
 	}
 }
 
+func TestHandleAPIStateOmitsMessages(t *testing.T) {
+	server, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "state-no-messages")
+	stateJSON := `{"status":"working","messages":[{"id":1,"fromAgent":"a","toAgent":"b","body":"legacy"}],"currentModel":"legacy-model","modelStatuses":{"legacy-model":"done"},"agentModels":[{"agent":"coordinator","models":["legacy-model"]}]}`
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "state.json"), []byte(stateJSON), 0o644))
+
+	w := serveHTTP(server, "GET", "/api/v1/state", "")
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), `"messages"`)
+	assert.NotContains(t, w.Body.String(), `"currentModel"`)
+	assert.NotContains(t, w.Body.String(), `"modelStatuses"`)
+	assert.NotContains(t, w.Body.String(), `"agentModels"`)
+}
+
 func computeExpectedEtag(content []byte) string {
 	h := sha256.Sum256(content)
 	return `"` + hex.EncodeToString(h[:8]) + `"`
-}
-
-func TestFindSteerInsertPosition(t *testing.T) {
-	tests := []struct {
-		name     string
-		messages []state.Message
-		expected int
-	}{
-		{
-			name:     "empty",
-			messages: []state.Message{},
-			expected: 0,
-		},
-		{
-			name: "allRead",
-			messages: []state.Message{
-				{ID: 1, Read: true},
-				{ID: 2, Read: true},
-			},
-			expected: 0,
-		},
-		{
-			name: "firstUnread",
-			messages: []state.Message{
-				{ID: 1, Read: true},
-				{ID: 2, Read: false},
-				{ID: 3, Read: false},
-			},
-			expected: 1,
-		},
-		{
-			name: "allUnread",
-			messages: []state.Message{
-				{ID: 1, Read: false},
-				{ID: 2, Read: false},
-			},
-			expected: 0,
-		},
-		{
-			name: "lastUnread",
-			messages: []state.Message{
-				{ID: 1, Read: true},
-				{ID: 2, Read: true},
-				{ID: 3, Read: false},
-			},
-			expected: 2,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := findSteerInsertPosition(tt.messages)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
 }
 
 func TestGenerateQuestionID(t *testing.T) {
@@ -537,114 +496,6 @@ func TestConvertEventsForAPIBoost(t *testing.T) {
 	})
 }
 
-func TestResolveCurrentModelVariants(t *testing.T) {
-	t.Run("fromState", func(t *testing.T) {
-		wfState := state.Workflow{CurrentModel: "claude-opus-4"}
-		result := resolveCurrentModel("/some/path", wfState)
-		assert.Equal(t, "claude-opus-4", result)
-	})
-
-	t.Run("noAgent", func(t *testing.T) {
-		wfState := state.Workflow{}
-		result := resolveCurrentModel("/some/path", wfState)
-		assert.Equal(t, "", result)
-	})
-
-	t.Run("fromGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		wfState := state.Workflow{CurrentAgent: "coordinator"}
-		result := resolveCurrentModel(dir, wfState)
-		assert.Equal(t, "claude-opus-4", result)
-	})
-
-	t.Run("agentNotInGoal", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		wfState := state.Workflow{CurrentAgent: "developer"}
-		result := resolveCurrentModel(dir, wfState)
-		assert.Equal(t, "", result)
-	})
-
-	t.Run("withExplicitModel", func(t *testing.T) {
-		wf := state.Workflow{CurrentModel: "opus-4"}
-		result := resolveCurrentModel("/tmp", wf)
-		assert.Equal(t, "opus-4", result)
-	})
-
-	t.Run("noAgentReturnsEmpty", func(t *testing.T) {
-		wf := state.Workflow{}
-		result := resolveCurrentModel("/tmp", wf)
-		assert.Empty(t, result)
-	})
-
-	t.Run("noModelReturnsEmpty", func(t *testing.T) {
-		dir := t.TempDir()
-		wf := state.Workflow{}
-		result := resolveCurrentModel(dir, wf)
-		assert.Empty(t, result)
-	})
-}
-
-func TestCollectAgentModelsVariants(t *testing.T) {
-	t.Run("noGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		result := collectAgentModels(dir)
-		assert.Nil(t, result)
-	})
-
-	t.Run("noModels", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		require.NoError(t, os.WriteFile(goalPath, []byte("# No frontmatter"), 0644))
-
-		result := collectAgentModels(dir)
-		assert.Nil(t, result)
-	})
-
-	t.Run("withModels", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n  developer: gpt-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		result := collectAgentModels(dir)
-		require.Len(t, result, 2)
-		assert.Equal(t, "coordinator", result[0].Agent)
-		assert.Equal(t, []string{"claude-opus-4"}, result[0].Models)
-		assert.Equal(t, "developer", result[1].Agent)
-		assert.Equal(t, []string{"gpt-4"}, result[1].Models)
-	})
-
-	t.Run("noAgents", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai", "agent"), 0o755))
-		result := collectAgentModels(dir)
-		assert.Empty(t, result)
-	})
-
-	t.Run("withGoal", func(t *testing.T) {
-		dir := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"),
-			[]byte("---\nmodels:\n  coordinator: openai/gpt-5.5\n---\n# Goal"), 0o644))
-
-		result := collectAgentModels(dir)
-		assert.NotNil(t, result)
-	})
-
-	t.Run("noGoalReturnsNil", func(t *testing.T) {
-		result := collectAgentModels(t.TempDir())
-		assert.Nil(t, result)
-	})
-}
-
 func TestBuildAdhocArgs(t *testing.T) {
 	t.Run("simpleModel", func(t *testing.T) {
 		args := buildAdhocArgs("claude-opus-4")
@@ -871,39 +722,6 @@ func TestCollectForksForAPIFromGroupsNoMatch(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestConvertMessagesForAPITruncation(t *testing.T) {
-	longBody := strings.Repeat("x", maxMessageBodyBytes+100)
-	messages := []state.Message{
-		{ID: 1, FromAgent: "a", ToAgent: "b", Body: longBody},
-	}
-	result := convertMessagesForAPI(messages)
-	require.Len(t, result, 1)
-	assert.True(t, strings.HasSuffix(result[0].Body, "...[truncated]"))
-	assert.True(t, len(result[0].Body) < len(longBody))
-}
-
-func TestConvertMessagesForAPIReversesOrder(t *testing.T) {
-	messages := []state.Message{
-		{ID: 1, FromAgent: "a", ToAgent: "b", Body: "first"},
-		{ID: 2, FromAgent: "b", ToAgent: "a", Body: "second"},
-		{ID: 3, FromAgent: "a", ToAgent: "b", Body: "third"},
-	}
-	result := convertMessagesForAPI(messages)
-	require.Len(t, result, 3)
-	assert.Equal(t, 3, result[0].ID)
-	assert.Equal(t, 2, result[1].ID)
-	assert.Equal(t, 1, result[2].ID)
-}
-
-func TestConvertMessagesForAPIExtractsSubject(t *testing.T) {
-	messages := []state.Message{
-		{ID: 1, FromAgent: "a", ToAgent: "b", Body: "# Important Update\nSome content here"},
-	}
-	result := convertMessagesForAPI(messages)
-	require.Len(t, result, 1)
-	assert.Equal(t, "Important Update", result[0].Subject)
-}
-
 func TestConvertEventsForAPIWithEntries(t *testing.T) {
 	displays := []eventsProgressDisplay{
 		{Timestamp: "2024-01-01T00:00:00Z", FormattedTime: "00:00", Agent: "coordinator", Description: "started"},
@@ -912,17 +730,6 @@ func TestConvertEventsForAPIWithEntries(t *testing.T) {
 	require.Len(t, result, 1)
 	assert.Equal(t, "coordinator", result[0].Agent)
 	assert.Equal(t, "started", result[0].Description)
-}
-
-func TestConvertModelStatusesWithEntries(t *testing.T) {
-	displays := []modelStatusDisplay{
-		{ModelID: "opus", Status: "running"},
-		{ModelID: "sonnet", Status: "completed"},
-	}
-	result := convertModelStatuses(displays)
-	require.Len(t, result, 2)
-	assert.Equal(t, "opus", result[0].ModelID)
-	assert.Equal(t, "running", result[0].Status)
 }
 
 func TestCollectSkillCategoriesEmpty(t *testing.T) {
@@ -1486,7 +1293,6 @@ func TestLoadWorkspaceState(t *testing.T) {
 			Status:       state.StatusComplete,
 			CurrentAgent: "test-agent",
 			Progress:     []state.ProgressEntry{},
-			Messages:     []state.Message{},
 		})
 		require.NoError(t, err)
 
@@ -1868,28 +1674,6 @@ func TestHandleAPIBrowseDirectories(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestHandleAPIDeleteMessage(t *testing.T) {
-	t.Run("missingWorkspace", func(t *testing.T) {
-		server, _ := setupTestServer(t)
-		w := serveHTTP(server, "DELETE", "/api/v1/workspaces/nonexistent/messages/1", "")
-		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
-
-	t.Run("invalidMessageID", func(t *testing.T) {
-		server, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-		stateFile := filepath.Join(wsDir, ".sgai", "state.json")
-		_, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-			Status:   state.StatusComplete,
-			Messages: []state.Message{},
-		})
-		require.NoError(t, err)
-
-		w := serveHTTP(server, "DELETE", "/api/v1/workspaces/test-ws/messages/abc", "")
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-}
-
 func TestHandleAPIListModels(t *testing.T) {
 	server, _ := setupTestServer(t)
 	w := serveHTTP(server, "GET", "/api/v1/models", "")
@@ -2063,24 +1847,6 @@ func TestHandleAPIDetachWorkspace(t *testing.T) {
 		server, _ := setupTestServer(t)
 		w := serveHTTP(server, "POST", "/api/v1/workspaces/detach", `{"path":"/some/random/path"}`)
 		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
-}
-
-func TestHandleAPIDeleteMessageByID(t *testing.T) {
-	t.Run("validMessageDelete", func(t *testing.T) {
-		server, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-		stateFile := filepath.Join(wsDir, ".sgai", "state.json")
-		_, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-			Status: state.StatusComplete,
-			Messages: []state.Message{
-				{ID: 1, FromAgent: "dev", ToAgent: "coordinator", Body: "test", Read: false},
-			},
-		})
-		require.NoError(t, err)
-
-		w := serveHTTP(server, "DELETE", "/api/v1/workspaces/test-ws/messages/1", "")
-		assert.Contains(t, []int{http.StatusOK, http.StatusNotFound}, w.Code)
 	})
 }
 
@@ -2335,22 +2101,6 @@ func TestHandleAPIModelsViaHTTP(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestHandleAPIDeleteMessageViaHTTP(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "msg-ws")
-	statePath := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status: state.StatusComplete,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "Human Partner", ToAgent: "coordinator", Body: "test"},
-		},
-	})
-	require.NoError(t, errCoord)
-
-	w := serveHTTP(srv, "DELETE", "/api/v1/workspaces/msg-ws/messages/1", "")
-	assert.NotEqual(t, http.StatusNotFound, w.Code)
-}
-
 func TestHandleAPITogglePinViaHTTP(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	_ = setupTestWorkspace(t, rootDir, "pin-ws")
@@ -2460,22 +2210,6 @@ func TestHandleAPIDeleteForkViaHTTP(t *testing.T) {
 
 	w := serveHTTP(srv, "POST", "/api/v1/workspaces/delfork-ws/delete-fork", `{"forkDir":"/nonexistent"}`)
 	assert.NotEqual(t, http.StatusNotFound, w.Code)
-}
-
-func TestHandleAPIDeleteMessageValid(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "test-ws-delmsg")
-	stateFile := filepath.Join(wsDir, ".sgai", "state.json")
-	_, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-		Status: state.StatusComplete,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "dev", ToAgent: "coordinator", Body: "test", Read: false},
-		},
-	})
-	require.NoError(t, err)
-
-	w := serveHTTP(server, "DELETE", "/api/v1/workspaces/test-ws-delmsg/messages/1", "")
-	assert.Equal(t, 200, w.Code)
 }
 
 func TestHandleAPISteerValid(t *testing.T) {
@@ -2863,25 +2597,6 @@ func TestHandleAPIForkTemplateStandaloneViaHTTP(t *testing.T) {
 	_ = setupTestWorkspace(t, rootDir, "tmpl-standalone")
 	w := serveHTTP(srv, "GET", "/api/v1/workspaces/tmpl-standalone/fork-template", "")
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestBuildWorkspaceFullStateWithMessages(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "msgs-ws")
-	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\n---\n# Goal"), 0o644))
-	statePath := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status: state.StatusComplete,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "coordinator", ToAgent: "builder", Body: "build", Read: true, CreatedAt: "2025-01-01T00:00:00Z"},
-			{ID: 2, FromAgent: "builder", ToAgent: "coordinator", Body: "done", Read: false, CreatedAt: "2025-01-01T00:01:00Z"},
-		},
-	})
-	require.NoError(t, errCoord)
-
-	ws := workspaceInfo{DirName: "msgs-ws", Directory: wsDir, HasWorkspace: true}
-	result := srv.buildWorkspaceFullState(ws, nil)
-	assert.Len(t, result.Messages, 2)
 }
 
 func TestBuildWorkspaceFullStateWithTodos(t *testing.T) {
@@ -3356,59 +3071,6 @@ func TestBuildWorkspaceFullStateWithWorkGatePending(t *testing.T) {
 	assert.Equal(t, "work-gate", result.PendingQuestion.Type)
 }
 
-func TestCollectAgentModels(t *testing.T) {
-	t.Run("noGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		result := collectAgentModels(dir)
-		assert.Nil(t, result)
-	})
-
-	t.Run("noModels", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		require.NoError(t, os.WriteFile(goalPath, []byte("# No frontmatter"), 0644))
-
-		result := collectAgentModels(dir)
-		assert.Nil(t, result)
-	})
-
-	t.Run("withModels", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n  developer: gpt-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		result := collectAgentModels(dir)
-		require.Len(t, result, 2)
-		assert.Equal(t, "coordinator", result[0].Agent)
-		assert.Equal(t, []string{"claude-opus-4"}, result[0].Models)
-		assert.Equal(t, "developer", result[1].Agent)
-		assert.Equal(t, []string{"gpt-4"}, result[1].Models)
-	})
-}
-
-func TestCollectAgentModelsNoAgents(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai", "agent"), 0o755))
-	result := collectAgentModels(dir)
-	assert.Empty(t, result)
-}
-
-func TestCollectAgentModelsNoGoalReturnsNil(t *testing.T) {
-	result := collectAgentModels(t.TempDir())
-	assert.Nil(t, result)
-}
-
-func TestCollectAgentModelsWithGoal(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"),
-		[]byte("---\nmodels:\n  coordinator: openai/gpt-5.5\n---\n# Goal"), 0o644))
-
-	result := collectAgentModels(dir)
-	assert.NotNil(t, result)
-}
-
 func TestComputeEtagConsistency(t *testing.T) {
 	data := []byte("test content")
 	etag1 := computeEtag(data)
@@ -3689,37 +3351,6 @@ func TestHandleAPIDeleteForkNotRootOrForkWorkspace(t *testing.T) {
 	setupTestWorkspace(t, rootDir, "test-ws")
 	w := serveHTTP(server, "POST", "/api/v1/workspaces/test-ws/delete-fork", `{"confirm":true}`)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestHandleAPIDeleteMessageInvalidID(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	_ = setupTestWorkspace(t, rootDir, "delmsg-badid")
-
-	w := serveHTTP(srv, "DELETE", "/api/v1/workspaces/delmsg-badid/messages/notanumber", "")
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestHandleAPIDeleteMessageInvalidIDPath(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	_ = setupTestWorkspace(t, rootDir, "delmsg-path")
-	w := serveHTTP(srv, "DELETE", "/api/v1/workspaces/delmsg-path/messages/abc", "")
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestHandleAPIDeleteMessageValidViaHTTP(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "delmsg-valid")
-	statePath := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status: state.StatusComplete,
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "Human Partner", ToAgent: "coordinator", Body: "test", CreatedAt: "2025-01-01T00:00:00Z"},
-		},
-	})
-	require.NoError(t, errCoord)
-
-	w := serveHTTP(srv, "DELETE", "/api/v1/workspaces/delmsg-valid/messages/1", "")
-	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestHandleAPIDeleteWorkspaceConfirmedStandalone(t *testing.T) {
@@ -4070,61 +3701,6 @@ func TestHandleAPIWorkspaceDiffFound(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestResolveCurrentModel(t *testing.T) {
-	t.Run("fromState", func(t *testing.T) {
-		wfState := state.Workflow{CurrentModel: "claude-opus-4"}
-		result := resolveCurrentModel("/some/path", wfState)
-		assert.Equal(t, "claude-opus-4", result)
-	})
-
-	t.Run("noAgent", func(t *testing.T) {
-		wfState := state.Workflow{}
-		result := resolveCurrentModel("/some/path", wfState)
-		assert.Equal(t, "", result)
-	})
-
-	t.Run("fromGoalFile", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		wfState := state.Workflow{CurrentAgent: "coordinator"}
-		result := resolveCurrentModel(dir, wfState)
-		assert.Equal(t, "claude-opus-4", result)
-	})
-
-	t.Run("agentNotInGoal", func(t *testing.T) {
-		dir := t.TempDir()
-		goalPath := filepath.Join(dir, "GOAL.md")
-		content := "---\nmodels:\n  coordinator: claude-opus-4\n---\n# Goal"
-		require.NoError(t, os.WriteFile(goalPath, []byte(content), 0644))
-
-		wfState := state.Workflow{CurrentAgent: "developer"}
-		result := resolveCurrentModel(dir, wfState)
-		assert.Equal(t, "", result)
-	})
-}
-
-func TestResolveCurrentModelNoAgentReturnsEmpty(t *testing.T) {
-	wf := state.Workflow{}
-	result := resolveCurrentModel("/tmp", wf)
-	assert.Empty(t, result)
-}
-
-func TestResolveCurrentModelNoModel(t *testing.T) {
-	dir := t.TempDir()
-	wf := state.Workflow{}
-	result := resolveCurrentModel(dir, wf)
-	assert.Empty(t, result)
-}
-
-func TestResolveCurrentModelWithExplicitModel(t *testing.T) {
-	wf := state.Workflow{CurrentModel: "opus-4"}
-	result := resolveCurrentModel("/tmp", wf)
-	assert.Equal(t, "opus-4", result)
-}
-
 func TestSPAMiddlewareStaticAssets(t *testing.T) {
 	srv, _ := setupTestServer(t)
 	mux := http.NewServeMux()
@@ -4222,47 +3798,6 @@ func TestWriteJSONWithStruct(t *testing.T) {
 	assert.JSONEq(t, `{"name":"test","value":123}`, w.Body.String())
 }
 
-func TestConvertMessagesForAPI(t *testing.T) {
-	tests := []struct {
-		name     string
-		messages []state.Message
-		expected []apiMessageEntry
-	}{
-		{
-			name:     "empty",
-			messages: []state.Message{},
-			expected: []apiMessageEntry{},
-		},
-		{
-			name: "singleMessage",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello", Read: true, CreatedAt: "2024-01-15T10:30:00Z"},
-			},
-			expected: []apiMessageEntry{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello", Subject: "Hello", Read: true, CreatedAt: "2024-01-15T10:30:00Z"},
-			},
-		},
-		{
-			name: "multipleMessages",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "First", Read: true, CreatedAt: "2024-01-15T10:00:00Z"},
-				{ID: 2, FromAgent: "agent2", ToAgent: "agent1", Body: "Second", Read: false, CreatedAt: "2024-01-15T11:00:00Z"},
-			},
-			expected: []apiMessageEntry{
-				{ID: 2, FromAgent: "agent2", ToAgent: "agent1", Body: "Second", Subject: "Second", Read: false, CreatedAt: "2024-01-15T11:00:00Z"},
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "First", Subject: "First", Read: true, CreatedAt: "2024-01-15T10:00:00Z"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := convertMessagesForAPI(tt.messages)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestExtractSubject(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -4294,49 +3829,6 @@ func TestExtractSubject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractSubject(tt.body)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestConvertModelStatuses(t *testing.T) {
-	tests := []struct {
-		name     string
-		displays []modelStatusDisplay
-		expected []apiModelStatusEntry
-	}{
-		{
-			name:     "empty",
-			displays: []modelStatusDisplay{},
-			expected: nil,
-		},
-		{
-			name: "singleEntry",
-			displays: []modelStatusDisplay{
-				{ModelID: "model1", Status: "running"},
-			},
-			expected: []apiModelStatusEntry{
-				{ModelID: "model1", Status: "running"},
-			},
-		},
-		{
-			name: "multipleEntries",
-			displays: []modelStatusDisplay{
-				{ModelID: "model1", Status: "running"},
-				{ModelID: "model2", Status: "done"},
-				{ModelID: "model3", Status: "error"},
-			},
-			expected: []apiModelStatusEntry{
-				{ModelID: "model1", Status: "running"},
-				{ModelID: "model2", Status: "done"},
-				{ModelID: "model3", Status: "error"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := convertModelStatuses(tt.displays)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -5227,13 +4719,6 @@ func TestHandleAPIOpenEditorForWorkspace(t *testing.T) {
 	assert.Contains(t, []int{http.StatusOK, http.StatusServiceUnavailable, http.StatusInternalServerError}, w.Code)
 }
 
-func TestHandleAPIDeleteMessageNumericNotFound(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "test-ws")
-	w := serveHTTP(server, "DELETE", "/api/v1/workspaces/test-ws/messages/99999", "")
-	assert.Contains(t, []int{http.StatusOK, http.StatusNotFound, http.StatusInternalServerError}, w.Code)
-}
-
 func TestCollectJJChangesNonRepo(t *testing.T) {
 	dir := t.TempDir()
 	lines, summary := collectJJChanges(dir)
@@ -5583,13 +5068,6 @@ func TestHandleAPIBrowseDirectoriesEmptyPath(t *testing.T) {
 	assert.Contains(t, []int{http.StatusOK, http.StatusBadRequest}, w.Code)
 }
 
-func TestHandleAPIDeleteMessageNotFoundNew(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "msg-ws3")
-	w := serveHTTP(server, "DELETE", "/api/v1/workspaces/msg-ws3/messages/999", "")
-	assert.Contains(t, []int{http.StatusOK, http.StatusNotFound, http.StatusBadRequest}, w.Code)
-}
-
 func TestGetWorkflowSVGServiceNoGoal(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "svg-ws")
@@ -5687,28 +5165,6 @@ func TestDeleteWorkspaceServiceDirect(t *testing.T) {
 
 	_, errStat := os.Stat(wsDir)
 	assert.True(t, os.IsNotExist(errStat))
-}
-
-func TestDeleteMessageServiceDirect(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "msg-svc-api")
-
-	coord := server.workspaceCoordinator(wsDir)
-	require.NoError(t, coord.UpdateState(func(wf *state.Workflow) {
-		wf.Messages = append(wf.Messages, state.Message{ID: 42, Body: "hello"})
-	}))
-
-	result, err := server.deleteMessageService(wsDir, 42)
-	require.NoError(t, err)
-	assert.True(t, result.Deleted)
-	assert.Equal(t, 42, result.ID)
-}
-
-func TestDeleteMessageServiceNotFoundDirect(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "msg-svc2-api")
-	_, err := server.deleteMessageService(wsDir, 999)
-	assert.Error(t, err)
 }
 
 func TestResolveForkTemplateContentNoForks(t *testing.T) {
@@ -5971,48 +5427,6 @@ func TestHandleAPIDeleteForkNotRootOrFork(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestHandleAPIDeleteMessageMissingID(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "ws-delmsg")
-	mux := http.NewServeMux()
-	server.registerAPIRoutes(mux)
-	req := httptest.NewRequest("DELETE", "/api/v1/workspaces/ws-delmsg/messages/", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Contains(t, []int{http.StatusBadRequest, http.StatusNotFound, http.StatusMethodNotAllowed}, w.Code)
-}
-
-func TestHandleAPIDeleteMessageNotFound(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "ws-delmsg3")
-	sgaiDir := filepath.Join(wsDir, ".sgai")
-	require.NoError(t, os.WriteFile(filepath.Join(sgaiDir, "state.json"), []byte(`{"status":"working","messages":[]}`), 0644))
-	mux := http.NewServeMux()
-	server.registerAPIRoutes(mux)
-	req := httptest.NewRequest("DELETE", "/api/v1/workspaces/ws-delmsg3/messages/99", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusNotFound, w.Code)
-}
-
-func TestHandleAPIDeleteMessageSuccess(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "ws-delmsg4")
-	sgaiDir := filepath.Join(wsDir, ".sgai")
-	stateData := `{"status":"working","messages":[{"id":1,"fromAgent":"a","toAgent":"b","body":"msg","read":false}]}`
-	require.NoError(t, os.WriteFile(filepath.Join(sgaiDir, "state.json"), []byte(stateData), 0644))
-	mux := http.NewServeMux()
-	server.registerAPIRoutes(mux)
-	req := httptest.NewRequest("DELETE", "/api/v1/workspaces/ws-delmsg4/messages/1", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
-	var resp apiDeleteMessageResponse
-	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
-	assert.True(t, resp.Deleted)
-	assert.Equal(t, 1, resp.ID)
-}
-
 func TestHandleAPIOpenEditorNotAvailable(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	setupTestWorkspace(t, rootDir, "ws-editor")
@@ -6047,27 +5461,6 @@ func TestHandleAPIOpenEditorGoalSuccess(t *testing.T) {
 	server.editor = newConfigurableEditor("echo")
 	w := serveHTTP(server, "POST", "/api/v1/workspaces/ws-editgoal3/open-editor/goal", "")
 	assert.Equal(t, http.StatusOK, w.Code)
-}
-
-func TestDeleteMessageServiceSuccess(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "ws-delsvc")
-	sgaiDir := filepath.Join(wsDir, ".sgai")
-	stateData := `{"status":"working","messages":[{"id":5,"fromAgent":"a","toAgent":"b","body":"test","read":false}]}`
-	require.NoError(t, os.WriteFile(filepath.Join(sgaiDir, "state.json"), []byte(stateData), 0644))
-	result, err := srv.deleteMessageService(wsDir, 5)
-	assert.NoError(t, err)
-	assert.True(t, result.Deleted)
-	assert.Equal(t, 5, result.ID)
-}
-
-func TestDeleteMessageServiceNotFound(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "ws-delsvc2")
-	sgaiDir := filepath.Join(wsDir, ".sgai")
-	require.NoError(t, os.WriteFile(filepath.Join(sgaiDir, "state.json"), []byte(`{"status":"working","messages":[]}`), 0644))
-	_, err := srv.deleteMessageService(wsDir, 99)
-	assert.ErrorIs(t, err, errMessageNotFound)
 }
 
 func TestTogglePin(t *testing.T) {

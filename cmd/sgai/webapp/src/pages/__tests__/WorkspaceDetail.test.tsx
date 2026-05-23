@@ -29,7 +29,6 @@ const createMockWorkspace = (overrides = {}) => ({
   interactiveAuto: false,
   continuousMode: false,
   currentAgent: "",
-  currentModel: "",
   task: "",
   goalContent: "# Test Goal",
   rawGoalContent: "# Test Goal",
@@ -41,10 +40,7 @@ const createMockWorkspace = (overrides = {}) => ({
   humanMessage: "",
   agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
-  modelStatuses: [],
-  agentModels: [],
   events: [],
-  messages: [],
   projectTodos: [],
   agentTodos: [],
   changes: { description: "", diffLines: [] },
@@ -322,20 +318,17 @@ describe("WorkspaceDetail", () => {
       });
     });
 
-    it("displays current agent and model", async () => {
+    it("displays current agent", async () => {
       mockWorkspaces[0] = createMockWorkspace({
         running: true,
         currentAgent: "coordinator",
-        currentModel: "opencode/glm-5",
       });
 
       renderWorkspaceDetail();
 
       await waitFor(() => {
         const coordinatorElements = screen.queryAllByText(/coordinator/);
-        const glmElements = screen.queryAllByText(/glm-5/);
         expect(coordinatorElements.length).toBeGreaterThan(0);
-        expect(glmElements.length).toBeGreaterThan(0);
       });
     });
   });

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
@@ -218,20 +217,15 @@ func (s *Server) steerService(workspacePath, message string) (steerResult, error
 
 	coord := s.workspaceCoordinator(workspacePath)
 	steerBody := "Re-steering instruction: " + strings.TrimSpace(message)
-	steerCreatedAt := time.Now().UTC().Format(time.RFC3339)
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		newMsg := state.Message{
-			ID:        nextMessageID(wf.Messages),
-			FromAgent: "Human Partner",
-			ToAgent:   "coordinator",
-			Body:      steerBody,
-			CreatedAt: steerCreatedAt,
-		}
-		insertIdx := findSteerInsertPosition(wf.Messages)
-		wf.Messages = slices.Insert(wf.Messages, insertIdx, newMsg)
+		wf.Status = state.StatusAgentDone
+		wf.Navigate = &state.NavigationRequest{To: "coordinator", Reason: steerBody}
 	}); errUpdate != nil {
 		return steerResult{}, fmt.Errorf("failed to save state: %w", errUpdate)
+	}
+	if errAppend := appendProjectManagementSection(workspacePath, "Human Steering", steerBody); errAppend != nil {
+		return steerResult{}, fmt.Errorf("failed to update PROJECT_MANAGEMENT.md: %w", errAppend)
 	}
 
 	s.notifyStateChange()

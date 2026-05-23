@@ -91,78 +91,14 @@ When the user explicitly requests to use a specific skill in their message, such
 
 This trigger takes priority over general skill discovery.
 
-# Inter-Agent Messaging System
+# Inter-Agent Coordination
 
-sgai now supports direct inter-agent communication through the messaging system. Two tools are available:
+Agents coordinate through `.sgai/PROJECT_MANAGEMENT.md` and workflow navigation.
 
-## sgai_send_message()
-
-Send a message to another agent in the workflow.
-
-**Arguments:**
-- `toAgent` (string, required): The agent who will receive this message. Must be one of the agents in the workflow.
-- `body` (string, required): The content of the message to send.
-
-**Example:**
-```
-sgai_send_message({
-  toAgent: "general-purpose",
-  body: "Please implement the authentication feature discussed in .sgai/PROJECT_MANAGEMENT.md"
-})
-```
-
-**Behavior:**
-- Messages are stored in `.sgai/state.json`
-- Validates that the target agent exists in the workflow
-- Messages persist across agent iterations
-- The recipient will be notified on their next startup
-- You can batch messages, but eventually you must call `sgai_update_workflow_state({"status":"agent-done"})` to let other agents to take over
-
-## sgai_check_inbox()
-
-Check for messages sent to the current agent.
-
-**Arguments:** None
-
-**Returns:** A list of messages from other agents, including:
-- `fromAgent`: The agent who sent the message
-- `body`: The message content
-
-**Example:**
-```
-sgai_check_inbox()
-```
-
-**Output:**
-```
-You have 2 message(s):
-
-Message 1:
-  From: coordinator
-  Body: Please implement the authentication feature
-
-Message 2:
-  From: general-purpose
-  Body: Implementation complete, ready for review
-```
-
-**Important Notes:**
-- When an agent has pending messages, they will see a notification: "YOU HAVE X PENDING MESSAGE(S). YOU MUST CALL `sgai_check_inbox()` TO READ THEM."
-- Messages are read-only - calling sgai_check_inbox() does not delete messages
-- Use messaging for coordination, task delegation, and status updates between agents
-- Messages complement but do not replace .sgai/PROJECT_MANAGEMENT.md for persistent documentation
-
-## sgai_check_outbox()
-
-Check for messages to other agents
-
-```
-sgai_check_outbox()  // Returns all messages sent by you, so that you can avoid duplicated sending
-```
-
-**When to use check your outbox:**
-- Before calling sgai_send_message() so that you can prevent duplicated sends
-- Before calling sgai_send_message() so that you can compose incremental communications
+- Write durable handoffs, decisions, blockers, and questions into `.sgai/PROJECT_MANAGEMENT.md`.
+- Yield to another workflow agent with `sgai_update_workflow_state({status: "agent-done", navigate: {to: "agent-name", reason: "why"}})`.
+- `navigate.to` must be an agent in the workflow DAG.
+- Do not use legacy routing tools; they are not available.
 
 ## Human Communication and Answer Logging
 
@@ -312,26 +248,25 @@ The master plan has these steps (if any of these files don't exist, YOU MUST CAL
   - `Concern`: gather the missing evidence yourself if it is read-only, or delegate evidence generation to the right non-coordinator agent.
   - `Block`: delegate the required fixes to the right non-coordinator agent and do not proceed to MARK-COMPLETE.
 
-  Never echo or forward a project-critic verdict to `coordinator` with `sgai_send_message`. You are the coordinator; record your own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`.
+  Never echo or forward a project-critic verdict to `coordinator`. You are the coordinator; record your own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`.
 
 ## IRON LAW: RETRO_QUESTION Relay
 
-When you receive a message from the retrospective agent with "RETRO_QUESTION:" prefix, you MUST follow this exact procedure:
+When `.sgai/PROJECT_MANAGEMENT.md` contains a retrospective entry with "RETRO_QUESTION:" prefix, you MUST follow this exact procedure:
 
-1. Extract the question content from the RETRO_QUESTION message
+1. Extract the question content from the RETRO_QUESTION entry
 2. Call `ask_user_question` to relay it to the human partner — this is MANDATORY
 3. Wait for the human's actual response
-4. Send the human's ACTUAL response back to the retrospective agent
+4. Append the human's ACTUAL response to `.sgai/PROJECT_MANAGEMENT.md`
 5. Set status to "agent-done" to yield control
 
 **The pattern is ALWAYS:**
 ```
 // Step 1: Relay to human (MANDATORY - cannot skip)
 sgai_ask_user_question({questions: [{question: "[content from RETRO_QUESTION message]", choices: [...], multiSelect: false}]})
-// Step 2: After receiving human's answer, send it back
-sgai_send_message({toAgent: "retrospective", body: "Human partner's answer: [ACTUAL answer received from ask_user_question]"})
-// Step 3: Yield control
-sgai_update_workflow_state({status: "agent-done"})
+// Step 2: After receiving human's answer, append it to .sgai/PROJECT_MANAGEMENT.md
+// Step 3: Yield control to retrospective
+sgai_update_workflow_state({status: "agent-done", navigate: {to: "retrospective", reason: "human answered retrospective question"}})
 ```
 
 ### ANTI-PATTERN: Fabricating Human Answers
@@ -342,21 +277,17 @@ sgai_update_workflow_state({status: "agent-done"})
 - If unsure whether you already asked: ASK AGAIN. Asking twice is far better than fabricating once.
 
 - Step Name: RUN-RETROSPECTIVE
-  BEFORE transitioning to the retrospective phase, the coordinator must verify that all pending inter-agent messages have been processed. Unread messages represent incomplete work (e.g., re-review requests, status updates) that would be orphaned at session end. Call `sgai_check_inbox()` and process any remaining messages before proceeding.
+  BEFORE transitioning to the retrospective phase, the coordinator must verify that `.sgai/PROJECT_MANAGEMENT.md` has no unresolved blockers or unanswered questions.
   BEFORE marking the workflow as complete, check if retrospective should run:
   1. Check GOAL.md frontmatter for `retrospective:` key (default: disabled when absent or empty)
   2. If disabled (absent, empty, or falsish value like "no", "false", "off", "0"), skip to MARK-COMPLETE
   3. If enabled AND the session is running in interactive mode:
-     - Send a message to the retrospective agent asking it to start its analysis:
+     - Append a retrospective handoff entry to `.sgai/PROJECT_MANAGEMENT.md`, then navigate to the retrospective agent:
        ```
-       sgai_send_message({
-         toAgent: "retrospective",
-         body: "Please start the post-completion retrospective analysis. Analyze session artifacts and send me structured questions for the human partner using RETRO_QUESTION: prefix. When done, send RETRO_COMPLETE: with a summary."
-       })
+       sgai_update_workflow_state({status: "agent-done", navigate: {to: "retrospective", reason: "run post-completion retrospective"}})
        ```
-     - Set status to "agent-done" to hand control to the retrospective agent
-     - When the retrospective agent sends you messages with "RETRO_QUESTION:" prefix, follow the IRON LAW: RETRO_QUESTION Relay procedure above — you MUST call `ask_user_question` to relay the question to the human partner
-     - When the retrospective agent sends "RETRO_COMPLETE:", proceed to MARK-COMPLETE
+     - When the retrospective agent writes "RETRO_QUESTION:" entries, follow the IRON LAW: RETRO_QUESTION Relay procedure above — you MUST call `ask_user_question` to relay the question to the human partner
+     - When the retrospective agent writes "RETRO_COMPLETE:", proceed to MARK-COMPLETE
   4. If enabled but running in self-drive mode: skip retrospective and proceed to MARK-COMPLETE (retrospective requires human interaction)
 
 - Step Name: MARK-COMPLETE

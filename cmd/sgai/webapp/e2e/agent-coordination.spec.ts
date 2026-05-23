@@ -101,7 +101,7 @@ test.describe("Agent Coordination Workflow", () => {
     }
   });
 
-  test("view messages tab shows agent communication", async ({ page }) => {
+  test("messages tab is removed from workspace navigation", async ({ page }) => {
     await page.waitForSelector("text=Workspaces", { timeout: 10000 });
 
     const workspaceLink = page.locator("a[href^='/workspaces/']").first();
@@ -109,16 +109,8 @@ test.describe("Agent Coordination Workflow", () => {
 
     await page.waitForURL(/\/workspaces\/[^/]+/);
 
-    const messagesTab = page.locator('a[href$="/messages"]');
-    const hasMessagesTab = await messagesTab.isVisible().catch(() => false);
-
-    if (hasMessagesTab) {
-      await messagesTab.click();
-
-      await page.waitForURL(/\/messages/);
-
-      await expect(page.locator("text=Messages")).toBeVisible();
-    }
+    await expect(page.locator('a[href$="/messages"]')).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "PROJECT_MANAGEMENT.md" })).toBeVisible();
   });
 
   test("view changes tab shows diffs", async ({ page }) => {

@@ -136,109 +136,26 @@ func ensureImplicitRetrospectiveModel(flowDag *dag, metadata *GoalMetadata) {
 }
 
 func getModelsForAgent(models map[string]any, agent string) []string {
+	model := getModelForAgent(models, agent)
+	if model == "" {
+		return nil
+	}
+	return []string{model}
+}
+
+func getModelForAgent(models map[string]any, agent string) string {
 	val, exists := models[agent]
 	if !exists {
-		return nil
+		return ""
 	}
-
-	switch v := val.(type) {
-	case string:
-		if v == "" {
-			return nil
-		}
-		return []string{v}
-	case []any:
-		result := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok && s != "" {
-				result = append(result, s)
-			}
-		}
-		return result
-	default:
-		return nil
+	model, ok := val.(string)
+	if !ok {
+		return ""
 	}
+	return model
 }
 
-func formatModelID(agent, modelSpec string) string {
-	return agent + ":" + modelSpec
-}
-
-func extractAgentFromModelID(modelID string) string {
-	agent, _, found := strings.Cut(modelID, ":")
-	if found {
-		return agent
-	}
-	return modelID
-}
-
-func allModelsDone(modelStatuses map[string]string) bool {
-	if len(modelStatuses) == 0 {
-		return true
-	}
-	for _, status := range modelStatuses {
-		if status != "model-done" && status != "model-error" {
-			return false
-		}
-	}
-	return true
-}
-
-func hasMessagesForModel(messages []state.Message, modelID string) bool {
-	agentName := extractAgentFromModelID(modelID)
-	for _, msg := range messages {
-		if msg.Read {
-			continue
-		}
-		if msg.ToAgent == modelID || msg.ToAgent == agentName {
-			return true
-		}
-	}
-	return false
-}
-
-func hasPendingMessagesForAnyModel(messages []state.Message, models []string, agent string) bool {
-	for _, modelSpec := range models {
-		modelID := formatModelID(agent, modelSpec)
-		if hasMessagesForModel(messages, modelID) {
-			return true
-		}
-	}
-	return false
-}
-
-func syncModelStatuses(modelStatuses map[string]string, models []string, agent string) map[string]string {
-	if modelStatuses == nil {
-		modelStatuses = make(map[string]string)
-	}
-
-	currentModelSet := make(map[string]bool)
-	for _, modelSpec := range models {
-		modelID := formatModelID(agent, modelSpec)
-		currentModelSet[modelID] = true
-		if _, exists := modelStatuses[modelID]; !exists {
-			modelStatuses[modelID] = "model-working"
-		}
-	}
-
-	for modelID := range modelStatuses {
-		if extractAgentFromModelID(modelID) != agent {
-			continue
-		}
-		if !currentModelSet[modelID] {
-			delete(modelStatuses, modelID)
-		}
-	}
-
-	return modelStatuses
-}
-
-func cleanupModelStatuses(wfState *state.Workflow) {
-	wfState.ModelStatuses = nil
-	wfState.CurrentModel = ""
-}
-
-type multiModelConfig struct {
+type agentRunConfig struct {
 	dir              string
 	goalPath         string
 	agent            string
@@ -254,110 +171,13 @@ type multiModelConfig struct {
 	stderrLog        io.Writer
 }
 
-func runMultiModelAgent(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
-	models := getModelsForAgent(metadata.Models, cfg.agent)
-	if len(models) <= 1 {
-		return runSingleModelIteration(ctx, cfg, wfState, metadata, iterationCounter, models)
-	}
+type multiModelConfig = agentRunConfig
 
-	wfState.ModelStatuses = syncModelStatuses(wfState.ModelStatuses, models, cfg.agent)
-	if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-		*wf = wfState
-	}); errUpdate != nil {
-		log.Fatalln("failed to save state before multi-model loop:", errUpdate)
-	}
-
-	for {
-		if ctx.Err() != nil {
-			fmt.Println("["+cfg.paddedsgai+"]", "interrupted, stopping multi-model agent...")
-			return wfState
-		}
-
-		var errReloadGoalMetadata error
-		metadata, errReloadGoalMetadata = tryReloadGoalMetadata(cfg.goalPath, metadata, cfg.flowDag)
-		if errReloadGoalMetadata != nil {
-			log.Fatalln("failed to reload GOAL.md frontmatter:", errReloadGoalMetadata)
-		}
-		newModels := getModelsForAgent(metadata.Models, cfg.agent)
-
-		if len(newModels) <= 1 {
-			fmt.Println("["+cfg.paddedsgai+"]", "switching to single-model mode for", cfg.agent)
-			cleanupModelStatuses(&wfState)
-			return runSingleModelIteration(ctx, cfg, wfState, metadata, iterationCounter, newModels)
-		}
-
-		wfState.ModelStatuses = syncModelStatuses(wfState.ModelStatuses, newModels, cfg.agent)
-		models = newModels
-
-		for _, modelSpec := range models {
-			if ctx.Err() != nil {
-				return wfState
-			}
-
-			modelID := formatModelID(cfg.agent, modelSpec)
-
-			currentStatus := wfState.ModelStatuses[modelID]
-			hasMessages := hasMessagesForModel(wfState.Messages, modelID)
-
-			if currentStatus == "model-done" && hasMessages {
-				wfState.ModelStatuses[modelID] = "model-working"
-				currentStatus = "model-working"
-				fmt.Println("["+cfg.paddedsgai+"]", "reverting", modelID, "to model-working due to pending messages")
-			}
-
-			if currentStatus == "model-done" || currentStatus == "model-error" {
-				continue
-			}
-
-			wfState.CurrentModel = modelID
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				*wf = wfState
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state before model iteration:", errUpdate)
-			}
-
-			fmt.Println("["+cfg.paddedsgai+"]", "running model:", modelID)
-			wfState = runSingleModelIteration(ctx, cfg, wfState, metadata, iterationCounter, []string{modelSpec})
-
-			newState := cfg.coord.State()
-
-			switch newState.Status {
-			case state.StatusAgentDone:
-				wfState.ModelStatuses[modelID] = "model-done"
-				wfState.Status = state.StatusWorking
-				if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-					*wf = wfState
-				}); errUpdate != nil {
-					log.Fatalln("failed to save state after model done:", errUpdate)
-				}
-			case state.StatusComplete, state.StatusWaitingForHuman:
-				return newState
-			}
-		}
-
-		if allModelsDone(wfState.ModelStatuses) && !hasPendingMessagesForAnyModel(wfState.Messages, models, cfg.agent) {
-			fmt.Println("["+cfg.paddedsgai+"]", "multi-model consensus reached for", cfg.agent)
-			cleanupModelStatuses(&wfState)
-			wfState.Status = state.StatusAgentDone
-			if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
-				*wf = wfState
-			}); errUpdate != nil {
-				log.Fatalln("failed to save state after consensus:", errUpdate)
-			}
-			return wfState
-		}
-	}
-}
-
-func runSingleModelIteration(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, models []string) state.Workflow {
-	modelSpec := ""
-	if len(models) > 0 {
-		modelSpec = models[0]
-	}
+func runSingleModelIteration(ctx context.Context, cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, modelSpec string) state.Workflow {
 	return runFlowAgentWithModel(ctx, cfg, wfState, metadata, iterationCounter, modelSpec)
 }
 
-func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, modelSpec string) state.Workflow {
+func runFlowAgentWithModel(ctx context.Context, cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int, modelSpec string) state.Workflow {
 	paddedAgentName := cfg.agent + strings.Repeat(" ", max(0, cfg.longestNameLen-len(cfg.agent)))
 	var capturedSessionID string
 	var consecutiveWorkingIterations int
@@ -413,10 +233,6 @@ func runFlowAgentWithModel(ctx context.Context, cfg multiModelConfig, wfState st
 
 		case state.StatusWorking:
 			saveState(cfg.coord, newState)
-			if agentHasUnreadOutgoingMessages(newState, cfg.agent) {
-				fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "sent message(s), yielding control...")
-				return newState
-			}
 			consecutiveWorkingIterations = handleWorkingLoop(cfg, &capturedSessionID, consecutiveWorkingIterations)
 			wfState = newState
 			continue
@@ -474,45 +290,18 @@ func buildAgentArgs(agent, baseAgent, modelSpec, sessionID string) []string {
 	return args
 }
 
-func buildAgentMessage(cfg multiModelConfig, wfState state.Workflow, metadata GoalMetadata) string {
+func buildAgentMessage(cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata) string {
 	msg := buildFlowMessage(cfg.flowDag, cfg.agent, wfState.VisitCounts, cfg.dir, wfState.InteractionMode, metadata.Alias)
-
-	multiModelSection := buildMultiModelSection(wfState.CurrentModel, metadata.Models, cfg.agent)
-	if multiModelSection != "" {
-		msg += multiModelSection
-	}
-
-	pendingCount := 0
-	for _, m := range wfState.Messages {
-		if m.ToAgent == cfg.agent && !m.Read {
-			pendingCount++
-		}
-	}
-	if pendingCount > 0 {
-		msg = fmt.Sprintf("\nYOU HAVE %d PENDING MESSAGE(S). YOU MUST CALL `sgai_check_inbox()` TO READ THEM.\n", pendingCount) + msg
-	}
 
 	pendingTodosCount := countPendingTodos(wfState, cfg.agent)
 	if pendingTodosCount > 0 {
 		msg += fmt.Sprintf("\nYou have %d pending TODO items. Please complete them before marking agent-done.\n", pendingTodosCount)
 	}
 
-	if cfg.agent != "coordinator" {
-		outboxPending := 0
-		for _, m := range wfState.Messages {
-			if m.FromAgent == cfg.agent && !m.Read {
-				outboxPending++
-			}
-		}
-		if outboxPending > 0 {
-			msg += "\nYou have sent messages that haven't been read yet. For the recipient agents to process them, you MUST yield control by calling sgai_update_workflow_state({status: 'agent-done'}). They cannot run while you hold control.\n"
-		}
-	}
-
 	return msg
 }
 
-func buildAgentEnv(cfg multiModelConfig, wfState state.Workflow, modelSpec string) []string {
+func buildAgentEnv(cfg agentRunConfig, wfState state.Workflow, modelSpec string) []string {
 	interactiveEnv := "yes"
 	if wfState.InteractionMode == state.ModeSelfDrive {
 		interactiveEnv = "auto"
@@ -531,7 +320,7 @@ func buildAgentEnv(cfg multiModelConfig, wfState state.Workflow, modelSpec strin
 		"SGAI_MCP_INTERACTIVE="+interactiveEnv)
 }
 
-func executeAgentProcess(ctx context.Context, cfg multiModelConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
+func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
 	stderrOut := buildAgentOutputWriter(os.Stderr, cfg.logWriter, cfg.stderrLog)
 	stdoutOut := buildAgentOutputWriter(os.Stdout, cfg.logWriter, cfg.stdoutLog)
 	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
@@ -601,7 +390,7 @@ func extractModelFromArgs(args []string) string {
 	return ""
 }
 
-func exportAgentSession(cfg multiModelConfig, sessionID string, iteration int) {
+func exportAgentSession(cfg agentRunConfig, sessionID string, iteration int) {
 	timestamp := time.Now().Format("20060102150405")
 	sessionFile := filepath.Join(cfg.retrospectiveDir, fmt.Sprintf("%04d-%s-%s.json", iteration, cfg.agent, timestamp))
 	if err := exportSession(cfg.dir, sessionID, sessionFile); err != nil {
@@ -609,7 +398,7 @@ func exportAgentSession(cfg multiModelConfig, sessionID string, iteration int) {
 	}
 }
 
-func handleCompleteStatus(ctx context.Context, cfg multiModelConfig, newState, wfState state.Workflow, metadata GoalMetadata) state.Workflow {
+func handleCompleteStatus(ctx context.Context, cfg agentRunConfig, newState, wfState state.Workflow, metadata GoalMetadata) state.Workflow {
 	if cfg.agent != "coordinator" {
 		fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "set status=complete, only coordinator can complete workflow; treating as agent-done")
 		newState.Status = state.StatusAgentDone
@@ -633,7 +422,7 @@ func handleCompleteStatus(ctx context.Context, cfg multiModelConfig, newState, w
 	return newState
 }
 
-func blockCompletionOnRetrospective(cfg multiModelConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
+func blockCompletionOnRetrospective(cfg agentRunConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
 	if !retrospectiveEnabled(metadata) {
 		return nil
 	}
@@ -645,23 +434,15 @@ func blockCompletionOnRetrospective(cfg multiModelConfig, newState state.Workflo
 	}
 	fmt.Println("["+cfg.paddedsgai+"]", "blocking completion: retrospective agent has not run yet")
 	newState.Status = state.StatusAgentDone
-	addRetrospectiveRedirectMessage(&newState, cfg.agent)
+	newState.Navigate = &state.NavigationRequest{To: "retrospective", Reason: "All work is complete and verified. Please run the retrospective analysis."}
+	if errAppend := appendProjectManagementSection(cfg.dir, "Retrospective Handoff", "All work is complete and verified. Please run the retrospective analysis."); errAppend != nil {
+		log.Println("failed to append retrospective handoff to PROJECT_MANAGEMENT.md:", errAppend)
+	}
 	saveState(cfg.coord, newState)
 	return &newState
 }
 
-func addRetrospectiveRedirectMessage(s *state.Workflow, fromAgent string) {
-	s.Messages = append(s.Messages, state.Message{
-		ID:        nextMessageID(s.Messages),
-		FromAgent: fromAgent,
-		ToAgent:   "retrospective",
-		Body:      "All work is complete and verified. Please run the retrospective analysis.",
-		Read:      false,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	})
-}
-
-func blockCompletionOnPendingTodos(cfg multiModelConfig, newState, wfState state.Workflow) *state.Workflow {
+func blockCompletionOnPendingTodos(cfg agentRunConfig, newState, wfState state.Workflow) *state.Workflow {
 	count := 0
 	for _, todo := range wfState.Todos {
 		if todo.Status != "completed" && todo.Status != "cancelled" {
@@ -673,12 +454,14 @@ func blockCompletionOnPendingTodos(cfg multiModelConfig, newState, wfState state
 	}
 	fmt.Println("["+cfg.paddedsgai+"]", "coordinator cannot complete workflow, there are pending TODO items")
 	newState.Status = state.StatusWorking
-	addEnvironmentMessage(&newState, cfg.agent, fmt.Sprintf("# Pending TODO items.\nYou have %d pending TODO items. Please complete them before marking workflow complete.\n", count))
+	if errAppend := appendProjectManagementSection(cfg.dir, "Pending TODO Items", fmt.Sprintf("You have %d pending TODO items. Please complete them before marking workflow complete.", count)); errAppend != nil {
+		log.Println("failed to append pending TODO blocker to PROJECT_MANAGEMENT.md:", errAppend)
+	}
 	saveState(cfg.coord, newState)
 	return &newState
 }
 
-func blockCompletionOnGateScript(ctx context.Context, cfg multiModelConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
+func blockCompletionOnGateScript(ctx context.Context, cfg agentRunConfig, newState state.Workflow, metadata GoalMetadata) *state.Workflow {
 	if metadata.CompletionGateScript == "" {
 		return nil
 	}
@@ -691,12 +474,14 @@ func blockCompletionOnGateScript(ctx context.Context, cfg multiModelConfig, newS
 	}
 	fmt.Println("["+cfg.paddedsgai+"]", "completionGateScript failed, blocking completion")
 	newState.Status = state.StatusWorking
-	addEnvironmentMessage(&newState, cfg.agent, formatCompletionGateScriptFailureMessage(metadata.CompletionGateScript, output))
+	if errAppend := appendProjectManagementSection(cfg.dir, "Completion Gate Failure", formatCompletionGateScriptFailureMessage(metadata.CompletionGateScript, output)); errAppend != nil {
+		log.Println("failed to append completion gate failure to PROJECT_MANAGEMENT.md:", errAppend)
+	}
 	saveState(cfg.coord, newState)
 	return &newState
 }
 
-func copyCompletionArtifactsToRetrospective(cfg multiModelConfig) {
+func copyCompletionArtifactsToRetrospective(cfg agentRunConfig) {
 	if cfg.retrospectiveDir == "" {
 		return
 	}
@@ -713,7 +498,40 @@ func copyCompletionArtifactsToRetrospective(cfg multiModelConfig) {
 	}
 }
 
-func handleWaitingForHumanStatus(cfg multiModelConfig, newState state.Workflow) state.Workflow {
+func appendProjectManagementSection(dir, title, body string) error {
+	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
+	if errMkdir := os.MkdirAll(filepath.Dir(pmPath), 0755); errMkdir != nil {
+		return errMkdir
+	}
+	file, errOpen := os.OpenFile(pmPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if errOpen != nil {
+		return errOpen
+	}
+	defer func() {
+		if errClose := file.Close(); errClose != nil {
+			log.Println("failed to close PROJECT_MANAGEMENT.md:", errClose)
+		}
+	}()
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	_, errWrite := fmt.Fprintf(file, "\n## %s (%s)\n%s\n", title, timestamp, strings.TrimSpace(body))
+	return errWrite
+}
+
+func readPendingSteeringMessage(dir string) string {
+	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
+	data, errRead := os.ReadFile(pmPath)
+	if errRead != nil {
+		return ""
+	}
+	content := string(data)
+	idx := strings.LastIndex(content, "## Human Steering")
+	if idx < 0 {
+		return ""
+	}
+	return strings.TrimSpace(content[idx:])
+}
+
+func handleWaitingForHumanStatus(cfg agentRunConfig, newState state.Workflow) state.Workflow {
 	saveState(cfg.coord, newState)
 	if newState.MultiChoiceQuestion != nil || newState.HumanMessage != "" {
 		log.Println("agent", cfg.agent, "has pending question after timeout, preserving state for notification")
@@ -725,7 +543,7 @@ func handleWaitingForHumanStatus(cfg multiModelConfig, newState state.Workflow) 
 	return newState
 }
 
-func handleWorkingLoop(cfg multiModelConfig, capturedSessionID *string, consecutiveWorkingIterations int) int {
+func handleWorkingLoop(cfg agentRunConfig, capturedSessionID *string, consecutiveWorkingIterations int) int {
 	consecutiveWorkingIterations++
 	if consecutiveWorkingIterations >= maxConsecutiveWorkingIterations {
 		fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "stuck in working loop after", consecutiveWorkingIterations, "iterations; discarding session to recover")
@@ -734,36 +552,6 @@ func handleWorkingLoop(cfg multiModelConfig, capturedSessionID *string, consecut
 	}
 	fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "still working, re-running...")
 	return consecutiveWorkingIterations
-}
-
-func agentHasUnreadOutgoingMessages(s state.Workflow, agentName string) bool {
-	for _, msg := range s.Messages {
-		if msg.FromAgent == agentName && !msg.Read {
-			return true
-		}
-	}
-	return false
-}
-
-func nextMessageID(messages []state.Message) int {
-	nextID := 1
-	for _, msg := range messages {
-		if msg.ID >= nextID {
-			nextID = msg.ID + 1
-		}
-	}
-	return nextID
-}
-
-func addEnvironmentMessage(wfState *state.Workflow, toAgent, body string) {
-	wfState.Messages = append(wfState.Messages, state.Message{
-		ID:        nextMessageID(wfState.Messages),
-		FromAgent: "environment",
-		ToAgent:   toAgent,
-		Body:      body,
-		Read:      false,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	})
 }
 
 func addAgentHandoffProgress(wfState *state.Workflow, targetAgent string) {
@@ -812,8 +600,7 @@ func countPendingTodos(wfState state.Workflow, agent string) int {
 
 // GoalMetadata represents the YAML frontmatter in GOAL.md files.
 // It configures workflow flow, per-agent models, agent aliases,
-// and completion gate command. Models can be either a single string
-// or an array of strings per agent (for multi-model support).
+// and completion gate command. Models are single strings per agent.
 type GoalMetadata struct {
 	Flow                 string            `json:"flow,omitempty" yaml:"flow,omitempty"`
 	Models               map[string]any    `json:"models,omitempty" yaml:"models,omitempty"`
@@ -907,7 +694,6 @@ func parseFrontmatterMap(content []byte) map[string]string {
 // validateModels checks that all agent models in the map are valid according to `opencode models`.
 // Returns an error listing invalid models and agents if any are found.
 // When model specs include variants (e.g., "model (variant)"), only the base model is validated.
-// Supports both single string models and arrays of model strings.
 func validateModels(models map[string]any) error {
 	if len(models) == 0 {
 		return nil
@@ -922,19 +708,25 @@ func validateModels(models map[string]any) error {
 	var invalidModelNames []string
 	seen := make(map[string]bool)
 
-	for agent := range models {
-		modelSpecs := getModelsForAgent(models, agent)
-		for _, modelSpec := range modelSpecs {
-			if modelSpec == "" {
-				continue
+	for agent, value := range models {
+		modelSpec, ok := value.(string)
+		if !ok {
+			invalidAgents = append(invalidAgents, agent)
+			if !seen["non-string model config"] {
+				invalidModelNames = append(invalidModelNames, "non-string model config")
+				seen["non-string model config"] = true
 			}
-			baseModel, _ := parseModelAndVariant(modelSpec)
-			if !validModels[baseModel] {
-				invalidAgents = append(invalidAgents, agent)
-				if !seen[baseModel] {
-					invalidModelNames = append(invalidModelNames, baseModel)
-					seen[baseModel] = true
-				}
+			continue
+		}
+		if modelSpec == "" {
+			continue
+		}
+		baseModel, _ := parseModelAndVariant(modelSpec)
+		if !validModels[baseModel] {
+			invalidAgents = append(invalidAgents, agent)
+			if !seen[baseModel] {
+				invalidModelNames = append(invalidModelNames, baseModel)
+				seen[baseModel] = true
 			}
 		}
 	}
@@ -1014,36 +806,6 @@ func parseYAMLFrontmatter(content []byte) (GoalMetadata, error) {
 //go:embed skel/**
 var skelFS embed.FS
 
-func findFirstPendingMessageAgent(s state.Workflow) string {
-	if len(s.Messages) == 0 {
-		return ""
-	}
-	for _, msg := range s.Messages {
-		if !msg.Read {
-			return extractAgentFromModelID(msg.ToAgent)
-		}
-	}
-	return ""
-}
-
-func redirectToPendingMessageAgent(s *state.Workflow, coord *state.Coordinator, paddedsgai string) bool {
-	pendingAgent := findFirstPendingMessageAgent(*s)
-	if pendingAgent == "" {
-		return false
-	}
-	fmt.Println("["+paddedsgai+"]", "pending messages for", pendingAgent, "- redirecting before completion")
-	s.Status = state.StatusWorking
-	s.CurrentAgent = pendingAgent
-	s.VisitCounts[pendingAgent]++
-	snapshot := *s
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		*wf = snapshot
-	}); errUpdate != nil {
-		log.Fatalln("failed to save state:", errUpdate)
-	}
-	return true
-}
-
 func runCompletionGateScript(ctx context.Context, dir, script string) (string, error) {
 	cmd := exec.CommandContext(ctx, "sh", "-c", script)
 	cmd.Dir = dir
@@ -1079,7 +841,7 @@ The script %s has failed with this output:
 }
 
 // initVisitCounts initializes a visit counts map with all agents set to 0.
-// This ensures send_message validation works before agents are visited.
+// This ensures navigation validation works before agents are visited.
 func initVisitCounts(agents []string) map[string]int {
 	counts := make(map[string]int)
 	for _, agent := range agents {

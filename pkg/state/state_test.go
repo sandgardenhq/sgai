@@ -1,6 +1,8 @@
 package state
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -230,7 +232,6 @@ func TestNewCoordinatorEmpty(t *testing.T) {
 		assert.Equal(t, StatusWorking, state.Status)
 		assert.Empty(t, state.Task)
 		assert.Empty(t, state.Progress)
-		assert.Empty(t, state.Messages)
 	})
 }
 
@@ -259,6 +260,26 @@ func TestNewCoordinatorWith(t *testing.T) {
 		assert.Equal(t, wf.Status, loaded.Status)
 		assert.Equal(t, wf.Task, loaded.Task)
 	})
+}
+
+func TestWorkflowJSONOmitsMessages(t *testing.T) {
+	data, err := json.Marshal(Workflow{Status: StatusWorking})
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), `"messages"`)
+	assert.NotContains(t, string(data), `"currentModel"`)
+	assert.NotContains(t, string(data), `"modelStatuses"`)
+
+	dir := t.TempDir()
+	statePath := filepath.Join(dir, "state.json")
+	coord, err := NewCoordinatorWith(statePath, Workflow{Status: StatusWorking})
+	require.NoError(t, err)
+	require.NotNil(t, coord)
+
+	content, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(content), `"messages"`)
+	assert.NotContains(t, string(content), `"currentModel"`)
+	assert.NotContains(t, string(content), `"modelStatuses"`)
 }
 
 func TestCoordinatorState(t *testing.T) {

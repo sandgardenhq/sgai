@@ -29,7 +29,6 @@ function writeLocalStorage<T>(key: string, value: T): void {
 
 export interface UseAdhocRunOptions {
   workspaceName: string;
-  currentModel?: string;
   /** When true, skip fetching model list (AdhocOutput uses a text input) */
   skipModelsFetch?: boolean;
 }
@@ -57,7 +56,6 @@ export interface UseAdhocRunResult {
 
 export function useAdhocRun({
   workspaceName,
-  currentModel,
   skipModelsFetch = false,
 }: UseAdhocRunOptions): UseAdhocRunResult {
   const [{ models, modelsLoading, modelsError }, updateModelsState] = useReducer(
@@ -187,7 +185,7 @@ export function useAdhocRun({
     };
   }, [workspaceName, skipModelsFetch]);
 
-  const fallbackModel = models?.defaultModel ?? currentModel ?? "";
+  const fallbackModel = models?.defaultModel ?? "";
   const selectedModel = storedSelectedModel || (
     fallbackModel && models?.models.some((m) => m.id === fallbackModel) ? fallbackModel : ""
   );

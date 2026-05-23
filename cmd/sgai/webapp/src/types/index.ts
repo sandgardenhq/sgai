@@ -16,7 +16,6 @@ export interface ApiWorkspaceEntry {
   interactiveAuto: boolean;
   continuousMode: boolean;
   currentAgent: string;
-  currentModel: string;
   task: string;
   goalContent: string;
   rawGoalContent: string;
@@ -29,10 +28,7 @@ export interface ApiWorkspaceEntry {
   humanMessage: string;
   agentSequence: ApiAgentSequenceEntry[];
   cost: ApiSessionCost;
-  modelStatuses?: ApiModelStatusEntry[];
-  agentModels?: ApiAgentModelEntry[];
   events: ApiEventEntry[];
-  messages: ApiMessageEntry[];
   projectTodos: ApiTodoEntry[];
   agentTodos: ApiTodoEntry[];
   changes: ApiChangesData;
@@ -157,11 +153,6 @@ export interface ApiSessionActionResponse {
   message: string;
 }
 
-export interface ApiModelStatusEntry {
-  modelId: string;
-  status: string;
-}
-
 export interface ApiModelEntry {
   id: string;
   name: string;
@@ -229,17 +220,6 @@ interface ApiSessionUsage {
   steps: ApiStepCost[];
 }
 
-export interface ApiMessageEntry {
-  id: number;
-  fromAgent: string;
-  toAgent: string;
-  body: string;
-  subject: string;
-  read: boolean;
-  readAt?: string;
-  createdAt?: string;
-}
-
 export interface ApiTodoEntry {
   id: string;
   content: string;
@@ -284,11 +264,6 @@ export interface ApiEventEntry {
   description: string;
   showDateDivider: boolean;
   dateDivider: string;
-}
-
-export interface ApiAgentModelEntry {
-  agent: string;
-  models: string[];
 }
 
 export interface ApiForkCommit {
@@ -417,12 +392,6 @@ export interface ApiTogglePinResponse {
 export interface ApiOpenEditorResponse {
   opened: boolean;
   editor: string;
-  message: string;
-}
-
-export interface ApiDeleteMessageResponse {
-  deleted: boolean;
-  id: number;
   message: string;
 }
 

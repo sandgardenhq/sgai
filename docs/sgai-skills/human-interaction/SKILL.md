@@ -173,25 +173,6 @@ The `questionId` is a SHA256 hash of the question content. It changes when the q
 2. Use the `questionId` from the current state
 3. If you get a `409 "question expired"` error, re-fetch state and get the new ID
 
-## Delete a Message
-
-Remove a message from a workspace's message queue.
-
-**Endpoint:** `DELETE /api/v1/workspaces/{name}/messages/{id}`
-
-```bash
-curl -X DELETE $BASE_URL/api/v1/workspaces/my-project/messages/42
-```
-
-Response:
-```json
-{
-  "deleted": true,
-  "id": 42,
-  "message": "message deleted successfully"
-}
-```
-
 ## Complete Interaction Loop Example
 
 ```bash

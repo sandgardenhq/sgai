@@ -99,15 +99,15 @@ Use `ask_user_question` to present structured multi-choice questions to the huma
 
 ---
 
-## Message-Driven Navigation
+## Workflow Navigation
 
-In flow mode, navigation between agents is driven by inter-agent messages using `sgai_send_message()` and `sgai_check_inbox()`.
+In flow mode, navigation between agents is driven by `sgai_update_workflow_state({status: "agent-done", navigate: {to, reason}})` and durable handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
 
 ### How Navigation Works
 
-1. **Send a message to route work**: Use `sgai_send_message({toAgent: "agent-name", body: "..."})` to send work to another agent.
+1. **Record the handoff**: Append the work request, blocker, or decision to `.sgai/PROJECT_MANAGEMENT.md`.
 
-2. **Message-based routing**: When you set `status: "agent-done"`, the system checks for pending messages and routes to the agent with the oldest unread message.
+2. **Request navigation**: Set `status: "agent-done"` with `navigate: {to: "agent-name", reason: "..."}` to route work to another DAG agent.
 
 3. **Default to coordinator**: When no messages are pending, control returns to the coordinator.
 
@@ -115,10 +115,10 @@ In flow mode, navigation between agents is driven by inter-agent messages using 
 
 ### Key Points
 
-- Messages drive the workflow - send a message to an agent to have work routed to them
+- `.sgai/PROJECT_MANAGEMENT.md` is the durable coordination ledger
 - Only coordinator can set `status: "complete"` to end the entire workflow
 - The DAG (flow definition) represents intention and provides predecessor/successor information for context
-- Agents can message other agents, never themselves
-- The coordinator must never send a message to `coordinator`; it should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
+- Agents navigate to other agents, never themselves
+- The coordinator must never navigate to `coordinator`; it should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
 
 ---

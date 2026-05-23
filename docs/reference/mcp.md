@@ -40,6 +40,7 @@ Input fields:
 - `status`
 - `task`
 - `addProgress`
+- `navigate`
 
 #### Status values depend on the current agent
 
@@ -56,35 +57,27 @@ When the current agent is `coordinator`, it also allows:
 
 Transitions to `agent-done` or `complete` fail if there are pending TODO items.
 
-### `send_message`
+#### Navigation
 
-Send a message to another agent.
+Agents request a non-default next agent with `navigate` while setting `status` to `agent-done`.
 
 Input:
 
 ```json
 {
-  "toAgent": "name-or-model-id",
-  "body": "message body"
+  "status": "agent-done",
+  "navigate": {
+    "to": "reviewer",
+    "reason": "review is needed before continuing"
+  }
 }
 ```
 
 Notes:
 
-- The target must be an agent in the workflow.
-- When `currentModel` is set in state, `send_message` uses that as `fromAgent`.
-
-### `check_inbox`
-
-Return unread messages for the current agent (and current model, if set) and mark them as read.
-
-### `check_outbox`
-
-Return messages sent by the current agent (and current model, if set).
-
-### `peek_message_bus` (coordinator only)
-
-Return all messages in the system (pending and read), in reverse chronological order.
+- `navigate` is only valid with `status: "agent-done"`.
+- `navigate.to` must be an agent in the workflow DAG.
+- Shared context and handoff notes belong in `.sgai/PROJECT_MANAGEMENT.md`.
 
 ### `project_todowrite` (coordinator only)
 
@@ -101,4 +94,3 @@ Present one or more multiple-choice questions to the human partner.
 Input:
 
 - `questions`: array of `{ "question": string, "choices": string[], "multiSelect": boolean }`
-

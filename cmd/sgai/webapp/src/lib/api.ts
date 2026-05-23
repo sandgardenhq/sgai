@@ -161,11 +161,6 @@ export const api = {
       fetchJSON<ApiDiffResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
       ),
-    deleteMessage: (name: string, messageId: number) =>
-      fetchJSON<ApiDeleteMessageResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/messages/${messageId}`,
-        { method: "DELETE" },
-      ),
     forkTemplate: (name: string) =>
       fetchJSON<ApiForkTemplateResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/fork-template`,

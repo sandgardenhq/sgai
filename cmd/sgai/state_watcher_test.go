@@ -91,70 +91,6 @@ func TestHashTodosDifferent(t *testing.T) {
 	assert.NotEqual(t, hash1, hash2, "different input should produce different hash")
 }
 
-func TestHashMessages(t *testing.T) {
-	tests := []struct {
-		name     string
-		messages []state.Message
-	}{
-		{
-			name:     "emptyMessages",
-			messages: []state.Message{},
-		},
-		{
-			name: "singleMessage",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello"},
-			},
-		},
-		{
-			name: "multipleMessages",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello"},
-				{ID: 2, FromAgent: "agent2", ToAgent: "agent1", Body: "World"},
-			},
-		},
-		{
-			name: "messageWithReadStatus",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello", Read: true},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := hashMessages(tt.messages)
-			assert.Len(t, result, 16)
-			assert.NotEmpty(t, result)
-		})
-	}
-}
-
-func TestHashMessagesConsistency(t *testing.T) {
-	messages := []state.Message{
-		{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello"},
-	}
-
-	hash1 := hashMessages(messages)
-	hash2 := hashMessages(messages)
-
-	assert.Equal(t, hash1, hash2, "same input should produce same hash")
-}
-
-func TestHashMessagesDifferent(t *testing.T) {
-	messages1 := []state.Message{
-		{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "Hello"},
-	}
-	messages2 := []state.Message{
-		{ID: 1, FromAgent: "agent1", ToAgent: "agent2", Body: "World"},
-	}
-
-	hash1 := hashMessages(messages1)
-	hash2 := hashMessages(messages2)
-
-	assert.NotEqual(t, hash1, hash2, "different input should produce different hash")
-}
-
 func TestHashGoalFile(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -261,9 +197,6 @@ func TestBuildStateSnapshot(t *testing.T) {
 		ProjectTodos: []state.TodoItem{
 			{Content: "task1", Status: "pending"},
 		},
-		Messages: []state.Message{
-			{ID: 1, FromAgent: "dev", ToAgent: "coord", Body: "done"},
-		},
 	}
 
 	snapshot := buildStateSnapshot(modTime, wfState, nil)
@@ -272,7 +205,6 @@ func TestBuildStateSnapshot(t *testing.T) {
 	assert.True(t, snapshot.needsInput)
 	assert.Equal(t, 1, snapshot.progressLen)
 	assert.NotEmpty(t, snapshot.todosHash)
-	assert.NotEmpty(t, snapshot.messagesHash)
 	assert.Empty(t, snapshot.goalHash)
 }
 
@@ -330,14 +262,14 @@ func TestEmitStateChangeEvents(t *testing.T) {
 
 func TestStateWatcherEmitChangeEventsStatusChange(t *testing.T) {
 	srv, _ := setupTestServer(t)
-	prev := workspaceStateSnapshot{status: state.StatusWorking, todosHash: "abc", messagesHash: "def", goalHash: "ghi"}
-	changed := workspaceStateSnapshot{status: state.StatusComplete, todosHash: "abc", messagesHash: "def", goalHash: "ghi"}
+	prev := workspaceStateSnapshot{status: state.StatusWorking, todosHash: "abc", goalHash: "ghi"}
+	changed := workspaceStateSnapshot{status: state.StatusComplete, todosHash: "abc", goalHash: "ghi"}
 	srv.emitStateChangeEvents("dir", prev, changed)
 }
 
 func TestStateWatcherEmitNoChangeEvents(t *testing.T) {
 	srv, _ := setupTestServer(t)
-	s := workspaceStateSnapshot{status: state.StatusWorking, progressLen: 3, todosHash: "abc", messagesHash: "def", goalHash: "ghi"}
+	s := workspaceStateSnapshot{status: state.StatusWorking, progressLen: 3, todosHash: "abc", goalHash: "ghi"}
 	srv.emitStateChangeEvents("dir", s, s)
 }
 

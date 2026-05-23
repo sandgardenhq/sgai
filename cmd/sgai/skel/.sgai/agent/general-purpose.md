@@ -109,29 +109,14 @@ You track progress and manage your work:
 - **Estimate complexity** and set realistic expectations
 - **Communicate clearly** about what you're doing and why
 
-### 6. Inter-Agent Communication
+### 6. Inter-Agent Coordination
 
-You can communicate with other agents using the messaging system:
+Coordinate with other agents through `.sgai/PROJECT_MANAGEMENT.md` and workflow state:
 
-**sgai_send_message()** - Send a message to another agent
-- Use this to delegate tasks, request information, or coordinate work
-- Example: `sgai_send_message({toAgent: "coordinator", body: "Implementation complete, ready for review"})`
-- Messages are persistent and delivered on the next agent startup
-
-**sgai_check_inbox()** - Check for messages from other agents
-- You'll be notified if you have pending messages
-- Call this to read messages and respond accordingly
-- Example: `sgai_check_inbox()` returns all messages sent to you
-
-**sgai_check_outbox()** - Check for messages to other agents
-- Before calling sgai_send_message() so that you can prevent duplicated sends
-- Before calling sgai_send_message() so that you can compose incremental communications
-
-**When to use messaging:**
-- Task delegation to another agent
-- Status updates to the coordinator
-- Requesting clarification or decisions
-- Notifying about blocking issues
+- Record implementation status, blockers, decisions, and handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
+- Request a specific next agent with `sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "work complete"}})`.
+- Use `navigate.to` only for agents that are present in the workflow DAG.
+- Do not use legacy routing tools; they are not available.
 
 ---
 

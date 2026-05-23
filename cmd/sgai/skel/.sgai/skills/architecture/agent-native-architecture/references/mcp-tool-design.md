@@ -32,7 +32,7 @@ tool("store_item", {
   return { text: `Stored ${key}` };
 });
 
-tool("sgai_send_message", {
+tool("post_notification", {
   channel: z.string(),
   content: z.string(),
 }, async ({ channel, content }) => {
@@ -53,7 +53,7 @@ Names should describe the capability, not the use case:
 |-------|-------|
 | `process_user_feedback` | `store_item` |
 | `create_feedback_summary` | `write_file` |
-| `send_notification` | `sgai_send_message` |
+| `send_notification_if_important` | `post_notification` |
 | `deploy_to_production` | `git_push` |
 
 The prompt tells the agent *when* to use primitives. The tool just provides *capability*.

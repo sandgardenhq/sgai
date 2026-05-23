@@ -148,7 +148,7 @@ tool("process_feedback", async ({ message }) => {
 
 // RIGHT - Agent figures out how to process feedback
 tool("store_item", { key, value }, ...);  // Primitive
-tool("sgai_send_message", { channel, content }, ...);  // Primitive
+tool("post_notification", { channel, content }, ...);  // Primitive
 // Prompt says: "Rate importance 1-5 based on actionability, store feedback, notify if >= 4"
 ```
 

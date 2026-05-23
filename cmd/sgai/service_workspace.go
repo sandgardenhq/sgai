@@ -8,11 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
-
-	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
 var (
@@ -20,7 +17,6 @@ var (
 	errGoalContentEmpty     = errors.New("GOAL.md must have content describing the goal")
 	errDirectoryExists      = errors.New("a directory with this name already exists")
 	errWorkspaceNameInvalid = errors.New("workspace name is invalid")
-	errMessageNotFound      = errors.New("message not found")
 )
 
 func generateRandomForkName() string {
@@ -330,36 +326,4 @@ func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceRe
 	s.notifyStateChange()
 
 	return deleteWorkspaceResult{Deleted: true, Message: "workspace deleted successfully"}, nil
-}
-
-type deleteMessageResult struct {
-	Deleted bool
-	ID      int
-	Message string
-}
-
-func (s *Server) deleteMessageService(workspacePath string, messageID int) (deleteMessageResult, error) {
-	coord := s.workspaceCoordinator(workspacePath)
-	wfState := coord.State()
-
-	if !slices.ContainsFunc(wfState.Messages, func(msg state.Message) bool {
-		return msg.ID == messageID
-	}) {
-		return deleteMessageResult{}, errMessageNotFound
-	}
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		i := slices.IndexFunc(wf.Messages, func(msg state.Message) bool {
-			return msg.ID == messageID
-		})
-		if i >= 0 {
-			wf.Messages = slices.Delete(wf.Messages, i, i+1)
-		}
-	}); errUpdate != nil {
-		return deleteMessageResult{}, fmt.Errorf("failed to save workspace state: %w", errUpdate)
-	}
-
-	s.notifyStateChange()
-
-	return deleteMessageResult{Deleted: true, ID: messageID, Message: "message deleted successfully"}, nil
 }

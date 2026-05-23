@@ -134,6 +134,6 @@ When the verdict is `Concern` or `Block`, identify the exact checkbox text and t
 
 You are invoked as a Task subagent. Return the verdict as your final answer so the invoking coordinator receives it.
 
-Do not call `sgai_send_message`. In Task-subagent mode, this tool would write workflow-level state on behalf of the invoking coordinator and can create coordinator-to-coordinator messages.
+Do not call workflow-state tools. In Task-subagent mode, return your verdict directly to the invoking coordinator.
 
-Do not message hidden role agents or reviewer agents through inter-agent workflow messages. Invoke them only through Task.
+Do not contact hidden role agents or reviewer agents through workflow state. Invoke them only through Task.

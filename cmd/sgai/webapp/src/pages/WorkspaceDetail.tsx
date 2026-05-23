@@ -25,7 +25,6 @@ import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
-const MessagesTab = lazy(() => import("./tabs/MessagesTab").then((m) => ({ default: m.MessagesTab })));
 const LogTab = lazy(() => import("./tabs/LogTab").then((m) => ({ default: m.LogTab })));
 const RunTab = lazy(() => import("./tabs/RunTab").then((m) => ({ default: m.RunTab })));
 const ChangesTab = lazy(() => import("./tabs/ChangesTab").then((m) => ({ default: m.ChangesTab })));
@@ -78,7 +77,6 @@ const TABS = [
   { key: "log", label: "Log" },
   { key: "changes", label: "Diffs" },
   { key: "commits", label: "Commits" },
-  { key: "messages", label: "Messages" },
   { key: "internals", label: "Internals" },
   { key: "run", label: "Run" },
 ] as const;
@@ -234,11 +232,8 @@ export function WorkspaceDetail(): JSX.Element | null {
     ? formatExecTime(execTimeSeconds)
     : fallbackExecTime;
   const agentLabel = detail.currentAgent?.trim();
-  const modelLabel = detail.currentModel
-    ? detail.currentModel.split("/").pop() ?? detail.currentModel
-    : "";
-  const agentModelLabel = [agentLabel, modelLabel].filter(Boolean).join(" | ");
-  const fullAgentModelLabel = [detail.currentAgent, detail.currentModel].filter(Boolean).join(" | ");
+  const agentModelLabel = agentLabel ?? "";
+  const fullAgentModelLabel = detail.currentAgent ?? "";
   const statusLine = detail.task?.trim() || detail.status?.trim();
   const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
@@ -392,7 +387,6 @@ export function WorkspaceDetail(): JSX.Element | null {
           <TabContent
             activeTab={activeTab}
             workspaceName={detail.name}
-            currentModel={detail.currentModel}
             goalContent={detail.goalContent}
             pmContent={detail.pmContent}
             hasProjectMgmt={detail.hasProjectMgmt}
@@ -840,7 +834,6 @@ function TabSkeleton() {
 function TabContent({
   activeTab,
   workspaceName,
-  currentModel,
   goalContent,
   pmContent,
   hasProjectMgmt,
@@ -849,7 +842,6 @@ function TabContent({
 }: {
   activeTab: string;
   workspaceName: string;
-  currentModel?: string;
   goalContent?: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
@@ -865,13 +857,11 @@ function TabContent({
       return <ChangesTab workspaceName={workspaceName} />;
     case "commits":
       return <CommitsTab workspaceName={workspaceName} />;
-    case "messages":
-      return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
       return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
 
     case "run":
-      return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
+      return <RunTab workspaceName={workspaceName} />;
     case "forks":
       return <ForksTab workspaceName={workspaceName} actions={actions} onActionClick={onActionClick} />;
     default:

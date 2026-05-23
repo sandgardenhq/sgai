@@ -151,17 +151,13 @@ After every deployment, verify by:
 
 ## Inter-Agent Communication
 
-Report deployment status to the coordinator:
+Report deployment status to the coordinator by appending to `.sgai/PROJECT_MANAGEMENT.md`, then yield with navigation:
 
 ```
-sgai_send_message({toAgent: "coordinator", body: "Deployment to Vercel complete: <url>"})
+sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "deployment status ready"}})
 ```
 
-If you encounter issues requiring human intervention:
-
-```
-sgai_send_message({toAgent: "coordinator", body: "QUESTION: <describe the issue>"})
-```
+If you encounter issues requiring human intervention, write `QUESTION: <describe the issue>` in `.sgai/PROJECT_MANAGEMENT.md` before yielding to coordinator.
 
 ---
 

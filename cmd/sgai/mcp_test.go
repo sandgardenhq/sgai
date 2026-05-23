@@ -162,7 +162,6 @@ func newTestMCPContext(t *testing.T) (*mcpContext, string) {
 	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
 		Status:       state.StatusWorking,
 		CurrentAgent: "test-agent",
-		Messages:     []state.Message{},
 		Progress:     []state.ProgressEntry{},
 	})
 	require.NoError(t, errCoord)
@@ -257,122 +256,6 @@ func TestUpdateWorkflowStateHandlerInvalidStatus(t *testing.T) {
 	require.NotNil(t, result)
 	text := result.Content[0].(*mcp.TextContent).Text
 	assert.Contains(t, text, "Error")
-}
-
-func TestSendMessageHandlerSuccess(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	result, _, err := ctx.sendMessageHandler(context.Background(), nil, sendMessageArgs{
-		ToAgent: "reviewer",
-		Body:    "Please review this code",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "Message sent")
-}
-
-func TestSendMessageHandlerInvalidRecipient(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	result, _, err := ctx.sendMessageHandler(context.Background(), nil, sendMessageArgs{
-		ToAgent: "nonexistent-agent",
-		Body:    "hello",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "Error")
-}
-
-func TestCheckInboxHandlerEmpty(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	result, _, err := ctx.checkInboxHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "no messages")
-}
-
-func TestCheckInboxHandlerWithMessages(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	require.NoError(t, ctx.coord.UpdateState(func(wf *state.Workflow) {
-		wf.Messages = append(wf.Messages, state.Message{
-			ID:        1,
-			FromAgent: "reviewer",
-			ToAgent:   "test-agent",
-			Body:      "Fix this bug",
-			Read:      false,
-		})
-	}))
-
-	result, _, err := ctx.checkInboxHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "Fix this bug")
-}
-
-func TestCheckOutboxHandlerEmpty(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	result, _, err := ctx.checkOutboxHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "not sent any messages")
-}
-
-func TestCheckOutboxHandlerWithMessages(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	require.NoError(t, ctx.coord.UpdateState(func(wf *state.Workflow) {
-		wf.Messages = append(wf.Messages, state.Message{
-			ID:        1,
-			FromAgent: "test-agent",
-			ToAgent:   "reviewer",
-			Body:      "Ready for review",
-			Read:      false,
-		})
-	}))
-
-	result, _, err := ctx.checkOutboxHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "Ready for review")
-}
-
-func TestPeekMessageBusHandlerEmpty(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	result, _, err := ctx.peekMessageBusHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "No messages")
-}
-
-func TestPeekMessageBusHandlerWithMessages(t *testing.T) {
-	ctx, _ := newTestMCPContext(t)
-
-	require.NoError(t, ctx.coord.UpdateState(func(wf *state.Workflow) {
-		wf.Messages = append(wf.Messages, state.Message{
-			ID:        1,
-			FromAgent: "reviewer",
-			ToAgent:   "coordinator",
-			Body:      "Code review complete",
-			Read:      false,
-		})
-	}))
-
-	result, _, err := ctx.peekMessageBusHandler(context.Background(), nil, struct{}{})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	text := result.Content[0].(*mcp.TextContent).Text
-	assert.Contains(t, text, "Code review complete")
 }
 
 func TestProjectTodoWriteHandlerSuccess(t *testing.T) {
@@ -534,81 +417,6 @@ func TestResolveCallerAgent(t *testing.T) {
 			})
 			require.NoError(t, err)
 			result := resolveCallerAgent(tt.headerAgent, coord)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-type messageMatchTest struct {
-	name         string
-	agentField   string
-	currentAgent string
-	currentModel string
-	expected     bool
-}
-
-func messageMatchCases() []messageMatchTest {
-	return []messageMatchTest{
-		{
-			name:         "matchesAgent",
-			agentField:   "go",
-			currentAgent: "go",
-			currentModel: "",
-			expected:     true,
-		},
-		{
-			name:         "matchesModel",
-			agentField:   "opencode/glm-5",
-			currentAgent: "go",
-			currentModel: "opencode/glm-5",
-			expected:     true,
-		},
-		{
-			name:         "noMatch",
-			agentField:   "react",
-			currentAgent: "go",
-			currentModel: "",
-			expected:     false,
-		},
-		{
-			name:         "emptyAgentField",
-			agentField:   "",
-			currentAgent: "go",
-			currentModel: "",
-			expected:     false,
-		},
-		{
-			name:         "emptyCurrentAgent",
-			agentField:   "go",
-			currentAgent: "",
-			currentModel: "",
-			expected:     false,
-		},
-		{
-			name:         "modelMatchWithEmptyModel",
-			agentField:   "opencode/glm-5",
-			currentAgent: "go",
-			currentModel: "",
-			expected:     false,
-		},
-	}
-}
-
-func TestMessageMatchesRecipient(t *testing.T) {
-	for _, tt := range messageMatchCases() {
-		t.Run(tt.name, func(t *testing.T) {
-			msg := state.Message{ToAgent: tt.agentField}
-			result := messageMatchesRecipient(msg, tt.currentAgent, tt.currentModel)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestMessageMatchesSender(t *testing.T) {
-	for _, tt := range messageMatchCases() {
-		t.Run(tt.name, func(t *testing.T) {
-			msg := state.Message{FromAgent: tt.agentField}
-			result := messageMatchesSender(msg, tt.currentAgent, tt.currentModel)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -839,7 +647,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "nilCoordinator" {
-				result, err := updateWorkflowState(nil, tt.callerAgent, tt.args)
+				result, err := updateWorkflowState(nil, tt.callerAgent, []string{"coordinator", "builder"}, tt.args)
 				require.NoError(t, err)
 				assert.Contains(t, result, tt.wantContains)
 				return
@@ -850,7 +658,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 			coord, err := state.NewCoordinatorWith(statePath, tt.initialState)
 			require.NoError(t, err)
 
-			result, err := updateWorkflowState(coord, tt.callerAgent, tt.args)
+			result, err := updateWorkflowState(coord, tt.callerAgent, []string{"coordinator", "builder"}, tt.args)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -861,290 +669,103 @@ func TestUpdateWorkflowState(t *testing.T) {
 	}
 }
 
-func TestSendMessage(t *testing.T) {
-	dagAgents := []string{"coordinator", "go", "react"}
+func TestUpdateWorkflowStateNavigate(t *testing.T) {
+	t.Run("storesValidNavigate", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
+		require.NoError(t, err)
 
-	tests := []struct {
-		name         string
-		callerAgent  string
-		currentModel string
-		toAgent      string
-		body         string
-		wantContains string
-	}{
-		{
-			name:         "nilCoordinator",
-			callerAgent:  "test-agent",
-			toAgent:      "coordinator",
-			body:         "hello",
-			wantContains: "Error: Could not read state.json",
-		},
-		{
-			name:         "invalidTargetAgent",
-			callerAgent:  "coordinator",
-			toAgent:      "non-existent-agent",
-			body:         "hello",
-			wantContains: "Error: Agent 'non-existent-agent' is not in the workflow",
-		},
-		{
-			name:         "sendFromCoordinator",
-			callerAgent:  "coordinator",
-			toAgent:      "go",
-			body:         "please review this",
-			wantContains: "Message sent successfully",
-		},
-		{
-			name:         "sendFromNonCoordinator",
-			callerAgent:  "go",
-			toAgent:      "coordinator",
-			body:         "done with review",
-			wantContains: "IMPORTANT: To receive a response",
-		},
-		{
-			name:         "rejectCoordinatorSelfMessage",
-			callerAgent:  "coordinator",
-			toAgent:      "coordinator",
-			body:         "status update",
-			wantContains: "cannot send a message to itself",
-		},
-		{
-			name:         "rejectBaseAgentSelfMessage",
-			callerAgent:  "go",
-			toAgent:      "go",
-			body:         "status update",
-			wantContains: "cannot send a message to itself",
-		},
-		{
-			name:         "rejectModelToBaseAgentSelfMessage",
-			callerAgent:  "go",
-			currentModel: "go:model-a",
-			toAgent:      "go",
-			body:         "status update",
-			wantContains: "cannot send a message to itself",
-		},
-		{
-			name:         "rejectBaseAgentToModelSelfMessage",
-			callerAgent:  "go",
-			toAgent:      "go:model-a",
-			body:         "status update",
-			wantContains: "cannot send a message to itself",
-		},
-		{
-			name:         "allowModelSiblingMessage",
-			callerAgent:  "go",
-			currentModel: "go:model-a",
-			toAgent:      "go:model-b",
-			body:         "sibling note",
-			wantContains: "Message sent successfully",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "nilCoordinator" {
-				result, err := sendMessage(nil, dagAgents, tt.callerAgent, tt.toAgent, tt.body)
-				require.NoError(t, err)
-				assert.Contains(t, result, tt.wantContains)
-				return
-			}
-
-			tmpDir := t.TempDir()
-			statePath := filepath.Join(tmpDir, "state.json")
-			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				Status:       state.StatusWorking,
-				Messages:     []state.Message{},
-				CurrentModel: tt.currentModel,
-			})
-			require.NoError(t, err)
-
-			result, err := sendMessage(coord, dagAgents, tt.callerAgent, tt.toAgent, tt.body)
-			require.NoError(t, err)
-			assert.Contains(t, result, tt.wantContains)
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status:   "agent-done",
+			Navigate: &navigateArgs{To: "reviewer", Reason: "needs review"},
 		})
-	}
-}
 
-func TestCheckInbox(t *testing.T) {
-	tests := []struct {
-		name         string
-		callerAgent  string
-		messages     []state.Message
-		wantContains string
-	}{
-		{
-			name:         "nilCoordinator",
-			callerAgent:  "test-agent",
-			wantContains: "Error: Could not read state.json",
-		},
-		{
-			name:        "noMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "coordinator", ToAgent: "other-agent", Body: "hello", Read: false},
-			},
-			wantContains: "You have no messages.",
-		},
-		{
-			name:        "hasUnreadMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "coordinator", ToAgent: "test-agent", Body: "please do this", Read: false},
-				{ID: 2, FromAgent: "coordinator", ToAgent: "test-agent", Body: "also this", Read: false},
-			},
-			wantContains: "You have 2 message(s):",
-		},
-		{
-			name:        "onlyReadMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "coordinator", ToAgent: "test-agent", Body: "old", Read: true},
-			},
-			wantContains: "You have no messages.",
-		},
-	}
+		require.NoError(t, err)
+		assert.Contains(t, result, "Navigate to: reviewer")
+		require.NotNil(t, coord.State().Navigate)
+		assert.Equal(t, "reviewer", coord.State().Navigate.To)
+		assert.Equal(t, "needs review", coord.State().Navigate.Reason)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "nilCoordinator" {
-				result, err := checkInbox(nil, tt.callerAgent)
-				require.NoError(t, err)
-				assert.Contains(t, result, tt.wantContains)
-				return
-			}
+	t.Run("rejectsNavigateWithoutAgentDone", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
+		require.NoError(t, err)
 
-			tmpDir := t.TempDir()
-			statePath := filepath.Join(tmpDir, "state.json")
-			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				Status:   state.StatusWorking,
-				Messages: tt.messages,
-			})
-			require.NoError(t, err)
-
-			result, err := checkInbox(coord, tt.callerAgent)
-			require.NoError(t, err)
-			assert.Contains(t, result, tt.wantContains)
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status:   "working",
+			Navigate: &navigateArgs{To: "reviewer"},
 		})
-	}
-}
 
-func TestCheckOutbox(t *testing.T) {
-	tests := []struct {
-		name         string
-		callerAgent  string
-		messages     []state.Message
-		wantContains string
-	}{
-		{
-			name:         "nilCoordinator",
-			callerAgent:  "test-agent",
-			wantContains: "Error: Could not read state.json",
-		},
-		{
-			name:        "noSentMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "other-agent", ToAgent: "test-agent", Body: "hello"},
-			},
-			wantContains: "You have not sent any messages.",
-		},
-		{
-			name:        "hasPendingMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "test-agent", ToAgent: "coordinator", Body: "done with work", Read: false},
-			},
-			wantContains: "Pending messages (1):",
-		},
-		{
-			name:        "hasDeliveredMessages",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "test-agent", ToAgent: "coordinator", Body: "done with work", Read: true, ReadAt: "2026-03-05T10:00:00Z"},
-			},
-			wantContains: "Delivered messages (1):",
-		},
-		{
-			name:        "mixedPendingAndDelivered",
-			callerAgent: "test-agent",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "test-agent", ToAgent: "coordinator", Body: "first msg", Read: true, ReadAt: "2026-03-05T10:00:00Z"},
-				{ID: 2, FromAgent: "test-agent", ToAgent: "reviewer", Body: "review request", Read: false},
-			},
-			wantContains: "Pending messages (1):",
-		},
-	}
+		require.NoError(t, err)
+		assert.Contains(t, result, "navigate is only valid")
+		assert.Nil(t, coord.State().Navigate)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "nilCoordinator" {
-				result, err := checkOutbox(nil, tt.callerAgent)
-				require.NoError(t, err)
-				assert.Contains(t, result, tt.wantContains)
-				return
-			}
+	t.Run("ignoresEmptyNavigateWithoutAgentDone", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
+		require.NoError(t, err)
 
-			tmpDir := t.TempDir()
-			statePath := filepath.Join(tmpDir, "state.json")
-			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				Status:   state.StatusWorking,
-				Messages: tt.messages,
-			})
-			require.NoError(t, err)
-
-			result, err := checkOutbox(coord, tt.callerAgent)
-			require.NoError(t, err)
-			assert.Contains(t, result, tt.wantContains)
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status:      "working",
+			Task:        "keep working",
+			AddProgress: "made progress",
+			Navigate:    &navigateArgs{},
 		})
-	}
-}
 
-func TestPeekMessageBus(t *testing.T) {
-	tests := []struct {
-		name         string
-		messages     []state.Message
-		wantContains string
-	}{
-		{
-			name:         "nilCoordinator",
-			wantContains: "Error: Could not read state.json",
-		},
-		{
-			name:         "noMessages",
-			messages:     []state.Message{},
-			wantContains: "No messages in the system.",
-		},
-		{
-			name: "hasMessages",
-			messages: []state.Message{
-				{ID: 1, FromAgent: "coordinator", ToAgent: "backend", Body: "do work", Read: false},
-				{ID: 2, FromAgent: "backend", ToAgent: "coordinator", Body: "done", Read: true, ReadAt: "2026-03-05T10:00:00Z"},
-			},
-			wantContains: "Total messages: 2",
-		},
-	}
+		require.NoError(t, err)
+		assert.Contains(t, result, "State updated successfully")
+		assert.Nil(t, coord.State().Navigate)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "nilCoordinator" {
-				result, err := peekMessageBus(nil)
-				require.NoError(t, err)
-				assert.Contains(t, result, tt.wantContains)
-				return
-			}
+	t.Run("rejectsUnknownNavigateTarget", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
+		require.NoError(t, err)
 
-			tmpDir := t.TempDir()
-			statePath := filepath.Join(tmpDir, "state.json")
-			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				Status:   state.StatusWorking,
-				Messages: tt.messages,
-			})
-			require.NoError(t, err)
-
-			result, err := peekMessageBus(coord)
-			require.NoError(t, err)
-			assert.Contains(t, result, tt.wantContains)
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status:   "agent-done",
+			Navigate: &navigateArgs{To: "unknown"},
 		})
-	}
+
+		require.NoError(t, err)
+		assert.Contains(t, result, "not in the workflow")
+		assert.Nil(t, coord.State().Navigate)
+	})
+
+	t.Run("rejectsNavigateWhileWaitingForHuman", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWaitingForHuman})
+		require.NoError(t, err)
+
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status:   "agent-done",
+			Navigate: &navigateArgs{To: "reviewer"},
+		})
+
+		require.NoError(t, err)
+		assert.Contains(t, result, "waiting for human response")
+		assert.Nil(t, coord.State().Navigate)
+	})
+
+	t.Run("clearsStaleNavigate", func(t *testing.T) {
+		statePath := filepath.Join(t.TempDir(), "state.json")
+		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
+			Status:   state.StatusWorking,
+			Navigate: &state.NavigationRequest{To: "reviewer", Reason: "old request"},
+		})
+		require.NoError(t, err)
+
+		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
+			Status: "working",
+			Task:   "continue normally",
+		})
+
+		require.NoError(t, err)
+		assert.Contains(t, result, "State updated successfully")
+		assert.Nil(t, coord.State().Navigate)
+	})
 }
 
 func TestFormatTodoList(t *testing.T) {
@@ -1799,7 +1420,7 @@ func TestUpdateWorkflowStateInvalidStatus(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
 		Status: "invalid-status",
 		Task:   "test task",
 	})
@@ -1816,7 +1437,7 @@ func TestUpdateWorkflowStateWithPendingTodos(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
 		Status: "agent-done",
 		Task:   "",
 	})
@@ -1831,7 +1452,7 @@ func TestUpdateWorkflowStatePreservesHumanPendingStatus(t *testing.T) {
 		HumanMessage: "waiting",
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
 		Status:      "working",
 		Task:        "new task",
 		AddProgress: "doing stuff",
@@ -1846,7 +1467,7 @@ func TestUpdateWorkflowStateClearsTaskOnComplete(t *testing.T) {
 		Status: state.StatusWorking,
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
 		Status: "agent-done",
 		Task:   "should be cleared",
 	})
@@ -1854,24 +1475,6 @@ func TestUpdateWorkflowStateClearsTaskOnComplete(t *testing.T) {
 	assert.Contains(t, result, "updated successfully")
 	wf := coord.State()
 	assert.Empty(t, wf.Task)
-}
-
-func TestSendMessageInvalidAgent(t *testing.T) {
-	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{})
-	require.NoError(t, err)
-	result, err := sendMessage(coord, []string{"coordinator", "builder"}, "builder", "nonexistent-agent", "hello")
-	require.NoError(t, err)
-	assert.Contains(t, result, "not in the workflow")
-}
-
-func TestSendMessageValidAgent(t *testing.T) {
-	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{})
-	require.NoError(t, err)
-	result, err := sendMessage(coord, []string{"coordinator", "builder"}, "builder", "coordinator", "hello from builder")
-	require.NoError(t, err)
-	assert.Contains(t, result, "sent")
 }
 
 func TestListSnippetLanguagesNoDir(t *testing.T) {

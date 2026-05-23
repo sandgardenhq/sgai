@@ -18,7 +18,6 @@ type workspaceStateSnapshot struct {
 	needsInput   bool
 	progressLen  int
 	todosHash    string
-	messagesHash string
 	goalModTime  time.Time
 	goalHash     string
 }
@@ -112,7 +111,6 @@ func buildStateSnapshot(modTime time.Time, wfState state.Workflow, goalInfo os.F
 		needsInput:   wfState.NeedsHumanInput(),
 		progressLen:  len(wfState.Progress),
 		todosHash:    hashTodos(wfState.ProjectTodos, wfState.Todos),
-		messagesHash: hashMessages(wfState.Messages),
 	}
 	if goalInfo != nil {
 		snapshot.goalModTime = goalInfo.ModTime()
@@ -126,7 +124,6 @@ func (s *Server) emitStateChangeEvents(_ string, prev, current workspaceStateSna
 		prev.needsInput != current.needsInput ||
 		current.progressLen > prev.progressLen ||
 		prev.todosHash != current.todosHash ||
-		prev.messagesHash != current.messagesHash ||
 		prev.goalHash != current.goalHash
 
 	if changed {
@@ -140,16 +137,6 @@ func hashTodos(projectTodos, agentTodos []state.TodoItem) string {
 		Project []state.TodoItem `json:"p"`
 		Agent   []state.TodoItem `json:"a"`
 	}{projectTodos, agentTodos})
-	if errMarshal != nil {
-		return ""
-	}
-	h.Write(data)
-	return fmt.Sprintf("%x", h.Sum(nil))[:16]
-}
-
-func hashMessages(messages []state.Message) string {
-	h := sha256.New()
-	data, errMarshal := json.Marshal(messages)
 	if errMarshal != nil {
 		return ""
 	}
