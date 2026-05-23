@@ -8,8 +8,8 @@ webapp-test:
 	cd cmd/sgai/webapp && bun install && bun test
 
 webapp-doctor:
-	cd cmd/sgai/webapp && bun install && npx -y react-doctor@latest . --offline --full --fail-on error
-	cd cmd/sgai/webapp && score=$$(npx -y react-doctor@latest . --offline --full --score | tail -n 1); test "$$score" -ge 100
+	cd cmd/sgai/webapp && bun install && npx -y react-doctor@latest . --full --fail-on error
+	cd cmd/sgai/webapp && score=$$(npx -y react-doctor@latest . --full --score | tail -n 1); test "$$score" -ge 100
 
 test: webapp-doctor webapp-test webapp-build
 	go test -v ./...

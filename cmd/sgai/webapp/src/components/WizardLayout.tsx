@@ -23,7 +23,7 @@ interface WizardLayoutProps {
 
 export function ProgressDots({ currentStep }: { currentStep: number }) {
   return (
-    <div className="flex items-center gap-1.5" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={TOTAL_STEPS}>
+    <progress className="flex items-center gap-1.5 appearance-none [&::-webkit-progress-bar]:hidden [&::-webkit-progress-value]:hidden" value={currentStep} max={TOTAL_STEPS} aria-label="Wizard progress">
       {Array.from({ length: TOTAL_STEPS }, (_, i) => {
         const step = i + 1;
         const isCompleted = step < currentStep;
@@ -42,7 +42,7 @@ export function ProgressDots({ currentStep }: { currentStep: number }) {
           />
         );
       })}
-    </div>
+    </progress>
   );
 }
 

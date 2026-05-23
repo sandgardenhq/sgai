@@ -68,7 +68,7 @@ export function useAdhocRun({
     { models: null, modelsLoading: !skipModelsFetch, modelsError: null },
   );
 
-  const [selectedModel, setSelectedModelState] = useState(() =>
+  const [storedSelectedModel, setSelectedModelState] = useState(() =>
     readLocalStorage(storageKey(workspaceName, "model"), ""),
   );
   const [prompt, setPromptState] = useState(() =>
@@ -187,23 +187,23 @@ export function useAdhocRun({
     };
   }, [workspaceName, skipModelsFetch]);
 
-  // -- auto-select default model --
-
-  useEffect(() => {
-    if (!models || selectedModel) return;
-    const fallbackModel = models.defaultModel ?? currentModel;
-    if (fallbackModel && models.models.some((m) => m.id === fallbackModel)) {
-      setSelectedModel(fallbackModel);
-    }
-  }, [models, selectedModel, currentModel, setSelectedModel]);
+  const fallbackModel = models?.defaultModel ?? currentModel ?? "";
+  const selectedModel = storedSelectedModel || (
+    fallbackModel && models?.models.some((m) => m.id === fallbackModel) ? fallbackModel : ""
+  );
 
   const startStatusPolling = useCallback(() => {
     pollTimerRef.current = setInterval(async () => {
+      if (!mountedRef.current) return;
       try {
         const poll = await api.workspaces.adhocStatus(workspaceName);
-        if (!mountedRef.current) return;
-        if (poll.output) updateRunState({ output: poll.output });
-        if (!poll.running) { stopPolling(); updateRunState({ isRunning: false }); }
+        if (mountedRef.current) {
+          updateRunState({
+            ...(poll.output ? { output: poll.output } : {}),
+            ...(!poll.running ? { isRunning: false } : {}),
+          });
+          if (!poll.running) stopPolling();
+        }
       } catch {
         stopPolling();
         updateRunState({ isRunning: false });
@@ -216,8 +216,11 @@ export function useAdhocRun({
     let cancelled = false;
     api.workspaces.adhocStatus(workspaceName).then((status) => {
       if (cancelled) return;
-      if (status.output) updateRunState({ output: status.output });
-      if (status.running) { updateRunState({ isRunning: true }); startStatusPolling(); }
+      updateRunState({
+        ...(status.output ? { output: status.output } : {}),
+        ...(status.running ? { isRunning: true } : {}),
+      });
+      if (status.running) startStatusPolling();
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [workspaceName, startStatusPolling]);

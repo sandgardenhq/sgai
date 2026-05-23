@@ -286,6 +286,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
+      type="button"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
       onClick={toggleSidebar}

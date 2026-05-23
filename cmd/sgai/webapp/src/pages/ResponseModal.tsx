@@ -33,10 +33,6 @@ export function ResponseModal({
   onOpenChange,
   onResponseSubmitted,
 }: ResponseModalProps) {
-  const handleQuestionMissing = useCallback(() => {
-    onOpenChange(false);
-  }, [onOpenChange]);
-
   const handleSubmitSuccess = useCallback(() => {
     onOpenChange(false);
     onResponseSubmitted?.();
@@ -58,7 +54,6 @@ export function ResponseModal({
     workspaceName,
     storagePrefix: STORAGE_PREFIX,
     active: open,
-    onQuestionMissing: handleQuestionMissing,
     onSubmitSuccess: handleSubmitSuccess,
   });
 
@@ -66,8 +61,10 @@ export function ResponseModal({
     onOpenChange(false);
   }, [onOpenChange]);
 
+  const questionMissing = open && !loading && !error && workspaceDetail !== null && question === null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && !questionMissing} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Response Required</DialogTitle>
