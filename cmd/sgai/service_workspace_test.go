@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -916,4 +918,51 @@ func TestDeleteWorkspaceServiceSuccess(t *testing.T) {
 
 	_, errStat := os.Stat(workspacePath)
 	assert.True(t, os.IsNotExist(errStat))
+}
+
+func TestResetWorkspaceServiceRemovesOnlyStateFiles(t *testing.T) {
+	srv, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "reset-service")
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("# Goal"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "state.json"), []byte(`{"status":"complete"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "PROJECT_MANAGEMENT.md"), []byte("# PM"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(wsDir, ".sgai", "retrospectives", "r1"), 0o755))
+	srv.mu.Lock()
+	srv.everStartedDirs[wsDir] = true
+	srv.mu.Unlock()
+
+	result, err := srv.resetWorkspaceService(wsDir)
+
+	require.NoError(t, err)
+	assert.True(t, result.Reset)
+	assert.Equal(t, "workspace reset", result.Message)
+	assert.NoFileExists(t, filepath.Join(wsDir, ".sgai", "state.json"))
+	assert.NoFileExists(t, filepath.Join(wsDir, ".sgai", "PROJECT_MANAGEMENT.md"))
+	assert.FileExists(t, filepath.Join(wsDir, "GOAL.md"))
+	assert.DirExists(t, filepath.Join(wsDir, ".sgai", "retrospectives", "r1"))
+	srv.mu.Lock()
+	assert.False(t, srv.everStartedDirs[wsDir])
+	srv.mu.Unlock()
+}
+
+func TestResetWorkspaceServiceRejectsRunningWorkspace(t *testing.T) {
+	srv, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "reset-running")
+	statePath := filepath.Join(wsDir, ".sgai", "state.json")
+	pmPath := filepath.Join(wsDir, ".sgai", "PROJECT_MANAGEMENT.md")
+	require.NoError(t, os.WriteFile(statePath, []byte(`{"status":"working"}`), 0o644))
+	require.NoError(t, os.WriteFile(pmPath, []byte("# PM"), 0o644))
+	srv.mu.Lock()
+	srv.sessions[wsDir] = &session{running: true}
+	srv.mu.Unlock()
+
+	_, err := srv.resetWorkspaceService(wsDir)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, errWorkspaceRunning))
+	assert.FileExists(t, statePath)
+	assert.FileExists(t, pmPath)
+
+	coord := srv.workspaceCoordinator(wsDir)
+	assert.Equal(t, state.StatusWorking, coord.State().Status)
 }

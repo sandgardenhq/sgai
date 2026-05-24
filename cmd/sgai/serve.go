@@ -422,17 +422,6 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 		coord = state.NewCoordinatorEmpty(statePath(workspacePath))
 	}
 	coord.OnUpdate(s.notifyStateChange)
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.HumanMessage = ""
-		if state.IsHumanPending(wf.Status) {
-			wf.Status = state.StatusWorking
-		}
-	}); errUpdate != nil {
-		sess.mu.Lock()
-		sess.running = false
-		sess.mu.Unlock()
-		return startSessionResult{startError: fmt.Errorf("updating state: %w", errUpdate)}
-	}
 	sess.mu.Lock()
 	sess.coord = coord
 	sess.mu.Unlock()
@@ -499,7 +488,6 @@ func (s *Server) stopSession(workspacePath string) {
 		sess.mu.Unlock()
 	}
 
-	s.resetHumanCommunication(workspacePath)
 	s.flushGoalChecksumOnStop(workspacePath)
 	s.notifyStateChange()
 }
@@ -887,31 +875,6 @@ func workspaceDagAgents(workspacePath string) []string {
 		flowDag.injectRetrospectiveEdge()
 	}
 	return flowDag.allAgents()
-}
-
-func (s *Server) resetHumanCommunication(workspacePath string) {
-	s.mu.Lock()
-	sess := s.sessions[workspacePath]
-	s.mu.Unlock()
-
-	if sess == nil {
-		return
-	}
-	sess.mu.Lock()
-	coord := sess.coord
-	sess.mu.Unlock()
-
-	if coord == nil {
-		return
-	}
-	if err := coord.UpdateState(func(wf *state.Workflow) {
-		wf.HumanMessage = ""
-		if state.IsHumanPending(wf.Status) {
-			wf.Status = state.StatusWorking
-		}
-	}); err != nil {
-		log.Println("failed to reset human communication state:", err)
-	}
 }
 
 func extractSubject(body string) string {
@@ -1323,13 +1286,6 @@ func (s *Server) workspaceCoordinator(workspacePath string) *state.Coordinator {
 	coord, errCoord := state.NewCoordinator(statePath(workspacePath))
 	if errCoord != nil {
 		return state.NewCoordinatorEmpty(statePath(workspacePath))
-	}
-	if coord.State().Status == state.StatusWorking {
-		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-			wf.Status = ""
-		}); errUpdate != nil {
-			log.Println("failed to reset workspace status:", errUpdate)
-		}
 	}
 	return coord
 }

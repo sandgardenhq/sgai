@@ -1125,16 +1125,6 @@ func TestCreateWorkspaceInfo(t *testing.T) {
 	assert.False(t, info.NeedsInput)
 }
 
-func TestResetHumanCommunicationNoSession(t *testing.T) {
-	rootDir := t.TempDir()
-	server := NewServer(rootDir)
-
-	workspacePath := filepath.Join(rootDir, "test-workspace")
-	require.NoError(t, os.MkdirAll(workspacePath, 0755))
-
-	server.resetHumanCommunication(workspacePath)
-}
-
 func TestPrepareAgentSequenceDisplay(t *testing.T) {
 	now := time.Now().UTC()
 
@@ -1509,6 +1499,20 @@ func TestWorkspaceCoordinator(t *testing.T) {
 	assert.Equal(t, state.StatusComplete, wf.Status)
 }
 
+func TestWorkspaceCoordinatorPreservesWorkingStatus(t *testing.T) {
+	srv, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "coord-working")
+	sp := filepath.Join(wsDir, ".sgai", "state.json")
+	_, errCoord := state.NewCoordinatorWith(sp, state.Workflow{
+		Status: state.StatusWorking,
+	})
+	require.NoError(t, errCoord)
+
+	coord := srv.workspaceCoordinator(wsDir)
+	wf := coord.State()
+	assert.Equal(t, state.StatusWorking, wf.Status)
+}
+
 func TestWorkspaceCoordinatorNoState(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "coord-nostate")
@@ -1570,30 +1574,24 @@ func TestInvalidateWorkspaceScanCache(t *testing.T) {
 	srv.invalidateWorkspaceScanCache()
 }
 
-func TestResetHumanCommunicationWithCoordinator(t *testing.T) {
+func TestStopSessionPreservesPendingHumanState(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "reset-human")
+	wsDir := setupTestWorkspace(t, rootDir, "stop-pending")
 	sp := filepath.Join(wsDir, ".sgai", "state.json")
 	coord, errCoord := state.NewCoordinatorWith(sp, state.Workflow{
 		Status:       state.StatusWaitingForHuman,
-		HumanMessage: "old message",
-		MultiChoiceQuestion: &state.MultiChoiceQuestion{
-			Questions: []state.QuestionItem{
-				{Question: "Q?", Choices: []string{"A", "B"}},
-			},
-		},
+		HumanMessage: "please choose",
 	})
 	require.NoError(t, errCoord)
-
 	srv.mu.Lock()
-	srv.sessions[wsDir] = &session{coord: coord}
+	srv.sessions[wsDir] = &session{coord: coord, running: true}
 	srv.mu.Unlock()
 
-	srv.resetHumanCommunication(wsDir)
+	srv.stopSession(wsDir)
 
 	wf := coord.State()
-	assert.Empty(t, wf.HumanMessage)
-	assert.Equal(t, state.StatusWorking, wf.Status)
+	assert.Equal(t, state.StatusWaitingForHuman, wf.Status)
+	assert.Equal(t, "please choose", wf.HumanMessage)
 }
 
 func TestValidateDirectoryEmpty(t *testing.T) {
@@ -1640,24 +1638,6 @@ func TestGatherSnippetsByLanguageWithSnippets(t *testing.T) {
 
 	result := gatherSnippetsByLanguage(dir)
 	assert.Len(t, result, 2)
-}
-
-func TestResetHumanCommunicationWithNoCoordinator(t *testing.T) {
-	rootDir := t.TempDir()
-	server := NewServer(rootDir)
-
-	workspacePath := filepath.Join(rootDir, "test-workspace")
-	require.NoError(t, os.MkdirAll(workspacePath, 0755))
-
-	sess := &session{
-		running: true,
-		coord:   nil,
-	}
-	server.mu.Lock()
-	server.sessions[workspacePath] = sess
-	server.mu.Unlock()
-
-	server.resetHumanCommunication(workspacePath)
 }
 
 func TestFlushGoalChecksumOnStopUpdatesChecksum(t *testing.T) {

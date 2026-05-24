@@ -17,6 +17,7 @@ var (
 	errGoalContentEmpty     = errors.New("GOAL.md must have content describing the goal")
 	errDirectoryExists      = errors.New("a directory with this name already exists")
 	errWorkspaceNameInvalid = errors.New("workspace name is invalid")
+	errWorkspaceRunning     = errors.New("workspace is running; stop it before resetting")
 )
 
 func generateRandomForkName() string {
@@ -303,6 +304,45 @@ func (s *Server) togglePinService(workspacePath string) (togglePinResult, error)
 type deleteWorkspaceResult struct {
 	Deleted bool
 	Message string
+}
+
+type resetWorkspaceResult struct {
+	Reset   bool   `json:"reset"`
+	Message string `json:"message"`
+}
+
+func (s *Server) resetWorkspaceService(workspacePath string) (resetWorkspaceResult, error) {
+	s.mu.Lock()
+	sess := s.sessions[workspacePath]
+	if sess != nil {
+		sess.mu.Lock()
+		running := sess.running
+		sess.mu.Unlock()
+		if running {
+			s.mu.Unlock()
+			return resetWorkspaceResult{}, errWorkspaceRunning
+		}
+	}
+	s.mu.Unlock()
+
+	for _, path := range []string{
+		filepath.Join(workspacePath, ".sgai", "state.json"),
+		filepath.Join(workspacePath, ".sgai", "PROJECT_MANAGEMENT.md"),
+	} {
+		if errRemove := os.Remove(path); errRemove != nil && !os.IsNotExist(errRemove) {
+			return resetWorkspaceResult{}, fmt.Errorf("failed to remove workspace state file: %w", errRemove)
+		}
+	}
+
+	s.mu.Lock()
+	delete(s.sessions, workspacePath)
+	delete(s.everStartedDirs, workspacePath)
+	s.mu.Unlock()
+
+	s.invalidateWorkspaceScanCache()
+	s.notifyStateChange()
+
+	return resetWorkspaceResult{Reset: true, Message: "workspace reset"}, nil
 }
 
 func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceResult, error) {

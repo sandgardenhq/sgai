@@ -1426,15 +1426,9 @@ func updateProjectManagementWithRetrospectiveDir(pmPath, retrospectiveDirRel str
 	return nil
 }
 
-// canResumeWorkflow determines if an existing workflow can be resumed based on
-// the current state and whether the GOAL.md checksum matches the stored checksum.
-func canResumeWorkflow(wfState state.Workflow, currentGoalChecksum string) bool {
-	if wfState.GoalChecksum != currentGoalChecksum {
-		return false
-	}
-	return wfState.Status == state.StatusWorking ||
-		wfState.Status == state.StatusAgentDone ||
-		state.IsHumanPending(wfState.Status)
+// canResumeWorkflow determines if an existing workflow state should be resumed.
+func canResumeWorkflow(wfState state.Workflow, _ string) bool {
+	return wfState.Status != "" || wfState.GoalChecksum != ""
 }
 
 // extractRetrospectiveDirFromProjectManagement parses the PROJECT_MANAGEMENT.md

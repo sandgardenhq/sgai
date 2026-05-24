@@ -1394,13 +1394,13 @@ func TestCanResumeWorkflow(t *testing.T) {
 			name:            "mismatchedChecksum",
 			wfState:         state.Workflow{GoalChecksum: "abc123", Status: state.StatusWorking},
 			currentChecksum: "different",
-			expected:        false,
+			expected:        true,
 		},
 		{
 			name:            "completeStatus",
 			wfState:         state.Workflow{GoalChecksum: "abc123", Status: state.StatusComplete},
 			currentChecksum: "abc123",
-			expected:        false,
+			expected:        true,
 		},
 	}
 

@@ -239,6 +239,8 @@ func TestResolveRetrospectiveDirNewSession(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
 	require.NoError(t, os.WriteFile(goalPath, []byte("# Test Goal"), 0o644))
+	require.NoError(t, os.WriteFile(stateJSONPath, []byte(`{"status":"working"}`), 0o644))
+	require.NoError(t, os.WriteFile(pmPath, []byte("# Existing PM"), 0o644))
 
 	retroDir := resolveRetrospectiveDir(false, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
 	assert.NotEmpty(t, retroDir)
@@ -248,9 +250,13 @@ func TestResolveRetrospectiveDirNewSession(t *testing.T) {
 	assert.FileExists(t, goalCopy)
 
 	assert.FileExists(t, pmPath)
+	pmData, errPM := os.ReadFile(pmPath)
+	require.NoError(t, errPM)
+	assert.Contains(t, string(pmData), "# Existing PM")
 
-	_, errStatState := os.Stat(stateJSONPath)
-	assert.True(t, os.IsNotExist(errStatState))
+	stateData, errState := os.ReadFile(stateJSONPath)
+	require.NoError(t, errState)
+	assert.JSONEq(t, `{"status":"working"}`, string(stateData))
 }
 
 func TestBuildWorkflowRunnerDefaultRetrospectiveDisabledCreatesNoArtifacts(t *testing.T) {

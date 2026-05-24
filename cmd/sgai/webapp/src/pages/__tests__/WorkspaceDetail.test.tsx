@@ -58,6 +58,11 @@ const mockTogglePin = mock(() => Promise.resolve({ pinned: true }));
 const mockOpenEditor = mock(() => Promise.resolve({ opened: true }));
 const mockDeleteWorkspace = mock(() => Promise.resolve({ deleted: true }));
 const mockDeleteFork = mock(() => Promise.resolve({ deleted: true }));
+const mockReset = mock(() => Promise.resolve({ reset: true, message: "Workspace reset" }));
+const mockForkTemplate = mock(() => Promise.resolve({ content: "# Test Goal" }));
+const mockFork = mock(() => Promise.resolve({ name: "test-fork", dir: "/path/to/test-fork", parent: "test-workspace" }));
+const mockAgentsList = mock(() => Promise.resolve({ agents: [] }));
+const mockModelsList = mock(() => Promise.resolve({ models: [] }));
 const mockTriggerFactoryRefresh = mock(() => {});
 const mockRespond = mock(() => Promise.resolve({ success: true }));
 const mockNavigate = mock(() => {});
@@ -85,7 +90,16 @@ mock.module("@/lib/api", () => ({
       openEditor: mockOpenEditor,
       deleteWorkspace: mockDeleteWorkspace,
       deleteFork: mockDeleteFork,
+      reset: mockReset,
+      forkTemplate: mockForkTemplate,
+      fork: mockFork,
       respond: mockRespond,
+    },
+    agents: {
+      list: mockAgentsList,
+    },
+    models: {
+      list: mockModelsList,
     },
   },
   ApiError: class ApiError extends Error {
@@ -105,6 +119,23 @@ mock.module("@/hooks/useAdhocRun", () => ({
     stopRun: mock(() => {}),
     outputRef: { current: null },
   }),
+}));
+
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: ({ value, onChange, disabled, placeholder }: {
+    value: string;
+    onChange: (value: string | undefined) => void;
+    disabled: boolean;
+    placeholder?: string;
+  }) => (
+    <textarea
+      data-testid="workspace-detail-markdown-editor"
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      value={value}
+    />
+  ),
 }));
 
 mock.module("@/hooks/use-mobile", () => ({
@@ -138,6 +169,11 @@ describe("WorkspaceDetail", () => {
     mockOpenEditor.mockClear();
     mockDeleteWorkspace.mockClear();
     mockDeleteFork.mockClear();
+    mockReset.mockClear();
+    mockForkTemplate.mockClear();
+    mockFork.mockClear();
+    mockAgentsList.mockClear();
+    mockModelsList.mockClear();
     mockTriggerFactoryRefresh.mockClear();
     mockRespond.mockClear();
     mockNavigate.mockClear();
@@ -399,6 +435,126 @@ describe("WorkspaceDetail", () => {
       await waitFor(() => {
         const deleteWorkspaceElements = screen.queryAllByText("Delete workspace");
         expect(deleteWorkspaceElements.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("reset functionality", () => {
+    it("shows Reset button for standalone, root, fork, and forked root workspaces", async () => {
+      const cases = [
+        createMockWorkspace({ name: "standalone", isRoot: false, isFork: false }),
+        createMockWorkspace({ name: "root", isRoot: true, isFork: false }),
+        createMockWorkspace({ name: "fork", isRoot: false, isFork: true }),
+        createMockWorkspace({ name: "forked-root", isRoot: true, isFork: false, forks: [{ name: "child", dir: "/child", running: false, needsInput: false, inProgress: false, pinned: false, description: "Child", commitAhead: 0, commits: [] }] }),
+      ];
+
+      for (const workspace of cases) {
+        cleanup();
+        mockWorkspaces = [workspace];
+        renderWorkspaceDetail(workspace.name, workspace.isRoot && workspace.forks?.length ? "forks" : "progress");
+
+        await waitFor(() => {
+          expect(screen.getByRole("button", { name: "Reset" })).toBeTruthy();
+        });
+      }
+    });
+
+    it("disables Reset while the workspace is running", async () => {
+      mockWorkspaces[0] = createMockWorkspace({ running: true });
+
+      renderWorkspaceDetail();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Reset" }).hasAttribute("disabled")).toBe(true);
+      });
+    });
+
+    it("enables Reset while the workspace is stopped", async () => {
+      renderWorkspaceDetail();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Reset" }).hasAttribute("disabled")).toBe(false);
+      });
+    });
+
+    it("opens reset confirmation dialog with required safety copy", async () => {
+      const user = userEvent.setup();
+
+      renderWorkspaceDetail();
+
+      await user.click(screen.getByRole("button", { name: "Reset" }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Reset workspace" })).toBeTruthy();
+        expect(screen.getByText(/clears session progress and state/i)).toBeTruthy();
+        expect(screen.getByText(/keeps workspace files/i)).toBeTruthy();
+        expect(screen.getByText(/keeps GOAL\.md/i)).toBeTruthy();
+        expect(screen.getByText(/cannot be used while the session is running/i)).toBeTruthy();
+      });
+    });
+
+    it("calls reset API and refreshes factory state after confirmation", async () => {
+      const user = userEvent.setup();
+      let resolveReset: (value: { reset: boolean; message: string }) => void = () => {};
+      const resetPromise = new Promise<{ reset: boolean; message: string }>((resolve) => {
+        resolveReset = resolve;
+      });
+      mockReset.mockImplementationOnce(() => resetPromise);
+
+      renderWorkspaceDetail();
+
+      await user.click(screen.getByRole("button", { name: "Reset" }));
+      await user.click(await screen.findByRole("button", { name: "Reset workspace" }));
+
+      await waitFor(() => {
+        expect(mockReset).toHaveBeenCalledWith("test-workspace");
+      });
+      expect(mockTriggerFactoryRefresh).not.toHaveBeenCalled();
+
+      resolveReset({ reset: true, message: "workspace reset" });
+
+      await waitFor(() => {
+        expect(mockTriggerFactoryRefresh).toHaveBeenCalled();
+      });
+    });
+
+    it("disables reset confirmation while reset is pending", async () => {
+      const user = userEvent.setup();
+      let resolveReset: (value: { reset: boolean; message: string }) => void = () => {};
+      const resetPromise = new Promise<{ reset: boolean; message: string }>((resolve) => {
+        resolveReset = resolve;
+      });
+      mockReset.mockImplementationOnce(() => resetPromise);
+
+      renderWorkspaceDetail();
+
+      await user.click(screen.getByRole("button", { name: "Reset" }));
+      const confirmButton = await screen.findByRole("button", { name: "Reset workspace" });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(confirmButton.hasAttribute("disabled")).toBe(true);
+      });
+
+      resolveReset({ reset: true, message: "workspace reset" });
+
+      await waitFor(() => {
+        expect(screen.queryByRole("heading", { name: "Reset workspace" })).toBeNull();
+      });
+    });
+
+    it("shows reset errors in the action error area", async () => {
+      const user = userEvent.setup();
+      mockReset.mockImplementationOnce(() => Promise.reject(new Error("Reset failed")));
+
+      renderWorkspaceDetail();
+
+      await user.click(screen.getByRole("button", { name: "Reset" }));
+      await user.click(await screen.findByRole("button", { name: "Reset workspace" }));
+
+      await waitFor(() => {
+        const errorAlert = screen.getByRole("alert");
+        expect(errorAlert.textContent).toContain("Reset failed");
       });
     });
   });

@@ -374,6 +374,11 @@ export interface ApiDeleteWorkspaceResponse {
   message: string;
 }
 
+export interface ApiResetWorkspaceResponse {
+  reset: boolean;
+  message: string;
+}
+
 export interface ApiUpdateGoalResponse {
   updated: boolean;
   workspace: string;
