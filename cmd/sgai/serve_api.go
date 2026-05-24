@@ -2068,8 +2068,8 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
 	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
-	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout, startTime: time.Now()}
-	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr, startTime: time.Now()}
+	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
+	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
 	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
