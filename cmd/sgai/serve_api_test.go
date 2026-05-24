@@ -5244,6 +5244,45 @@ func TestHandleAPISteerValidMessageNew(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestHandleAPIResetWorkspaceSuccess(t *testing.T) {
+	server, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "reset-api")
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("# Goal"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "state.json"), []byte(`{"status":"complete"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "PROJECT_MANAGEMENT.md"), []byte("# PM"), 0o644))
+
+	w := serveHTTP(server, "POST", "/api/v1/workspaces/reset-api/reset", "")
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, `{"reset":true,"message":"workspace reset"}`, w.Body.String())
+	assert.NoFileExists(t, filepath.Join(wsDir, ".sgai", "state.json"))
+	assert.FileExists(t, filepath.Join(wsDir, "GOAL.md"))
+}
+
+func TestHandleAPIResetWorkspaceRejectsRunning(t *testing.T) {
+	server, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "reset-api-running")
+	statePath := filepath.Join(wsDir, ".sgai", "state.json")
+	require.NoError(t, os.WriteFile(statePath, []byte(`{"status":"working"}`), 0o644))
+	server.mu.Lock()
+	server.sessions[wsDir] = &session{running: true}
+	server.mu.Unlock()
+
+	w := serveHTTP(server, "POST", "/api/v1/workspaces/reset-api-running/reset", "")
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Contains(t, w.Body.String(), "workspace is running; stop it before resetting")
+	assert.FileExists(t, statePath)
+}
+
+func TestHandleAPIResetWorkspaceNotFound(t *testing.T) {
+	server, _ := setupTestServer(t)
+
+	w := serveHTTP(server, "POST", "/api/v1/workspaces/missing-reset/reset", "")
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
 func TestHandleAPIAdhocPostNoPrompt(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	setupTestWorkspace(t, rootDir, "adhoc-noprompt")

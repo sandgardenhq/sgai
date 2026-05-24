@@ -320,7 +320,8 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
 
-	resuming := canResumeWorkflow(wfState, newChecksum)
+	_, errStateStat := os.Stat(stateJSONPath)
+	resuming := errStateStat == nil && canResumeWorkflow(wfState, newChecksum)
 
 	retroDir := ""
 	if retrospectiveOn {
@@ -443,7 +444,7 @@ func computeLongestNameLen(agents []string) int {
 	return longest
 }
 
-func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath string) string {
+func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath string, _ string, goalPath string) string {
 	if resuming {
 		retroDirRel := extractRetrospectiveDirFromProjectManagement(pmPath)
 		if retroDirRel == "" {
@@ -464,13 +465,6 @@ func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath, 
 	retroDirRel, errRel := filepath.Rel(dir, retroDir)
 	if errRel != nil {
 		log.Fatalln("failed to compute relative retrospective directory path:", errRel)
-	}
-
-	if errRemove := os.Remove(stateJSONPath); errRemove != nil && !os.IsNotExist(errRemove) {
-		log.Fatalln("failed to truncate state.json on startup:", errRemove)
-	}
-	if errRemove := os.Remove(pmPath); errRemove != nil && !os.IsNotExist(errRemove) {
-		log.Fatalln("failed to truncate PROJECT_MANAGEMENT.md on startup:", errRemove)
 	}
 
 	if errUpdate := updateProjectManagementWithRetrospectiveDir(pmPath, retroDirRel); errUpdate != nil {

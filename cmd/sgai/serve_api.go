@@ -83,6 +83,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/respond", s.handleAPIRespond)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/start", s.handleAPIStartSession)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/stop", s.handleAPIStopSession)
+	mux.HandleFunc("POST /api/v1/workspaces/{name}/reset", s.handleAPIResetWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/fork", s.handleAPIForkWorkspace)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete-fork", s.handleAPIDeleteFork)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/delete", s.handleAPIDeleteWorkspace)
@@ -1390,6 +1391,25 @@ func (s *Server) handleAPIStopSession(w http.ResponseWriter, r *http.Request) {
 		Running: false,
 		Message: message,
 	})
+}
+
+func (s *Server) handleAPIResetWorkspace(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	result, errReset := s.resetWorkspaceService(workspacePath)
+	if errReset != nil {
+		if errors.Is(errReset, errWorkspaceRunning) {
+			http.Error(w, errReset.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, errReset.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, result)
 }
 
 type apiComposeStateResponse struct {

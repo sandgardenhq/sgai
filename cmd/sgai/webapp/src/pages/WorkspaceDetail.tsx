@@ -134,6 +134,7 @@ export function WorkspaceDetail(): JSX.Element | null {
   const [isPinPending, startPinTransition] = useTransition();
   const [isEditorPending, startEditorTransition] = useTransition();
   const [isDeletePending, startDeleteTransition] = useTransition();
+  const [isResetPending, startResetTransition] = useTransition();
   const [execTimeSeconds, setExecTimeSeconds] = useReducer(
     (state: number | null, update: number | null | ((value: number | null) => number | null)) => (
       typeof update === "function" ? update(state) : update
@@ -332,6 +333,19 @@ export function WorkspaceDetail(): JSX.Element | null {
     });
   };
 
+  const handleReset = () => {
+    if (!workspaceName) return;
+    setActionError(null);
+    startResetTransition(async () => {
+      try {
+        await api.workspaces.reset(workspaceName);
+        triggerFactoryRefresh();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Failed to reset workspace");
+      }
+    });
+  };
+
   return (
     <div className="sticky-header-wrapper">
       <WorkspaceDetailHeader
@@ -357,6 +371,7 @@ export function WorkspaceDetail(): JSX.Element | null {
         isPinPending={isPinPending}
         isStartStopPending={isStartStopPending}
         isDeletePending={isDeletePending}
+        isResetPending={isResetPending}
         navigate={navigate}
         handleStart={handleStart}
         handleStop={handleStop}
@@ -364,6 +379,7 @@ export function WorkspaceDetail(): JSX.Element | null {
         handlePinToggle={handlePinToggle}
         handleOpenEditor={handleOpenEditor}
         handleDelete={handleDelete}
+        handleReset={handleReset}
       />
 
       <div className="pt-4">
@@ -413,6 +429,7 @@ interface WorkspaceDetailActionsConfig {
   isPinPending: boolean;
   isStartStopPending: boolean;
   isDeletePending: boolean;
+  isResetPending: boolean;
   navigate: (to: string) => void;
   handleStart: () => void;
   handleStop: () => void;
@@ -420,6 +437,7 @@ interface WorkspaceDetailActionsConfig {
   handlePinToggle: () => void;
   handleOpenEditor: () => void;
   handleDelete: () => void;
+  handleReset: () => void;
 }
 
 interface WorkspaceDetailActionsProps {
@@ -445,6 +463,7 @@ function WorkspaceDetailActions({
   isPinPending,
   isStartStopPending,
   isDeletePending,
+  isResetPending,
   navigate,
   handleStart,
   handleStop,
@@ -452,6 +471,7 @@ function WorkspaceDetailActions({
   handlePinToggle,
   handleOpenEditor,
   handleDelete,
+  handleReset,
   } = actions;
   if (isForkedRoot) {
     return (
@@ -477,6 +497,12 @@ function WorkspaceDetailActions({
         >
           {detail.pinned ? "Unpin" : "Pin"}
         </Button>
+        <ResetWorkspaceDialog
+          workspaceName={detail.name}
+          disabled={effectiveRunning || isResetPending}
+          isPending={isResetPending}
+          onReset={handleReset}
+        />
       </>
     );
   }
@@ -617,6 +643,12 @@ function WorkspaceDetailActions({
       >
         {detail.pinned ? "Unpin" : "Pin"}
       </Button>
+      <ResetWorkspaceDialog
+        workspaceName={detail.name}
+        disabled={effectiveRunning || isResetPending}
+        isPending={isResetPending}
+        onReset={handleReset}
+      />
       {showDeleteAction && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -653,6 +685,51 @@ function WorkspaceDetailActions({
         </AlertDialog>
       )}
     </>
+  );
+}
+
+function ResetWorkspaceDialog({
+  workspaceName,
+  disabled,
+  isPending,
+  onReset,
+}: {
+  workspaceName: string;
+  disabled: boolean;
+  isPending: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+        >
+          Reset
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Reset workspace</AlertDialogTitle>
+          <AlertDialogDescription>
+            Reset clears session progress and state for &lsquo;{workspaceName}&rsquo;. It keeps workspace files and keeps GOAL.md. Reset cannot be used while the session is running.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onReset}
+            disabled={isPending}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            Reset workspace
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

@@ -187,6 +187,29 @@ describe("API URL construction patterns", () => {
     expect(`/api/v1/workspaces/${encodeURIComponent("ws-1")}/delete`).toBe("/api/v1/workspaces/ws-1/delete");
   });
 
+  it("calls reset endpoint with POST", async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ reset: true, message: "Workspace reset" }),
+        text: () => Promise.resolve(""),
+      } as Response)
+    );
+
+    const response = await fetch("/api/v1/workspaces/my%20workspace%2Fspecial/reset", {
+      method: "POST",
+      headers: {},
+    });
+    const result = await response.json();
+
+    expect(result).toEqual({ reset: true, message: "Workspace reset" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/v1/workspaces/my%20workspace%2Fspecial/reset", {
+      method: "POST",
+      headers: {},
+    });
+  });
+
   it("constructs correct delete-fork URL", () => {
     expect(`/api/v1/workspaces/${encodeURIComponent("ws-1")}/delete-fork`).toBe("/api/v1/workspaces/ws-1/delete-fork");
   });
