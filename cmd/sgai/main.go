@@ -323,8 +323,8 @@ func buildAgentEnv(cfg agentRunConfig, wfState state.Workflow, modelSpec string)
 func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {
 	stderrOut := buildAgentOutputWriter(os.Stderr, cfg.logWriter, cfg.stderrLog)
 	stdoutOut := buildAgentOutputWriter(os.Stdout, cfg.logWriter, cfg.stdoutLog)
-	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut, startTime: time.Now()}
-	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, startTime: time.Now()}
+	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut}
+	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent}
 
 	cfg.coord.ResetAgentDoneWatchdog()
 	agentCtx, agentCancel := context.WithCancel(ctx)
@@ -1005,26 +1005,20 @@ func terminateProcessGroupOnCancel(ctx context.Context, cmd *exec.Cmd, processEx
 	}
 }
 
-func formatElapsed(start time.Time) string {
-	elapsed := time.Since(start)
-	hours := int(elapsed.Hours())
-	mins := int(elapsed.Minutes()) % 60
-	secs := int(elapsed.Seconds()) % 60
-	millis := elapsed.Milliseconds() % 1000
-	return fmt.Sprintf("[%02d:%02d:%02d.%03d]", hours, mins, secs, millis)
+func formatLogTimestamp(t time.Time) string {
+	return "[" + t.UTC().Format(time.RFC3339) + "]"
 }
 
 type prefixWriter struct {
-	prefix    string
-	w         io.Writer
-	startTime time.Time
+	prefix string
+	w      io.Writer
 }
 
 func (p *prefixWriter) Write(data []byte) (int, error) {
 	lines := linesWithTrailingEmpty(string(data))
 	for i, line := range lines {
 		if i < len(lines)-1 || line != "" {
-			timestamp := formatElapsed(p.startTime)
+			timestamp := formatLogTimestamp(time.Now())
 			if _, err := p.w.Write([]byte(timestamp + p.prefix + line + "\n")); err != nil {
 				return 0, err
 			}
@@ -1080,11 +1074,10 @@ type jsonPrettyWriter struct {
 	coord        *state.Coordinator
 	currentAgent string
 	stepCounter  int
-	startTime    time.Time
 }
 
 func (j *jsonPrettyWriter) tsPrefix() string {
-	return formatElapsed(j.startTime) + j.prefix
+	return formatLogTimestamp(time.Now()) + j.prefix
 }
 
 func (j *jsonPrettyWriter) Write(data []byte) (int, error) {

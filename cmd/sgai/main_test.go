@@ -528,9 +528,9 @@ func TestBlockCompletionOnRetrospectiveDefaultDisabled(t *testing.T) {
 	assert.Nil(t, blocked)
 }
 
-func TestFormatElapsedOutput(t *testing.T) {
-	got := formatElapsed(time.Now().Add(-5 * time.Minute))
-	assert.Contains(t, got, "05:0")
+func TestFormatLogTimestampOutput(t *testing.T) {
+	got := formatLogTimestamp(time.Date(2026, 5, 23, 0, 5, 25, 0, time.UTC))
+	assert.Equal(t, "[2026-05-23T00:05:25Z]", got)
 }
 
 func TestIsExistingDirectoryVariants(t *testing.T) {
@@ -2119,48 +2119,32 @@ func TestResolveBaseAgent(t *testing.T) {
 	}
 }
 
-func TestFormatElapsed(t *testing.T) {
+func TestFormatLogTimestamp(t *testing.T) {
 	tests := []struct {
 		name     string
-		duration time.Duration
+		input    time.Time
 		expected string
 	}{
 		{
-			name:     "zeroDuration",
-			duration: 0,
-			expected: "[00:00:00.000]",
+			name:     "utcTimestamp",
+			input:    time.Date(2026, 5, 23, 0, 5, 25, 0, time.UTC),
+			expected: "[2026-05-23T00:05:25Z]",
 		},
 		{
-			name:     "oneSecond",
-			duration: time.Second,
-			expected: "[00:00:01.000]",
+			name:     "nonUTCTimestamp",
+			input:    time.Date(2026, 5, 22, 21, 5, 25, 0, time.FixedZone("UTC-3", -3*60*60)),
+			expected: "[2026-05-23T00:05:25Z]",
 		},
 		{
-			name:     "oneMinute",
-			duration: time.Minute,
-			expected: "[00:01:00.000]",
-		},
-		{
-			name:     "oneHour",
-			duration: time.Hour,
-			expected: "[01:00:00.000]",
-		},
-		{
-			name:     "mixedDuration",
-			duration: time.Hour + 2*time.Minute + 3*time.Second + 4*time.Millisecond,
-			expected: "[01:02:03.004]",
-		},
-		{
-			name:     "millisecondsOnly",
-			duration: 123 * time.Millisecond,
-			expected: "[00:00:00.123]",
+			name:     "dropsSubsecondPrecision",
+			input:    time.Date(2026, 5, 23, 0, 5, 25, int(325*time.Millisecond), time.UTC),
+			expected: "[2026-05-23T00:05:25Z]",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			start := time.Now().Add(-tt.duration)
-			result := formatElapsed(start)
+			result := formatLogTimestamp(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -2359,9 +2343,8 @@ func TestDotSGAILinePresent(t *testing.T) {
 func TestJSONPrettyWriterWrite(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " [test] ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " [test] ",
+		w:      &buf,
 	}
 
 	event := streamEvent{Type: "text", Part: part{Text: "hello world"}}
@@ -2380,9 +2363,8 @@ func TestJSONPrettyWriterWrite(t *testing.T) {
 func TestJSONPrettyWriterProcessEventText(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{Type: "text", Part: part{Text: "some text"}})
@@ -2395,9 +2377,8 @@ func TestJSONPrettyWriterProcessEventText(t *testing.T) {
 func TestJSONPrettyWriterProcessEventToolPending(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{
@@ -2418,9 +2399,8 @@ func TestJSONPrettyWriterProcessEventToolPending(t *testing.T) {
 func TestJSONPrettyWriterProcessEventToolRunning(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{
@@ -2442,9 +2422,8 @@ func TestJSONPrettyWriterProcessEventToolRunning(t *testing.T) {
 func TestJSONPrettyWriterProcessEventToolCompleted(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{
@@ -2467,9 +2446,8 @@ func TestJSONPrettyWriterProcessEventToolCompleted(t *testing.T) {
 func TestJSONPrettyWriterProcessEventToolCompletedTodo(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	todos := `[{"content":"task1","status":"completed","priority":"high"},{"content":"task2","status":"pending","priority":"medium"}]`
@@ -2505,7 +2483,6 @@ func TestJSONPrettyWriterPersistsNativeTodoOutput(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "go",
 	}
@@ -2588,7 +2565,6 @@ func newTodoStateJSONPrettyWriter(t *testing.T, currentAgent string) (*jsonPrett
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: currentAgent,
 	}
@@ -2598,9 +2574,8 @@ func newTodoStateJSONPrettyWriter(t *testing.T, currentAgent string) (*jsonPrett
 func TestJSONPrettyWriterProcessEventToolError(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{
@@ -2623,9 +2598,8 @@ func TestJSONPrettyWriterProcessEventToolError(t *testing.T) {
 func TestJSONPrettyWriterProcessEventStepStart(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.currentText.WriteString("buffered text")
@@ -2638,9 +2612,8 @@ func TestJSONPrettyWriterProcessEventStepStart(t *testing.T) {
 func TestJSONPrettyWriterProcessEventReasoning(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{Type: "reasoning", Part: part{Text: "thinking about it"}})
@@ -2650,9 +2623,8 @@ func TestJSONPrettyWriterProcessEventReasoning(t *testing.T) {
 func TestJSONPrettyWriterProcessEventUnknownType(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{Type: "custom_event"})
@@ -2662,9 +2634,8 @@ func TestJSONPrettyWriterProcessEventUnknownType(t *testing.T) {
 func TestJSONPrettyWriterSessionIDCapture(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{Type: "text", SessionID: "sess-123", Part: part{Text: "hi"}})
@@ -2674,9 +2645,8 @@ func TestJSONPrettyWriterSessionIDCapture(t *testing.T) {
 func TestJSONPrettyWriterFlushEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.Flush()
@@ -2686,9 +2656,8 @@ func TestJSONPrettyWriterFlushEmpty(t *testing.T) {
 func TestJSONPrettyWriterProcessBufferMultipleEvents(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	event1, _ := json.Marshal(streamEvent{Type: "text", Part: part{Text: "hello"}})
@@ -2704,9 +2673,8 @@ func TestJSONPrettyWriterProcessBufferMultipleEvents(t *testing.T) {
 func TestJSONPrettyWriterProcessBufferPartialLine(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	event, _ := json.Marshal(streamEvent{Type: "text", Part: part{Text: "partial"}})
@@ -2729,7 +2697,6 @@ func TestJSONPrettyWriterRecordStepCost(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
@@ -2760,7 +2727,6 @@ func TestJSONPrettyWriterRecordStepCostMultipleSteps(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
@@ -2780,7 +2746,6 @@ func TestJSONPrettyWriterRecordStepCostNilCoord(_ *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        nil,
 		currentAgent: "test-agent",
 	}
@@ -2797,7 +2762,6 @@ func TestJSONPrettyWriterRecordStepCostEmptyAgent(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "",
 	}
@@ -2816,7 +2780,6 @@ func TestJSONPrettyWriterRecordStepCostZeroValues(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "agent",
 	}
@@ -2829,9 +2792,8 @@ func TestJSONPrettyWriterRecordStepCostZeroValues(t *testing.T) {
 func TestJSONPrettyWriterFormatTodoOutput(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	todos := `[{"content":"write tests","status":"in_progress","priority":"high"},{"content":"fix bug","status":"completed","priority":"medium"},{"content":"deploy","status":"cancelled","priority":"low"}]`
@@ -2850,9 +2812,8 @@ func TestJSONPrettyWriterFormatTodoOutput(t *testing.T) {
 func TestJSONPrettyWriterFormatTodoOutputInvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	_, errFormat := w.formatTodoOutput("not json at all")
@@ -2866,9 +2827,8 @@ func TestJSONPrettyWriterFormatTodoOutputInvalidJSON(t *testing.T) {
 func TestJSONPrettyWriterFormatTodoOutputWithPrefix(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	todos := "Updated todos\n" + `[{"content":"task","status":"pending","priority":"high"}]`
@@ -2889,7 +2849,6 @@ func TestJSONPrettyWriterProcessEventStepFinish(t *testing.T) {
 	w := &jsonPrettyWriter{
 		prefix:       " ",
 		w:            &buf,
-		startTime:    time.Now(),
 		coord:        coord,
 		currentAgent: "test-agent",
 		stepCounter:  1,
@@ -2913,9 +2872,8 @@ func TestJSONPrettyWriterProcessEventStepFinish(t *testing.T) {
 func TestJSONPrettyWriterToolNilState(t *testing.T) {
 	var buf bytes.Buffer
 	w := &jsonPrettyWriter{
-		prefix:    " ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " ",
+		w:      &buf,
 	}
 
 	w.processEvent(streamEvent{
@@ -2932,9 +2890,8 @@ func TestJSONPrettyWriterToolNilState(t *testing.T) {
 func TestPrefixWriter(t *testing.T) {
 	var buf bytes.Buffer
 	w := &prefixWriter{
-		prefix:    " [test] ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " [test] ",
+		w:      &buf,
 	}
 
 	n, err := w.Write([]byte("hello\nworld\n"))
@@ -2954,9 +2911,8 @@ func TestPrefixWriter(t *testing.T) {
 func TestPrefixWriterSingleLine(t *testing.T) {
 	var buf bytes.Buffer
 	w := &prefixWriter{
-		prefix:    " [p] ",
-		w:         &buf,
-		startTime: time.Now(),
+		prefix: " [p] ",
+		w:      &buf,
 	}
 
 	_, _ = w.Write([]byte("single line\n"))
