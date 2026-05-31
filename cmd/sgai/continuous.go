@@ -31,12 +31,13 @@ const (
 	continuousModePollInterval = 2 * time.Second
 )
 
-func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
+func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator, runtime sessionRuntime) {
 	runner := &workflowRunner{
 		dir:       dir,
 		mcpURL:    mcpURL,
 		logWriter: logWriter,
 		coord:     sessionCoord,
+		runtime:   runtime,
 	}
 	runner.runContinuous(ctx, continuousPrompt)
 }

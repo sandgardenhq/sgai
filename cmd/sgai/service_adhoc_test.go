@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAdhocStatusService(t *testing.T) {
@@ -59,6 +61,18 @@ func TestAdhocStartServiceAlreadyRunningReturnsExisting(t *testing.T) {
 	assert.Nil(t, result.Error)
 	assert.True(t, result.Running)
 	assert.Contains(t, result.Output, "test output")
+}
+
+func TestAdhocStartServiceWrapsStartError(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	server, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "test-ws-adhoc-start-error")
+
+	result := server.adhocStartService(wsDir, "prompt", "model")
+
+	require.Error(t, result.Error)
+	assert.Contains(t, result.Error.Error(), "failed to start command")
+	assert.True(t, errors.Unwrap(result.Error) != nil)
 }
 
 func TestGetAdhocStateCreation(t *testing.T) {

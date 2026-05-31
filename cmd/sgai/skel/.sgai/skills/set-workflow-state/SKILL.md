@@ -99,26 +99,26 @@ Use `ask_user_question` to present structured multi-choice questions to the huma
 
 ---
 
-## Workflow Navigation
+## Coordinator Handoffs
 
-In flow mode, navigation between agents is driven by `sgai_update_workflow_state({status: "agent-done", navigate: {to, reason}})` and durable handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
+Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus optional `sgai_update_workflow_state({status: "agent-done", navigate: {to, reason}})` requests when the current runtime has made another agent available.
 
-### How Navigation Works
+### How Handoffs Work
 
 1. **Record the handoff**: Append the work request, blocker, or decision to `.sgai/PROJECT_MANAGEMENT.md`.
 
-2. **Request navigation**: Set `status: "agent-done"` with `navigate: {to: "agent-name", reason: "..."}` to route work to another DAG agent.
+2. **Request a specific next agent only when appropriate**: Set `status: "agent-done"` with `navigate: {to: "agent-name", reason: "..."}` only for an agent that the coordinator or current handoff explicitly made available.
 
 3. **Default to coordinator**: When no messages are pending, control returns to the coordinator.
 
-4. **Terminal Nodes**: If your agent has no successors (terminal node), control returns to the coordinator.
+4. **Default handoff target**: If no explicit next agent is requested, control returns to the coordinator to inspect the ledger and decide the next delegation.
 
 ### Key Points
 
 - `.sgai/PROJECT_MANAGEMENT.md` is the durable coordination ledger
 - Only coordinator can set `status: "complete"` to end the entire workflow
-- The DAG (flow definition) represents intention and provides predecessor/successor information for context
-- Agents navigate to other agents, never themselves
+- The current handoff and available-agent list provide context for any explicit navigation request
+- Agents never navigate to themselves
 - The coordinator must never navigate to `coordinator`; it should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
 
 ---

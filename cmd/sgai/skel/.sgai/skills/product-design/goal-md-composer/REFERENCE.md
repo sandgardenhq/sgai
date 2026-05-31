@@ -2,51 +2,45 @@
 
 Complete reference documentation for composing `GOAL.md` files for SGAI.
 
-## Models
+## Model and Agents Configuration
 
-Recommended GPT-5.5 split:
+GOAL.md uses a single `model` and an `agents` list of delegate agents. The coordinator is implicit and runs at the top level with the configured model; the OpenCode runtime handles subagent delegation.
+
+Recommended GPT-5.5 setup:
 
 ```yaml
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "react": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
+agents:
+  - "go"
+  - "react"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 ```
 
 Notes:
 
-- Agents without explicit model assignments use defaults.
+- `agents` lists the non-coordinator agents available for OpenCode subagent delegation.
+- `model` is a single model string used by the coordinator; the OpenCode runtime manages model propagation to subagents.
 - Variant syntax such as `(xhigh)` and `(low)` is passed through to the inference engine.
-- The `coordinator` should typically use `openai/gpt-5.5 (xhigh)` because orchestration and safety-gate reasoning dominate workflow quality.
-- Non-coordinator implementation, reviewer, utility, specialist, and general-purpose agents should default to `openai/gpt-5.5 (low)` for GPT-5.5 cost/performance efficiency.
-- Users can still override any agent model in `GOAL.md`.
-- Aliases remain the recommended way to run the same role at multiple cost tiers.
-- Do not assign a model to `stpa-analyst`.
+- The coordinator runs with the configured model — use `openai/gpt-5.5 (xhigh)` for orchestration quality.
+- Do not add `stpa-analyst` to the agents list.
 
 ## Model Selection Guidelines
 
-| Agent Type | Recommended Model | Reason |
-|------------|-------------------|--------|
-| Coordinator | `openai/gpt-5.5 (xhigh)` | Orchestration and safety-gate reasoning |
-| Go Developer | `openai/gpt-5.5 (low)` | Cost-conscious GPT-5.5 implementation baseline |
-| Go Reviewer | `openai/gpt-5.5 (low)` | Routine review baseline; override only for exceptional workflows |
-| Frontend Developer | `openai/gpt-5.5 (low)` | Cost-conscious GPT-5.5 UI implementation baseline |
-| Frontend Reviewer | `openai/gpt-5.5 (low)` | Routine review baseline; override only for exceptional workflows |
-| General Purpose | `openai/gpt-5.5 (low)` | Cross-domain default baseline for routine work |
-| Utility Agents | `openai/gpt-5.5 (low)` | Simple targeted work |
+A single `model` is used for all agents. The coordinator runs with this model; the OpenCode runtime propagates it to subagents as appropriate.
+
+| Recommended Model | Reason |
+|-------------------|--------|
+| `openai/gpt-5.5 (xhigh)` | Orchestration, safety-gate reasoning, and implementation quality |
 
 ## Complete Examples
 
-### Simple Go Workflow
+### Simple Go Project
 
 ```markdown
 ---
-flow: |
-  "go"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
+agents:
+  - "go"
+model: "openai/gpt-5.5 (xhigh)"
 interactive: yes
 completionGateScript: go test ./...
 ---
@@ -62,20 +56,16 @@ Create a command-line tool that validates JSON files against a schema.
 - [ ] Write tests
 ```
 
-### Full-Stack Workflow with Safety Analysis
+### Full-Stack Project with Safety Analysis
 
 ```markdown
 ---
+agents:
+  - "go"
+  - "react"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 completionGateScript: make test
-flow: |
-  "go"
-  "react"
-  "general-purpose"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "react": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
 interactive: yes
 ---
 
@@ -99,11 +89,9 @@ Build a web-based task management application for small teams.
 
 ```markdown
 ---
-flow: |
-  "general-purpose"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "general-purpose": "openai/gpt-5.5 (low)"
+agents:
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 interactive: yes
 ---
 

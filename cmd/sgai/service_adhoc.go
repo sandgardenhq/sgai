@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 )
 
 type adhocStatusResult struct {
@@ -27,15 +26,16 @@ func (s *Server) adhocStatusService(workspacePath string) adhocStatusResult {
 }
 
 type adhocStartResult struct {
-	Running bool
-	Output  string
-	Message string
-	Error   error
+	Running    bool
+	Output     string
+	Message    string
+	BadRequest bool
+	Error      error
 }
 
 func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocStartResult {
 	if strings.TrimSpace(prompt) == "" || strings.TrimSpace(model) == "" {
-		return adhocStartResult{Error: fmt.Errorf("prompt and model are required")}
+		return adhocStartResult{BadRequest: true, Error: fmt.Errorf("prompt and model are required")}
 	}
 
 	st := s.getAdhocState(workspacePath)
@@ -55,7 +55,7 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	args := buildAdhocArgs(st.selectedModel)
 	cmd := exec.Command("opencode", args...)
 	cmd.Dir = workspacePath
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = commandProcessGroupAttr()
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
@@ -67,21 +67,32 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
-	_, _ = fmt.Fprintln(stderrPW, commandLine)
-	_, _ = fmt.Fprintln(stderrPW, promptLine)
+	if _, errWriteCommand := fmt.Fprintln(stderrPW, commandLine); errWriteCommand != nil {
+		st.running = false
+		st.mu.Unlock()
+		return adhocStartResult{Error: fmt.Errorf("writing command line: %w", errWriteCommand)}
+	}
+	if _, errWritePrompt := fmt.Fprintln(stderrPW, promptLine); errWritePrompt != nil {
+		st.running = false
+		st.mu.Unlock()
+		return adhocStartResult{Error: fmt.Errorf("writing prompt line: %w", errWritePrompt)}
+	}
 	st.output.WriteString(commandLine + "\n")
 	st.output.WriteString(promptLine + "\n")
 
 	if errStart := cmd.Start(); errStart != nil {
 		st.running = false
 		st.mu.Unlock()
-		return adhocStartResult{Error: fmt.Errorf("failed to start command")}
+		return adhocStartResult{Error: fmt.Errorf("failed to start command: %w", errStart)}
 	}
 
+	done := make(chan struct{})
 	st.cmd = cmd
+	st.done = done
 	st.mu.Unlock()
 
 	go func() {
+		defer close(done)
 		errWait := cmd.Wait()
 		st.mu.Lock()
 		if errWait != nil {
@@ -91,6 +102,7 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 		selectedModel := st.selectedModel
 		st.running = false
 		st.cmd = nil
+		st.done = nil
 		st.mu.Unlock()
 		if errWait == nil {
 			s.reconcileAdhocUsage(workspacePath, rawOutput, selectedModel)

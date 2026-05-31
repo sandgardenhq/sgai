@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"syscall"
-	"time"
 )
 
 var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b[^[\]].?`)
@@ -19,6 +17,7 @@ type adhocPromptState struct {
 	output        bytes.Buffer
 	rawOutput     bytes.Buffer
 	cmd           *exec.Cmd
+	done          chan struct{}
 	selectedModel string
 	promptText    string
 }
@@ -102,29 +101,17 @@ func (st *adhocPromptState) stop() {
 		return
 	}
 	cmd := st.cmd
+	done := st.done
 	st.mu.Unlock()
 
 	if cmd != nil && cmd.Process != nil {
-		pgid := -cmd.Process.Pid
-		_ = syscall.Kill(pgid, syscall.SIGTERM)
-
-		done := make(chan struct{})
-		go func() {
-			_ = cmd.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-		case <-time.After(gracefulShutdownTimeout):
-			_ = syscall.Kill(pgid, syscall.SIGKILL)
-			<-done
-		}
+		stopProcessGroup(cmd, done)
 	}
 
 	st.mu.Lock()
 	st.running = false
 	st.cmd = nil
+	st.done = nil
 	st.output.WriteString("\n[stopped by user]\n")
 	st.mu.Unlock()
 }

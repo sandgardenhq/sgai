@@ -167,10 +167,10 @@ func newTestMCPContext(t *testing.T) (*mcpContext, string) {
 	require.NoError(t, errCoord)
 
 	ctx := &mcpContext{
-		workingDir: dir,
-		coord:      coord,
-		dagAgents:  []string{"coordinator", "test-agent", "reviewer"},
-		agentName:  "test-agent",
+		workingDir:      dir,
+		coord:           coord,
+		availableAgents: []string{"coordinator", "test-agent", "reviewer"},
+		agentName:       "test-agent",
 	}
 	return ctx, dir
 }
@@ -730,7 +730,7 @@ func TestUpdateWorkflowStateNavigate(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Contains(t, result, "not in the workflow")
+		assert.Contains(t, result, "not in the available agents")
 		assert.Nil(t, coord.State().Navigate)
 	})
 
@@ -1096,7 +1096,7 @@ func TestRegisterCommonToolsInternal(t *testing.T) {
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
 	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, dagAgents: []string{"builder"}, agentName: "builder"}
+	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"builder"}, agentName: "builder"}
 	registerCommonTools(server, mcpCtx, "builder")
 	assert.NotNil(t, server)
 }
@@ -1106,7 +1106,7 @@ func TestRegisterCoordinatorToolsInternal(t *testing.T) {
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
 	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, dagAgents: []string{"coordinator"}, agentName: "coordinator"}
+	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"coordinator"}, agentName: "coordinator"}
 	registerCoordinatorTools(server, mcpCtx, t.TempDir())
 	assert.NotNil(t, server)
 }
@@ -1116,7 +1116,7 @@ func TestRegisterCoordinatorToolsBrainstormingMode(t *testing.T) {
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeBrainstorming})
 	require.NoError(t, errCoord)
 	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, dagAgents: []string{"coordinator"}, agentName: "coordinator"}
+	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"coordinator"}, agentName: "coordinator"}
 	registerCoordinatorTools(server, mcpCtx, t.TempDir())
 	assert.NotNil(t, server)
 }

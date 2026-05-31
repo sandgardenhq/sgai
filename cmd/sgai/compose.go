@@ -15,14 +15,13 @@ type composerState struct {
 	SafetyAnalysis bool                `json:"safetyAnalysis"`
 	Retrospective  bool                `json:"retrospective"`
 	Agents         []composerAgentConf `json:"agents"`
-	Flow           string              `json:"flow"`
+	Model          string              `json:"model"`
 	Tasks          string              `json:"tasks"`
 }
 
 type composerAgentConf struct {
 	Name     string `json:"name"`
 	Selected bool   `json:"selected"`
-	Model    string `json:"model"`
 }
 
 type composerSession struct {
@@ -59,30 +58,24 @@ func loadComposerStateFromDisk(dir string) composerState {
 	}
 
 	bodyContent := string(extractBody(content))
-	legacySafetyAnalysis := strings.Contains(metadata.Flow, "stpa-analyst")
 
 	st := composerState{
 		Description:    extractDescriptionFromBody(bodyContent),
 		CompletionGate: metadata.CompletionGateScript,
-		SafetyAnalysis: bodyHasSafetyAnalysis(bodyContent) || legacySafetyAnalysis,
+		SafetyAnalysis: bodyHasSafetyAnalysis(bodyContent),
 		Retrospective:  retrospectiveEnabled(metadata),
-		Flow:           activeComposerFlow(metadata.Flow),
+		Model:          metadata.Model,
 		Tasks:          extractTasksFromBody(bodyContent),
 	}
 
-	for agentName, modelVal := range metadata.Models {
-		if agentName == "stpa-analyst" {
-			st.SafetyAnalysis = true
-			continue
-		}
-		model := ""
-		if s, ok := modelVal.(string); ok {
-			model = s
-		}
+	if st.Model == "" {
+		st.Model = defaultCoordinatorModel
+	}
+
+	for _, agentName := range metadata.Agents {
 		st.Agents = append(st.Agents, composerAgentConf{
 			Name:     agentName,
 			Selected: true,
-			Model:    model,
 		})
 	}
 
@@ -99,9 +92,7 @@ func bodyHasSafetyAnalysis(body string) bool {
 
 func defaultComposerState() composerState {
 	return composerState{
-		Agents: []composerAgentConf{
-			{Name: "coordinator", Selected: true, Model: defaultModelForAgent("coordinator")},
-		},
+		Model: defaultCoordinatorModel,
 	}
 }
 
@@ -173,16 +164,6 @@ func buildGOALContent(st composerState) string {
 
 	buf.WriteString("---\n")
 
-	flow := activeComposerFlow(st.Flow)
-	if flow != "" {
-		buf.WriteString("flow: |\n")
-		for line := range strings.SplitSeq(flow, "\n") {
-			buf.WriteString("  ")
-			buf.WriteString(line)
-			buf.WriteString("\n")
-		}
-	}
-
 	agents := activeComposerAgents(st.Agents)
 	hasSelectedAgents := false
 	for _, a := range agents {
@@ -193,18 +174,24 @@ func buildGOALContent(st composerState) string {
 	}
 
 	if hasSelectedAgents {
-		buf.WriteString("models:\n")
+		buf.WriteString("agents:\n")
 		for _, a := range agents {
 			if !a.Selected {
 				continue
 			}
-			buf.WriteString("  \"")
+			buf.WriteString("  - \"")
 			buf.WriteString(a.Name)
-			buf.WriteString("\": \"")
-			buf.WriteString(modelForComposerAgent(a))
 			buf.WriteString("\"\n")
 		}
 	}
+
+	modelVal := st.Model
+	if modelVal == "" {
+		modelVal = defaultCoordinatorModel
+	}
+	buf.WriteString("model: \"")
+	buf.WriteString(modelVal)
+	buf.WriteString("\"\n")
 
 	if st.CompletionGate != "" {
 		buf.WriteString("completionGateScript: ")
@@ -225,7 +212,7 @@ func buildGOALContent(st composerState) string {
 
 	if st.SafetyAnalysis {
 		buf.WriteString("## Safety Analysis\n\n")
-		buf.WriteString("- STPA analysis is a skill workflow, not a routable workflow agent; do not add `stpa-analyst` to GOAL `flow` or `models`.\n")
+		buf.WriteString("- STPA analysis is a skill workflow, not a routable workflow agent; do not add `stpa-analyst` to GOAL `agents`.\n")
 		buf.WriteString("- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.\n")
 		buf.WriteString("- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.\n\n")
 	}
@@ -239,32 +226,13 @@ func buildGOALContent(st composerState) string {
 	return buf.String()
 }
 
-func activeComposerFlow(flow string) string {
-	var lines []string
-	for line := range strings.SplitSeq(flow, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.Contains(trimmed, "stpa-analyst") {
-			continue
-		}
-		lines = append(lines, line)
-	}
-	return strings.Join(lines, "\n")
-}
-
 func activeComposerAgents(agents []composerAgentConf) []composerAgentConf {
 	active := make([]composerAgentConf, 0, len(agents))
 	for _, agent := range agents {
-		if agent.Name == "stpa-analyst" {
+		if !isDelegatableAgent(agent.Name) {
 			continue
 		}
 		active = append(active, agent)
 	}
 	return active
-}
-
-func modelForComposerAgent(agent composerAgentConf) string {
-	if agent.Model != "" {
-		return agent.Model
-	}
-	return defaultModelForAgent(agent.Name)
 }

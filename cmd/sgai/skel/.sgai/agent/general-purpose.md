@@ -103,7 +103,7 @@ You approach problems systematically:
 You track progress and manage your work:
 
 - **Maintain state file** with current status
-- **Update scratchpad** with progress notes regularly
+- **Update workflow state** with task/progress notes regularly
 - **Know when to iterate** vs when to complete
 - **Request clarification** when requirements are ambiguous
 - **Estimate complexity** and set realistic expectations
@@ -114,8 +114,8 @@ You track progress and manage your work:
 Coordinate with other agents through `.sgai/PROJECT_MANAGEMENT.md` and workflow state:
 
 - Record implementation status, blockers, decisions, and handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
-- Request a specific next agent with `sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "work complete"}})`.
-- Use `navigate.to` only for agents that are present in the workflow DAG.
+- Return control by setting `sgai_update_workflow_state({status: "agent-done", task: "", addProgress: "Work complete; returning control to coordinator"})`; omit `navigate` unless the current handoff explicitly made a non-coordinator next agent available.
+- Use `navigate.to` only for an explicitly available non-coordinator delegate named in the current handoff; otherwise leave routing to the coordinator.
 - Do not use legacy routing tools; they are not available.
 
 ---
@@ -172,9 +172,9 @@ ls -la
 - Determine order of implementation (dependencies first)
 - Identify potential challenges or risks
 - Estimate number of iterations needed
-- Document your plan in the scratchpad
+- Document your plan in workflow state progress notes or `.sgai/PROJECT_MANAGEMENT.md` when durable handoff context is needed
 
-**Example plan in scratchpad:**
+**Example plan in workflow state progress notes:**
 ```
 "Plan: Implement user authentication"
 "Step 1: Create User model with password hashing"
@@ -201,7 +201,7 @@ ls -la
 - Commit to your plan but adapt if needed
 - Write code that you'd be proud to show others
 - Don't cut corners - do it right the first time
-- Update `what_are_you_doing` field as you work
+- Update workflow `task` and `addProgress` state as you work
 
 ### Step 5: Verify
 

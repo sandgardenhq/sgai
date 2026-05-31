@@ -6,7 +6,7 @@ type continuousBranch struct{}
 
 func (b *continuousBranch) run(ctx context.Context, cfg branchConfig) {
 	continuousPrompt := readContinuousModePrompt(cfg.workspacePath)
-	runContinuousWorkflow(ctx, cfg.workspacePath, continuousPrompt, cfg.mcpURL, cfg.logWriter, cfg.coord)
+	runContinuousWorkflow(ctx, cfg.workspacePath, continuousPrompt, cfg.mcpURL, cfg.logWriter, cfg.coord, cfg.runtime)
 }
 
 func (b *continuousBranch) toolsAllowed() bool {

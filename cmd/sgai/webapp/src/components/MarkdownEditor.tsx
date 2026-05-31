@@ -560,7 +560,7 @@ export function MarkdownEditor({
 
         const suggestions: MonacoCompletionItem[] = [];
 
-        if (currentSection === "flow") {
+        if (currentSection === "agents") {
           for (const agent of agentsRef.current) {
             suggestions.push({
               label: `"${agent.name}"`,
@@ -571,32 +571,16 @@ export function MarkdownEditor({
               range,
             });
           }
-        } else if (currentSection === "models") {
-          const colonPos = textBeforeCursor.indexOf(":");
-          const isAfterColon = colonPos >= 0 && position.column - 1 > colonPos;
-
-          if (isAfterColon) {
-            for (const m of modelsRef.current) {
-              suggestions.push({
-                label: `"${m.id}"`,
-                kind: monaco.languages.CompletionItemKind.Variable,
-                detail: m.name,
-                insertText: `"${m.id}"`,
-                filterText: m.id,
-                range,
-              });
-            }
-          } else {
-            for (const agent of agentsRef.current) {
-              suggestions.push({
-                label: `"${agent.name}"`,
-                kind: monaco.languages.CompletionItemKind.Value,
-                detail: agent.description,
-                insertText: `"${agent.name}":`,
-                filterText: agent.name,
-                range,
-              });
-            }
+        } else if (currentSection === "model") {
+          for (const m of modelsRef.current) {
+            suggestions.push({
+              label: `"${m.id}"`,
+              kind: monaco.languages.CompletionItemKind.Variable,
+              detail: m.name,
+              insertText: `"${m.id}"`,
+              filterText: m.id,
+              range,
+            });
           }
         }
 

@@ -28,7 +28,7 @@ func TestStartSessionService(t *testing.T) {
 			auto: false,
 			setupFunc: func(t *testing.T, workspacePath string) {
 				require.NoError(t, initializeWorkspace(workspacePath))
-				goalContent := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+				goalContent := "---\nagents:\n  - agent1\n  - agent2\nmodel: openai/gpt-5.5\n---\n# Test Goal"
 				goalPath := filepath.Join(workspacePath, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
@@ -43,7 +43,7 @@ func TestStartSessionService(t *testing.T) {
 			auto: true,
 			setupFunc: func(t *testing.T, workspacePath string) {
 				require.NoError(t, initializeWorkspace(workspacePath))
-				goalContent := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+				goalContent := "---\nagents:\n  - agent1\n  - agent2\nmodel: openai/gpt-5.5\n---\n# Test Goal"
 				goalPath := filepath.Join(workspacePath, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
@@ -438,7 +438,7 @@ func TestStartSessionServiceStandaloneWorkspace(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workspacePath, 0755))
 	require.NoError(t, initializeWorkspace(workspacePath))
 
-	goalContent := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+	goalContent := "---\nagents:\n  - agent1\n  - agent2\nmodel: openai/gpt-5.5\n---\n# Test Goal"
 	goalPath := filepath.Join(workspacePath, "GOAL.md")
 	require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 

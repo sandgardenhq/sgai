@@ -19,8 +19,9 @@ test.describe("Workspace Management Workflow", () => {
     await page.waitForURL(/\/goal\/edit/);
 
     await page.fill('[data-testid="markdown-editor"] textarea', `---
-flow: |
-  "go"
+agents:
+  - "go"
+model: "openai/gpt-5.5 (xhigh)"
 ---
 
 # Test Goal

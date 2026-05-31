@@ -86,7 +86,7 @@ describe("MarkdownContent", () => {
     });
 
     it("renders complex frontmatter values as pre-formatted text", () => {
-      const content = '---\nflow: |\n  "a" -> "b"\n  "b" -> "c"\n---\n\nBody';
+      const content = '---\nagents:\n  - "a"\n  - "b"\nmodel: "openai/gpt-5.5 (xhigh)"\n---\n\nBody';
       render(<MarkdownContent content={content} />);
       expect(screen.getByTestId("frontmatter-table")).toBeTruthy();
     });
