@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { resetFactoryStateStore, triggerFactoryRefresh } from "@/lib/factory-state";
+import { resetFactoryStateStore, triggerFactoryRefresh } from "../factory-state?actual";
 
 const mockFetch = mock(() =>
   Promise.resolve({
@@ -55,14 +55,14 @@ describe("factory-state store", () => {
 
   describe("useFactoryState", () => {
     it("exports useFactoryState function", async () => {
-      const mod = await import("@/lib/factory-state");
+      const mod = await import("../factory-state?actual");
       expect(typeof mod.useFactoryState).toBe("function");
     });
   });
 
   describe("FactoryStateSnapshot type", () => {
     it("has correct shape", () => {
-      const snapshot: import("@/lib/factory-state").FactoryStateSnapshot = {
+      const snapshot: import("../factory-state?actual").FactoryStateSnapshot = {
         workspaces: [],
         fetchStatus: "idle",
         lastFetchedAt: null,

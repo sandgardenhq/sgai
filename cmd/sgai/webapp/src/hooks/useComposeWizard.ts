@@ -400,7 +400,10 @@ export function useComposeWizard({
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveDraftRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const isDirtyRef = useRef(false);
-  const cleanBaselineRef = useRef(serializeWizardData(DEFAULT_WIZARD_DATA));
+  const cleanBaselineRef = useRef<string | null>(null);
+  if (cleanBaselineRef.current === null) {
+    cleanBaselineRef.current = serializeWizardData(DEFAULT_WIZARD_DATA);
+  }
   const wizardDataRef = useRef(wizardData);
 
   // Load initial state from server + sessionStorage

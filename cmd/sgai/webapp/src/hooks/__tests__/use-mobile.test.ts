@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { renderHook, cleanup, act } from "@testing-library/react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "../use-mobile?actual";
 
 afterEach(() => {
   cleanup();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { renderHook, act } from "@testing-library/react";
-import { useSidebarResize } from "@/hooks/useSidebarResize";
+import { useSidebarResize } from "../useSidebarResize?actual";
 
 beforeEach(() => {
   localStorage.clear();
