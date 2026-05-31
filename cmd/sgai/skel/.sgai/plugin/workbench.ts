@@ -15,21 +15,7 @@ export const Workbench: Plugin = async ({ directory }) => {
       }
       config.instructions?.unshift(directory + "/.sgai/AGENTS.md");
       config.model = "opencode/big-pickle";
-
-      // Configure MCP server for sgai custom tools (remote HTTP)
-      if (!config.mcp) {
-        config.mcp = {};
-      }
-      config.mcp.sgai = {
-        type: "remote",
-        url: process.env.SGAI_MCP_URL,
-        headers: {
-          "X-SGAI-Agent-Identity": process.env.SGAI_AGENT_IDENTITY || ""
-        },
-        timeout: 43200000
-      };
     },
-    // Tools are now provided by the MCP server configured above
     tool: {},
     event: async (input: { event: any; client: any }) => {
       if (input.event.type === "todo.updated") {

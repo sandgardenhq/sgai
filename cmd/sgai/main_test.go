@@ -1582,6 +1582,7 @@ func TestBuildAgentEnv(t *testing.T) {
 	}
 
 	assert.Equal(t, filepath.Join("/tmp/test-workspace", ".sgai"), envMap["OPENCODE_CONFIG_DIR"])
+	assert.Contains(t, envMap["OPENCODE_CONFIG_CONTENT"], "internal-mcp")
 	assert.Equal(t, "auto", envMap["SGAI_MCP_INTERACTIVE"])
 	assert.Equal(t, "test-agent", envMap["SGAI_AGENT_IDENTITY"])
 }
