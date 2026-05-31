@@ -41,7 +41,10 @@ function fireNotification(workspaceName: string): void {
 
 export function useNotifications(): void {
   const { workspaces, lastFetchedAt } = useFactoryState();
-  const previousStateRef = useRef<Map<string, boolean>>(new Map());
+  const previousStateRef = useRef<Map<string, boolean> | null>(null);
+  if (previousStateRef.current === null) {
+    previousStateRef.current = new Map();
+  }
 
   useEffect(() => {
     if (lastFetchedAt === null) {
@@ -51,7 +54,7 @@ export function useNotifications(): void {
     const currentState = new Map<string, boolean>();
     collectNeedsInput(workspaces, currentState);
 
-    const previous = previousStateRef.current;
+    const previous = previousStateRef.current ?? new Map<string, boolean>();
 
     for (const [name, needsInput] of currentState) {
       const wasNeedingInput = previous.get(name) ?? false;

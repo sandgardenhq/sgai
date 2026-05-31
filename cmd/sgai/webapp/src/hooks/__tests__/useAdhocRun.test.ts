@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { renderHook, act } from "@testing-library/react";
-import { useAdhocRun } from "@/hooks/useAdhocRun";
+import { useAdhocRun } from "../useAdhocRun?actual";
 
 const mockAdhoc = mock(() => Promise.resolve({ output: "result", running: false }));
 const mockAdhocStatus = mock(() => Promise.resolve({ output: "", running: false }));

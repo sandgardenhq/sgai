@@ -5,18 +5,18 @@ interface BadgeProps extends React.ComponentProps<"span"> {
   variant?: "default" | "secondary" | "destructive" | "outline"
 }
 
+const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
+  default: "border-transparent bg-primary text-primary-foreground shadow-sm",
+  secondary: "border-transparent bg-secondary text-secondary-foreground",
+  destructive: "border-transparent bg-destructive text-white shadow-sm",
+  outline: "text-foreground",
+}
+
 function Badge({
   className,
   variant = "default",
   ...props
 }: BadgeProps) {
-  const variantClasses: Record<string, string> = {
-    default: "border-transparent bg-primary text-primary-foreground shadow-sm",
-    secondary: "border-transparent bg-secondary text-secondary-foreground",
-    destructive: "border-transparent bg-destructive text-white shadow-sm",
-    outline: "text-foreground",
-  }
-
   return (
     <span
       data-slot="badge"
