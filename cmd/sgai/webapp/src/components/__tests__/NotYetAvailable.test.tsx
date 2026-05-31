@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { render, screen, cleanup } from "@testing-library/react";
+import "../../../happydom";
 import { NotYetAvailable } from "../NotYetAvailable";
 
 afterEach(() => {

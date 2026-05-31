@@ -70,11 +70,11 @@ export function ComposeTemplateRedirect() {
   }
 
   return (
-    <output className="block max-w-lg mx-auto py-8 space-y-4" aria-live="polite">
+    <div className="max-w-lg mx-auto py-8 space-y-4" aria-live="polite">
       <Skeleton className="h-6 w-40" />
       <Skeleton className="h-4 w-64" />
       <Skeleton className="h-32 w-full" />
-    </output>
+    </div>
   );
 }
 

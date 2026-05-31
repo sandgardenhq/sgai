@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useCallback, useReducer } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
+const MessagesTab = lazy(() => import("./tabs/MessagesTab").then((m) => ({ default: m.MessagesTab })));
 const LogTab = lazy(() => import("./tabs/LogTab").then((m) => ({ default: m.LogTab })));
 const RunTab = lazy(() => import("./tabs/RunTab").then((m) => ({ default: m.RunTab })));
 const ChangesTab = lazy(() => import("./tabs/ChangesTab").then((m) => ({ default: m.ChangesTab })));
@@ -77,6 +78,7 @@ const TABS = [
   { key: "log", label: "Log" },
   { key: "changes", label: "Diffs" },
   { key: "commits", label: "Commits" },
+  { key: "messages", label: "Messages" },
   { key: "internals", label: "Internals" },
   { key: "run", label: "Run" },
 ] as const;
@@ -128,7 +130,9 @@ export function WorkspaceDetail(): JSX.Element | null {
   const navigate = useNavigate();
 
   const [actionError, setActionError] = useState<string | null>(null);
-  const [runningOverride, setRunningOverride] = useState<{ workspaceName: string; running: boolean } | null>(null);
+  const [runningOverride, setRunningOverride] = useState<boolean | null>(null);
+  const runningOverrideObservedRef = useRef(false);
+  const previousWorkspaceRef = useRef<string | null>(null);
   const [isStartStopPending, startStartStopTransition] = useTransition();
   const [isSelfDrivePending, startSelfDriveTransition] = useTransition();
   const [isPinPending, startPinTransition] = useTransition();
@@ -147,6 +151,14 @@ export function WorkspaceDetail(): JSX.Element | null {
   const detail: ApiWorkspaceEntry | null = workspaces.find((ws) => ws.name === workspaceName) ?? null;
   const loading = fetchStatus === "fetching" && detail === null;
   const error: Error | null = fetchStatus === "error" && detail === null ? new Error("Failed to load workspace state") : null;
+
+  useEffect(() => {
+    if (previousWorkspaceRef.current !== workspaceName) {
+      previousWorkspaceRef.current = workspaceName;
+      runningOverrideObservedRef.current = false;
+      setRunningOverride(null);
+    }
+  }, [workspaceName]);
 
   useEffect(() => {
     if (!workspaceName) return;
@@ -222,10 +234,11 @@ export function WorkspaceDetail(): JSX.Element | null {
     return <NoWorkspaceState name={detail.name} dir={detail.dir} />;
   }
 
-  const runningOverrideValue = runningOverride?.workspaceName === workspaceName && detail.running !== runningOverride.running
-    ? runningOverride.running
-    : null;
-  const effectiveRunning = runningOverrideValue ?? (detail.running ?? false);
+  const detailIsRunning = detail.running ?? false;
+  if (runningOverride !== null && detailIsRunning === runningOverride) {
+    runningOverrideObservedRef.current = true;
+  }
+  const effectiveRunning = runningOverride !== null && !runningOverrideObservedRef.current ? runningOverride : detailIsRunning;
 
   const totalExecTime = detail.totalExecTime?.trim() ?? "";
   const fallbackExecTime = totalExecTime && totalExecTime !== "-" ? totalExecTime : "0s";
@@ -233,8 +246,11 @@ export function WorkspaceDetail(): JSX.Element | null {
     ? formatExecTime(execTimeSeconds)
     : fallbackExecTime;
   const agentLabel = detail.currentAgent?.trim();
-  const agentModelLabel = agentLabel ?? "";
-  const fullAgentModelLabel = detail.currentAgent ?? "";
+  const modelLabel = detail.currentModel
+    ? detail.currentModel.split("/").pop() ?? detail.currentModel
+    : "";
+  const agentModelLabel = [agentLabel, modelLabel].filter(Boolean).join(" | ");
+  const fullAgentModelLabel = [detail.currentAgent, detail.currentModel].filter(Boolean).join(" | ");
   const statusLine = detail.task?.trim() || detail.status?.trim();
   const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
@@ -252,7 +268,8 @@ export function WorkspaceDetail(): JSX.Element | null {
         const result = await api.workspaces.start(workspaceName, false);
         triggerFactoryRefresh();
         if (result.running) {
-          setRunningOverride({ workspaceName, running: true });
+          runningOverrideObservedRef.current = false;
+          setRunningOverride(true);
         }
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to start session");
@@ -263,7 +280,8 @@ export function WorkspaceDetail(): JSX.Element | null {
   const handleStop = () => {
     if (!workspaceName) return;
     setActionError(null);
-    setRunningOverride({ workspaceName, running: false });
+    runningOverrideObservedRef.current = false;
+    setRunningOverride(false);
     startStartStopTransition(async () => {
       try {
         await api.workspaces.stop(workspaceName);
@@ -314,6 +332,19 @@ export function WorkspaceDetail(): JSX.Element | null {
 
   const showDeleteAction = !effectiveRunning && !isForkedRoot;
 
+  const handleReset = () => {
+    if (!workspaceName) return;
+    setActionError(null);
+    startResetTransition(async () => {
+      try {
+        await api.workspaces.reset(workspaceName);
+        triggerFactoryRefresh();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Failed to reset workspace");
+      }
+    });
+  };
+
   const handleDelete = () => {
     if (!workspaceName) return;
     setActionError(null);
@@ -329,19 +360,6 @@ export function WorkspaceDetail(): JSX.Element | null {
         navigate("/");
       } catch (err) {
         setActionError(err instanceof Error ? err.message : "Failed to delete workspace");
-      }
-    });
-  };
-
-  const handleReset = () => {
-    if (!workspaceName) return;
-    setActionError(null);
-    startResetTransition(async () => {
-      try {
-        await api.workspaces.reset(workspaceName);
-        triggerFactoryRefresh();
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Failed to reset workspace");
       }
     });
   };
@@ -378,8 +396,8 @@ export function WorkspaceDetail(): JSX.Element | null {
         handleSelfDrive={handleSelfDrive}
         handlePinToggle={handlePinToggle}
         handleOpenEditor={handleOpenEditor}
-        handleDelete={handleDelete}
         handleReset={handleReset}
+        handleDelete={handleDelete}
       />
 
       <div className="pt-4">
@@ -403,6 +421,7 @@ export function WorkspaceDetail(): JSX.Element | null {
           <TabContent
             activeTab={activeTab}
             workspaceName={detail.name}
+            currentModel={detail.currentModel}
             goalContent={detail.goalContent}
             pmContent={detail.pmContent}
             hasProjectMgmt={detail.hasProjectMgmt}
@@ -436,8 +455,8 @@ interface WorkspaceDetailActionsConfig {
   handleSelfDrive: () => void;
   handlePinToggle: () => void;
   handleOpenEditor: () => void;
-  handleDelete: () => void;
   handleReset: () => void;
+  handleDelete: () => void;
 }
 
 interface WorkspaceDetailActionsProps {
@@ -461,17 +480,17 @@ function WorkspaceDetailActions({
   isActionDisabled,
   isEditorPending,
   isPinPending,
-  isStartStopPending,
-  isDeletePending,
-  isResetPending,
-  navigate,
+    isStartStopPending,
+    isDeletePending,
+    isResetPending,
+    navigate,
   handleStart,
   handleStop,
   handleSelfDrive,
-  handlePinToggle,
-  handleOpenEditor,
-  handleDelete,
-  handleReset,
+    handlePinToggle,
+    handleOpenEditor,
+    handleReset,
+    handleDelete,
   } = actions;
   if (isForkedRoot) {
     return (
@@ -498,9 +517,8 @@ function WorkspaceDetailActions({
           {detail.pinned ? "Unpin" : "Pin"}
         </Button>
         <ResetWorkspaceDialog
-          workspaceName={detail.name}
           disabled={effectiveRunning || isResetPending}
-          isPending={isResetPending}
+          pending={isResetPending}
           onReset={handleReset}
         />
       </>
@@ -644,9 +662,8 @@ function WorkspaceDetailActions({
         {detail.pinned ? "Unpin" : "Pin"}
       </Button>
       <ResetWorkspaceDialog
-        workspaceName={detail.name}
         disabled={effectiveRunning || isResetPending}
-        isPending={isResetPending}
+        pending={isResetPending}
         onReset={handleReset}
       />
       {showDeleteAction && (
@@ -688,26 +705,17 @@ function WorkspaceDetailActions({
   );
 }
 
-function ResetWorkspaceDialog({
-  workspaceName,
-  disabled,
-  isPending,
-  onReset,
-}: {
-  workspaceName: string;
+interface ResetWorkspaceDialogProps {
   disabled: boolean;
-  isPending: boolean;
+  pending: boolean;
   onReset: () => void;
-}) {
+}
+
+function ResetWorkspaceDialog({ disabled, pending, onReset }: ResetWorkspaceDialogProps) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-        >
+        <Button type="button" size="sm" variant="outline" disabled={disabled}>
           Reset
         </Button>
       </AlertDialogTrigger>
@@ -715,16 +723,12 @@ function ResetWorkspaceDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Reset workspace</AlertDialogTitle>
           <AlertDialogDescription>
-            Reset clears session progress and state for &lsquo;{workspaceName}&rsquo;. It keeps workspace files and keeps GOAL.md. Reset cannot be used while the session is running.
+            Reset clears session progress and state, keeps workspace files, keeps GOAL.md, and cannot be used while the session is running.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onReset}
-            disabled={isPending}
-            className="bg-destructive text-white hover:bg-destructive/90"
-          >
+          <AlertDialogAction onClick={onReset} disabled={pending}>
             Reset workspace
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -911,6 +915,7 @@ function TabSkeleton() {
 function TabContent({
   activeTab,
   workspaceName,
+  currentModel,
   goalContent,
   pmContent,
   hasProjectMgmt,
@@ -919,6 +924,7 @@ function TabContent({
 }: {
   activeTab: string;
   workspaceName: string;
+  currentModel?: string;
   goalContent?: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
@@ -934,11 +940,13 @@ function TabContent({
       return <ChangesTab workspaceName={workspaceName} />;
     case "commits":
       return <CommitsTab workspaceName={workspaceName} />;
+    case "messages":
+      return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
       return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
 
     case "run":
-      return <RunTab workspaceName={workspaceName} />;
+      return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
     case "forks":
       return <ForksTab workspaceName={workspaceName} actions={actions} onActionClick={onActionClick} />;
     default:

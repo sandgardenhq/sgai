@@ -48,6 +48,7 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 
 	st.running = true
 	st.output.Reset()
+	st.rawOutput.Reset()
 	st.selectedModel = strings.TrimSpace(model)
 	st.promptText = strings.TrimSpace(prompt)
 
@@ -58,10 +59,11 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
+	rawWriter := &lockedWriter{mu: &st.mu, buf: &st.rawOutput, raw: true}
 	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
 	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
+	cmd.Stdout = io.MultiWriter(stdoutPW, writer, rawWriter)
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
@@ -85,9 +87,14 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 		if errWait != nil {
 			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
 		}
+		rawOutput := st.rawOutput.String()
+		selectedModel := st.selectedModel
 		st.running = false
 		st.cmd = nil
 		st.mu.Unlock()
+		if errWait == nil {
+			s.reconcileAdhocUsage(workspacePath, rawOutput, selectedModel)
+		}
 	}()
 
 	s.notifyStateChange()

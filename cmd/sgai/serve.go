@@ -268,6 +268,10 @@ type Server struct {
 	stateFlight        singleflight[string, apiFactoryState]
 	stateCache         *ttlCache[string, apiFactoryState]
 	stateGeneration    uint64
+
+	usageStoreMu  sync.Mutex
+	usageStore    *usageStore
+	usageStoreErr error
 }
 
 // NewServer creates a new Server instance with the given root directory.
@@ -569,6 +573,7 @@ func cmdServe(args []string) {
 		log.Println("warning: failed to load external dirs:", err)
 	}
 	srv.startStateWatcher()
+	go srv.backfillGlobalUsage()
 	go srv.warmStateCache()
 
 	mux := http.NewServeMux()

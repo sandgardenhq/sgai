@@ -48,7 +48,7 @@ export function AttachExternal() {
   );
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLSelectElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const fetchDirectorySuggestions = useEffectEvent(async (currentPath: string) => {
     if (!currentPath.trim()) {
@@ -197,30 +197,34 @@ export function AttachExternal() {
               </div>
             )}
             {showSuggestions && suggestions.length > 0 && (
-              <select
+              <ul
                 id="workspace-path-suggestions"
                 ref={suggestionsRef}
-                className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md text-sm"
-                size={Math.min(suggestions.length, 6)}
-                value={activeIndex >= 0 ? suggestions[activeIndex]?.path : ""}
+                className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md"
                 aria-label="Directory suggestions"
-                onMouseDown={(e) => e.preventDefault()}
-                onChange={(e) => {
-                  const entry = suggestions.find((suggestion) => suggestion.path === e.target.value);
-                  if (entry) handleSelectSuggestion(entry);
-                }}
               >
                 {suggestions.map((entry, index) => (
-                  <option
+                  <li
                     id={`suggestion-${index}`}
                     key={entry.path}
-                    value={entry.path}
-                    className={cn("px-3 py-2", index === activeIndex && "bg-accent text-accent-foreground")}
                   >
-                    {entry.name} - {entry.path}
-                  </option>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-2 text-sm cursor-pointer text-left",
+                        index === activeIndex
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent hover:text-accent-foreground",
+                      )}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelectSuggestion(entry)}
+                    >
+                      <span className="font-medium">{entry.name}</span>
+                      <span className="text-xs text-muted-foreground truncate">{entry.path}</span>
+                    </button>
+                  </li>
                 ))}
-              </select>
+              </ul>
             )}
           </div>
           <p className="text-xs text-muted-foreground">

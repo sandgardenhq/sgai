@@ -159,10 +159,8 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
     pre: (props: HTMLAttributes<HTMLPreElement>) => (
       <pre className="overflow-x-auto rounded border bg-muted/30 p-3 text-xs" {...props} />
     ),
-    a: ({ children, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
-      <a className="text-primary underline underline-offset-4" {...props}>
-        {children || props.href}
-      </a>
+    a: ({ children, title, href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
+      <a className="text-primary underline underline-offset-4" href={href} title={title} aria-label={children ? undefined : title ?? href ?? "Link"} {...props}>{children}</a>
     ),
     hr: (props: HTMLAttributes<HTMLHRElement>) => (
       <hr className="my-4 border-border" {...props} />

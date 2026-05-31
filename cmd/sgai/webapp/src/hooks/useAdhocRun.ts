@@ -29,6 +29,7 @@ function writeLocalStorage<T>(key: string, value: T): void {
 
 export interface UseAdhocRunOptions {
   workspaceName: string;
+  currentModel?: string;
   /** When true, skip fetching model list (AdhocOutput uses a text input) */
   skipModelsFetch?: boolean;
 }
@@ -56,6 +57,7 @@ export interface UseAdhocRunResult {
 
 export function useAdhocRun({
   workspaceName,
+  currentModel,
   skipModelsFetch = false,
 }: UseAdhocRunOptions): UseAdhocRunResult {
   const [{ models, modelsLoading, modelsError }, updateModelsState] = useReducer(
@@ -66,9 +68,10 @@ export function useAdhocRun({
     { models: null, modelsLoading: !skipModelsFetch, modelsError: null },
   );
 
-  const [storedSelectedModel, setSelectedModelState] = useState(() =>
+  const [selectedModel, setSelectedModelState] = useState(() =>
     readLocalStorage(storageKey(workspaceName, "model"), ""),
   );
+  const selectedModelRef = useRef(selectedModel);
   const [prompt, setPromptState] = useState(() =>
     readLocalStorage(storageKey(workspaceName, "prompt"), ""),
   );
@@ -91,6 +94,7 @@ export function useAdhocRun({
 
   const setSelectedModel = useCallback(
     (model: string) => {
+      selectedModelRef.current = model;
       setSelectedModelState(model);
       writeLocalStorage(storageKey(workspaceName, "model"), model);
     },
@@ -171,6 +175,10 @@ export function useAdhocRun({
       .list(workspaceName)
       .then((response) => {
         if (!cancelled) {
+          const fallbackModel = response.defaultModel ?? currentModel;
+          if (!selectedModelRef.current && fallbackModel && response.models.some((m) => m.id === fallbackModel)) {
+            setSelectedModel(fallbackModel);
+          }
           updateModelsState({ models: response, modelsLoading: false });
         }
       })
@@ -183,24 +191,16 @@ export function useAdhocRun({
     return () => {
       cancelled = true;
     };
-  }, [workspaceName, skipModelsFetch]);
-
-  const fallbackModel = models?.defaultModel ?? "";
-  const selectedModel = storedSelectedModel || (
-    fallbackModel && models?.models.some((m) => m.id === fallbackModel) ? fallbackModel : ""
-  );
+  }, [workspaceName, skipModelsFetch, currentModel, setSelectedModel]);
 
   const startStatusPolling = useCallback(() => {
     pollTimerRef.current = setInterval(async () => {
-      if (!mountedRef.current) return;
       try {
+        if (!workspaceName || !mountedRef.current) return;
         const poll = await api.workspaces.adhocStatus(workspaceName);
         if (mountedRef.current) {
-          updateRunState({
-            ...(poll.output ? { output: poll.output } : {}),
-            ...(!poll.running ? { isRunning: false } : {}),
-          });
-          if (!poll.running) stopPolling();
+          if (poll.output) updateRunState({ output: poll.output });
+          if (!poll.running) { stopPolling(); updateRunState({ isRunning: false }); }
         }
       } catch {
         stopPolling();
@@ -214,11 +214,8 @@ export function useAdhocRun({
     let cancelled = false;
     api.workspaces.adhocStatus(workspaceName).then((status) => {
       if (cancelled) return;
-      updateRunState({
-        ...(status.output ? { output: status.output } : {}),
-        ...(status.running ? { isRunning: true } : {}),
-      });
-      if (status.running) startStatusPolling();
+      if (status.output) updateRunState({ output: status.output });
+      if (status.running) { updateRunState({ isRunning: true }); startStatusPolling(); }
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [workspaceName, startStatusPolling]);

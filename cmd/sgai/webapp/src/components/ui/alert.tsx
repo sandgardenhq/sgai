@@ -1,8 +1,8 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { AlertTitle } from "./alert-title"
 import { AlertDescription } from "./alert-description"
+import { AlertTitle } from "./alert-title"
 
 function Alert({ className, ...props }: React.ComponentProps<"div">) {
   return (
