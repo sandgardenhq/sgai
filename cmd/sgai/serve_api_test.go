@@ -499,7 +499,7 @@ func TestConvertEventsForAPIBoost(t *testing.T) {
 func TestBuildAdhocArgs(t *testing.T) {
 	t.Run("simpleModel", func(t *testing.T) {
 		args := buildAdhocArgs("claude-opus-4")
-		assert.Equal(t, []string{"run", "-m", "claude-opus-4", "--agent", "build", "--title", "adhoc [claude-opus-4]"}, args)
+		assert.Equal(t, []string{"run", "-m", "claude-opus-4", "--agent", "build", "--title", "adhoc [claude-opus-4]", "--format=json"}, args)
 	})
 
 	t.Run("modelWithVariant", func(t *testing.T) {

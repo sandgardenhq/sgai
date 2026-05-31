@@ -27,14 +27,15 @@ export function EditGoal(): JSX.Element {
   const description = workspace?.description || workspaceName;
   const dir = workspace?.dir || "";
 
-  useEffect(() => {
+  const clearRedirectTimeout = useCallback(() => {
     const redirectTimeout = redirectTimeoutRef.current;
-    return () => {
-      if (redirectTimeout) {
-        clearTimeout(redirectTimeout);
-      }
-    };
+    if (redirectTimeout) {
+      clearTimeout(redirectTimeout);
+      redirectTimeoutRef.current = null;
+    }
   }, []);
+
+  useEffect(() => clearRedirectTimeout, [clearRedirectTimeout]);
 
   useEffect(() => {
     if (!workspaceName) return;
@@ -67,13 +68,12 @@ export function EditGoal(): JSX.Element {
       await api.workspaces.updateGoal(workspaceName, content);
       triggerFactoryRefresh();
       updateState({ saveSuccess: true });
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-      redirectTimeoutRef.current = setTimeout(() => {
+      clearRedirectTimeout();
+      const timeout = setTimeout(() => {
         redirectTimeoutRef.current = null;
         navigate(`/workspaces/${encodeURIComponent(workspaceName)}`);
       }, 1000);
+      redirectTimeoutRef.current = timeout;
     } catch (err) {
       if (err instanceof ApiError) {
         updateState({ error: err.message });
@@ -83,7 +83,7 @@ export function EditGoal(): JSX.Element {
     } finally {
       updateState({ isSaving: false });
     }
-  }, [workspaceName, isSaving, content, navigate]);
+  }, [workspaceName, isSaving, content, navigate, clearRedirectTimeout]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

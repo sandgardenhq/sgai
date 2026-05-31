@@ -16,8 +16,8 @@ const STORAGE_PREFIX = "sgai-response-";
 
 function ResponseSkeleton() {
   return (
-    <output
-      className="block max-w-2xl mx-auto space-y-4"
+    <div
+      className="max-w-2xl mx-auto space-y-4"
       aria-live="polite"
       aria-labelledby="response-loading-label"
     >
@@ -29,7 +29,7 @@ function ResponseSkeleton() {
       <Skeleton className="h-48 w-full rounded-xl" />
       <Skeleton className="h-24 w-full rounded-xl" />
       <Skeleton className="h-10 w-32" />
-    </output>
+    </div>
   );
 }
 
@@ -67,10 +67,6 @@ export function ResponseMultiChoice() {
 
   if (loading) return <ResponseSkeleton />;
 
-  if (workspaceName && workspaceDetail && !question) {
-    return <Navigate to={`/workspaces/${encodeURIComponent(workspaceName)}/progress`} replace />;
-  }
-
   if (!workspaceName) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -106,7 +102,10 @@ export function ResponseMultiChoice() {
     );
   }
 
-  if (!question) return null;
+  if (!question) {
+    const fallbackPath = workspaceName ? `/workspaces/${encodeURIComponent(workspaceName)}/progress` : "/";
+    return <Navigate to={fallbackPath} replace />;
+  }
 
   return (
     <div className="max-w-2xl mx-auto">

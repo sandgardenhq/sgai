@@ -71,6 +71,7 @@ func (b *signalBroker) notify() {
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/state", s.handleAPIState)
+	mux.HandleFunc("GET /api/v1/usage", s.handleAPIUsage)
 	mux.HandleFunc("GET /api/v1/signal", s.handleSignalStream)
 	mux.HandleFunc("GET /api/v1/agents", s.handleAPIAgents)
 	mux.HandleFunc("GET /api/v1/skills", s.handleAPISkills)
@@ -2057,6 +2058,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 
 	st.running = true
 	st.output.Reset()
+	st.rawOutput.Reset()
 	st.selectedModel = strings.TrimSpace(req.Model)
 	st.promptText = strings.TrimSpace(req.Prompt)
 
@@ -2067,10 +2069,11 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
+	rawWriter := &lockedWriter{mu: &st.mu, buf: &st.rawOutput, raw: true}
 	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
 	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-	cmd.Stdout = io.MultiWriter(stdoutPW, writer)
+	cmd.Stdout = io.MultiWriter(stdoutPW, writer, rawWriter)
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
@@ -2095,9 +2098,14 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 		if errWait != nil {
 			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
 		}
+		rawOutput := st.rawOutput.String()
+		model := st.selectedModel
 		st.running = false
 		st.cmd = nil
 		st.mu.Unlock()
+		if errWait == nil {
+			s.reconcileAdhocUsage(workspacePath, rawOutput, model)
+		}
 	}()
 
 	s.notifyStateChange()
@@ -2110,7 +2118,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 
 func buildAdhocArgs(modelSpec string) []string {
 	baseModel, variant := parseModelAndVariant(modelSpec)
-	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]"}
+	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]", "--format=json"}
 	if variant != "" {
 		args = append(args, "--variant", variant)
 	}

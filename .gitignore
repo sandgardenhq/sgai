@@ -12,3 +12,4 @@ vendor/
 cover*.out
 .playwright-mcp/
 folding-agents-compose.png
+/*.png

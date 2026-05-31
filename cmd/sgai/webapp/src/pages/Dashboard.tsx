@@ -38,7 +38,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Loader2, Inbox, Trash2, FolderPlus, Link as LinkIcon } from "lucide-react";
+import { BarChart3, Loader2, Inbox, Trash2, FolderPlus, Link as LinkIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
@@ -279,8 +279,7 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
   const hasForks = forks.length > 0;
   const isSelected = workspace.name === selectedName;
   const hasForkSelected = forks.some((f) => f.name === selectedName);
-  const [userExpanded, setUserExpanded] = useState(false);
-  const expanded = isSelected || hasForkSelected || userExpanded;
+  const [expanded, setExpanded] = useState(() => isSelected || hasForkSelected);
 
   const isRoot = fullWorkspace?.isRoot ?? workspace.isRoot;
   const showDelete = !isRoot || !hasForks;
@@ -296,7 +295,7 @@ function WorkspaceTreeItem({ workspace, selectedName, workspaceLookup }: Workspa
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setUserExpanded(!expanded)}
+            onClick={() => setExpanded((prev) => !prev)}
             className="w-5 h-6 p-0 text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors self-start mt-1"
             aria-label="Toggle forks"
           >
@@ -426,8 +425,7 @@ function PinnedTreeItem({ workspace, selectedName, workspaceLookup, pinnedForks 
   const fullWorkspace = workspaceLookup.get(workspace.name);
   const isSelected = workspace.name === selectedName;
   const hasForkSelected = pinnedForks.some((f) => f.name === selectedName);
-  const [userExpanded, setUserExpanded] = useState(false);
-  const expanded = isSelected || hasForkSelected || userExpanded;
+  const [expanded, setExpanded] = useState(() => isSelected || hasForkSelected);
 
   const isRoot = fullWorkspace?.isRoot ?? workspace.isRoot;
   const description = workspace.description || null;
@@ -441,7 +439,7 @@ function PinnedTreeItem({ workspace, selectedName, workspaceLookup, pinnedForks 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setUserExpanded(!expanded)}
+            onClick={() => setExpanded((prev) => !prev)}
             className="w-5 h-6 p-0 text-xs font-semibold shrink-0 mr-1 bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors self-start mt-1"
             aria-label="Toggle forks"
           >
@@ -601,7 +599,7 @@ function PinnedSection({ workspaces, selectedName, workspaceLookup, forkParentLo
       <SidebarMenu>
         {pinnedRoots.map((root) => (
           <PinnedTreeItem
-            key={root.name}
+            key={`${root.name}:${selectedName ?? ""}`}
             workspace={root}
             selectedName={selectedName}
             workspaceLookup={workspaceLookup}
@@ -706,7 +704,7 @@ function WorkspaceList({ workspaces, selectedName }: WorkspaceListProps) {
         {rootWorkspaces.length > 0 ? (
           rootWorkspaces.map((workspace) => (
             <WorkspaceTreeItem
-              key={workspace.name}
+              key={`${workspace.name}:${selectedName ?? ""}`}
               workspace={workspace}
               selectedName={selectedName}
               workspaceLookup={workspaceLookup}
@@ -839,6 +837,11 @@ function MobileHeader({ workspaces, loading, error }: { workspaces: ApiWorkspace
       {!loading && !error && (
         <SidebarHeaderIndicators workspaces={workspaces} />
       )}
+      <Button variant="ghost" size="icon" asChild aria-label="Global usage">
+        <Link to="/usage">
+          <BarChart3 className="size-4" />
+        </Link>
+      </Button>
     </div>
   );
 }
@@ -895,6 +898,15 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
         </SidebarHeader>
         <Separator />
         <SidebarContent onClickCapture={handleSidebarNavigation}>
+          <div className="px-1 py-2">
+            <Button variant="ghost" className="w-full justify-start" asChild>
+              <Link to="/usage">
+                <BarChart3 className="mr-2 size-4" />
+                Global usage (Beta)
+              </Link>
+            </Button>
+          </div>
+          <Separator />
           <ScrollArea className="flex-1 px-1 py-2">
             {loading && <WorkspaceTreeSkeleton />}
 

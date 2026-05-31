@@ -182,6 +182,48 @@ interface ApiTokenUsage {
   cacheWrite: number;
 }
 
+export type ApiUsageTokenUsage = ApiTokenUsage;
+
+export interface ApiUsageTotals {
+  cost: number;
+  meteredReportedCost: number;
+  apiEquivalentCost: number;
+  apiEquivalentCostAvailable: boolean;
+  tokens: ApiUsageTokenUsage;
+}
+
+export interface ApiUsageDailyPoint {
+  date: string;
+  cost: number;
+}
+
+export interface ApiUsageRow {
+  date: string;
+  project: string;
+  rootProject: string;
+  workspacePath: string;
+  rootWorkspacePath: string;
+  source: string;
+  cost: number;
+  meteredReportedCost: number;
+  apiEquivalentCost: number;
+  apiEquivalentCostAvailable: boolean;
+  tokens: ApiUsageTokenUsage;
+}
+
+export interface ApiUsageFilters {
+  projects: string[];
+  rootProjects: string[];
+}
+
+export interface ApiUsageResponse {
+  totals: ApiUsageTotals;
+  daily: ApiUsageDailyPoint[];
+  rows: ApiUsageRow[];
+  filters: ApiUsageFilters;
+  warning?: string;
+}
+
 export interface ApiStepCost {
   stepId: string;
   agent: string;

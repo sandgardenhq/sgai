@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Collapsible as CollapsiblePrimitive } from "radix-ui"
-import { CollapsibleTrigger } from "./collapsible-trigger"
 import { CollapsibleContent } from "./collapsible-content"
+import { CollapsibleTrigger } from "./collapsible-trigger"
 
 function Collapsible({
   ...props

@@ -1,48 +1,30 @@
-import { Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { App } from "./App";
 import { NotYetAvailable } from "./components/NotYetAvailable";
 import {
-  AdhocOutput,
-  AgentList,
-  AttachExternal,
-  ComposeLanding,
-  ComposePreviewPage,
-  ComposeTemplate,
-  DashboardSkeleton,
-  DashboardWithEmpty,
-  DashboardWithWorkspace,
-  EditGoal,
-  FullDiffPage,
-  NewWorkspace,
-  PageSkeleton,
-  ResponseMultiChoice,
-  SkillDetail,
-  SkillList,
-  SnippetDetail,
-  SnippetList,
-  WizardFinish,
-  WizardStep1,
-  WizardStep2,
-  WizardStep3,
-  WizardStep4,
-} from "./router-components";
-
-function withSuspense(Component: React.ComponentType) {
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <Component />
-    </Suspense>
-  );
-}
-
-function withDashboardSuspense(Component: React.ComponentType) {
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <Component />
-    </Suspense>
-  );
-}
+  AdhocOutputRoute,
+  AgentListRoute,
+  AttachExternalRoute,
+  ComposeLandingRoute,
+  ComposePreviewRoute,
+  ComposeTemplateRoute,
+  DashboardEmptyRoute,
+  DashboardUsageRoute,
+  DashboardWorkspaceRoute,
+  EditGoalRoute,
+  FullDiffRoute,
+  NewWorkspaceRoute,
+  ResponseMultiChoiceRoute,
+  SkillDetailRoute,
+  SkillListRoute,
+  SnippetDetailRoute,
+  SnippetListRoute,
+  WizardFinishRoute,
+  WizardStep1Route,
+  WizardStep2Route,
+  WizardStep3Route,
+  WizardStep4Route,
+} from "./router-elements";
 
 export const router = createBrowserRouter([
   {
@@ -51,105 +33,107 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: withDashboardSuspense(DashboardWithEmpty),
+        element: <DashboardEmptyRoute />,
       },
       {
         path: "trees",
         element: <Navigate to="/" replace />,
       },
       {
+        path: "usage",
+        element: <DashboardUsageRoute />,
+      },
+      {
         path: "workspaces/new",
-        element: withSuspense(NewWorkspace),
+        element: <NewWorkspaceRoute />,
       },
       {
         path: "workspaces/attach",
-        element: withSuspense(AttachExternal),
+        element: <AttachExternalRoute />,
       },
       {
         path: "workspaces/:name/agents",
-        element: withSuspense(AgentList),
+        element: <AgentListRoute />,
       },
       {
         path: "workspaces/:name/skills",
-        element: withSuspense(SkillList),
+        element: <SkillListRoute />,
       },
       {
         path: "workspaces/:name/skills/*",
-        element: withSuspense(SkillDetail),
+        element: <SkillDetailRoute />,
       },
       {
         path: "workspaces/:name/snippets",
-        element: withSuspense(SnippetList),
+        element: <SnippetListRoute />,
       },
       {
         path: "workspaces/:name/snippets/:lang/:fileName",
-        element: withSuspense(SnippetDetail),
+        element: <SnippetDetailRoute />,
       },
       {
         path: "workspaces/:name/goal/edit",
-        element: withSuspense(EditGoal),
+        element: <EditGoalRoute />,
       },
       {
         path: "workspaces/:name/goal",
-        element: withSuspense(EditGoal),
+        element: <EditGoalRoute />,
       },
       {
         path: "workspaces/:name/adhoc",
-        element: withSuspense(AdhocOutput),
+        element: <AdhocOutputRoute />,
       },
       {
         path: "workspace/:name/diff",
-        element: withSuspense(FullDiffPage),
+        element: <FullDiffRoute />,
       },
-
       {
         path: "workspaces/:name/*",
-        element: withDashboardSuspense(DashboardWithWorkspace),
+        element: <DashboardWorkspaceRoute />,
       },
       {
         path: "workspaces/:name",
-        element: withDashboardSuspense(DashboardWithWorkspace),
+        element: <DashboardWorkspaceRoute />,
       },
       {
         path: "compose",
-        element: withSuspense(ComposeLanding),
+        element: <ComposeLandingRoute />,
       },
       {
         path: "compose/landing",
-        element: withSuspense(ComposeLanding),
+        element: <ComposeLandingRoute />,
       },
       {
         path: "compose/template/:id",
-        element: withSuspense(ComposeTemplate),
+        element: <ComposeTemplateRoute />,
       },
       {
         path: "compose/step/1",
-        element: withSuspense(WizardStep1),
+        element: <WizardStep1Route />,
       },
       {
         path: "compose/step/2",
-        element: withSuspense(WizardStep2),
+        element: <WizardStep2Route />,
       },
       {
         path: "compose/step/3",
-        element: withSuspense(WizardStep3),
+        element: <WizardStep3Route />,
       },
       {
         path: "compose/step/4",
-        element: withSuspense(WizardStep4),
+        element: <WizardStep4Route />,
       },
       {
         path: "compose/finish",
-        element: withSuspense(WizardFinish),
+        element: <WizardFinishRoute />,
       },
       {
         path: "compose/preview",
-        element: withSuspense(ComposePreviewPage),
+        element: <ComposePreviewRoute />,
       },
-
       {
         path: "workspaces/:name/respond",
-        element: withSuspense(ResponseMultiChoice),
+        element: <ResponseMultiChoiceRoute />,
       },
       {
         path: "*",

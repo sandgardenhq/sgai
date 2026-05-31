@@ -110,9 +110,30 @@ func reconcileAgentUsage(dir string, coord *state.Coordinator, agent, sessionID,
 		return err
 	}
 
-	return coord.UpdateState(func(wf *state.Workflow) {
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		replaceReconciledSessions(wf, usage, catalog, catalogErr)
-	})
+	}); errUpdate != nil {
+		return errUpdate
+	}
+
+	if errGlobal := writeGlobalUsage("session", dir, reconciledStateSessions(coord.State(), usage)); errGlobal != nil {
+		return fmt.Errorf("writing global usage: %w", errGlobal)
+	}
+	return nil
+}
+
+func reconciledStateSessions(wf state.Workflow, usage []exportedSessionUsage) []state.SessionUsage {
+	reconciled := map[string]bool{}
+	for _, session := range usage {
+		reconciled[session.SessionID] = true
+	}
+	var sessions []state.SessionUsage
+	for _, session := range wf.Cost.BySession {
+		if reconciled[session.SessionID] {
+			sessions = append(sessions, session)
+		}
+	}
+	return sessions
 }
 
 func collectExportedSessionUsage(dir, agent, sessionID, parentSessionID, fallbackModel string, visited map[string]bool) ([]exportedSessionUsage, error) {

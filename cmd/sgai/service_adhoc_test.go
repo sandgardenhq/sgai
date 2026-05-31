@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -99,6 +101,38 @@ func TestLockedWriterPlainTextPassthrough(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 10, n)
 	assert.Equal(t, "plain text", buf.String())
+}
+
+func TestLockedWriterFormatsJSONEventsForHumanReadableAdhocOutput(t *testing.T) {
+	var mu sync.Mutex
+	var buf bytes.Buffer
+	w := &lockedWriter{mu: &mu, buf: &buf}
+	event, errJSON := json.Marshal(streamEvent{Type: "text", SessionID: "adhoc-output-session", Part: part{Text: "done for humans"}, Timestamp: time.Now().UnixMilli()})
+	assert.NoError(t, errJSON)
+
+	_, errWrite := w.Write(append(event, '\n'))
+
+	assert.NoError(t, errWrite)
+	assert.Contains(t, buf.String(), "done for humans")
+	assert.NotContains(t, buf.String(), `{"type":"text"`)
+	assert.NotContains(t, buf.String(), `"sessionID":"adhoc-output-session"`)
+}
+
+func TestLockedWriterFormatsJSONEventsAcrossChunkedWrites(t *testing.T) {
+	var mu sync.Mutex
+	var buf bytes.Buffer
+	w := &lockedWriter{mu: &mu, buf: &buf}
+	event, errJSON := json.Marshal(streamEvent{Type: "text", SessionID: "adhoc-chunk-session", Part: part{Text: "chunked human output"}, Timestamp: time.Now().UnixMilli()})
+	assert.NoError(t, errJSON)
+
+	_, errFirst := w.Write(event[:20])
+	_, errSecond := w.Write(append(event[20:], '\n'))
+
+	assert.NoError(t, errFirst)
+	assert.NoError(t, errSecond)
+	assert.Contains(t, buf.String(), "chunked human output")
+	assert.NotContains(t, buf.String(), `{"type":"text"`)
+	assert.NotContains(t, buf.String(), `"sessionID":"adhoc-chunk-session"`)
 }
 
 func TestAnsiEscapePatternMatches(t *testing.T) {
