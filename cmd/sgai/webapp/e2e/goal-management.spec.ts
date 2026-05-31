@@ -31,11 +31,9 @@ test.describe("Goal Management Workflow", () => {
 
         await page.keyboard.press("Control+a");
         await page.keyboard.type(`---
-flow: |
-  "go"
-models:
-  "coordinator": "opencode/glm-5"
-  "go": "opencode/glm-5"
+agents:
+  - "go"
+model: "opencode/glm-5"
 completionGateScript: make test
 ---
 
@@ -170,7 +168,7 @@ completionGateScript: make test
       if (hasEditor) {
         await editor.click();
 
-        await page.keyboard.type('flow: |\n  "');
+        await page.keyboard.type('agents:\n  - "');
 
         await page.waitForTimeout(1000);
 

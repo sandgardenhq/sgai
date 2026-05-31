@@ -148,61 +148,38 @@ function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizard
 }
 
 const DEFAULT_COORDINATOR_MODEL = "openai/gpt-5.5 (xhigh)";
-const DEFAULT_WORKER_MODEL = "openai/gpt-5.5 (low)";
-
-function defaultModelForAgent(agentName: string): string {
-  return agentName === "coordinator" ? DEFAULT_COORDINATOR_MODEL : DEFAULT_WORKER_MODEL;
-}
 
 interface TechStackMapping {
   agents: string[];
-  flow: string[];
 }
 
 const TECH_STACK_AGENT_MAP: Record<string, TechStackMapping> = {
   go: {
     agents: ["go"],
-    flow: [
-      '"go"',
-    ],
   },
   htmx: {
     agents: ["htmx-picocss"],
-    flow: ['"htmx-picocss"'],
   },
   react: {
     agents: ["react"],
-    flow: ['"react"'],
   },
   python: {
     agents: ["general-purpose"],
-    flow: [],
   },
   typescript: {
     agents: [],
-    flow: [],
   },
   shell: {
     agents: ["shell-script"],
-    flow: ['"shell-script"'],
   },
   "general-purpose": {
     agents: ["general-purpose"],
-    flow: [],
   },
   claudesdk: {
     agents: ["general-purpose", "agent-sdk-verifier-ts", "agent-sdk-verifier-py"],
-    flow: [
-      '"general-purpose" -> "agent-sdk-verifier-ts"',
-      '"general-purpose" -> "agent-sdk-verifier-py"',
-    ],
   },
   openaisdk: {
     agents: ["general-purpose", "openai-sdk-verifier-ts", "openai-sdk-verifier-py"],
-    flow: [
-      '"general-purpose" -> "openai-sdk-verifier-ts"',
-      '"general-purpose" -> "openai-sdk-verifier-py"',
-    ],
   },
 };
 
@@ -210,16 +187,6 @@ const RETIRED_AGENT_NAMES = new Set(["stpa-analyst"]);
 
 function sanitizeComposerAgents(agents: ApiComposerAgentConf[]): ApiComposerAgentConf[] {
   return agents.filter((agent) => !RETIRED_AGENT_NAMES.has(agent.name));
-}
-
-function sanitizeComposerFlow(flow: string): string {
-  return flow
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      return trimmed && !Array.from(RETIRED_AGENT_NAMES).some((name) => trimmed.includes(name));
-    })
-    .join("\n");
 }
 
 function mergeComposerAgents(
@@ -240,23 +207,10 @@ function mergeComposerAgents(
   return mergedAgents;
 }
 
-function mergeComposerFlow(serverFlow: string, generatedFlow: string): string {
-  const flowLines = [
-    ...sanitizeComposerFlow(serverFlow).split("\n"),
-    ...sanitizeComposerFlow(generatedFlow).split("\n"),
-  ].flatMap((line) => {
-    const trimmedLine = line.trim();
-    return trimmedLine ? [trimmedLine] : [];
-  });
-
-  return [...new Set(flowLines)].join("\n");
-}
-
-function computeAgentsAndFlowFromTechStack(
+function computeAgentsFromTechStack(
   techStack: string[],
-): { agents: ApiComposerAgentConf[]; flow: string } {
-  const agentSet = new Set<string>(["coordinator"]);
-  const flowLines: string[] = [];
+): ApiComposerAgentConf[] {
+  const agentSet = new Set<string>();
 
   for (const tech of techStack) {
     const mapping = TECH_STACK_AGENT_MAP[tech];
@@ -264,32 +218,25 @@ function computeAgentsAndFlowFromTechStack(
     for (const agent of mapping.agents) {
       agentSet.add(agent);
     }
-    for (const line of mapping.flow) {
-      flowLines.push(line);
-    }
   }
 
-  const agents: ApiComposerAgentConf[] = Array.from(agentSet)
+  return Array.from(agentSet)
     .sort()
-    .map((name) => ({ name, selected: true, model: defaultModelForAgent(name) }));
-
-  const uniqueFlowLines = [...new Set(flowLines)];
-
-  return { agents, flow: uniqueFlowLines.join("\n") };
+    .map((name) => ({ name, selected: true }));
 }
 
 function buildComposerStateFromData(
   data: WizardStepData,
   serverState: ApiComposerState | null,
 ): ApiComposerState {
-  const { agents, flow } = computeAgentsAndFlowFromTechStack(data.techStack);
+  const agents = computeAgentsFromTechStack(data.techStack);
 
   return {
     description: data.description,
     completionGate: data.completionGate,
     retrospective: data.retrospective,
     agents: mergeComposerAgents(serverState?.agents ?? [], agents),
-    flow: mergeComposerFlow(serverState?.flow ?? "", flow),
+    model: serverState?.model || DEFAULT_COORDINATOR_MODEL,
     tasks: serverState?.tasks ?? "",
   };
 }

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
@@ -19,7 +20,6 @@ type workflowRunner struct {
 	goalPath         string
 	coord            *state.Coordinator
 	metadata         GoalMetadata
-	flowDag          *dag
 	wfState          state.Workflow
 	retroDir         string
 	paddedsgai       string
@@ -29,6 +29,64 @@ type workflowRunner struct {
 	retroLogs        retroLogWriters
 	iterationCounter int
 	previousAgent    string
+}
+
+func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent string, coord *state.Coordinator, paddedsgai string) {
+	if currentAgent != "retrospective" {
+		return
+	}
+	if wfState.InteractionMode == state.ModeRetrospective {
+		return
+	}
+	wfState.InteractionMode = state.ModeRetrospective
+	snapshot := *wfState
+	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+		*wf = snapshot
+	}); errUpdate != nil {
+		log.Fatalln("failed to save state for retrospective unlock:", errUpdate)
+	}
+	fmt.Println("["+paddedsgai+"]", "transitioning to retrospective mode")
+}
+
+func addAgentHandoffProgress(wfState *state.Workflow, targetAgent string) {
+	progressEntry := state.ProgressEntry{
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		Agent:       "sgai",
+		Description: fmt.Sprintf("Handing off to %s", targetAgent),
+	}
+	wfState.Progress = append(wfState.Progress, progressEntry)
+}
+
+func markCurrentAgentInSequence(s *state.Workflow, currentAgent string) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	lastIdx := len(s.AgentSequence) - 1
+	if lastIdx >= 0 && s.AgentSequence[lastIdx].Agent == currentAgent {
+		s.AgentSequence[lastIdx].IsCurrent = true
+		return
+	}
+	for i := range s.AgentSequence {
+		s.AgentSequence[i].IsCurrent = false
+	}
+	s.AgentSequence = append(s.AgentSequence, state.AgentSequenceEntry{
+		Agent:     currentAgent,
+		StartTime: now,
+		IsCurrent: true,
+	})
+}
+
+func initVisitCounts(agents []string) map[string]int {
+	counts := make(map[string]int)
+	for _, agent := range agents {
+		counts[agent] = 0
+	}
+	return counts
+}
+
+func canResumeWorkflow(wfState state.Workflow, newChecksum string) bool {
+	if wfState.Status == "" || wfState.GoalChecksum == "" {
+		return false
+	}
+	return wfState.GoalChecksum == newChecksum
 }
 
 type retroLogWriters struct {
@@ -43,6 +101,15 @@ const (
 	resultComplete
 	resultInterrupt
 )
+
+func runWorkflow(ctx context.Context, dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
+	runner, cleanup, ok := buildWorkflowRunner(dir, mcpURL, logWriter, sessionCoord)
+	if !ok {
+		return
+	}
+	defer cleanup()
+	runner.run(ctx)
+}
 
 func (r *workflowRunner) run(ctx context.Context) {
 	for {
@@ -65,17 +132,14 @@ func (r *workflowRunner) run(ctx context.Context) {
 }
 
 func (r *workflowRunner) resolveCurrentAgent() string {
-	if r.wfState.CurrentAgent == "" {
-		return "coordinator"
-	}
-	return r.wfState.CurrentAgent
+	return "coordinator"
 }
 
 func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runResult {
 	r.prepareAgent(currentAgent)
 
 	var errReload error
-	r.metadata, errReload = tryReloadGoalMetadata(r.goalPath, r.metadata, r.flowDag)
+	r.metadata, errReload = parseYAMLFrontmatterFromFile(r.goalPath)
 	if errReload != nil {
 		log.Println("failed to reload GOAL.md frontmatter:", errReload)
 		return resultInterrupt
@@ -98,10 +162,8 @@ func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runR
 	return resultContinue
 }
 
-func (r *workflowRunner) resolveNextAgent(currentAgent string) string {
+func (r *workflowRunner) resolveNextAgent(_ string) string {
 	if r.wfState.Navigate != nil && r.wfState.Navigate.To != "" {
-		nextAgent := r.wfState.Navigate.To
-		fmt.Println("["+r.paddedsgai+"]", "navigating to", nextAgent)
 		r.wfState.Navigate = nil
 		snapshot := r.wfState
 		if errUpdate := r.coord.UpdateState(func(wf *state.Workflow) {
@@ -109,28 +171,9 @@ func (r *workflowRunner) resolveNextAgent(currentAgent string) string {
 		}); errUpdate != nil {
 			log.Println("failed to clear navigation request:", errUpdate)
 		}
-		return nextAgent
 	}
 
-	if r.flowDag.isTerminal(currentAgent) {
-		fmt.Println("["+r.paddedsgai+"]", "reached terminal node", currentAgent)
-		return "coordinator"
-	}
-
-	if currentAgent == "coordinator" {
-		for _, entryNode := range r.flowDag.parsedEntryNodes {
-			if entryNode != "coordinator" {
-				return entryNode
-			}
-		}
-		for _, successor := range r.flowDag.getSuccessors(currentAgent) {
-			if successor != "retrospective" {
-				return successor
-			}
-		}
-	}
-
-	return determineNextAgent(r.flowDag, currentAgent)
+	return "coordinator"
 }
 
 func (r *workflowRunner) prepareAgent(currentAgent string) {
@@ -161,7 +204,6 @@ func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) 
 		dir:              r.dir,
 		goalPath:         r.goalPath,
 		agent:            currentAgent,
-		flowDag:          r.flowDag,
 		statePath:        filepath.Join(r.dir, ".sgai", "state.json"),
 		coord:            r.coord,
 		retrospectiveDir: r.retroDir,
@@ -172,8 +214,7 @@ func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) 
 		stdoutLog:        r.retroLogs.stdout,
 		stderrLog:        r.retroLogs.stderr,
 	}
-	modelSpec := getModelForAgent(r.metadata.Models, currentAgent)
-	return runSingleModelIteration(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter, modelSpec)
+	return runSingleModelIteration(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter)
 }
 
 func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt string) {
@@ -273,24 +314,6 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		log.Fatalln("failed to apply custom MCPs:", errMCP)
 	}
 
-	flowDag, errFlow := parseFlow(metadata.Flow, dir)
-	if errFlow != nil {
-		log.Fatalln("failed to parse flow:", errFlow)
-	}
-
-	retrospectiveOn := retrospectiveEnabled(metadata)
-	if retrospectiveOn {
-		flowDag.injectRetrospectiveEdge()
-	} else {
-		flowDag.removeRetrospective()
-	}
-
-	ensureImplicitRetrospectiveModel(flowDag, &metadata)
-
-	if errModels := validateModels(metadata.Models); errModels != nil {
-		log.Fatalln(errModels)
-	}
-
 	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
 	coord := sessionCoord
 	if coord == nil {
@@ -310,8 +333,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		log.Fatalln("failed to compute GOAL.md checksum:", errChecksum)
 	}
 
-	dagAgents := flowDag.allAgents()
-	allAgents := buildAllAgents(dagAgents)
+	allAgents := buildAllAgents(metadata.Agents)
 
 	workspaceName := filepath.Base(dir)
 	longestNameLen := computeLongestNameLen(allAgents)
@@ -323,6 +345,7 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	_, errStateStat := os.Stat(stateJSONPath)
 	resuming := errStateStat == nil && canResumeWorkflow(wfState, newChecksum)
 
+	retrospectiveOn := retrospectiveEnabled(metadata)
 	retroDir := ""
 	if retrospectiveOn {
 		retroDir = resolveRetrospectiveDir(resuming, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
@@ -369,27 +392,12 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		wfState = coord.State()
 	}
 
-	if !retrospectiveOn {
-		sanitizedState, changed := sanitizeDisabledRetrospectiveState(wfState)
-		if changed {
-			if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-				*wf = sanitizedState
-			}); errUpdate != nil {
-				log.Println("failed to sanitize disabled retrospective state:", errUpdate)
-				cleanup()
-				return nil, func() {}, false
-			}
-			wfState = coord.State()
-		}
-	}
-
 	retroLogs := retroLogWriters{stdout: retroStdoutLog, stderr: retroStderrLog}
 	runner := &workflowRunner{
 		dir:            dir,
 		goalPath:       goalPath,
 		coord:          coord,
 		metadata:       metadata,
-		flowDag:        flowDag,
 		wfState:        wfState,
 		retroDir:       retroDir,
 		paddedsgai:     paddedsgai,
@@ -401,39 +409,42 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	return runner, cleanup, true
 }
 
-func sanitizeDisabledRetrospectiveState(wfState state.Workflow) (state.Workflow, bool) {
-	changed := false
-	if wfState.CurrentAgent == "retrospective" {
-		wfState.CurrentAgent = "coordinator"
-		changed = true
+func buildAllAgents(goalAgents []string) []string {
+	goalAgents = runtimeGoalAgents(goalAgents)
+	if slices.Contains(goalAgents, "coordinator") {
+		return goalAgents
 	}
-	if wfState.InteractionMode == state.ModeRetrospective {
-		wfState.InteractionMode = state.ModeBuilding
-		changed = true
-	}
-	if _, exists := wfState.VisitCounts["retrospective"]; exists {
-		delete(wfState.VisitCounts, "retrospective")
-		changed = true
-	}
-	if wfState.Navigate != nil && wfState.Navigate.To == "retrospective" {
-		wfState.Navigate = nil
-		changed = true
-	}
-	agentSequence := slices.DeleteFunc(wfState.AgentSequence, func(entry state.AgentSequenceEntry) bool {
-		return entry.Agent == "retrospective"
-	})
-	if len(agentSequence) != len(wfState.AgentSequence) {
-		wfState.AgentSequence = agentSequence
-		changed = true
-	}
-	return wfState, changed
+	return append([]string{"coordinator"}, goalAgents...)
 }
 
-func buildAllAgents(dagAgents []string) []string {
-	if slices.Contains(dagAgents, "coordinator") {
-		return dagAgents
+func runtimeGoalAgents(goalAgents []string) []string {
+	agents := make([]string, 0, len(goalAgents))
+	for _, agent := range goalAgents {
+		if isRetiredWorkflowAgent(agent) {
+			continue
+		}
+		agents = append(agents, agent)
 	}
-	return append([]string{"coordinator"}, dagAgents...)
+	return agents
+}
+
+func delegatableAgents(agents []string) []string {
+	delegatable := make([]string, 0, len(agents))
+	for _, agent := range agents {
+		if !isDelegatableAgent(agent) {
+			continue
+		}
+		delegatable = append(delegatable, agent)
+	}
+	return delegatable
+}
+
+func isDelegatableAgent(agent string) bool {
+	return agent != "" && agent != "coordinator" && !isRetiredWorkflowAgent(agent)
+}
+
+func isRetiredWorkflowAgent(agent string) bool {
+	return agent == "stpa-analyst"
 }
 
 func computeLongestNameLen(agents []string) int {

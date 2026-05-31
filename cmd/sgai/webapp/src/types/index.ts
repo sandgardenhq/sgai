@@ -22,7 +22,6 @@ export interface ApiWorkspaceEntry {
   fullGoalContent?: string;
   pmContent: string;
   hasProjectMgmt: boolean;
-  svgHash: string;
   totalExecTime: string;
   latestProgress: string;
   humanMessage: string;
@@ -331,7 +330,6 @@ export interface ApiForkEntry {
 export interface ApiComposerAgentConf {
   name: string;
   selected: boolean;
-  model: string;
 }
 
 export interface ApiComposerState {
@@ -339,7 +337,7 @@ export interface ApiComposerState {
   completionGate: string;
   retrospective: boolean;
   agents: ApiComposerAgentConf[];
-  flow: string;
+  model: string;
   tasks: string;
 }
 
@@ -364,7 +362,6 @@ export interface ApiComposeStateResponse {
   state: ApiComposerState;
   wizard: ApiWizardState;
   techStackItems: ApiTechStackItem[];
-  flowError?: string;
 }
 
 export interface ApiComposeTemplateEntry {
@@ -373,7 +370,6 @@ export interface ApiComposeTemplateEntry {
   description: string;
   icon: string;
   agents: ApiComposerAgentConf[];
-  flow: string;
 }
 
 export interface ApiComposeTemplatesResponse {
@@ -382,7 +378,6 @@ export interface ApiComposeTemplatesResponse {
 
 export interface ApiComposePreviewResponse {
   content: string;
-  flowError?: string;
   etag: string;
 }
 

@@ -163,22 +163,6 @@ Response:
 }
 ```
 
-## Get Workflow SVG Diagram
-
-Get a visual diagram of the agent workflow.
-
-**Endpoint:** `GET /api/v1/workspaces/{name}/workflow.svg`
-
-```bash
-# Save to file
-curl -s $BASE_URL/api/v1/workspaces/my-project/workflow.svg > workflow.svg
-
-# Or open directly in browser
-open $BASE_URL/api/v1/workspaces/my-project/workflow.svg
-```
-
-Returns SVG with the agent flow graph. The current agent is highlighted.
-
 ## Monitor Agent Sequence
 
 The `agentSequence` field shows the execution history:

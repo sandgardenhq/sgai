@@ -2,12 +2,9 @@ package main
 
 import (
 	"io/fs"
-	"log"
-	"maps"
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 )
 
 type listAgentsResult struct {
@@ -135,19 +132,12 @@ type listModelsResult struct {
 	DefaultModel string
 }
 
-func (s *Server) listModelsService(workspaceName string) listModelsResult {
-	validModels, errFetch := fetchValidModels()
-	if errFetch != nil {
-		log.Println("cannot fetch models:", errFetch)
-		return listModelsResult{Models: []apiModelEntry{}}
-	}
-
-	modelNames := slices.Sorted(maps.Keys(validModels))
-	entries := make([]apiModelEntry, 0, len(modelNames))
-	for _, name := range modelNames {
-		entries = append(entries, apiModelEntry{ID: name, Name: name})
+func (s *Server) listModelsService(workspaceName string) (listModelsResult, error) {
+	catalog, errModels := fetchValidModels()
+	if errModels != nil {
+		return listModelsResult{}, errModels
 	}
 
 	defaultModel := s.coordinatorModelFromWorkspace(workspaceName)
-	return listModelsResult{Models: entries, DefaultModel: defaultModel}
+	return listModelsResult{Models: modelEntries(catalog), DefaultModel: defaultModel}, nil
 }

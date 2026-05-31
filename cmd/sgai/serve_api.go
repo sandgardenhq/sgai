@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"maps"
@@ -18,7 +17,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
@@ -95,8 +93,6 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhoc)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{name}/adhoc", s.handleAPIAdhocStop)
 
-	mux.HandleFunc("GET /api/v1/workspaces/{name}/workflow.svg", s.handleAPIWorkflowSVG)
-	mux.HandleFunc("POST /api/v1/workspaces/{name}/steer", s.handleAPISteer)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/pin", s.handleAPITogglePin)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor", s.handleAPIOpenEditor)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
@@ -175,7 +171,6 @@ type apiWorkspaceFullState struct {
 	FullGoalContent string                      `json:"fullGoalContent"`
 	PMContent       string                      `json:"pmContent"`
 	HasProjectMgmt  bool                        `json:"hasProjectMgmt"`
-	SVGHash         string                      `json:"svgHash"`
 	TotalExecTime   string                      `json:"totalExecTime"`
 	LatestProgress  string                      `json:"latestProgress"`
 	HumanMessage    string                      `json:"humanMessage"`
@@ -379,7 +374,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		FullGoalContent: fullGoalContent,
 		PMContent:       pmContent,
 		HasProjectMgmt:  hasProjectMgmt,
-		SVGHash:         s.getWorkflowSVGHashCached(ws.Directory, currentAgent),
 		TotalExecTime:   totalExecTime,
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		HumanMessage:    wfState.HumanMessage,
@@ -555,6 +549,9 @@ func collectAgents(workspacePath string) []apiAgentEntry {
 			return nil
 		}
 		name := strings.TrimSuffix(p, ".md")
+		if isRetiredWorkflowAgent(name) {
+			return nil
+		}
 		content, errRead := fs.ReadFile(agentsFS, p)
 		if errRead != nil {
 			return nil
@@ -1418,7 +1415,6 @@ type apiComposeStateResponse struct {
 	State          composerState      `json:"state"`
 	Wizard         apiWizardState     `json:"wizard"`
 	TechStackItems []apiTechStackItem `json:"techStackItems"`
-	FlowError      string             `json:"flowError,omitempty"`
 }
 
 type apiWizardState struct {
@@ -1450,13 +1446,6 @@ func (s *Server) handleAPIComposeState(w http.ResponseWriter, r *http.Request) {
 	wizard := syncWizardState(cs.wizard, currentState)
 	cs.mu.Unlock()
 
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
 	techStack := buildAPITechStackItems(wizard.TechStack)
 
 	writeJSON(w, apiComposeStateResponse{
@@ -1464,7 +1453,6 @@ func (s *Server) handleAPIComposeState(w http.ResponseWriter, r *http.Request) {
 		State:          currentState,
 		Wizard:         apiWizardState(wizard),
 		TechStackItems: techStack,
-		FlowError:      flowErr,
 	})
 }
 
@@ -1474,8 +1462,9 @@ func buildAPITechStackItems(selectedTech []string) []apiTechStackItem {
 		selectedMap[ts] = true
 	}
 
-	items := make([]apiTechStackItem, len(defaultTechStackItems))
-	for i, item := range defaultTechStackItems {
+	defaults := defaultTechStackItems()
+	items := make([]apiTechStackItem, len(defaults))
+	for i, item := range defaults {
 		items[i] = apiTechStackItem{
 			ID:       item.ID,
 			Name:     item.Name,
@@ -1548,7 +1537,6 @@ type apiComposeTemplateEntry struct {
 	Description string              `json:"description"`
 	Icon        string              `json:"icon"`
 	Agents      []composerAgentConf `json:"agents"`
-	Flow        string              `json:"flow"`
 }
 
 type apiComposeTemplatesResponse struct {
@@ -1556,8 +1544,9 @@ type apiComposeTemplatesResponse struct {
 }
 
 func (s *Server) handleAPIComposeTemplates(w http.ResponseWriter, _ *http.Request) {
-	entries := make([]apiComposeTemplateEntry, len(workflowTemplates))
-	for i, tmpl := range workflowTemplates {
+	templates := workflowTemplates()
+	entries := make([]apiComposeTemplateEntry, len(templates))
+	for i, tmpl := range templates {
 		entries[i] = apiComposeTemplateEntry(tmpl)
 	}
 
@@ -1565,9 +1554,8 @@ func (s *Server) handleAPIComposeTemplates(w http.ResponseWriter, _ *http.Reques
 }
 
 type apiComposePreviewResponse struct {
-	Content   string `json:"content"`
-	FlowError string `json:"flowError,omitempty"`
-	Etag      string `json:"etag"`
+	Content string `json:"content"`
+	Etag    string `json:"etag"`
 }
 
 func (s *Server) handleAPIComposePreview(w http.ResponseWriter, r *http.Request) {
@@ -1584,13 +1572,6 @@ func (s *Server) handleAPIComposePreview(w http.ResponseWriter, r *http.Request)
 
 	preview := buildGOALContent(currentState)
 
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
 	goalPath := filepath.Join(workspacePath, "GOAL.md")
 	existingContent, errRead := os.ReadFile(goalPath)
 	if errRead != nil && !os.IsNotExist(errRead) {
@@ -1600,9 +1581,8 @@ func (s *Server) handleAPIComposePreview(w http.ResponseWriter, r *http.Request)
 	etag := computeEtag(existingContent)
 
 	writeJSON(w, apiComposePreviewResponse{
-		Content:   preview,
-		FlowError: flowErr,
-		Etag:      etag,
+		Content: preview,
+		Etag:    etag,
 	})
 }
 
@@ -1984,10 +1964,6 @@ func (s *Server) handleAPIUpdateGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefix := workspacePath + "|"
-	s.svgCache.deleteFunc(func(k string) bool {
-		return strings.HasPrefix(k, prefix)
-	})
 	s.notifyStateChange()
 
 	writeJSON(w, apiUpdateGoalResponse{
@@ -2013,17 +1989,9 @@ func (s *Server) handleAPIAdhocStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	st := s.getAdhocState(workspacePath)
-	st.mu.Lock()
-	running := st.running
-	output := st.output.String()
-	st.mu.Unlock()
+	result := s.adhocStatusService(workspacePath)
 
-	writeJSON(w, apiAdhocResponse{
-		Running: running,
-		Output:  output,
-		Message: "adhoc status",
-	})
+	writeJSON(w, apiAdhocResponse(result))
 }
 
 func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
@@ -2038,81 +2006,27 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Prompt) == "" || strings.TrimSpace(req.Model) == "" {
-		http.Error(w, "prompt and model are required", http.StatusBadRequest)
+	result := s.adhocStartService(workspacePath, req.Prompt, req.Model)
+	if result.Error != nil {
+		status := http.StatusInternalServerError
+		if result.BadRequest {
+			status = http.StatusBadRequest
+		}
+		http.Error(w, result.Error.Error(), status)
 		return
 	}
-
-	st := s.getAdhocState(workspacePath)
-	st.mu.Lock()
-	if st.running {
-		output := st.output.String()
-		st.mu.Unlock()
+	if result.Message == "ad-hoc prompt already running" {
 		writeJSON(w, apiAdhocResponse{
-			Running: true,
-			Output:  output,
-			Message: "ad-hoc prompt already running",
+			Running: result.Running,
+			Output:  result.Output,
+			Message: result.Message,
 		})
 		return
 	}
 
-	st.running = true
-	st.output.Reset()
-	st.rawOutput.Reset()
-	st.selectedModel = strings.TrimSpace(req.Model)
-	st.promptText = strings.TrimSpace(req.Prompt)
-
-	args := buildAdhocArgs(st.selectedModel)
-	cmd := exec.Command("opencode", args...)
-	cmd.Dir = workspacePath
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(workspacePath, ".sgai"))
-	cmd.Stdin = strings.NewReader(st.promptText)
-	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
-	rawWriter := &lockedWriter{mu: &st.mu, buf: &st.rawOutput, raw: true}
-	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
-	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
-	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-	cmd.Stdout = io.MultiWriter(stdoutPW, writer, rawWriter)
-	cmd.Stderr = io.MultiWriter(stderrPW, writer)
-	commandLine := "$ opencode " + strings.Join(args, " ")
-	promptLine := "prompt: " + st.promptText
-	_, _ = fmt.Fprintln(stderrPW, commandLine)
-	_, _ = fmt.Fprintln(stderrPW, promptLine)
-	st.output.WriteString(commandLine + "\n")
-	st.output.WriteString(promptLine + "\n")
-
-	if errStart := cmd.Start(); errStart != nil {
-		st.running = false
-		st.mu.Unlock()
-		http.Error(w, "failed to start command", http.StatusInternalServerError)
-		return
-	}
-
-	st.cmd = cmd
-	st.mu.Unlock()
-
-	go func() {
-		errWait := cmd.Wait()
-		st.mu.Lock()
-		if errWait != nil {
-			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
-		}
-		rawOutput := st.rawOutput.String()
-		model := st.selectedModel
-		st.running = false
-		st.cmd = nil
-		st.mu.Unlock()
-		if errWait == nil {
-			s.reconcileAdhocUsage(workspacePath, rawOutput, model)
-		}
-	}()
-
-	s.notifyStateChange()
-
 	writeJSON(w, apiAdhocResponse{
-		Running: true,
-		Message: "ad-hoc prompt started",
+		Running: result.Running,
+		Message: result.Message,
 	})
 }
 
@@ -2131,44 +2045,9 @@ func (s *Server) handleAPIAdhocStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	st := s.getAdhocState(workspacePath)
-	st.stop()
-	s.notifyStateChange()
+	result := s.adhocStopService(workspacePath)
 
-	st.mu.Lock()
-	output := st.output.String()
-	st.mu.Unlock()
-
-	writeJSON(w, apiAdhocResponse{
-		Running: false,
-		Output:  output,
-		Message: "ad-hoc stopped",
-	})
-}
-
-func (s *Server) handleAPIWorkflowSVG(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	wfState := s.workspaceCoordinator(workspacePath).State()
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
-	svg := s.getWorkflowSVGCached(workspacePath, currentAgent)
-	if svg == "" {
-		http.Error(w, "workflow SVG not available", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "no-cache")
-	if _, errWrite := w.Write([]byte(svg)); errWrite != nil {
-		log.Println("failed to write workflow SVG:", errWrite)
-	}
+	writeJSON(w, apiAdhocResponse(result))
 }
 
 type apiCommitEntry struct {
@@ -2238,41 +2117,6 @@ func (s *Server) filteredCommitsForWorkspace(workspacePath string) []jjCommit {
 	default:
 		return s.runJJLogForWorkspaceCached(workspacePath)
 	}
-}
-
-type apiSteerRequest struct {
-	Message string `json:"message"`
-}
-
-type apiSteerResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
-func (s *Server) handleAPISteer(w http.ResponseWriter, r *http.Request) {
-	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
-	if !ok {
-		return
-	}
-
-	var req apiSteerRequest
-	if errDecode := json.NewDecoder(r.Body).Decode(&req); errDecode != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if strings.TrimSpace(req.Message) == "" {
-		http.Error(w, "message cannot be empty", http.StatusBadRequest)
-		return
-	}
-
-	result, errSteer := s.steerService(workspacePath, req.Message)
-	if errSteer != nil {
-		http.Error(w, errSteer.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, apiSteerResponse(result))
 }
 
 type apiTogglePinResponse struct {
@@ -2379,24 +2223,13 @@ type apiModelsResponse struct {
 }
 
 func (s *Server) handleAPIListModels(w http.ResponseWriter, r *http.Request) {
-	validModels, errFetch := fetchValidModels()
-	if errFetch != nil {
-		log.Println("cannot fetch models:", errFetch)
-		writeJSON(w, apiModelsResponse{Models: []apiModelEntry{}})
+	models, errModels := s.listModelsService(r.URL.Query().Get("workspace"))
+	if errModels != nil {
+		http.Error(w, errModels.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	modelNames := slices.Sorted(maps.Keys(validModels))
-	entries := make([]apiModelEntry, 0, len(modelNames))
-	for _, name := range modelNames {
-		entries = append(entries, apiModelEntry{
-			ID:   name,
-			Name: name,
-		})
-	}
-
-	defaultModel := s.coordinatorModelFromWorkspace(r.URL.Query().Get("workspace"))
-	writeJSON(w, apiModelsResponse{Models: entries, DefaultModel: defaultModel})
+	writeJSON(w, apiModelsResponse(models))
 }
 
 func (s *Server) coordinatorModelFromWorkspace(workspace string) string {
@@ -2407,11 +2240,11 @@ func (s *Server) coordinatorModelFromWorkspace(workspace string) string {
 	if workspacePath == "" {
 		return ""
 	}
-	models := modelsForAgentFromGoal(workspacePath, "coordinator")
-	if len(models) == 0 {
+	model := modelFromGoal(workspacePath)
+	if model == "" {
 		return ""
 	}
-	baseModel, _ := parseModelAndVariant(models[0])
+	baseModel, _ := parseModelAndVariant(model)
 	return baseModel
 }
 

@@ -49,7 +49,7 @@ If already running:
 
 ### Model Format
 
-The model parameter accepts the same format as GOAL.md models:
+The model parameter accepts the same format as a GOAL.md model value:
 - `"openai/gpt-5.5 (low)"` — cost-conscious GPT-5.5 baseline
 - `"openai/gpt-5.5 (xhigh)"` — high-reasoning GPT-5.5 variant
 - Use `GET /api/v1/models` to list available models

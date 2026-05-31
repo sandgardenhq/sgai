@@ -1,0 +1,16 @@
+- generic [ref=e2]:
+  - alert [ref=e3]:
+    - generic [ref=e4]: Enable browser notifications to get alerted when a workspace needs your input.
+    - generic [ref=e5]:
+      - button "Enable" [ref=e6]
+      - button "Dismiss" [ref=e7]
+  - main [ref=e9]:
+    - generic [ref=e22]:
+      - generic [ref=e25]:
+        - generic [ref=e26]
+        - generic [ref=e33]
+        - button "[ + ]" [ref=e45]
+        - button "Toggle Sidebar" [ref=e46]
+      - generic [ref=e48]:
+        - button "Toggle Sidebar" [ref=e50]
+        - main [ref=e52]

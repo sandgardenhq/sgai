@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/xml"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 type workspaceStateResult struct {
@@ -32,15 +37,6 @@ func (s *Server) getWorkspaceStateService(workspaceName string) (workspaceStateR
 	return workspaceStateResult{Found: false}, nil
 }
 
-func (s *Server) getWorkflowSVGService(workspacePath string) string {
-	wfState := s.workspaceCoordinator(workspacePath).State()
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-	return s.getWorkflowSVGCached(workspacePath, currentAgent)
-}
-
 type workspaceDiffResult struct {
 	Diff string
 }
@@ -50,6 +46,31 @@ func (s *Server) workspaceDiffService(workspacePath string) workspaceDiffResult 
 		return workspaceDiffResult{}
 	}
 	return workspaceDiffResult{Diff: collectJJFullDiff(workspacePath)}
+}
+
+func (s *Server) getAgentDelegationSVGService(workspacePath string) string {
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	if _, errStat := os.Stat(goalPath); errStat != nil {
+		return ""
+	}
+	metadata, errParse := parseYAMLFrontmatterFromFile(goalPath)
+	if errParse != nil {
+		return ""
+	}
+	agents := delegatableAgents(metadata.Agents)
+	if len(agents) == 0 {
+		return ""
+	}
+	return buildAgentDelegationSVG(agents)
+}
+
+func buildAgentDelegationSVG(agents []string) string {
+	var buf bytes.Buffer
+	errEscape := xml.EscapeText(&buf, []byte(strings.Join(agents, " → ")))
+	if errEscape != nil {
+		return ""
+	}
+	return `<svg xmlns="http://www.w3.org/2000/svg"><text>` + buf.String() + `</text></svg>`
 }
 
 type updateDescriptionResult struct {

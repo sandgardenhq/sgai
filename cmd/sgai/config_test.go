@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -158,9 +157,7 @@ func TestValidateProjectConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.config != nil && tt.config.DefaultModel != "" {
-				if _, err := exec.LookPath("opencode"); err != nil {
-					t.Skip("opencode not found in PATH")
-				}
+				setupFakeOpenCode(t, fakeModelsVerboseOutput, 0)
 			}
 
 			err := validateProjectConfig(tt.config)
@@ -186,13 +183,11 @@ func TestApplyConfigDefaults(t *testing.T) {
 		validate func(*testing.T, *GoalMetadata)
 	}{
 		{
-			name:   "nilConfig",
-			config: nil,
-			metadata: &GoalMetadata{
-				Models: map[string]any{"agent1": "model1"},
-			},
+			name:     "nilConfig",
+			config:   nil,
+			metadata: &GoalMetadata{Model: "model1"},
 			validate: func(t *testing.T, m *GoalMetadata) {
-				assert.Equal(t, "model1", m.Models["agent1"])
+				assert.Equal(t, "model1", m.Model)
 			},
 		},
 		{
@@ -200,36 +195,29 @@ func TestApplyConfigDefaults(t *testing.T) {
 			config: &projectConfig{
 				DefaultModel: "",
 			},
-			metadata: &GoalMetadata{
-				Models: map[string]any{"agent1": "model1"},
-			},
+			metadata: &GoalMetadata{Model: "model1"},
 			validate: func(t *testing.T, m *GoalMetadata) {
-				assert.Equal(t, "model1", m.Models["agent1"])
+				assert.Equal(t, "model1", m.Model)
 			},
 		},
 		{
-			name: "applyDefaultToEmptyAgent",
+			name: "keepsExistingModel",
 			config: &projectConfig{
 				DefaultModel: "default-model",
 			},
-			metadata: &GoalMetadata{
-				Models: map[string]any{
-					"agent1": "model1",
-					"agent2": "",
-				},
-			},
+			metadata: &GoalMetadata{Model: "model1"},
 			validate: func(t *testing.T, m *GoalMetadata) {
-				assert.Equal(t, "model1", m.Models["agent1"])
+				assert.Equal(t, "model1", m.Model)
 			},
 		},
 		{
-			name: "nilModelsMap",
+			name: "appliesDefaultModel",
 			config: &projectConfig{
 				DefaultModel: "default-model",
 			},
 			metadata: &GoalMetadata{},
 			validate: func(t *testing.T, m *GoalMetadata) {
-				assert.NotNil(t, m.Models)
+				assert.Equal(t, "default-model", m.Model)
 			},
 		},
 	}

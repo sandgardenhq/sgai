@@ -36,7 +36,6 @@ const createMockWorkspace = (overrides = {}) => ({
   rawGoalContent: "",
   pmContent: "",
   hasProjectMgmt: false,
-  svgHash: "",
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
