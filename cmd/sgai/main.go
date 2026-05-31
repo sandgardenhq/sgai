@@ -50,13 +50,18 @@ func main() {
 		subcommand = os.Args[1]
 	}
 
-	if subcommand != "help" && subcommand != "-h" && subcommand != "--help" {
+	if requiresOpencode(subcommand) {
 		if _, err := exec.LookPath("opencode"); err != nil {
 			log.Fatalln("opencode is required but not found in PATH")
 		}
 	}
 
 	switch subcommand {
+	case "internal-mcp":
+		if err := runInternalMCP(context.Background(), os.Args[2:]); err != nil {
+			log.Fatalln("internal mcp failed:", err)
+		}
+		return
 	case "help", "-h", "--help":
 		printUsage()
 		return
@@ -66,6 +71,15 @@ func main() {
 	default:
 		cmdServe(os.Args[1:])
 		return
+	}
+}
+
+func requiresOpencode(subcommand string) bool {
+	switch subcommand {
+	case "help", "-h", "--help", "internal-mcp":
+		return false
+	default:
+		return true
 	}
 }
 
@@ -313,11 +327,7 @@ func buildAgentEnv(cfg agentRunConfig, wfState state.Workflow, modelSpec string)
 		agentIdentity = cfg.agent + "|" + model + "|" + variant
 	}
 
-	return append(os.Environ(),
-		"OPENCODE_CONFIG_DIR="+filepath.Join(cfg.dir, ".sgai"),
-		"SGAI_MCP_URL="+cfg.mcpURL,
-		"SGAI_AGENT_IDENTITY="+agentIdentity,
-		"SGAI_MCP_INTERACTIVE="+interactiveEnv)
+	return buildManagedOpenCodeEnv(cfg.dir, cfg.mcpURL, agentIdentity, interactiveEnv)
 }
 
 func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow) (state.Workflow, string, *state.Workflow) {

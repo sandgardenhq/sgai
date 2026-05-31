@@ -51,10 +51,7 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 
 		cmd := exec.CommandContext(ctx, "opencode", "run", "--title", "continuous-mode-prompt")
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"),
-			"SGAI_MCP_URL="+mcpURL,
-			"SGAI_MCP_INTERACTIVE=auto")
+		cmd.Env = buildManagedOpenCodeEnv(dir, mcpURL, "continuous-mode", "auto")
 		cmd.Stdin = strings.NewReader(prompt)
 
 		if errRun := cmd.Run(); errRun != nil {
