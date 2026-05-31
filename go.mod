@@ -3,11 +3,11 @@ module github.com/sandgardenhq/sgai
 go 1.26.3
 
 require (
-	github.com/adhocore/gronx v1.19.7
+	github.com/adhocore/gronx v1.20.0
 	github.com/adrg/xdg v0.5.3
 	github.com/google/jsonschema-go v0.4.3
 	github.com/mactaggart/gographviz v0.0.0-20250815040658-9ffd0326c418
-	github.com/modelcontextprotocol/go-sdk v1.6.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/goldmark v1.8.2
 	github.com/yuin/goldmark-emoji v1.0.6
@@ -22,7 +22,7 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
