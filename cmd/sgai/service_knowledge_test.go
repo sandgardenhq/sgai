@@ -16,7 +16,7 @@ func TestListAgentsService(t *testing.T) {
 		validate  func(*testing.T, listAgentsResult)
 	}{
 		{
-			name: "listAgentsWithAgentFiles",
+			name: "listAgentsWithAgentFilesExcludesRetiredWorkflowAgents",
 			setupFunc: func(t *testing.T, workspacePath string) {
 				agentsDir := filepath.Join(workspacePath, ".sgai", "agent")
 				require.NoError(t, os.MkdirAll(agentsDir, 0755))
@@ -32,6 +32,8 @@ description: Agent 2 description
 # Agent 2 Instructions`
 				agent2Path := filepath.Join(agentsDir, "agent2.md")
 				require.NoError(t, os.WriteFile(agent2Path, []byte(agent2Content), 0644))
+				retiredAgentPath := filepath.Join(agentsDir, "stpa-analyst.md")
+				require.NoError(t, os.WriteFile(retiredAgentPath, []byte("---\ndescription: retired\n---\n"), 0644))
 			},
 			validate: func(t *testing.T, result listAgentsResult) {
 				assert.Len(t, result.Agents, 2)
@@ -41,6 +43,7 @@ description: Agent 2 description
 				}
 				assert.True(t, agentNames["agent1"])
 				assert.True(t, agentNames["agent2"])
+				assert.False(t, agentNames["stpa-analyst"])
 			},
 		},
 		{
@@ -314,7 +317,8 @@ func TestListModelsService(t *testing.T) {
 	require.NoError(t, os.MkdirAll(workspacePath, 0755))
 	require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
 
-	result := server.listModelsService("test-workspace")
+	result, err := server.listModelsService("test-workspace")
+	require.NoError(t, err)
 	assert.NotEmpty(t, result.Models)
 }
 
@@ -323,7 +327,8 @@ func TestListModelsServiceEmptyWorkspace(t *testing.T) {
 	rootDir := t.TempDir()
 	server := NewServer(rootDir)
 
-	result := server.listModelsService("non-existent-workspace")
+	result, err := server.listModelsService("non-existent-workspace")
+	require.NoError(t, err)
 	assert.Empty(t, result.Models)
 	assert.Empty(t, result.DefaultModel)
 }

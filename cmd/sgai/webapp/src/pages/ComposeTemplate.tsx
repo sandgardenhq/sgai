@@ -85,7 +85,7 @@ function buildDraftRequest(template: ApiComposeTemplateEntry) {
       completionGate: "",
       retrospective: false,
       agents: template.agents,
-      flow: template.flow,
+      model: "openai/gpt-5.5 (xhigh)",
       tasks: "",
     },
     wizard: {

@@ -1,36 +1,34 @@
 ---
 name: goal-md-composer
-description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. Use when creating GOAL.md, configuring agents, model lists, flow DAGs, safety-analysis guidance, or starting an SGAI project. Safety Analysis must use coordinator/reviewer stpa-overview skill guidance, not stpa-analyst flow nodes.
+description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. Use when creating GOAL.md, configuring agents and model, safety-analysis guidance, or starting an SGAI project. Safety Analysis must use coordinator/reviewer stpa-overview skill guidance, not stpa-analyst as a GOAL agent.
 ---
 
 # GOAL.md Composer
 
-Guide the user through a complete `GOAL.md` using seven phases: purpose, agents, flow, model configuration, specification writing, options, and validation.
+Guide the user through a complete `GOAL.md` using seven phases: purpose, agents, model configuration, specification writing, options, and validation.
 
 ## Phase 4: Model Configuration
 
-Configure per-agent model assignments.
+Configure the shared model and list available delegate agents.
 
-Default GPT-5.5 recommendations:
+Default GPT-5.5 recommendation:
 
-- `coordinator`: `openai/gpt-5.5 (xhigh)` because orchestration quality dominates workflow quality.
-- Development, review, frontend, utility, specialist, and general-purpose agents: `openai/gpt-5.5 (low)` by default because GPT-5.5 low is the cost-conscious baseline for routine implementation and review.
-- Users may override any agent model when a specific workflow warrants a higher tier.
-- Aliases remain the recommended way to run the same role at multiple cost tiers.
+- A single `model` is used for all agents. The coordinator runs with `openai/gpt-5.5 (xhigh)` for orchestration quality; the OpenCode runtime handles model propagation to subagents.
+- The `agents` list enumerates non-coordinator delegate agents available for OpenCode subagent delegation.
 
-Do not add a model entry for `stpa-analyst`.
+Do not add `stpa-analyst` to the agents list.
 
 Example:
 
 ```yaml
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "react": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
+agents:
+  - "go"
+  - "react"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 ```
 
-Ask: "Do you want to adjust any model assignments?"
+Ask: "Which delegate agents should be available, and what model should be used?"
 
 ## Safety Analysis Guidance
 
@@ -45,14 +43,9 @@ Safety analysis is coordinator/reviewer skill guidance, not a routable flow node
 
 ## Validation Checklist
 
-- [ ] Flow has no cycles
-- [ ] Coordinator is not in the flow
-- [ ] `stpa-analyst` is not in the flow
-- [ ] `stpa-analyst` is not in models
+- [ ] `stpa-analyst` is not in the agents list
 - [ ] Safety Analysis, if selected, appears as coordinator/reviewer `stpa-overview` guidance
-- [ ] Models are assigned to agents that appear in the flow or to the coordinator
-- [ ] `coordinator` uses `openai/gpt-5.5 (xhigh)` unless the user explicitly overrides it
-- [ ] Non-coordinator agents use `openai/gpt-5.5 (low)` unless the user explicitly overrides them
+- [ ] Agent names are valid OpenCode subagent identifiers
 - [ ] Interactive mode is set
 - [ ] Specification has clear requirements and checkbox tasks
 
@@ -60,16 +53,12 @@ Safety analysis is coordinator/reviewer skill guidance, not a routable flow node
 
 ```markdown
 ---
+agents:
+  - "go"
+  - "react"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 completionGateScript: make test
-flow: |
-  "go"
-  "react"
-  "general-purpose"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "react": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
 interactive: yes
 ---
 

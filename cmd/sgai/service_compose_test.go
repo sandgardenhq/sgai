@@ -14,121 +14,47 @@ func TestComposeStateService(t *testing.T) {
 	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
 
 	result := server.composeStateService(wsDir)
+
 	assert.Equal(t, "test-ws", result.Workspace)
-	assert.NotNil(t, result.State)
+	assert.Equal(t, defaultCoordinatorModel, result.State.Model)
 }
 
-func TestComposeSaveService(t *testing.T) {
-	t.Run("savesGoal", func(t *testing.T) {
-		server, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-
-		result, err := server.composeSaveService(wsDir, "")
-		require.NoError(t, err)
-		assert.True(t, result.Saved)
-		assert.Equal(t, "test-ws", result.Workspace)
-
-		goalPath := filepath.Join(wsDir, "GOAL.md")
-		_, errStat := os.Stat(goalPath)
-		assert.NoError(t, errStat)
-	})
-
-	t.Run("etagMismatch", func(t *testing.T) {
-		server, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("# existing"), 0644))
-
-		_, err := server.composeSaveService(wsDir, `"wrong-etag"`)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "modified")
-	})
-
-	t.Run("etagMatch", func(t *testing.T) {
-		server, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-		content := []byte("# existing")
-		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), content, 0644))
-
-		etag := computeEtag(content)
-		result, err := server.composeSaveService(wsDir, etag)
-		require.NoError(t, err)
-		assert.True(t, result.Saved)
-	})
-}
-
-func TestComposeTemplatesService(t *testing.T) {
-	server, _ := setupTestServer(t)
-	result := server.composeTemplatesService()
-	assert.NotEmpty(t, result.Templates)
-}
-
-func TestComposePreviewService(t *testing.T) {
+func TestComposeSaveServiceWritesAgentsAndModel(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
+	server.composeDraftService(wsDir, composerState{Model: "openai/gpt-5.5 (xhigh)", Agents: []composerAgentConf{{Name: "coordinator", Selected: true}, {Name: "go", Selected: true}}}, wizardState{})
 
-	result, err := server.composePreviewService(wsDir)
-	require.NoError(t, err)
-	assert.NotEmpty(t, result.Content)
+	result, errSave := server.composeSaveService(wsDir, "")
+
+	require.NoError(t, errSave)
+	assert.True(t, result.Saved)
+	goalContent, errRead := os.ReadFile(filepath.Join(wsDir, "GOAL.md"))
+	require.NoError(t, errRead)
+	assert.Contains(t, string(goalContent), "agents:\n  - \"go\"")
+	assert.NotContains(t, string(goalContent), "coordinator")
+	assert.Contains(t, string(goalContent), "model: \"openai/gpt-5.5 (xhigh)\"")
 }
 
-func TestComposeStateServiceWithInvalidFlow(t *testing.T) {
+func TestComposePreviewServiceReturnsAgentsAndModel(t *testing.T) {
 	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "flow-err-ws")
-	server.composeDraftService(wsDir, composerState{
-		Description: "Test",
-		Flow:        `digraph G { "a" -> }`,
-	}, wizardState{})
-	result := server.composeStateService(wsDir)
-	assert.NotEmpty(t, result.FlowError)
-}
+	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
+	server.composeDraftService(wsDir, composerState{Model: "openai/gpt-5.5 (xhigh)", Agents: []composerAgentConf{{Name: "coordinator", Selected: true}, {Name: "go", Selected: true}}}, wizardState{})
 
-func TestComposePreviewServiceWithInvalidFlow(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "preview-flow-ws")
-	server.composeDraftService(wsDir, composerState{
-		Description: "Test",
-		Flow:        `digraph G { "a" -> }`,
-	}, wizardState{})
-	result, err := server.composePreviewService(wsDir)
-	require.NoError(t, err)
-	assert.NotEmpty(t, result.FlowError)
-}
+	result, errPreview := server.composePreviewService(wsDir)
 
-func TestComposePreviewServiceWithValidFlow(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "preview-valid-ws")
-	server.composeDraftService(wsDir, composerState{
-		Description: "Test",
-		Flow:        `"a" -> "b"`,
-	}, wizardState{})
-	result, err := server.composePreviewService(wsDir)
-	require.NoError(t, err)
-	assert.Empty(t, result.FlowError)
-	assert.NotEmpty(t, result.Content)
-}
-
-func TestComposeStateServiceWithValidFlow(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "state-valid-ws")
-	server.composeDraftService(wsDir, composerState{
-		Description: "Test",
-		Flow:        `"x" -> "y"`,
-	}, wizardState{})
-	result := server.composeStateService(wsDir)
-	assert.Empty(t, result.FlowError)
+	require.NoError(t, errPreview)
+	assert.Contains(t, result.Content, "agents:\n  - \"go\"")
+	assert.NotContains(t, result.Content, "coordinator")
+	assert.Contains(t, result.Content, "model: \"openai/gpt-5.5 (xhigh)\"")
 }
 
 func TestComposeDraftService(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
 
-	result := server.composeDraftService(wsDir, composerState{
-		Description:   "Test description",
-		Tasks:         "Test tasks",
-		Retrospective: true,
-	}, wizardState{})
-	assert.True(t, result.Saved)
+	result := server.composeDraftService(wsDir, composerState{Description: "Test description", Tasks: "Test tasks", Retrospective: true}, wizardState{})
 
+	assert.True(t, result.Saved)
 	stateResult := server.composeStateService(wsDir)
 	assert.Equal(t, "Test description", stateResult.State.Description)
 	assert.True(t, stateResult.State.Retrospective)

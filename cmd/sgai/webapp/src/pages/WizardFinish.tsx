@@ -178,7 +178,7 @@ export function WizardFinish() {
                 </div>
                 {wizardData.safetyAnalysis ? (
                   <div className="text-xs text-muted-foreground mt-1">
-                    Coordinator uses the STPA skill workflow
+                    Coordinator uses the STPA skill guidance
                   </div>
                 ) : null}
               </div>

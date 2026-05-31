@@ -98,7 +98,7 @@ func TestForkWorkspaceService(t *testing.T) {
 	}{
 		{
 			name:        "forkFromRootWorkspace",
-			goalContent: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal",
+			goalContent: "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Test Goal",
 			setupFunc: func(t *testing.T, rootDir string) string { //nolint:thelper
 				workspacePath := filepath.Join(rootDir, "root-workspace")
 				require.NoError(t, os.MkdirAll(workspacePath, 0755))
@@ -122,7 +122,7 @@ func TestForkWorkspaceService(t *testing.T) {
 		},
 		{
 			name:        "forkFromForkWorkspace",
-			goalContent: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal",
+			goalContent: "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Test Goal",
 			setupFunc: func(t *testing.T, rootDir string) string { //nolint:thelper
 				rootPath := filepath.Join(rootDir, "root-workspace")
 				require.NoError(t, os.MkdirAll(rootPath, 0755))
@@ -157,7 +157,7 @@ func TestForkWorkspaceService(t *testing.T) {
 		},
 		{
 			name:        "forkWithOnlyFrontmatter",
-			goalContent: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n",
+			goalContent: "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n",
 			setupFunc: func(t *testing.T, rootDir string) string { //nolint:thelper
 				workspacePath := filepath.Join(rootDir, "root-workspace")
 				require.NoError(t, os.MkdirAll(workspacePath, 0755))
@@ -210,7 +210,7 @@ func TestForkExternalWorkspaceSiblingPlacement(t *testing.T) {
 	server.externalDirs[resolveSymlinks(externalRepo)] = true
 	server.mu.Unlock()
 
-	result, err := server.forkWorkspaceService(externalRepo, "---\nflow: |\n  \"a\" -> \"b\"\n---\n# Test Goal")
+	result, err := server.forkWorkspaceService(externalRepo, "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Test Goal")
 	require.NoError(t, err)
 
 	assert.Equal(t, externalParent, filepath.Dir(result.Dir))
@@ -398,7 +398,7 @@ func TestGetGoalService(t *testing.T) {
 				require.NoError(t, os.MkdirAll(workspacePath, 0755))
 				require.NoError(t, initializeWorkspace(workspacePath))
 
-				goalContent := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+				goalContent := "# Test Goal"
 				goalPath := filepath.Join(workspacePath, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 
@@ -455,7 +455,7 @@ func TestUpdateGoalService(t *testing.T) {
 	}{
 		{
 			name:    "updateExistingGoal",
-			content: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Updated Goal",
+			content: "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Updated Goal",
 			setupFunc: func(t *testing.T, rootDir string) string { //nolint:thelper
 				workspacePath := filepath.Join(rootDir, "test-workspace")
 				require.NoError(t, os.MkdirAll(workspacePath, 0755))
@@ -805,17 +805,17 @@ func TestGoalContentBodyIsEmpty(t *testing.T) {
 		},
 		{
 			name:     "onlyFrontmatter",
-			content:  "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n",
+			content:  "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n",
 			expected: true,
 		},
 		{
 			name:     "frontmatterWithBody",
-			content:  "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal",
+			content:  "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Test Goal",
 			expected: false,
 		},
 		{
 			name:     "frontmatterWithWhitespaceBody",
-			content:  "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n   \n\t\n",
+			content:  "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n   \n\t\n",
 			expected: true,
 		},
 		{
@@ -837,7 +837,7 @@ func TestWriteGoalContent(t *testing.T) {
 	rootDir := t.TempDir()
 
 	goalPath := filepath.Join(rootDir, "GOAL.md")
-	content := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+	content := "---\nagents:\n  - go\nmodel: openai/gpt-5.5 (xhigh)\n---\n# Test Goal"
 
 	err := writeGoalContent(rootDir, content)
 	require.NoError(t, err)
@@ -865,26 +865,6 @@ func TestGenerateRandomForkNameUniqueness(t *testing.T) {
 		names[name] = true
 	}
 	assert.True(t, len(names) > 100, "should generate many unique names")
-}
-
-func TestUpdateGoalServiceInvalidatesSVGCache(t *testing.T) {
-	rootDir := t.TempDir()
-	server := NewServer(rootDir)
-	workspacePath := filepath.Join(rootDir, "cache-ws")
-	require.NoError(t, os.MkdirAll(workspacePath, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(workspacePath, "GOAL.md"), []byte("# Old"), 0644))
-	server.svgCache.set(workspacePath+"|coordinator", "<svg>old</svg>")
-	server.svgCache.set(workspacePath+"|agent1", "<svg>old2</svg>")
-	server.svgCache.set("/other/path|coordinator", "<svg>other</svg>")
-
-	result, err := server.updateGoalService(workspacePath, "# New Goal")
-	require.NoError(t, err)
-	assert.True(t, result.Updated)
-
-	_, wsOK := server.svgCache.get(workspacePath + "|coordinator")
-	assert.False(t, wsOK)
-	_, otherOK := server.svgCache.get("/other/path|coordinator")
-	assert.True(t, otherOK)
 }
 
 func TestTogglePinServiceSuccess(t *testing.T) {

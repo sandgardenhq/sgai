@@ -5,7 +5,7 @@ import "context"
 type interactiveBranch struct{}
 
 func (b *interactiveBranch) run(ctx context.Context, cfg branchConfig) {
-	runWorkflow(ctx, cfg.workspacePath, cfg.mcpURL, cfg.logWriter, cfg.coord)
+	runWorkflow(ctx, cfg.workspacePath, cfg.mcpURL, cfg.logWriter, cfg.coord, cfg.runtime)
 }
 
 func (b *interactiveBranch) toolsAllowed() bool {

@@ -101,20 +101,6 @@ Notes:
 - Workflow state requests coordinator as the next agent so the instruction is processed next
 - This works while a session is running or even when stopped; it is picked up on the next run
 
-## Get Workflow SVG
-
-Get the workflow diagram showing agent flow and current position.
-
-**Endpoint:** `GET /api/v1/workspaces/{name}/workflow.svg`
-
-```bash
-curl -s $BASE_URL/api/v1/workspaces/my-project/workflow.svg > workflow.svg
-```
-
-Response: SVG image (`Content-Type: image/svg+xml`)
-
-Returns 404 if workflow SVG is not available.
-
 ## Check Running Status
 
 Use the full state endpoint to check session status:

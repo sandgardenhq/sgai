@@ -34,7 +34,6 @@ const createMockWorkspace = (overrides: Record<string, unknown> = {}) => ({
   rawGoalContent: "",
   pmContent: "",
   hasProjectMgmt: false,
-  svgHash: "",
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",

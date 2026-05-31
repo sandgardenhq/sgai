@@ -75,7 +75,7 @@ export function WizardStep4() {
       <div>
         <h2 className="text-xl font-semibold mb-1">Step 4: Settings</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Configure runtime settings for your workflow.
+          Configure runtime settings for coordinator delegation.
         </p>
 
         <div className="space-y-6">
@@ -88,7 +88,7 @@ export function WizardStep4() {
               placeholder="e.g., make test"
             />
             <p className="text-xs text-muted-foreground">
-              A command that must pass before the workflow is considered complete (optional)
+              A command that must pass before coordinator delegation is considered complete (optional)
             </p>
           </div>
 

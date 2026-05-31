@@ -93,6 +93,26 @@ func TestBuildingModePromptDoesNotSayRetrospectiveIsMandatory(t *testing.T) {
 	assert.NotContains(t, coordPlan, "Do NOT mark status:complete until the retrospective has finished")
 }
 
+func TestCoordinatorDelegationPromptStatesCoordinatorOwnedSubagentDelegation(t *testing.T) {
+	prompt := buildCoordinatorDelegationMessage([]string{"coordinator", "go-reviewer"}, map[string]int{"coordinator": 1, "go-reviewer": 0}, t.TempDir(), state.ModeBuilding)
+
+	assert.Contains(t, prompt, "SGAI runs this top-level OpenCode session as the coordinator")
+	assert.Contains(t, prompt, "Delegate to available subagents through OpenCode's subagent/delegation mechanisms")
+	assert.Contains(t, prompt, "Available OpenCode Subagents for Delegation")
+	assert.Contains(t, prompt, "go-reviewer")
+	assert.Contains(t, prompt, ".sgai/PROJECT_MANAGEMENT.md is the shared ledger for inter-agent state, handoffs, blockers, questions, and completion evidence")
+	assert.Contains(t, prompt, "do not use navigate to cycle SGAI through the GOAL agents")
+}
+
+func TestNonCoordinatorPromptReturnsThroughDelegationAndLedgerHandoff(t *testing.T) {
+	prompt := composeCoordinatorPromptTemplate("go")
+
+	assert.Contains(t, prompt, "append QUESTION: <your question> to PROJECT_MANAGEMENT.md")
+	assert.Contains(t, prompt, "return through OpenCode's subagent/delegation mechanism")
+	assert.Contains(t, prompt, "only the coordinator can mark checkboxes")
+	assert.Contains(t, prompt, "append status updates to .sgai/PROJECT_MANAGEMENT.md")
+}
+
 func TestModePromptsDoNotPresentRetrospectiveAsMandatory(t *testing.T) {
 	tests := []struct {
 		name string

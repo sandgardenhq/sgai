@@ -28,7 +28,6 @@ const mockWorkspace = {
   rawGoalContent: "# Test Goal\n\nThis is a test goal.",
   pmContent: "",
   hasProjectMgmt: false,
-  svgHash: "",
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
@@ -371,7 +370,7 @@ describe("EditGoal", () => {
   });
 
   describe("editor renders frontmatter content", () => {
-    it("editor renders frontmatter with flow and models", async () => {
+    it("editor renders frontmatter with agents and model", async () => {
       renderEditGoal();
 
       await waitFor(() => {
@@ -380,14 +379,14 @@ describe("EditGoal", () => {
       });
 
       const textareas = screen.getAllByTestId("markdown-textarea");
-      fireEvent.change(textareas[0], { target: { value: "---\nflow: |\n  \"a\" -> \"b\"\nmodels:\n  \"coordinator\": \"opencode/glm-5\"\n---\n# Goal" } });
+      fireEvent.change(textareas[0], { target: { value: "---\nagents:\n  - \"react\"\nmodel: \"opencode/glm-5\"\n---\n# Goal" } });
 
       await waitFor(() => {
-        expect((textareas[0] as HTMLTextAreaElement).value).toContain("flow:");
+        expect((textareas[0] as HTMLTextAreaElement).value).toContain("agents:");
       });
     });
 
-    it("editor renders flow syntax content", async () => {
+    it("editor renders agents section content", async () => {
       renderEditGoal();
 
       await waitFor(() => {
@@ -396,14 +395,14 @@ describe("EditGoal", () => {
       });
 
       const textareas = screen.getAllByTestId("markdown-textarea");
-      fireEvent.change(textareas[0], { target: { value: "---\nflow: |\n  \"a\" -> \"b\"\n---\n# Goal" } });
+      fireEvent.change(textareas[0], { target: { value: "---\nagents:\n  - \"react\"\n---\n# Goal" } });
 
       await waitFor(() => {
-        expect((textareas[0] as HTMLTextAreaElement).value).toContain("flow:");
+        expect((textareas[0] as HTMLTextAreaElement).value).toContain("agents:");
       });
     });
 
-    it("editor renders models section content", async () => {
+    it("editor renders model field content", async () => {
       renderEditGoal();
 
       await waitFor(() => {
@@ -412,10 +411,10 @@ describe("EditGoal", () => {
       });
 
       const textareas = screen.getAllByTestId("markdown-textarea");
-      fireEvent.change(textareas[0], { target: { value: "---\nmodels:\n  \"coordinator\": \"opencode/glm-5\"\n---\n# Goal" } });
+      fireEvent.change(textareas[0], { target: { value: "---\nmodel: \"opencode/glm-5\"\n---\n# Goal" } });
 
       await waitFor(() => {
-        expect((textareas[0] as HTMLTextAreaElement).value).toContain("models:");
+        expect((textareas[0] as HTMLTextAreaElement).value).toContain("model:");
       });
     });
   });

@@ -11,7 +11,7 @@
 
 The repository includes example configuration files you can use as starting points:
 
-- [`GOAL.example.md`](../../cmd/sgai/GOAL.example.md): Example `GOAL.md` frontmatter with a workflow graph and per-agent model selection.
+- [`GOAL.example.md`](../../cmd/sgai/GOAL.example.md): Example `GOAL.md` frontmatter with an agents list and a single model.
 - [`sgai.example.json`](../../sgai.example.json): Example MCP configuration snippet for a project-level `sgai.json`.
 - [`opencode.json`](../../opencode.json): Example OpenCode configuration with a local MCP entry.
 
@@ -21,9 +21,9 @@ The repository includes example configuration files you can use as starting poin
 
 Type: string
 
-If set, `defaultModel` fills empty per-agent entries already present in `GOAL.md` `models:`. It does not create model entries for agents that are absent from the `models:` map.
+If set, `defaultModel` provides a fallback model when `GOAL.md` does not specify a `model:` field. GOAL.md uses a single shared `model` for all agents, so `defaultModel` supplies that value when absent.
 
-For GPT-5.5, the recommended cost-conscious split is to set an explicit `models:` entry for `coordinator` with `openai/gpt-5.5 (xhigh)` and use `openai/gpt-5.5 (low)` for non-coordinator implementation, reviewer, utility, and specialist agents. A project-level `defaultModel` can provide a fallback for empty model entries, but it is not sufficient by itself for the recommended split.
+For GPT-5.5, the recommended model is `openai/gpt-5.5 (xhigh)` for orchestration quality. A project-level `defaultModel` can set this once instead of repeating it in every GOAL.md file.
 
 Example:
 

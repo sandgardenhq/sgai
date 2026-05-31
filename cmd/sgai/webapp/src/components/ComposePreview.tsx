@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertDescription, Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, AlertTriangle } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { ApiComposePreviewResponse } from "@/types";
 
 interface ComposePreviewProps {
@@ -36,12 +35,6 @@ export function ComposePreview({
             <pre className="text-xs leading-relaxed whitespace-pre-wrap break-words font-mono text-muted-foreground">
               {preview?.content ?? "No preview available"}
             </pre>
-            {preview?.flowError ? (
-              <Alert className="mt-3 border-destructive/50 text-destructive">
-                <AlertTriangle className="size-4" />
-                <AlertDescription>{preview.flowError}</AlertDescription>
-              </Alert>
-            ) : null}
           </>
         )}
       </CardContent>

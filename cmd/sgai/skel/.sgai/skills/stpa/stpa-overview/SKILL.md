@@ -11,7 +11,7 @@ metadata:
 
 STPA is a **skill workflow**, not a routable workflow agent.
 
-When safety, hazards, risk, unsafe state transitions, external input, filesystem effects, concurrency, physical systems, or AI-driven control loops are relevant, load and use this skill. Do **not** route to `stpa-analyst`, add `stpa-analyst` to GOAL `flow`, add a `stpa-analyst` model entry, or send `QUALITY_REPORT_REQUEST` to a retired agent.
+When safety, hazards, risk, unsafe state transitions, external input, filesystem effects, concurrency, physical systems, or AI-driven control loops are relevant, load and use this skill. Do **not** route to `stpa-analyst`, add `stpa-analyst` to GOAL `agents`, expose it as an available delegate agent, or send `QUALITY_REPORT_REQUEST` to a retired agent.
 
 ## What is STPA?
 
@@ -174,11 +174,11 @@ Record full STPA sessions like this:
 | "The quality-report behavior lived in the old wrapper." | Focused safety-review mode now owns that behavior. Use this skill's report format. |
 | "STPA is outside reviewer scope." | `*-reviewer` agents may load/use STPA when safety or hazard risk warrants it. |
 | "Full STPA is too heavy for a project-critic gate." | Use focused safety-review mode; escalate only if needed. |
-| "Safety Analysis should add an agent to GOAL flow." | Safety analysis is coordinator/reviewer guidance plus this skill, not a flow node. |
+| "Safety Analysis should add `stpa-analyst` to GOAL agents." | Safety analysis is coordinator/reviewer guidance plus this skill, not an available delegate agent. |
 
 ## Red Flags - STOP
 
-- Adding `stpa-analyst` to GOAL `flow` or `models`
+- Adding `stpa-analyst` to GOAL `agents` or exposing it as an available delegate
 - Sending `QUALITY_REPORT_REQUEST` to `stpa-analyst`
 - Treating safety review as impossible because full STPA is too large
 - Saying reviewers cannot use STPA when they see hazard/safety implications

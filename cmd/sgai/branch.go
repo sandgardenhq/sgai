@@ -18,4 +18,5 @@ type branchConfig struct {
 	mcpURL        string
 	logWriter     io.Writer
 	coord         *state.Coordinator
+	runtime       sessionRuntime
 }

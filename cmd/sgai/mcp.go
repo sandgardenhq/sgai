@@ -216,11 +216,11 @@ type updateWorkflowStateArgs struct {
 	Status      workflowStatus `json:"status" jsonschema:"Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete"`
 	Task        string         `json:"task" jsonschema:"Current task being worked on (e.g. 'Writing tests for auth endpoints'). Use empty string to clear. Be specific about what you're doing."`
 	AddProgress string         `json:"addProgress" jsonschema:"Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps."`
-	Navigate    *navigateArgs  `json:"navigate,omitempty" jsonschema:"Optional navigation request. Only valid with status 'agent-done'. The target must be an agent in the workflow DAG."`
+	Navigate    *navigateArgs  `json:"navigate,omitempty" jsonschema:"Optional navigation request. Only valid with status 'agent-done'. The target must be an available agent."`
 }
 
 type navigateArgs struct {
-	To     string `json:"to" jsonschema:"The workflow DAG agent to run next."`
+	To     string `json:"to" jsonschema:"The available agent to run next."`
 	Reason string `json:"reason,omitempty" jsonschema:"Why this navigation is needed."`
 }
 
@@ -259,14 +259,14 @@ var (
 	schemaAskUserWorkGate  = mustSchema[askUserWorkGateArgs]()
 )
 
-func startMCPHTTPServer(workingDir string, coord *state.Coordinator, dagAgents []string) (string, func(), error) {
+func startMCPHTTPServer(workingDir string, coord *state.Coordinator, availableAgents []string) (string, func(), error) {
 	listener, errListen := net.Listen("tcp", "127.0.0.1:0")
 	if errListen != nil {
 		return "", nil, fmt.Errorf("failed to listen on random port: %w", errListen)
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.Handle("/mcp", buildMCPHTTPHandler(workingDir, coord, dagAgents))
+	serveMux.Handle("/mcp", buildMCPHTTPHandler(workingDir, coord, availableAgents))
 
 	httpServer := &http.Server{Handler: serveMux}
 	go func() {
@@ -309,17 +309,17 @@ func resolveCallerAgent(headerAgent string, coord *state.Coordinator) string {
 	return "coordinator"
 }
 
-func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator, dagAgents []string) http.Handler {
+func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator, availableAgents []string) http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return buildMCPServer(workingDir, r, coord, dagAgents)
+		return buildMCPServer(workingDir, r, coord, availableAgents)
 	}, nil)
 }
 
-func buildMCPServer(workingDir string, r *http.Request, coord *state.Coordinator, dagAgents []string) *mcp.Server {
+func buildMCPServer(workingDir string, r *http.Request, coord *state.Coordinator, availableAgents []string) *mcp.Server {
 	agentName := resolveCallerAgent(parseAgentIdentityHeader(r), coord)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "sgai"}, nil)
-	mcpCtx := &mcpContext{workingDir: workingDir, coord: coord, dagAgents: dagAgents, agentName: agentName}
+	mcpCtx := &mcpContext{workingDir: workingDir, coord: coord, availableAgents: availableAgents, agentName: agentName}
 
 	registerCommonTools(server, mcpCtx, agentName)
 
@@ -386,10 +386,10 @@ func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, _ string) 
 }
 
 type mcpContext struct {
-	workingDir string
-	coord      *state.Coordinator
-	dagAgents  []string
-	agentName  string
+	workingDir      string
+	coord           *state.Coordinator
+	availableAgents []string
+	agentName       string
 }
 
 type emptyResult struct{}
@@ -415,7 +415,7 @@ func (c *mcpContext) findSnippetsHandler(_ context.Context, _ *mcp.CallToolReque
 }
 
 func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := updateWorkflowState(c.coord, c.agentName, c.dagAgents, args)
+	result, err := updateWorkflowState(c.coord, c.agentName, c.availableAgents, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -861,7 +861,7 @@ func findSnippetsByFuzzyMatch(langDir string, entries []os.DirEntry, query strin
 	return strings.Join(matches, "\n"), nil
 }
 
-func updateWorkflowState(coord *state.Coordinator, callerAgent string, dagAgents []string, args updateWorkflowStateArgs) (string, error) {
+func updateWorkflowState(coord *state.Coordinator, callerAgent string, availableAgents []string, args updateWorkflowStateArgs) (string, error) {
 	var (
 		response        string
 		statusPreserved bool
@@ -871,7 +871,7 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, dagAgents
 		return "Error: workflow coordinator not available.", nil
 	}
 
-	if errNavigate := validateNavigationRequest(args, dagAgents); errNavigate != "" {
+	if errNavigate := validateNavigationRequest(args, availableAgents); errNavigate != "" {
 		return errNavigate, nil
 	}
 
@@ -963,7 +963,7 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, dagAgents
 	return response, nil
 }
 
-func validateNavigationRequest(args updateWorkflowStateArgs, dagAgents []string) string {
+func validateNavigationRequest(args updateWorkflowStateArgs, availableAgents []string) string {
 	if !hasNavigationRequest(args.Navigate) {
 		return ""
 	}
@@ -975,8 +975,8 @@ func validateNavigationRequest(args updateWorkflowStateArgs, dagAgents []string)
 	if targetAgent == "" {
 		return "Error: navigate.to is required."
 	}
-	if !slices.Contains(dagAgents, targetAgent) {
-		return fmt.Sprintf("Error: Agent '%s' is not in the workflow. Valid agents are: %s", targetAgent, strings.Join(dagAgents, ", "))
+	if !slices.Contains(availableAgents, targetAgent) {
+		return fmt.Sprintf("Error: Agent '%s' is not in the available agents. Valid agents are: %s", targetAgent, strings.Join(availableAgents, ", "))
 	}
 	return ""
 }
@@ -1054,11 +1054,11 @@ func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, st
 			},
 			"navigate": {
 				Type:        "object",
-				Description: "Optional navigation request. Only valid with status 'agent-done'. The target must be an agent in the workflow DAG.",
+				Description: "Optional navigation request. Only valid with status 'agent-done'. The target must be an available agent.",
 				Properties: map[string]*jsonschema.Schema{
 					"to": {
 						Type:        "string",
-						Description: "The workflow DAG agent to run next.",
+						Description: "The available agent to run next.",
 					},
 					"reason": {
 						Type:        "string",

@@ -278,15 +278,10 @@ mkdir -p ./sgai/TodoApp/.sgai
 
 ```markdown
 ---
-flow: |
-  "go"
-  "general-purpose"
-  "project-critic-council"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
-  "project-critic-council": "openai/gpt-5.5 (low)"
+agents:
+  - "go"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 interactive: yes
 ---
 
@@ -299,7 +294,7 @@ Build a simple command-line todo application.
 - Add, list, complete, and delete todos
 - Persist todos to a local file
 - Simple and clean CLI interface
-- Coordinator and reviewer agents should use STPA skill guidance if file persistence or CLI inputs create safety-relevant risks
+- The coordinator should use STPA skill guidance if file persistence or CLI inputs create safety-relevant risks
 
 ## Tasks
 

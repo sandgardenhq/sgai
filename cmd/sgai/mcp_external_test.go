@@ -224,7 +224,7 @@ func connectMCPClient(t *testing.T, srv *Server) *mcp.ClientSession {
 func TestMCPToolListWorkspaces(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	setupTestWorkspace(t, rootDir, "mcp-ws")
-	require.NoError(t, os.WriteFile(filepath.Join(rootDir, "mcp-ws", "GOAL.md"), []byte("---\nflow: |\n  \"a\" -> \"b\"\n---\n# Test"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(rootDir, "mcp-ws", "GOAL.md"), []byte("---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\n# Test"), 0644))
 
 	cs := connectMCPClient(t, srv)
 	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
@@ -239,7 +239,7 @@ func TestMCPToolGetWorkspaceState(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		srv, rootDir := setupTestServer(t)
 		setupTestWorkspace(t, rootDir, "state-ws")
-		require.NoError(t, os.WriteFile(filepath.Join(rootDir, "state-ws", "GOAL.md"), []byte("---\nflow: |\n  \"a\" -> \"b\"\n---\n# Test"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(rootDir, "state-ws", "GOAL.md"), []byte("---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\n# Test"), 0644))
 
 		cs := connectMCPClient(t, srv)
 		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
@@ -264,23 +264,44 @@ func TestMCPToolGetWorkspaceState(t *testing.T) {
 	})
 }
 
-func TestMCPToolGetWorkflowSVG(t *testing.T) {
+func TestMCPToolGetAgentDelegationSVG(t *testing.T) {
 	t.Run("emptyWorkspace", func(t *testing.T) {
 		srv, rootDir := setupTestServer(t)
 		setupTestWorkspace(t, rootDir, "svg-mcp")
 		cs := connectMCPClient(t, srv)
-		_, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-			Name:      "get_workflow_svg",
+		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+			Name:      "get_agent_delegation_svg",
 			Arguments: map[string]any{"workspace": "svg-mcp"},
 		})
 		require.NoError(t, err)
+		require.NotNil(t, result)
+		tc := result.Content[0].(*mcp.TextContent)
+		assert.Contains(t, tc.Text, "not available")
+	})
+
+	t.Run("availableDelegationAgents", func(t *testing.T) {
+		srv, rootDir := setupTestServer(t)
+		wsDir := setupTestWorkspace(t, rootDir, "svg-agents-mcp")
+		goalContent := "---\nagents:\n  - coordinator\n  - go\n  - reviewer\nmodel: openai/gpt-5.5\n---\n# Test"
+		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte(goalContent), 0644))
+		cs := connectMCPClient(t, srv)
+		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+			Name:      "get_agent_delegation_svg",
+			Arguments: map[string]any{"workspace": "svg-agents-mcp"},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		tc := result.Content[0].(*mcp.TextContent)
+		assert.Contains(t, tc.Text, "go")
+		assert.Contains(t, tc.Text, "reviewer")
+		assert.NotContains(t, tc.Text, "coordinator")
 	})
 
 	t.Run("workspaceNotFound", func(t *testing.T) {
 		srv, _ := setupTestServer(t)
 		cs := connectMCPClient(t, srv)
 		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-			Name:      "get_workflow_svg",
+			Name:      "get_agent_delegation_svg",
 			Arguments: map[string]any{"workspace": "nonexistent"},
 		})
 		if err != nil {
@@ -431,7 +452,7 @@ func TestMCPToolSteerAgent(t *testing.T) {
 	t.Run("withGoal", func(t *testing.T) {
 		srv, rootDir := setupTestServer(t)
 		wsDir := setupTestWorkspace(t, rootDir, "steer-mcp2")
-		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nflow: |\n  \"a\" -> \"b\"\n---\n# Test"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\n# Test"), 0644))
 		cs := connectMCPClient(t, srv)
 		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 			Name:      "steer_agent",
@@ -1028,7 +1049,7 @@ func TestMCPToolSaveComposeDraft(t *testing.T) {
 				"description":    "test desc",
 				"completionGate": "",
 				"agents":         []any{},
-				"flow":           "",
+				"model":          "openai/gpt-5.5",
 				"tasks":          "",
 			},
 			"wizard": map[string]any{

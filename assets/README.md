@@ -20,7 +20,7 @@ Sgai turns software development into a **goal-driven, multi-agent workflow**.
 Instead of prompting step-by-step, you:
 
 1. **Define the outcome** — "Build a music sequencer web app"
-2. **Agents plan the work** — Breaking it into a visual workflow diagram of tasks
+2. **Coordinator plans the work** — Receives the allowed agent list and delegates specialist tasks
 3. **You supervise** — Watch progress, answer questions when agents need guidance
 4. **Success checks** — Tests, linting, or other validation determines "done"
 
@@ -31,8 +31,8 @@ A local AI software factory.
 
 ## Why Try It?
 
-* **See what's happening** — Visual workflow diagram instead of hidden AI reasoning
-* **Multiple specialists** — Developer writes code, reviewer checks it, safety analyst validates
+* **See what's happening** — Dashboard status, questions, and coordinator delegation context instead of hidden AI reasoning
+* **Multiple specialists** — Developer, reviewer, and utility agents can be made available to the coordinator
 * **Approve before execution** — Review the plan and answer questions, then agents work autonomously
 * **Proof of completion** — Tests must pass before work is marked done
 * **Works locally** — Runs in your repository, nothing leaves your machine
@@ -100,13 +100,10 @@ Goals are stored in `GOAL.md` and describe outcomes — not implementation steps
 
 ```markdown
 ---
-flow: |
-  "go"
-  "general-purpose"
-models:
-  "coordinator": "openai/gpt-5.5 (xhigh)"
-  "go": "openai/gpt-5.5 (low)"
-  "general-purpose": "openai/gpt-5.5 (low)"
+agents:
+  - "go"
+  - "general-purpose"
+model: "openai/gpt-5.5 (xhigh)"
 completionGateScript: make test
 interactive: yes
 ---
@@ -122,32 +119,17 @@ Create endpoints for user registration and login with JWT auth.
 
 See [GOAL.example.md](../cmd/sgai/GOAL.example.md) for full reference.
 
-**Model Selection:** For GPT-5.5, Sgai recommends assigning `openai/gpt-5.5 (xhigh)` to the always-present `coordinator` because orchestration quality dominates workflow quality. Implementation, reviewer, utility, and specialist agents should default to `openai/gpt-5.5 (low)`, which is the cost-conscious GPT-5.5 baseline for routine work. You can still override any agent in `models:` when a specific workflow warrants a higher tier.
+**Model Selection:** Pick one `model` for the top-level coordinator run. Include an OpenCode variant suffix when needed, such as `openai/gpt-5.5 (xhigh)`. Sgai launches the coordinator with that model and provides the `agents` list as available OpenCode subagents for delegation.
 
-**Agent Aliases:**
+**Agent Availability:** `agents` is the allowlist of non-coordinator delegates the coordinator may use. The coordinator itself is implicit. Aliases are no longer GOAL semantics; add the real OpenCode agent names you want available.
 
-You can create agent aliases that reuse an existing agent's prompt and tools with a different model. This lets you run the same agent role at different cost/capability tiers while keeping the default worker tier low-cost:
-
-```markdown
----
-flow: |
-  "go-lite"
-alias:
-  "go-lite": "go"
-models:
-  "go-lite": "openai/gpt-5.5 (low)"
----
-```
-
-An aliased agent inherits everything from its base agent (prompt, tools, snippets) but uses its own model configuration. Aliased agents appear like any other agent in the workflow.
-
-### 2. Agents Plan the Work
+### 2. Coordinator Delegates the Work
 
 <img style="margin:20px 0;border:1px solid #999;" src="https://github.com/sandgardenhq/sgai/blob/main/assets/screenshots/02-ChooseATemplate.png?raw=true" alt="Choose a Template" width="600">
 
-Sgai breaks your goal into a workflow diagram of coordinated agents with defined roles.
+Sgai starts the coordinator with your selected model and gives it the allowed delegate agents.
 
-Dependencies are explicit. Execution is visible.
+Delegation decisions, questions, and execution status stay visible in the dashboard.
 
 ### 3. Approve the Plan & Monitor
 
@@ -186,13 +168,15 @@ You stay in control.
 
 ## Contributing
 
-Sgai accepts improvements as specifications inside `GOALS/`.
+Sgai accepts improvements as contribution specs in the `GOALS/` archive.
 
-1. Create `GOALS/YYYY_MM_DD_feature_name.md`
+1. Create a project spec at `GOALS/YYYY_MM_DD_feature_name.md`
 2. Describe desired behavior and success criteria
 3. Submit a PR
 
-See the [GOALS directory](https://github.com/sandgardenhq/sgai/tree/main/GOALS) for examples.
+For current GOAL schema examples, use [`cmd/sgai/GOAL.example.md`](../cmd/sgai/GOAL.example.md) or the inline `GOAL.md` example in the main README.
+
+The [`GOALS/` archive](https://github.com/sandgardenhq/sgai/tree/main/GOALS) is historical project and contribution-spec history, not the reference for the current schema; some older archived files predate the current `agents` plus single `model` format.
 
 ---
 

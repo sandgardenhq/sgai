@@ -61,7 +61,7 @@ describe("useComposeWizard retrospective state helpers", () => {
         completionGate: wizardData.completionGate,
         retrospective: wizardData.retrospective,
         agents: [],
-        flow: "",
+        model: "openai/gpt-5.5 (xhigh)",
         tasks: "",
       },
       wizard: {

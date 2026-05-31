@@ -276,10 +276,6 @@ func (s *Server) updateGoalService(workspacePath, content string) (updateGoalRes
 		return updateGoalResult{}, fmt.Errorf("failed to write GOAL.md: %w", errWrite)
 	}
 
-	prefix := workspacePath + "|"
-	s.svgCache.deleteFunc(func(k string) bool {
-		return strings.HasPrefix(k, prefix)
-	})
 	s.notifyStateChange()
 
 	return updateGoalResult{Updated: true, Workspace: filepath.Base(workspacePath)}, nil
