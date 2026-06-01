@@ -382,7 +382,7 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 		}); errUpdate != nil {
 			log.Fatalln("failed to save state:", errUpdate)
 		}
-		fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to error")
+		fmt.Fprintln(os.Stderr, "agent", cfg.agent, "marked as agent-done due to error:", errWait)
 		result := cfg.coord.State()
 		return state.Workflow{}, "", &result
 	}
