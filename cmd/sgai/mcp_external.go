@@ -111,21 +111,21 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyResult{}, err
 	})
 
-	type getWorkflowSVGArgs struct {
+	type getAgentDelegationSVGArgs struct {
 		Workspace string `json:"workspace" jsonschema:"The workspace name"`
 	}
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "get_workflow_svg",
-		Description: "Get the workflow diagram as SVG for a workspace.",
-		InputSchema: mustSchema[getWorkflowSVGArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkflowSVGArgs) (*mcp.CallToolResult, emptyResult, error) {
+		Name:        "get_agent_delegation_svg",
+		Description: "Get available agents for coordinator delegation as SVG for a workspace.",
+		InputSchema: mustSchema[getAgentDelegationSVGArgs](),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, args getAgentDelegationSVGArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
 		if err != nil {
 			return nil, emptyResult{}, err
 		}
-		svg := ctx.srv.getWorkflowSVGService(workspacePath)
+		svg := ctx.srv.getAgentDelegationSVGService(workspacePath)
 		if svg == "" {
-			return textResult("workflow SVG not available"), emptyResult{}, nil
+			return textResult("agent delegation SVG not available"), emptyResult{}, nil
 		}
 		return textResult(svg), emptyResult{}, nil
 	})
@@ -135,7 +135,7 @@ func registerStateTools(server *mcp.Server, ctx *externalMCPContext) {
 	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_workspace_diff",
-		Description: "Get the current git diff for a workspace.",
+		Description: "Get the current repository diff for a workspace.",
 		InputSchema: mustSchema[getWorkspaceDiffArgs](),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args getWorkspaceDiffArgs) (*mcp.CallToolResult, emptyResult, error) {
 		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
@@ -713,7 +713,10 @@ func registerModelTools(server *mcp.Server, ctx *externalMCPContext) {
 		Description: "List all available AI models.",
 		InputSchema: mustSchema[listModelsArgs](),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args listModelsArgs) (*mcp.CallToolResult, emptyResult, error) {
-		modelsResult := ctx.srv.listModelsService(args.Workspace)
+		modelsResult, errModels := ctx.srv.listModelsService(args.Workspace)
+		if errModels != nil {
+			return nil, emptyResult{}, errModels
+		}
 		result, err := jsonResult(modelsResult)
 		return result, emptyResult{}, err
 	})

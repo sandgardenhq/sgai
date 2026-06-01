@@ -203,16 +203,18 @@ func TestPrependSteeringMessage(t *testing.T) {
 		{
 			name: "withFrontmatter",
 			existingGoal: `---
-flow: |
-  "a" -> "b"
+agents:
+  - go
+model: openai/gpt-5.5
 ---
 # My Goal
 
 Some content`,
 			message: "Steering message",
 			expected: `---
-flow: |
-  "a" -> "b"
+agents:
+  - go
+model: openai/gpt-5.5
 ---
 
 Steering message
@@ -239,11 +241,11 @@ Some content`,
 		{
 			name: "unclosedFrontmatter",
 			existingGoal: `---
-flow: |
-  "a" -> "b"
+agents:
+  - go
 # My Goal`,
 			message:  "Steering message",
-			expected: "Steering message\n\n---\nflow: |\n  \"a\" -> \"b\"\n# My Goal",
+			expected: "Steering message\n\n---\nagents:\n  - go\n# My Goal",
 		},
 	}
 

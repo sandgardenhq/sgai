@@ -10,7 +10,7 @@ beforeEach(() => {
 });
 
 const mockFork = mock(() => Promise.resolve({ name: "new-fork", dir: "/path/to/new-fork" }));
-const mockForkTemplate = mock(() => Promise.resolve({ content: "---\nflow: |\n  \"a\" -> \"b\"\n---\n# Goal\n\nDescribe your task" }));
+const mockForkTemplate = mock(() => Promise.resolve({ content: "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n# Goal\n\nDescribe your task" }));
 const mockTriggerFactoryRefresh = mock(() => {});
 const mockNavigate = mock(() => {});
 
@@ -78,7 +78,7 @@ describe("InlineForkEditor", () => {
     mockTriggerFactoryRefresh.mockClear();
     mockNavigate.mockClear();
     mockFork.mockImplementation(() => Promise.resolve({ name: "new-fork", dir: "/path/to/new-fork" }));
-    mockForkTemplate.mockImplementation(() => Promise.resolve({ content: "---\nflow: |\n  \"a\" -> \"b\"\n---\n# Goal\n\nDescribe your task" }));
+    mockForkTemplate.mockImplementation(() => Promise.resolve({ content: "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n# Goal\n\nDescribe your task" }));
   });
 
   describe("rendering", () => {
@@ -121,7 +121,7 @@ describe("InlineForkEditor", () => {
 
   describe("validation", () => {
     it("disables Create Fork button when body is empty", async () => {
-      mockForkTemplate.mockImplementation(() => Promise.resolve({ content: "---\nflow: |\n  \"a\" -> \"b\"\n---\n" }));
+      mockForkTemplate.mockImplementation(() => Promise.resolve({ content: "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n" }));
 
       renderInlineForkEditor();
 

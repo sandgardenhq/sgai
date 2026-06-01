@@ -25,11 +25,8 @@ Response:
     "completionGate": "make test",
     "safetyAnalysis": false,
     "retrospective": false,
-    "agents": [
-      {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
-      {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
-    ],
-    "flow": "\"go\"",
+    "agents": ["go"],
+    "model": "openai/gpt-5.5 (xhigh)",
     "tasks": "- [ ] Build a REST API for user management\n- [ ] Write tests with 80%+ coverage"
   },
   "wizard": {
@@ -44,8 +41,7 @@ Response:
     {"id": "go", "name": "Go", "selected": true},
     {"id": "react", "name": "React", "selected": false},
     {"id": "shell", "name": "Shell/Bash", "selected": false}
-  ],
-  "flowError": ""
+  ]
 }
 ```
 
@@ -55,9 +51,9 @@ Response:
 - `description` — markdown description that becomes the GOAL.md body before tasks
 - `completionGate` — shell command to verify completion
 - `safetyAnalysis` — whether to include Safety Analysis guidance in the GOAL.md body
-- `retrospective` — whether to enable retrospective flow metadata
-- `agents` — array of `{name, selected, model}` entries used to generate the `models:` frontmatter
-- `flow` — agent flow definition (quoted agent names with `->`)
+- `retrospective` — whether to enable retrospective metadata
+- `agents` — array of agent names used to generate the `agents:` frontmatter list
+- `model` — the shared model string for the coordinator
 - `tasks` — markdown goal checklist written under `## Tasks`
 
 **`wizard`** — user-facing wizard state:
@@ -85,11 +81,8 @@ Response:
       "name": "Go Development",
       "description": "Go implementation and review wrapper",
       "icon": "🔧",
-      "agents": [
-        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
-        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
-      ],
-      "flow": "\"go\""
+      "agents": ["go"],
+      "model": "openai/gpt-5.5 (xhigh)"
     }
   ]
 }
@@ -108,14 +101,12 @@ curl -s "$BASE_URL/api/v1/compose/preview?workspace=my-project"
 Response:
 ```json
 {
-  "content": "---\nflow: |\n  \"go\"\nmodels:\n  \"coordinator\": \"openai/gpt-5.5 (xhigh)\"\n  \"go\": \"openai/gpt-5.5 (low)\"\ncompletionGateScript: make test\n---\n\nUser management REST API\n\n## Tasks\n\n- [ ] Build a REST API\n",
-  "flowError": "",
+  "content": "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\ncompletionGateScript: make test\n---\n\nUser management REST API\n\n## Tasks\n\n- [ ] Build a REST API\n",
   "etag": "\"abc123def456\""
 }
 ```
 
 - `content` — the full GOAL.md content that would be saved
-- `flowError` — non-empty if the flow definition has syntax errors
 - `etag` — current file ETag for optimistic concurrency
 
 ## Save Draft (In-Memory)
@@ -133,11 +124,8 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
       "completionGate": "",
       "safetyAnalysis": false,
       "retrospective": false,
-      "agents": [
-        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
-        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
-      ],
-      "flow": "\"go\"",
+      "agents": ["go"],
+      "model": "openai/gpt-5.5 (xhigh)",
       "tasks": "- [ ] Build authentication\n"
     },
     "wizard": {
@@ -197,11 +185,8 @@ curl -X POST "$BASE_URL/api/v1/compose/draft?workspace=my-project" \
       "completionGate": "make test",
       "safetyAnalysis": false,
       "retrospective": false,
-      "agents": [
-        {"name": "coordinator", "selected": true, "model": "openai/gpt-5.5 (xhigh)"},
-        {"name": "go", "selected": true, "model": "openai/gpt-5.5 (low)"}
-      ],
-      "flow": "\"go\"",
+      "agents": ["go"],
+      "model": "openai/gpt-5.5 (xhigh)",
       "tasks": "- [ ] Build REST API\n- [ ] Add authentication\n- [ ] Write tests\n"
     },
     "wizard": {

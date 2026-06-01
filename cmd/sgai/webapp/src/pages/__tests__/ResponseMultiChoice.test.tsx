@@ -59,7 +59,6 @@ const mockWorkspace = {
   rawGoalContent: "# Test Goal",
   pmContent: "",
   hasProjectMgmt: false,
-  svgHash: "",
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",

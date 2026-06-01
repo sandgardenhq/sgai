@@ -1,7 +1,7 @@
 import { useState, useTransition, type MouseEvent } from "react";
 import { ChevronRight, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -30,34 +30,24 @@ function EventsTabSkeleton() {
   );
 }
 
-function WorkflowSection({ svgHash, needsInput, humanMessage, currentAgent, workspaceName }: {
-  svgHash: string;
+function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
   needsInput: boolean;
   humanMessage: string;
   currentAgent: string;
-  workspaceName: string;
 }) {
-  const svgUrl = `/api/v1/workspaces/${encodeURIComponent(workspaceName)}/workflow.svg${svgHash ? `?h=${svgHash}` : ""}`;
+  if (!needsInput || !humanMessage) {
+    return null;
+  }
 
   return (
     <Card>
-      <CardContent className="space-y-3">
-        <img
-          src={svgUrl}
-          alt="Workflow graph"
-          className="max-w-full h-auto"
-        />
-
-        {needsInput && humanMessage && (
-          <div className="mt-3 p-3 border rounded-lg bg-yellow-50">
-            <p className="text-sm font-medium">
-              <Badge variant="default">{currentAgent}</Badge>
-            </p>
-            <blockquote className="mt-2 text-sm italic border-l-2 pl-3 text-muted-foreground">
-              {humanMessage}
-            </blockquote>
-          </div>
-        )}
+      <CardContent className="p-3 bg-yellow-50">
+        <p className="text-sm font-medium">
+          <Badge variant="default">{currentAgent}</Badge>
+        </p>
+        <blockquote className="mt-2 text-sm italic border-l-2 pl-3 text-muted-foreground">
+          {humanMessage}
+        </blockquote>
       </CardContent>
     </Card>
   );
@@ -201,12 +191,10 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
           ) : null}
         </div>
       )}
-      <WorkflowSection
-        svgHash={workspace.svgHash}
+      <NeedsInputBanner
         needsInput={workspace.needsInput}
         humanMessage={workspace.humanMessage}
         currentAgent={workspace.currentAgent}
-        workspaceName={workspaceName}
       />
       {goalContent && (
         <details className="group">

@@ -68,7 +68,7 @@ func TestGetWorkspaceStateService(t *testing.T) {
 	}
 }
 
-func TestGetWorkflowSVGService(t *testing.T) {
+func TestGetAgentDelegationSVGService(t *testing.T) {
 	tests := []struct {
 		name      string
 		setupFunc func(*testing.T, string)
@@ -78,19 +78,34 @@ func TestGetWorkflowSVGService(t *testing.T) {
 			name: "getSVGForWorkspaceWithGoal",
 			setupFunc: func(t *testing.T, workspacePath string) {
 				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-				goalContent := "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal"
+				goalContent := "---\nagents:\n  - coordinator\n  - agent1\n  - agent2\nmodel: openai/gpt-5.5\n---\n# Test Goal"
 				goalPath := filepath.Join(workspacePath, "GOAL.md")
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
 			validate: func(t *testing.T, svg string) {
 				assert.NotEmpty(t, svg)
 				assert.Contains(t, svg, "svg")
+				assert.Contains(t, svg, "agent1")
+				assert.Contains(t, svg, "agent2")
+				assert.NotContains(t, svg, "coordinator")
 			},
 		},
 		{
 			name: "getSVGForWorkspaceWithoutGoal",
 			setupFunc: func(t *testing.T, workspacePath string) {
 				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
+			},
+			validate: func(t *testing.T, svg string) {
+				assert.Empty(t, svg)
+			},
+		},
+		{
+			name: "getSVGForWorkspaceWithOnlyCoordinator",
+			setupFunc: func(t *testing.T, workspacePath string) {
+				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
+				goalContent := "---\nagents:\n  - coordinator\nmodel: openai/gpt-5.5\n---\n# Test Goal"
+				goalPath := filepath.Join(workspacePath, "GOAL.md")
+				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
 			validate: func(t *testing.T, svg string) {
 				assert.Empty(t, svg)
@@ -107,44 +122,10 @@ func TestGetWorkflowSVGService(t *testing.T) {
 			require.NoError(t, os.MkdirAll(workspacePath, 0755))
 			tt.setupFunc(t, workspacePath)
 
-			svg := server.getWorkflowSVGService(workspacePath)
+			svg := server.getAgentDelegationSVGService(workspacePath)
 
 			if tt.validate != nil {
 				tt.validate(t, svg)
-			}
-		})
-	}
-}
-
-func TestWorkspaceDiffService(t *testing.T) {
-	tests := []struct {
-		name      string
-		setupFunc func(*testing.T, string)
-		validate  func(*testing.T, workspaceDiffResult)
-	}{
-		{
-			name: "getDiffForWorkspace",
-			setupFunc: func(t *testing.T, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-			},
-			validate: func(_ *testing.T, _ workspaceDiffResult) {
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rootDir := t.TempDir()
-			server := NewServer(rootDir)
-
-			workspacePath := filepath.Join(rootDir, "test-workspace")
-			require.NoError(t, os.MkdirAll(workspacePath, 0755))
-			tt.setupFunc(t, workspacePath)
-
-			result := server.workspaceDiffService(workspacePath)
-
-			if tt.validate != nil {
-				tt.validate(t, result)
 			}
 		})
 	}
@@ -252,39 +233,50 @@ func TestGetWorkspaceStateServiceWithMultipleWorkspaces(t *testing.T) {
 	assert.False(t, result.Found)
 }
 
-func TestGetWorkflowSVGServiceWithDifferentGoals(t *testing.T) {
+func TestGetAgentDelegationSVGServiceWithDifferentAgentLists(t *testing.T) {
 	tests := []struct {
 		name        string
 		goalContent string
 		validate    func(*testing.T, string)
 	}{
 		{
-			name:        "goalWithSimpleFlow",
-			goalContent: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n---\n# Test Goal",
+			name:        "goalWithSimpleAgents",
+			goalContent: "---\nagents:\n  - agent1\n  - agent2\nmodel: openai/gpt-5.5\n---\n# Test Goal",
 			validate: func(t *testing.T, svg string) {
 				assert.NotEmpty(t, svg)
 				assert.Contains(t, svg, "svg")
 				assert.Contains(t, svg, "agent1")
 				assert.Contains(t, svg, "agent2")
+				assert.NotContains(t, svg, "coordinator")
 			},
 		},
 		{
-			name:        "goalWithComplexFlow",
-			goalContent: "---\nflow: |\n  \"agent1\" -> \"agent2\"\n  \"agent2\" -> \"agent3\"\n  \"agent1\" -> \"agent3\"\n---\n# Complex Goal",
+			name:        "goalWithMultipleAgents",
+			goalContent: "---\nagents:\n  - agent1\n  - agent2\n  - agent3\nmodel: openai/gpt-5.5\n---\n# Complex Goal",
 			validate: func(t *testing.T, svg string) {
 				assert.NotEmpty(t, svg)
 				assert.Contains(t, svg, "svg")
 				assert.Contains(t, svg, "agent1")
 				assert.Contains(t, svg, "agent2")
 				assert.Contains(t, svg, "agent3")
+				assert.NotContains(t, svg, "coordinator")
 			},
 		},
 		{
-			name:        "goalWithNoFlow",
-			goalContent: "# Test Goal\n\nNo flow defined",
+			name:        "goalWithXMLSignificantAgentName",
+			goalContent: "---\nagents:\n  - 'research <review> & verify'\nmodel: openai/gpt-5.5\n---\n# Escaped Goal",
 			validate: func(t *testing.T, svg string) {
 				assert.NotEmpty(t, svg)
-				assert.Contains(t, svg, "svg")
+				assert.Contains(t, svg, "research &lt;review&gt; &amp; verify")
+				assert.NotContains(t, svg, "research <review> & verify")
+			},
+		},
+		{
+			name:        "goalWithNoAgents",
+			goalContent: "---\nmodel: openai/gpt-5.5\n---\n# Test Goal",
+			validate: func(t *testing.T, svg string) {
+				assert.Empty(t, svg)
+				assert.NotContains(t, svg, "coordinator")
 			},
 		},
 	}
@@ -301,27 +293,13 @@ func TestGetWorkflowSVGServiceWithDifferentGoals(t *testing.T) {
 			goalPath := filepath.Join(workspacePath, "GOAL.md")
 			require.NoError(t, os.WriteFile(goalPath, []byte(tt.goalContent), 0644))
 
-			svg := server.getWorkflowSVGService(workspacePath)
+			svg := server.getAgentDelegationSVGService(workspacePath)
 
 			if tt.validate != nil {
 				tt.validate(t, svg)
 			}
 		})
 	}
-}
-
-func TestWorkspaceDiffServiceWithJJRepo(t *testing.T) {
-	t.Skip("Integration test - requires real jj repository with commits")
-	rootDir := t.TempDir()
-	server := NewServer(rootDir)
-
-	workspacePath := filepath.Join(rootDir, "test-workspace")
-	require.NoError(t, os.MkdirAll(workspacePath, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".jj"), 0755))
-
-	result := server.workspaceDiffService(workspacePath)
-	assert.NotEmpty(t, result.Diff)
 }
 
 func TestWorkspaceDiffServiceWithoutJJRepo(t *testing.T) {

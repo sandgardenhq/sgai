@@ -3,14 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"log"
 	"maps"
@@ -36,12 +33,6 @@ import (
 
 //go:embed GOAL.example.md
 var goalExampleContent string
-
-var tmplFallbackSVG = template.Must(template.New("fallbackSVG").Parse(
-	`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="{{.Height}}" viewBox="0 0 400 {{.Height}}">
-<rect width="100%" height="100%" fill="#f8fafc"/>
-<text x="10" y="20" font-family="monospace" font-size="12" fill="#475569">{{range .Lines}}<tspan x="10" dy="{{.DY}}">{{.Text}}</tspan>{{end}}</text>
-</svg>`))
 
 type project struct {
 	Directory    string
@@ -258,8 +249,6 @@ type Server struct {
 	classifyCache       *ttlCache[string, workspaceKind]
 	bookmarkFlight      singleflight[string, string]
 	bookmarkCache       *ttlCache[string, string]
-	svgFlight           singleflight[string, string]
-	svgCache            *ttlCache[string, string]
 
 	jjChangesFlight    singleflight[string, jjChangesResult]
 	forkCommitsFlight  singleflight[string, int]
@@ -315,7 +304,6 @@ func NewServerWithConfig(rootDir, editorConfig string) *Server {
 		workspaceScanCache: newTTLCache[string, []workspaceGroup](3 * time.Second),
 		classifyCache:      newTTLCache[string, workspaceKind](5 * time.Second),
 		bookmarkCache:      newTTLCache[string, string](30 * time.Second),
-		svgCache:           newTTLCache[string, string](10 * time.Second),
 		stateCache:         newTTLCache[string, apiFactoryState](30 * time.Second),
 	}
 }
@@ -430,9 +418,9 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 	sess.coord = coord
 	sess.mu.Unlock()
 
-	dagAgents := workspaceDagAgents(workspacePath)
+	availableAgents := workspaceGoalAgents(workspacePath)
 
-	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath, coord, dagAgents)
+	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath, coord, availableAgents)
 	if errMCP != nil {
 		sess.mu.Lock()
 		sess.running = false
@@ -492,22 +480,7 @@ func (s *Server) stopSession(workspacePath string) {
 		sess.mu.Unlock()
 	}
 
-	s.flushGoalChecksumOnStop(workspacePath)
 	s.notifyStateChange()
-}
-
-func (s *Server) flushGoalChecksumOnStop(workspacePath string) {
-	goalPath := filepath.Join(workspacePath, "GOAL.md")
-	checksum, errChecksum := computeGoalChecksum(goalPath)
-	if errChecksum != nil {
-		return
-	}
-	coord := s.workspaceCoordinator(workspacePath)
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.GoalChecksum = checksum
-	}); errUpdate != nil {
-		log.Println("failed to flush goal checksum on stop:", errUpdate)
-	}
 }
 
 func badgeStatus(wfState state.Workflow, running bool) (class, text string) {
@@ -598,56 +571,6 @@ func cmdServe(args []string) {
 	}
 }
 
-func renderDotToSVG(dotContent string) string {
-	if dotContent == "" {
-		return ""
-	}
-	dotPath, err := exec.LookPath("dot")
-	if err != nil {
-		return renderDotAsFallbackSVG(dotContent)
-	}
-
-	cmd := exec.Command(dotPath, "-Tsvg")
-	cmd.Stdin = strings.NewReader(dotContent)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return renderDotAsFallbackSVG(dotContent)
-	}
-	return out.String()
-}
-
-func renderDotAsFallbackSVG(dotContent string) string {
-	lines := linesWithTrailingEmpty(dotContent)
-	height := max(20+len(lines)*16, 100)
-
-	type lineData struct {
-		DY   int
-		Text string
-	}
-	var lineItems []lineData
-	for i, line := range lines {
-		dy := 16
-		if i == 0 {
-			dy = 0
-		}
-		lineItems = append(lineItems, lineData{DY: dy, Text: line})
-	}
-
-	var buf bytes.Buffer
-	data := struct {
-		Height int
-		Lines  []lineData
-	}{
-		Height: height,
-		Lines:  lineItems,
-	}
-	if err := tmplFallbackSVG.Execute(&buf, data); err != nil {
-		return ""
-	}
-	return buf.String()
-}
-
 func linesWithTrailingEmpty(content string) []string {
 	var lines []string
 	for line := range strings.Lines(content) {
@@ -657,64 +580,6 @@ func linesWithTrailingEmpty(content string) []string {
 		lines = append(lines, "")
 	}
 	return lines
-}
-
-func getWorkflowSVG(dir string, currentAgent string) string {
-	goalPath := filepath.Join(dir, "GOAL.md")
-	goalData, err := os.ReadFile(goalPath)
-	if err != nil {
-		return ""
-	}
-
-	metadata, err := parseYAMLFrontmatter(goalData)
-	if err != nil {
-		return ""
-	}
-
-	d, err := parseFlow(metadata.Flow, dir)
-	if err != nil {
-		return ""
-	}
-
-	if retrospectiveEnabled(metadata) {
-		d.injectRetrospectiveEdge()
-	}
-
-	dotContent := d.toDOT()
-
-	if currentAgent != "" {
-		dotContent = injectCurrentAgentStyle(dotContent, currentAgent)
-	}
-	dotContent = injectLightTheme(dotContent)
-
-	return renderDotToSVG(dotContent)
-}
-
-func (s *Server) getWorkflowSVGCached(dir string, currentAgent string) string {
-	cacheKey := dir + "|" + currentAgent
-	if cached, ok := s.svgCache.get(cacheKey); ok {
-		return cached
-	}
-	svg, _ := s.svgFlight.do(cacheKey, func() (string, error) {
-		if cached, ok := s.svgCache.get(cacheKey); ok {
-			return cached, nil
-		}
-		svg := getWorkflowSVG(dir, currentAgent)
-		if svg != "" {
-			s.svgCache.set(cacheKey, svg)
-		}
-		return svg, nil
-	})
-	return svg
-}
-
-func (s *Server) getWorkflowSVGHashCached(dir string, currentAgent string) string {
-	svg := s.getWorkflowSVGCached(dir, currentAgent)
-	if svg == "" {
-		return ""
-	}
-	hash := sha256.Sum256([]byte(svg))
-	return hex.EncodeToString(hash[:8])
 }
 
 type eventsProgressDisplay struct {
@@ -819,9 +684,7 @@ func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bo
 		elapsedStr := formatDuration(elapsed)
 		var model string
 		if workspacePath != "" {
-			if models := modelsForAgentFromGoal(workspacePath, entry.Agent); len(models) > 0 {
-				model = models[0]
-			}
+			model = modelFromGoal(workspacePath)
 		}
 		result = append(result, agentSequenceDisplay{
 			Agent:       entry.Agent,
@@ -862,7 +725,7 @@ func calculateTotalExecutionTime(sequence []state.AgentSequenceEntry, running bo
 	return formatDuration(elapsed)
 }
 
-func workspaceDagAgents(workspacePath string) []string {
+func workspaceGoalAgents(workspacePath string) []string {
 	goalPath := filepath.Join(workspacePath, "GOAL.md")
 	goalContent, errRead := os.ReadFile(goalPath)
 	if errRead != nil {
@@ -872,48 +735,7 @@ func workspaceDagAgents(workspacePath string) []string {
 	if errParse != nil {
 		return nil
 	}
-	flowDag, errFlow := parseFlow(metadata.Flow, workspacePath)
-	if errFlow != nil {
-		return nil
-	}
-	if retrospectiveEnabled(metadata) {
-		flowDag.injectRetrospectiveEdge()
-	}
-	return flowDag.allAgents()
-}
-
-func extractSubject(body string) string {
-	for _, line := range linesWithTrailingEmpty(body) {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			return strings.TrimLeft(trimmed, "# ")
-		}
-	}
-	return ""
-}
-
-func injectCurrentAgentStyle(dot, currentAgent string) string {
-	agentLine := fmt.Sprintf(`    "%s"`, currentAgent)
-	styledLine := fmt.Sprintf(`    "%s" [style=filled, fillcolor="#10b981", fontcolor=white]`, currentAgent)
-
-	if !strings.Contains(dot, agentLine) {
-		return dot
-	}
-
-	return strings.Replace(dot, agentLine, styledLine, 1)
-}
-
-func injectLightTheme(dot string) string {
-	lightTheme := `    bgcolor="transparent"
-    node [style=filled, fillcolor="#e2e8f0", fontcolor="#1e293b", color="#94a3b8"]
-    edge [color="#64748b", fontcolor="#475569"]`
-
-	braceIdx := strings.Index(dot, "{")
-	if braceIdx == -1 {
-		return dot
-	}
-
-	return dot[:braceIdx+1] + "\n" + lightTheme + dot[braceIdx+1:]
+	return buildAllAgents(metadata.Agents)
 }
 
 func getLatestProgress(progress []state.ProgressEntry) string {
@@ -1542,17 +1364,17 @@ func (s *Server) resolveWorkspaceNameToPath(workspaceName string) string {
 	return ""
 }
 
-func modelsForAgentFromGoal(dir, agent string) []string {
+func modelFromGoal(dir string) string {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	goalData, errRead := os.ReadFile(goalPath)
 	if errRead != nil {
-		return nil
+		return ""
 	}
 	metadata, errParse := parseYAMLFrontmatter(goalData)
 	if errParse != nil {
-		return nil
+		return ""
 	}
-	return getModelsForAgent(metadata.Models, agent)
+	return metadata.Model
 }
 
 func initializeWorkspace(workspacePath string) error {

@@ -11,7 +11,6 @@ type composeStateResult struct {
 	State          composerState
 	Wizard         apiWizardState
 	TechStackItems []apiTechStackItem
-	FlowError      string
 }
 
 func (s *Server) composeStateService(workspacePath string) composeStateResult {
@@ -21,19 +20,11 @@ func (s *Server) composeStateService(workspacePath string) composeStateResult {
 	wizard := syncWizardState(cs.wizard, currentState)
 	cs.mu.Unlock()
 
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
 	return composeStateResult{
 		Workspace:      filepath.Base(workspacePath),
 		State:          currentState,
 		Wizard:         apiWizardState(wizard),
 		TechStackItems: buildAPITechStackItems(wizard.TechStack),
-		FlowError:      flowErr,
 	}
 }
 
@@ -77,17 +68,17 @@ type composeTemplatesResult struct {
 }
 
 func (s *Server) composeTemplatesService() composeTemplatesResult {
-	entries := make([]apiComposeTemplateEntry, len(workflowTemplates))
-	for i, tmpl := range workflowTemplates {
+	templates := workflowTemplates()
+	entries := make([]apiComposeTemplateEntry, len(templates))
+	for i, tmpl := range templates {
 		entries[i] = apiComposeTemplateEntry(tmpl)
 	}
 	return composeTemplatesResult{Templates: entries}
 }
 
 type composePreviewResult struct {
-	Content   string
-	FlowError string
-	Etag      string
+	Content string
+	Etag    string
 }
 
 func (s *Server) composePreviewService(workspacePath string) (composePreviewResult, error) {
@@ -98,13 +89,6 @@ func (s *Server) composePreviewService(workspacePath string) (composePreviewResu
 
 	preview := buildGOALContent(currentState)
 
-	var flowErr string
-	if currentState.Flow != "" {
-		if _, errParse := parseFlow(currentState.Flow, workspacePath); errParse != nil {
-			flowErr = errParse.Error()
-		}
-	}
-
 	goalPath := filepath.Join(workspacePath, "GOAL.md")
 	existingContent, errRead := os.ReadFile(goalPath)
 	if errRead != nil && !os.IsNotExist(errRead) {
@@ -112,7 +96,7 @@ func (s *Server) composePreviewService(workspacePath string) (composePreviewResu
 	}
 	etag := computeEtag(existingContent)
 
-	return composePreviewResult{Content: preview, FlowError: flowErr, Etag: etag}, nil
+	return composePreviewResult{Content: preview, Etag: etag}, nil
 }
 
 type composeDraftResult struct {

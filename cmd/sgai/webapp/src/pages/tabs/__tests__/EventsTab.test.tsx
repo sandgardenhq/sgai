@@ -31,7 +31,6 @@ const createMockWorkspace = (overrides = {}) => ({
   rawGoalContent: "",
   pmContent: "",
   hasProjectMgmt: false,
-  svgHash: "abc123",
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
@@ -215,14 +214,12 @@ describe("EventsTab", () => {
     });
   });
 
-  describe("workflow section", () => {
-    it("renders workflow graph image", async () => {
+  describe("needs input banner", () => {
+    it("does not render when workspace does not need input", async () => {
       renderEventsTab();
 
       await waitFor(() => {
-        const img = screen.getByAltText("Workflow graph");
-        expect(img).toBeTruthy();
-        expect(img.getAttribute("src")).toContain("workflow.svg");
+        expect(screen.queryByText("Please choose an option")).toBeNull();
       });
     });
 
@@ -237,6 +234,7 @@ describe("EventsTab", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Please choose an option")).toBeTruthy();
+        expect(screen.getByText("coordinator")).toBeTruthy();
       });
     });
   });

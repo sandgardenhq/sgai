@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Standalone interactive explainer for SGAI coordinator-first agent delegation and the safe allowed-agent payload.">
+    <title>Agent Drive Workflow Explainer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #fff8e7;
+        --muted: #cdbd97;
+        --dim: #877a5f;
+        --charcoal: #11100c;
+        --panel: rgba(34, 31, 24, 0.78);
+        --panel-strong: rgba(17, 16, 12, 0.94);
+        --line: rgba(255, 248, 231, 0.16);
+        --gold: #ffc94f;
+        --gold-deep: #7b5a16;
+        --mint: #8cf7c1;
+        --mint-deep: #245b42;
+        --ember: #ff866e;
+        --ember-deep: #733126;
+        --cyan: #61d8ff;
+        --shadow: rgba(0, 0, 0, 0.52);
+        --radius-xl: 34px;
+        --radius-lg: 24px;
+        --radius-md: 16px;
+        --mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+        --body: "Avenir Next", "Segoe UI", Verdana, sans-serif;
+        --display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-height: 100%;
+        background: #090907;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: var(--body);
+        background:
+          radial-gradient(circle at 18% 10%, rgba(255, 201, 79, 0.18), transparent 33rem),
+          radial-gradient(circle at 82% 18%, rgba(97, 216, 255, 0.12), transparent 30rem),
+          radial-gradient(circle at 56% 70%, rgba(140, 247, 193, 0.09), transparent 36rem),
+          linear-gradient(112deg, #120e08 0%, #15130f 42%, #091113 100%);
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.12;
+        background-image:
+          linear-gradient(rgba(255, 248, 231, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 248, 231, 0.08) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: linear-gradient(to bottom, black, transparent 82%);
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.16;
+        background-image: radial-gradient(rgba(255, 248, 231, 0.75) 0.7px, transparent 0.8px);
+        background-size: 5px 5px;
+        mix-blend-mode: soft-light;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 3px solid var(--mint);
+        outline-offset: 4px;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        width: min(1480px, calc(100% - 44px));
+        margin: 0 auto;
+        padding: 56px 0 44px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(320px, 1.12fr) minmax(300px, 0.88fr);
+        gap: 28px;
+        align-items: stretch;
+        min-height: 430px;
+      }
+
+      .hero-card,
+      .principle-card,
+      .panel,
+      .note-card {
+        position: relative;
+        min-width: 0;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, rgba(36, 32, 24, 0.86), rgba(14, 14, 11, 0.84));
+        box-shadow: 0 30px 80px var(--shadow), inset 0 1px 0 rgba(255, 248, 231, 0.06);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero > *,
+      .flow-grid > *,
+      .notes > *,
+      .result-columns > *,
+      .candidate-grid > * {
+        min-width: 0;
+      }
+
+      .hero-card {
+        min-height: 430px;
+        padding: clamp(34px, 5vw, 58px);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+      }
+
+      .hero-card::before {
+        content: "";
+        position: absolute;
+        width: 420px;
+        height: 300px;
+        right: -120px;
+        top: -80px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 201, 79, 0.5), rgba(255, 201, 79, 0.08) 58%, transparent 70%);
+        filter: blur(14px);
+        transform: rotate(-18deg);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 28px;
+        color: var(--gold);
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 13px;
+        height: 13px;
+        border-radius: 999px;
+        background: var(--mint);
+        box-shadow: 0 0 26px var(--mint);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: var(--display);
+        line-height: 0.92;
+        letter-spacing: -0.055em;
+      }
+
+      h1 {
+        position: relative;
+        max-width: 720px;
+        font-size: clamp(4.4rem, 11vw, 9.2rem);
+        text-wrap: balance;
+      }
+
+      .hero-card p {
+        position: relative;
+        max-width: 640px;
+        margin: 32px 0 0;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 2vw, 1.44rem);
+        line-height: 1.65;
+      }
+
+      .hero-card strong,
+      .principle-card strong,
+      .note-card strong,
+      .copy strong {
+        color: var(--ink);
+      }
+
+      .principles {
+        display: grid;
+        gap: 18px;
+        align-content: start;
+      }
+
+      .principle-card {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 18px;
+        align-items: start;
+        padding: 24px;
+        border-radius: 28px;
+      }
+
+      .number {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 15px;
+        color: #161007;
+        background: var(--gold);
+        font-weight: 900;
+        box-shadow: 0 12px 30px rgba(255, 201, 79, 0.32);
+      }
+
+      .principle-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.02rem;
+        line-height: 1.55;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.72fr) minmax(340px, 0.92fr) minmax(420px, 1.28fr);
+        gap: 24px;
+        margin-top: 28px;
+        align-items: stretch;
+      }
+
+      .panel {
+        border-radius: var(--radius-lg);
+        padding: clamp(22px, 3vw, 30px);
+      }
+
+      .panel h2 {
+        margin-bottom: 18px;
+        font-size: clamp(1.75rem, 3.5vw, 2.45rem);
+      }
+
+      .panel-kicker {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-width: 0;
+        color: var(--gold);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      .panel-kicker span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .copy {
+        margin: 0 0 20px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .code-box {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        margin: 18px 0;
+        padding: 22px;
+        overflow: auto;
+        border: 1px solid rgba(97, 216, 255, 0.38);
+        border-radius: 20px;
+        color: #fff4d1;
+        background: #050707;
+        font-family: var(--mono);
+        font-size: 0.95rem;
+        line-height: 1.45;
+        box-shadow: inset 0 0 0 1px rgba(255, 248, 231, 0.03);
+      }
+
+      .model-row,
+      .scenario-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0 22px;
+      }
+
+      .pill,
+      .scenario {
+        min-height: 40px;
+        padding: 0 18px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        background: rgba(255, 248, 231, 0.08);
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        font-weight: 800;
+        transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+      }
+
+      .pill[aria-pressed="true"],
+      .scenario.is-active {
+        color: #181006;
+        border-color: rgba(255, 201, 79, 0.72);
+        background: linear-gradient(135deg, var(--mint), #fff0a8 92%);
+        box-shadow: 0 12px 28px rgba(140, 247, 193, 0.16);
+      }
+
+      .pill:hover,
+      .scenario:hover,
+      .candidate:hover {
+        transform: translateY(-2px);
+      }
+
+      .candidate-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .candidate {
+        min-height: 94px;
+        padding: 16px;
+        border: 1px solid rgba(97, 216, 255, 0.55);
+        border-radius: 20px;
+        color: var(--ink);
+        background: linear-gradient(145deg, rgba(45, 48, 38, 0.92), rgba(28, 26, 21, 0.92));
+        text-align: left;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+      }
+
+      .candidate[aria-pressed="true"] {
+        border-color: rgba(255, 201, 79, 0.9);
+        background: linear-gradient(145deg, rgba(82, 59, 22, 0.94), rgba(34, 30, 20, 0.94));
+        box-shadow: inset 0 0 0 1px rgba(255, 201, 79, 0.17), 0 18px 40px rgba(0, 0, 0, 0.22);
+      }
+
+      .candidate-name {
+        display: block;
+        margin-bottom: 7px;
+        font-family: var(--mono);
+        font-size: 1.03rem;
+        font-weight: 900;
+      }
+
+      .candidate-note {
+        display: block;
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.35;
+      }
+
+      .boundary-panel {
+        display: grid;
+        gap: 18px;
+      }
+
+      .boundary-visual {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 260px;
+        border: 1px solid rgba(255, 201, 79, 0.25);
+        border-radius: 26px;
+        background:
+          radial-gradient(circle, rgba(255, 201, 79, 0.26), transparent 43%),
+          linear-gradient(135deg, rgba(8, 8, 7, 0.95), rgba(20, 18, 12, 0.92));
+        overflow: hidden;
+      }
+
+      .boundary-ring {
+        position: absolute;
+        width: 178px;
+        height: 178px;
+        border: 1px dashed rgba(255, 248, 231, 0.28);
+        border-radius: 999px;
+        animation: slow-spin 28s linear infinite;
+      }
+
+      .coordinator-orb {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 150px;
+        height: 150px;
+        padding: 18px;
+        border-radius: 999px;
+        color: #1b1104;
+        background: radial-gradient(circle at 35% 24%, #fff0a8, #ffc94f 52%, #f59a38 100%);
+        font-family: var(--display);
+        font-size: 1.18rem;
+        font-weight: 900;
+        line-height: 1.02;
+        text-align: center;
+        box-shadow: 0 0 52px rgba(255, 201, 79, 0.32);
+      }
+
+      .result-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .result-box {
+        min-height: 270px;
+        padding: 18px;
+        border-radius: 22px;
+        background: rgba(0, 0, 0, 0.38);
+      }
+
+      .result-box.allowed {
+        border: 1px solid rgba(140, 247, 193, 0.54);
+      }
+
+      .result-box.blocked {
+        border: 1px solid rgba(255, 134, 110, 0.52);
+      }
+
+      .result-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .allowed .result-title {
+        color: var(--mint);
+      }
+
+      .blocked .result-title {
+        color: var(--ember);
+      }
+
+      .count {
+        display: grid;
+        place-items: center;
+        min-width: 33px;
+        height: 33px;
+        padding: 0 9px;
+        border-radius: 999px;
+        color: #1a1309;
+        background: var(--ink);
+        letter-spacing: 0;
+      }
+
+      .agent-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .agent-card {
+        padding: 14px;
+        border-radius: 15px;
+        background: rgba(255, 248, 231, 0.08);
+      }
+
+      .allowed .agent-card {
+        border: 1px solid rgba(140, 247, 193, 0.24);
+      }
+
+      .blocked .agent-card {
+        border: 1px solid rgba(255, 134, 110, 0.24);
+      }
+
+      .agent-card b {
+        display: block;
+        margin-bottom: 3px;
+        font-family: var(--mono);
+        font-size: 1rem;
+      }
+
+      .agent-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.35;
+      }
+
+      .payload-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+      }
+
+      .command-card {
+        min-width: 0;
+        max-width: 100%;
+        margin: 34px 0 18px;
+        padding: 24px;
+        border: 1px solid rgba(140, 247, 193, 0.52);
+        border-radius: 24px;
+        color: #10150d;
+        background: linear-gradient(135deg, #9dfbd1, #e7ffe8);
+        box-shadow: 0 22px 60px rgba(140, 247, 193, 0.18);
+      }
+
+      .command-card small {
+        display: block;
+        margin-bottom: 9px;
+        font-size: 0.9rem;
+      }
+
+      .command-card code {
+        display: block;
+        overflow-wrap: anywhere;
+        font-family: var(--mono);
+        font-size: clamp(0.88rem, 1.35vw, 1.04rem);
+        font-weight: 900;
+      }
+
+      .payload-code {
+        min-width: 0;
+        min-height: 520px;
+        flex: 1;
+        margin: 0;
+        white-space: pre-wrap;
+      }
+
+      .warning {
+        margin-top: 18px;
+        padding: 20px;
+        border-left: 4px solid var(--gold);
+        border-radius: 18px;
+        color: var(--muted);
+        background: rgba(255, 201, 79, 0.1);
+        line-height: 1.55;
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .note-card {
+        min-height: 130px;
+        padding: 22px;
+        border-radius: 20px;
+      }
+
+      .note-card h3 {
+        margin-bottom: 9px;
+        color: var(--gold);
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .note-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .footer-line {
+        margin-top: 30px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      @keyframes slow-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 1180px) {
+        .hero,
+        .flow-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .payload-code {
+          min-height: 340px;
+        }
+      }
+
+      @media (min-width: 1181px) and (max-width: 1340px) {
+        .flow-grid {
+          grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+        }
+
+        .payload-panel {
+          grid-column: 1 / -1;
+        }
+
+        .payload-code {
+          min-height: 340px;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          width: min(100% - 28px, 720px);
+          padding-top: 28px;
+        }
+
+        .hero-card,
+        .principle-card,
+        .panel {
+          border-radius: 22px;
+        }
+
+        .hero-card {
+          min-height: auto;
+          padding: 28px;
+        }
+
+        h1 {
+          font-size: clamp(3.8rem, 18vw, 5.8rem);
+        }
+
+        .principle-card {
+          grid-template-columns: 1fr;
+        }
+
+        .candidate-grid,
+        .result-columns,
+        .notes {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-card">
+          <div class="eyebrow">Coordinator-first agent drive</div>
+          <h1 id="page-title">Only chosen agents enter the room.</h1>
+          <p>SGAI launches exactly one top-level worker: <strong>the coordinator</strong>. The GOAL file feeds it a safe payload of available OpenCode subagents. Anything outside the configured allowlist is stopped before prompt construction.</p>
+        </div>
+
+        <div class="principles" aria-label="Core rules">
+          <article class="principle-card">
+            <div class="number">1</div>
+            <p><strong>GOAL frontmatter is small:</strong> an <code>agents</code> list and one shared <code>model</code>.</p>
+          </article>
+          <article class="principle-card">
+            <div class="number">2</div>
+            <p><strong>The coordinator is implicit:</strong> it is launched by SGAI, not delegated as a worker.</p>
+          </article>
+          <article class="principle-card">
+            <div class="number">3</div>
+            <p><strong>STPA stays a skill workflow:</strong> <code>stpa-analyst</code> is never a routable GOAL agent.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="flow-grid" aria-label="Interactive coordinator payload explainer">
+        <article class="panel">
+          <div class="panel-kicker"><span>1. GOAL chooses the delegate set</span><span>source</span></div>
+          <pre class="code-box" id="goal-source-preview" aria-label="Live sample GOAL frontmatter"></pre>
+
+          <p class="copy">The only current schema shape is <strong>agents + model</strong>. The source preview follows the selected model, with no Graphviz flow, per-agent model table, or alias map.</p>
+
+          <div class="panel-kicker"><span>Model spec</span><span id="model-spec-label">xhigh</span></div>
+          <div class="model-row" role="group" aria-label="Model variant controls">
+            <button class="pill" type="button" data-model="xhigh" aria-pressed="true">variant xhigh</button>
+            <button class="pill" type="button" data-model="medium" aria-pressed="false">variant medium</button>
+            <button class="pill" type="button" data-model="base" aria-pressed="false">base model only</button>
+          </div>
+
+          <div class="panel-kicker"><span>2. Try candidate agents</span><span>stress cases</span></div>
+          <p class="copy">Toggle chips or use scenarios. The stress case intentionally includes bad candidates so the filter path is visible.</p>
+          <div class="scenario-row" role="group" aria-label="Scenario controls">
+            <button class="scenario is-active" type="button" data-scenario="stress" aria-pressed="true">Stress boundary</button>
+            <button class="scenario" type="button" data-scenario="safe" aria-pressed="false">Safe payload only</button>
+            <button class="scenario" type="button" data-scenario="base" aria-pressed="false">Base model only</button>
+          </div>
+
+          <div class="candidate-grid" id="candidate-grid" aria-label="Candidate agents">
+            <button class="candidate" type="button" data-index="0" data-agent="go" aria-pressed="true"><span class="candidate-name">go</span><span class="candidate-note">Configured delegate; can be offered to coordinator.</span></button>
+            <button class="candidate" type="button" data-index="1" data-agent="react" aria-pressed="true"><span class="candidate-name">react</span><span class="candidate-note">Configured delegate; can be offered to coordinator.</span></button>
+            <button class="candidate" type="button" data-index="2" data-agent="general-purpose" aria-pressed="true"><span class="candidate-name">general-purpose</span><span class="candidate-note">Configured delegate; can be offered to coordinator.</span></button>
+            <button class="candidate" type="button" data-index="3" data-agent="coordinator" aria-pressed="true"><span class="candidate-name">coordinator</span><span class="candidate-note">Implicit top-level controller; blocked as delegate.</span></button>
+            <button class="candidate" type="button" data-index="4" data-agent="stpa-analyst" aria-pressed="true"><span class="candidate-name">stpa-analyst</span><span class="candidate-note">Retired as a routable agent; STPA remains a skill workflow.</span></button>
+            <button class="candidate" type="button" data-index="5" data-agent="docs" aria-pressed="true"><span class="candidate-name">docs</span><span class="candidate-note">Not listed in GOAL; blocked before coordinator context.</span></button>
+            <button class="candidate" type="button" data-index="6" data-agent="go" aria-pressed="true"><span class="candidate-name">go again</span><span class="candidate-note">Duplicate request; only the first allowed entry survives.</span></button>
+          </div>
+        </article>
+
+        <article class="panel boundary-panel">
+          <div>
+            <div class="panel-kicker"><span>3. The airlock filters before the prompt</span><span>boundary</span></div>
+            <p class="copy">Configured, non-reserved, first-seen agents pass. Reserved names, retired agents, unlisted names, and duplicates become blocked evidence.</p>
+          </div>
+
+          <div class="boundary-visual" aria-hidden="true">
+            <div class="boundary-ring"></div>
+            <div class="coordinator-orb">Coordinator<br>prompt<br>boundary</div>
+          </div>
+
+          <div class="result-columns">
+            <section class="result-box allowed" aria-labelledby="allowed-title">
+              <div class="result-title" id="allowed-title">Allowed payload <span class="count" id="allowed-count">0</span></div>
+              <ul class="agent-list" id="allowed-list"></ul>
+            </section>
+            <section class="result-box blocked" aria-labelledby="blocked-title">
+              <div class="result-title" id="blocked-title">Blocked entries <span class="count" id="blocked-count">0</span></div>
+              <ul class="agent-list" id="blocked-list"></ul>
+            </section>
+          </div>
+        </article>
+
+        <article class="panel payload-panel">
+          <div class="panel-kicker"><span>4. Coordinator receives only the safe payload</span><span>live payload</span></div>
+          <div class="command-card">
+            <small>SGAI starts one process:</small>
+            <code id="launch-command">opencode run --agent coordinator --model openai/gpt-5.5 --variant xhigh</code>
+          </div>
+
+          <pre class="code-box payload-code" id="payload-preview" aria-live="polite"></pre>
+          <div class="warning">OpenCode subagent delegation handles specialists from this allowed list. STPA remains a skill workflow, not a routable agent. The coordinator never receives blocked names as delegation options.</div>
+        </article>
+      </section>
+
+      <section class="notes" aria-label="What gets blocked">
+        <article class="note-card">
+          <h3>Reserved self-routing</h3>
+          <p><strong>coordinator</strong> is implicit and cannot be fed back as a delegate.</p>
+        </article>
+        <article class="note-card">
+          <h3>Retired safety agent</h3>
+          <p><strong>stpa-analyst</strong> is rejected; STPA runs through skills.</p>
+        </article>
+        <article class="note-card">
+          <h3>Unlisted or duplicate drift</h3>
+          <p>Unknown and repeated names are visible as blocked entries, not hidden in prompts.</p>
+        </article>
+      </section>
+
+      <p class="footer-line">Result: the coordinator can choose from <em>allowed subagents</em>, but non-allowed, retired, recursive, or duplicate entries never enter the prompt payload.</p>
+    </main>
+
+    <script>
+      const configuredAgents = ["go", "react", "general-purpose"];
+      const candidates = [
+        { agent: "go", allowedNote: "configured delegate available to coordinator" },
+        { agent: "react", allowedNote: "configured delegate available to coordinator" },
+        { agent: "general-purpose", allowedNote: "configured delegate available to coordinator" },
+        { agent: "coordinator" },
+        { agent: "stpa-analyst" },
+        { agent: "docs" },
+        { agent: "go" },
+      ];
+
+      const modelSpecs = {
+        xhigh: "openai/gpt-5.5 (xhigh)",
+        medium: "openai/gpt-5.5 (medium)",
+        base: "openai/gpt-5.5",
+      };
+
+      const scenarioSelections = {
+        stress: [0, 1, 2, 3, 4, 5, 6],
+        safe: [0, 1, 2],
+        base: [0, 1, 2],
+      };
+
+      let selected = new Set(scenarioSelections.stress);
+      let currentModelKey = "xhigh";
+
+      const elements = {
+        allowedList: document.getElementById("allowed-list"),
+        blockedList: document.getElementById("blocked-list"),
+        allowedCount: document.getElementById("allowed-count"),
+        blockedCount: document.getElementById("blocked-count"),
+        goalSourcePreview: document.getElementById("goal-source-preview"),
+        payloadPreview: document.getElementById("payload-preview"),
+        launchCommand: document.getElementById("launch-command"),
+        modelSpecLabel: document.getElementById("model-spec-label"),
+        candidates: Array.from(document.querySelectorAll(".candidate")),
+        scenarios: Array.from(document.querySelectorAll(".scenario")),
+        models: Array.from(document.querySelectorAll(".pill")),
+      };
+
+      function parseModelSpec(spec) {
+        const match = spec.match(/^(.+?)\s*\(([^)]+)\)$/);
+        if (!match) {
+          return { model: spec, variant: "" };
+        }
+        return { model: match[1], variant: match[2] };
+      }
+
+      function classifySelectedCandidates() {
+        const seen = new Set();
+        const allowed = [];
+        const blocked = [];
+
+        Array.from(selected).sort((a, b) => a - b).forEach((index) => {
+          const candidate = candidates[index];
+          const agent = candidate.agent;
+          const blockReason = blockedReason(agent, seen);
+          if (blockReason) {
+            blocked.push({ agent, reason: blockReason });
+            return;
+          }
+          seen.add(agent);
+          allowed.push({ agent, note: candidate.allowedNote });
+        });
+
+        return { allowed, blocked };
+      }
+
+      function blockedReason(agent, seen) {
+        if (agent === "coordinator") {
+          return "reserved: SGAI already launches the coordinator";
+        }
+        if (agent === "stpa-analyst") {
+          return "retired route: use STPA skills instead";
+        }
+        if (!configuredAgents.includes(agent)) {
+          return "not present in GOAL agents allowlist";
+        }
+        if (seen.has(agent)) {
+          return "duplicate: first allowed occurrence already included";
+        }
+        return "";
+      }
+
+      function renderList(container, items, emptyText, kind) {
+        container.replaceChildren();
+        if (items.length === 0) {
+          const empty = document.createElement("li");
+          empty.className = "agent-card";
+          empty.innerHTML = `<b>${kind === "allowed" ? "no delegates" : "none blocked"}</b><span>${emptyText}</span>`;
+          container.appendChild(empty);
+          return;
+        }
+
+        items.forEach((item) => {
+          const row = document.createElement("li");
+          row.className = "agent-card";
+          const name = document.createElement("b");
+          name.textContent = item.agent;
+          const note = document.createElement("span");
+          note.textContent = kind === "allowed" ? item.note : item.reason;
+          row.append(name, note);
+          container.appendChild(row);
+        });
+      }
+
+      function buildCommand(model, variant) {
+        return variant
+          ? `opencode run --agent coordinator --model ${model} --variant ${variant}`
+          : `opencode run --agent coordinator --model ${model}`;
+      }
+
+      function renderGoalSource(modelSpec) {
+        return `---
+agents: [${configuredAgents.join(", ")}]
+model: "${modelSpec}"
+---`;
+      }
+
+      function renderPayload(allowed, blocked, model, variant, launch) {
+        const prePromptFilterAudit = {
+          purpose: "Filter evidence only; not appended to coordinatorContext.",
+          allowedCandidateAgents: allowed.map((item) => item.agent),
+          rejectedCandidateAgents: blocked.map((item) => ({
+            agent: item.agent,
+            reason: item.reason,
+          })),
+        };
+
+        const coordinatorContext = {
+          availableAgentsForDelegation: allowed.map((item) => item.agent),
+          model,
+          instruction: "Delegate specialist work only through OpenCode subagent delegation to availableAgentsForDelegation.",
+        };
+
+        if (variant) {
+          coordinatorContext.variant = variant;
+        }
+
+        return JSON.stringify({ launch, prePromptFilterAudit, coordinatorContext }, null, 2);
+      }
+
+      function render() {
+        const { allowed, blocked } = classifySelectedCandidates();
+        const modelSpec = modelSpecs[currentModelKey];
+        const { model, variant } = parseModelSpec(modelSpec);
+        const command = buildCommand(model, variant);
+
+        elements.allowedCount.textContent = String(allowed.length);
+        elements.blockedCount.textContent = String(blocked.length);
+        elements.goalSourcePreview.textContent = renderGoalSource(modelSpec);
+        elements.launchCommand.textContent = command;
+        elements.modelSpecLabel.textContent = currentModelKey === "base" ? "base" : currentModelKey;
+        elements.payloadPreview.textContent = renderPayload(allowed, blocked, model, variant, command);
+
+        renderList(elements.allowedList, allowed, "No selected candidates are in the GOAL agents allowlist.", "allowed");
+        renderList(elements.blockedList, blocked, "Every selected candidate is safe to expose.", "blocked");
+
+        elements.candidates.forEach((button) => {
+          const index = Number(button.dataset.index);
+          button.setAttribute("aria-pressed", selected.has(index) ? "true" : "false");
+        });
+
+        elements.models.forEach((button) => {
+          button.setAttribute("aria-pressed", button.dataset.model === currentModelKey ? "true" : "false");
+        });
+      }
+
+      function applyScenario(name) {
+        selected = new Set(scenarioSelections[name]);
+        if (name === "base") {
+          currentModelKey = "base";
+        }
+        if (name === "stress" || name === "safe") {
+          currentModelKey = "xhigh";
+        }
+        elements.scenarios.forEach((button) => {
+          const active = button.dataset.scenario === name;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        render();
+      }
+
+      elements.candidates.forEach((button) => {
+        button.addEventListener("click", () => {
+          const index = Number(button.dataset.index);
+          if (selected.has(index)) {
+            selected.delete(index);
+          } else {
+            selected.add(index);
+          }
+          elements.scenarios.forEach((scenario) => {
+            scenario.classList.remove("is-active");
+            scenario.setAttribute("aria-pressed", "false");
+          });
+          render();
+        });
+      });
+
+      elements.scenarios.forEach((button) => {
+        button.addEventListener("click", () => applyScenario(button.dataset.scenario));
+      });
+
+      elements.models.forEach((button) => {
+        button.addEventListener("click", () => {
+          currentModelKey = button.dataset.model;
+          elements.scenarios.forEach((scenario) => {
+            scenario.classList.remove("is-active");
+            scenario.setAttribute("aria-pressed", "false");
+          });
+          render();
+        });
+      });
+
+      render();
+    </script>
+  </body>
+</html>

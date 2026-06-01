@@ -341,43 +341,26 @@ func TestExtractGoalDescription(t *testing.T) {
 	}{
 		{
 			name: "simpleGoal",
-			input: `---
-flow: |
-  "agent1" -> "agent2"
----
-# My Goal
+			input: `# My Goal
 
 This is a description.`,
 			expected: "My Goal",
 		},
 		{
 			name: "goalWithCheckbox",
-			input: `---
-flow: |
-  "agent1" -> "agent2"
----
-- [x] Completed task
+			input: `- [x] Completed task
 
 This is a description.`,
 			expected: "Completed task",
 		},
 		{
-			name: "longDescription",
-			input: `---
-flow: |
-  "agent1" -> "agent2"
----
-` + string(make([]byte, 300)),
+			name:     "longDescription",
+			input:    string(make([]byte, 300)),
 			expected: string(make([]byte, 255)) + "...",
 		},
 		{
-			name: "emptyGoal",
-			input: `---
-flow: |
-  "agent1" -> "agent2"
----
-
-`,
+			name:     "emptyGoal",
+			input:    "",
 			expected: "",
 		},
 		{
@@ -400,19 +383,19 @@ flow: |
 }
 
 func TestExtractGoalDescriptionComplex(t *testing.T) {
-	content := "---\nflow: coordinator -> dev\nmodels:\n  coordinator: claude-opus-4\n---\n\n# Complex Goal Description\n\nThis is the body"
+	content := "---\nagents:\n  - dev\nmodel: claude-opus-4\n---\n\n# Complex Goal Description\n\nThis is the body"
 	result := extractGoalDescription(content)
 	assert.Equal(t, "Complex Goal Description", result)
 }
 
 func TestExtractGoalDescriptionFromContent(t *testing.T) {
-	content := "---\nflow: |\n  \"a\" -> \"b\"\n---\n# My Project Description\nSome body"
+	content := "---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\n# My Project Description\nSome body"
 	result := extractGoalDescription(content)
 	assert.Equal(t, "My Project Description", result)
 }
 
 func TestExtractGoalDescriptionNoHeadingReturnsFirstLine(t *testing.T) {
-	content := "---\nflow: |\n  \"a\" -> \"b\"\n---\nNo heading here"
+	content := "---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\nNo heading here"
 	result := extractGoalDescription(content)
 	assert.Equal(t, "No heading here", result)
 }

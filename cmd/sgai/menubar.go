@@ -2,8 +2,6 @@ package main
 
 import (
 	"net/url"
-	"os"
-	"path/filepath"
 	"sync"
 )
 
@@ -24,33 +22,6 @@ type menuBarState struct {
 
 type menuBarAction struct {
 	actionURL string
-}
-
-func toMenuBarItem(w workspaceInfo) menuBarItem {
-	return menuBarItem{
-		name:        w.DirName,
-		description: goalDescription(w.Directory, w.DirName),
-		needsInput:  w.NeedsInput,
-		running:     w.Running,
-		stopped:     !w.Running && w.InProgress,
-		pinned:      w.Pinned,
-	}
-}
-
-func goalDescription(directory, dirName string) string {
-	if directory == "" {
-		return dirName
-	}
-	goalPath := filepath.Join(directory, "GOAL.md")
-	data, errRead := os.ReadFile(goalPath)
-	if errRead != nil {
-		return dirName
-	}
-	desc := extractGoalDescription(string(data))
-	if desc == "" {
-		return dirName
-	}
-	return desc
 }
 
 func countAttention(items []menuBarItem) int {

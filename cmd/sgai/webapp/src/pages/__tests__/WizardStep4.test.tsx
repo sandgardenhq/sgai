@@ -14,7 +14,7 @@ const defaultDraft: ApiComposeDraftRequest = {
     completionGate: "",
     retrospective: false,
     agents: [],
-    flow: "",
+    model: "openai/gpt-5.5 (xhigh)",
     tasks: "",
   },
   wizard: {
@@ -266,7 +266,7 @@ describe("WizardStep4 retrospective opt-in", () => {
         completionGate: "make test",
         retrospective: true,
         agents: [],
-        flow: "",
+        model: "openai/gpt-5.5 (xhigh)",
         tasks: "",
       },
       wizard: {

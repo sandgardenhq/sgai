@@ -3,8 +3,7 @@ import { useSearchParams, Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, FileText, AlertTriangle, Copy, Check } from "lucide-react";
+import { ArrowLeft, FileText, Copy, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ApiComposePreviewResponse } from "@/types";
 
@@ -95,12 +94,6 @@ export function ComposePreviewPage() {
               <pre className="text-sm leading-relaxed whitespace-pre-wrap break-words font-mono text-muted-foreground bg-muted/50 p-4 rounded-lg">
                 {preview?.content ?? "No preview available"}
               </pre>
-              {preview?.flowError ? (
-                <Alert className="mt-4 border-destructive/50 text-destructive">
-                  <AlertTriangle className="size-4" />
-                  <AlertDescription>{preview.flowError}</AlertDescription>
-                </Alert>
-              ) : null}
             </>
           )}
         </CardContent>

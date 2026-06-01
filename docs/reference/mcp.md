@@ -76,7 +76,7 @@ Input:
 Notes:
 
 - `navigate` is only valid with `status: "agent-done"`.
-- `navigate.to` must be an agent in the workflow DAG.
+- `navigate.to` must name an agent made available by the current coordinator handoff/runtime context; omit it when the coordinator should choose the next delegation.
 - Shared context and handoff notes belong in `.sgai/PROJECT_MANAGEMENT.md`.
 
 ### `project_todowrite` (coordinator only)

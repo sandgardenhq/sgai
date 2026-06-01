@@ -11,489 +11,125 @@ import (
 )
 
 func TestBuildAllAgents(t *testing.T) {
-	cases := []struct {
-		name  string
-		input []string
-		want  []string
+	tests := []struct {
+		name string
+		in   []string
+		want []string
 	}{
-		{"alreadyHasCoordinator", []string{"coordinator", "builder", "reviewer"}, []string{"coordinator", "builder", "reviewer"}},
-		{"noCoordinator", []string{"builder", "reviewer"}, []string{"coordinator", "builder", "reviewer"}},
-		{"empty", []string{}, []string{"coordinator"}},
-		{"onlyCoordinator", []string{"coordinator"}, []string{"coordinator"}},
+		{name: "addsCoordinator", in: []string{"go", "react"}, want: []string{"coordinator", "go", "react"}},
+		{name: "keepsCoordinator", in: []string{"coordinator", "go"}, want: []string{"coordinator", "go"}},
+		{name: "empty", in: nil, want: []string{"coordinator"}},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := buildAllAgents(tc.input)
-			assert.Equal(t, tc.want, got)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, buildAllAgents(tt.in))
 		})
 	}
 }
 
-func TestComputeLongestNameLen(t *testing.T) {
-	cases := []struct {
-		name   string
-		agents []string
-		want   int
-	}{
-		{"empty", []string{}, len("sgai")},
-		{"shortNames", []string{"a", "bb"}, len("sgai")},
-		{"longName", []string{"very-long-agent-name"}, len("very-long-agent-name")},
-		{"mixedLengths", []string{"ab", "coordinator", "z"}, len("coordinator")},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := computeLongestNameLen(tc.agents)
-			assert.Equal(t, tc.want, got)
-		})
-	}
-}
-
-func TestResolveCurrentAgent(t *testing.T) {
-	t.Run("emptyDefaultsToCoordinator", func(t *testing.T) {
-		r := &workflowRunner{wfState: state.Workflow{CurrentAgent: ""}}
-		assert.Equal(t, "coordinator", r.resolveCurrentAgent())
-	})
-
-	t.Run("returnsCurrentAgent", func(t *testing.T) {
-		r := &workflowRunner{wfState: state.Workflow{CurrentAgent: "builder"}}
-		assert.Equal(t, "builder", r.resolveCurrentAgent())
-	})
-}
-
-func buildTestDag(edges map[string][]string, entryNodes []string) *dag {
-	d := &dag{
-		Nodes:      make(map[string]*dagNode),
-		EntryNodes: entryNodes,
-	}
-	for from, toList := range edges {
-		node := d.ensureNode(from)
-		for _, to := range toList {
-			toNode := d.ensureNode(to)
-			node.Successors = append(node.Successors, to)
-			toNode.Predecessors = append(toNode.Predecessors, from)
-		}
-	}
-	return d
-}
-
-func TestResolveNextAgent(t *testing.T) {
-	t.Run("navigatesToRequestedAgent", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Navigate: &state.NavigationRequest{To: "reviewer", Reason: "review please"}})
-		require.NoError(t, errCoord)
-
-		r := &workflowRunner{
-			paddedsgai: "test",
-			coord:      coord,
-			flowDag:    buildTestDag(map[string][]string{"coordinator": {"reviewer"}}, []string{"coordinator"}),
-			wfState:    coord.State(),
-		}
-		got := r.resolveNextAgent("coordinator")
-		assert.Equal(t, "reviewer", got)
-		assert.Nil(t, coord.State().Navigate)
-	})
-
-	t.Run("terminalNodeReturnsCoordinator", func(t *testing.T) {
-		r := &workflowRunner{
-			paddedsgai: "test",
-			flowDag:    buildTestDag(map[string][]string{"coordinator": {"reviewer"}}, []string{"coordinator"}),
-			wfState:    state.Workflow{},
-		}
-		got := r.resolveNextAgent("reviewer")
-		assert.Equal(t, "coordinator", got)
-	})
-
-	t.Run("coordinatorGoesToFirstEntry", func(t *testing.T) {
-		flowDag, errFlow := parseFlow("\"builder\" -> \"reviewer\"", t.TempDir())
-		require.NoError(t, errFlow)
-		require.Equal(t, []string{"coordinator"}, flowDag.EntryNodes)
-
-		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{}}
-		got := r.resolveNextAgent("coordinator")
-		assert.Equal(t, "builder", got)
-	})
-
-	t.Run("coordinatorSkipsRetrospectiveEdgeForFirstEntry", func(t *testing.T) {
-		flowDag, errFlow := parseFlow("\"worker\" -> \"reviewer\"", t.TempDir())
-		require.NoError(t, errFlow)
-		flowDag.injectRetrospectiveEdge()
-
-		r := &workflowRunner{paddedsgai: "test", flowDag: flowDag, wfState: state.Workflow{}}
-		got := r.resolveNextAgent("coordinator")
-		assert.Equal(t, "worker", got)
-	})
-}
-
-func TestPrepareAgent(t *testing.T) {
-	dir := t.TempDir()
-	sgaiDir := filepath.Join(dir, ".sgai")
-	require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status:      state.StatusWorking,
-		VisitCounts: map[string]int{},
-	})
+func TestResolveNextAgentAlwaysReturnsCoordinator(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Navigate: &state.NavigationRequest{To: "go", Reason: "implement"}})
 	require.NoError(t, errCoord)
 
-	r := &workflowRunner{
-		dir:           dir,
-		paddedsgai:    "test",
-		coord:         coord,
-		previousAgent: "",
-		wfState: state.Workflow{
-			Status:      state.StatusWorking,
-			VisitCounts: map[string]int{},
-			Todos:       []state.TodoItem{{ID: "agent-1", Content: "stale agent todo", Status: "pending", Priority: "high"}},
-			ProjectTodos: []state.TodoItem{
-				{ID: "project-1", Content: "project todo", Status: "pending", Priority: "medium"},
-			},
+	r := &workflowRunner{paddedsgai: "test", coord: coord, wfState: coord.State()}
+	assert.Equal(t, "coordinator", r.resolveNextAgent("coordinator"))
+	assert.Nil(t, coord.State().Navigate)
+
+	r.wfState = coord.State()
+	assert.Equal(t, "coordinator", r.resolveNextAgent("go"))
+}
+
+func TestPrepareAgentTracksVisits(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
+	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, ".sgai", "state.json"), state.Workflow{})
+	require.NoError(t, errCoord)
+
+	r := &workflowRunner{dir: dir, paddedsgai: "test", coord: coord, wfState: state.Workflow{VisitCounts: map[string]int{}, Todos: []state.TodoItem{{Content: "stale", Status: "pending"}}}}
+
+	r.prepareAgent("coordinator")
+	r.prepareAgent("go")
+
+	assert.Equal(t, "go", r.wfState.CurrentAgent)
+	assert.Equal(t, 1, r.wfState.VisitCounts["coordinator"])
+	assert.Equal(t, 1, r.wfState.VisitCounts["go"])
+	assert.Empty(t, r.wfState.Todos)
+}
+
+func TestCanResumeWorkflowRequiresMatchingGoalChecksum(t *testing.T) {
+	tests := []struct {
+		name        string
+		wfState     state.Workflow
+		newChecksum string
+		want        bool
+	}{
+		{
+			name:        "matching checksum resumes active workflow",
+			wfState:     state.Workflow{Status: state.StatusWorking, GoalChecksum: "abc"},
+			newChecksum: "abc",
+			want:        true,
+		},
+		{
+			name:        "changed checksum starts fresh workflow",
+			wfState:     state.Workflow{Status: state.StatusWorking, GoalChecksum: "abc"},
+			newChecksum: "def",
+			want:        false,
+		},
+		{
+			name:        "missing stored checksum cannot resume",
+			wfState:     state.Workflow{Status: state.StatusWorking},
+			newChecksum: "abc",
+			want:        false,
+		},
+		{
+			name:        "empty state cannot resume",
+			wfState:     state.Workflow{},
+			newChecksum: "abc",
+			want:        false,
 		},
 	}
 
-	r.prepareAgent("coordinator")
-	assert.Equal(t, "coordinator", r.previousAgent)
-	assert.Equal(t, "coordinator", r.wfState.CurrentAgent)
-	assert.Equal(t, 1, r.wfState.VisitCounts["coordinator"])
-
-	r.prepareAgent("builder")
-	assert.Equal(t, "builder", r.previousAgent)
-	assert.Equal(t, "builder", r.wfState.CurrentAgent)
-	assert.Equal(t, 1, r.wfState.VisitCounts["builder"])
-	assert.Empty(t, r.wfState.Todos)
-	assert.Equal(t, []state.TodoItem{{ID: "project-1", Content: "project todo", Status: "pending", Priority: "medium"}}, r.wfState.ProjectTodos)
-}
-
-func TestHandleTrigger(t *testing.T) {
-	t.Run("ignoresNonSteeringTrigger", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-		require.NoError(t, errCoord)
-
-		r := &workflowRunner{coord: coord}
-		goalPath := filepath.Join(dir, "GOAL.md")
-		require.NoError(t, os.WriteFile(goalPath, []byte("# Goal"), 0o644))
-
-		r.handleTrigger(triggerGoal, goalPath)
-	})
-
-	t.Run("steeringNoNavigate", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-		require.NoError(t, errCoord)
-
-		r := &workflowRunner{coord: coord}
-		goalPath := filepath.Join(dir, "GOAL.md")
-		require.NoError(t, os.WriteFile(goalPath, []byte("# Goal"), 0o644))
-
-		r.handleTrigger(triggerSteering, goalPath)
-	})
-
-	t.Run("steeringWithNavigate", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Navigate: &state.NavigationRequest{To: "coordinator", Reason: "Add logging"}})
-		require.NoError(t, errCoord)
-
-		r := &workflowRunner{coord: coord}
-		goalPath := filepath.Join(dir, "GOAL.md")
-		require.NoError(t, os.WriteFile(goalPath, []byte("# Goal\n\nOriginal content"), 0o644))
-
-		r.handleTrigger(triggerSteering, goalPath)
-	})
-}
-
-func TestResolveRetrospectiveDirResuming(t *testing.T) {
-	dir := t.TempDir()
-	retroDir := filepath.Join(dir, ".sgai", "retrospectives", "2026-03-06-12-00.abcd")
-	require.NoError(t, os.MkdirAll(retroDir, 0755))
-
-	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
-	retroDirRel, errRel := filepath.Rel(dir, retroDir)
-	require.NoError(t, errRel)
-	pmContent := "---\nRetrospective Session: " + retroDirRel + "\n---\n"
-	require.NoError(t, os.WriteFile(pmPath, []byte(pmContent), 0644))
-
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
-	goalPath := filepath.Join(dir, "GOAL.md")
-	require.NoError(t, os.WriteFile(goalPath, []byte("# Test Goal"), 0644))
-
-	result := resolveRetrospectiveDir(true, dir, filepath.Join(dir, ".sgai", "retrospectives"), pmPath, stateJSONPath, goalPath)
-	assert.Equal(t, retroDir, result)
-}
-
-func TestResolveRetrospectiveDirNewSession(t *testing.T) {
-	dir := t.TempDir()
-	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
-	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
-	goalPath := filepath.Join(dir, "GOAL.md")
-
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
-	require.NoError(t, os.WriteFile(goalPath, []byte("# Test Goal"), 0o644))
-	require.NoError(t, os.WriteFile(stateJSONPath, []byte(`{"status":"working"}`), 0o644))
-	require.NoError(t, os.WriteFile(pmPath, []byte("# Existing PM"), 0o644))
-
-	retroDir := resolveRetrospectiveDir(false, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
-	assert.NotEmpty(t, retroDir)
-	assert.DirExists(t, retroDir)
-
-	goalCopy := filepath.Join(retroDir, "GOAL.md")
-	assert.FileExists(t, goalCopy)
-
-	assert.FileExists(t, pmPath)
-	pmData, errPM := os.ReadFile(pmPath)
-	require.NoError(t, errPM)
-	assert.Contains(t, string(pmData), "# Existing PM")
-
-	stateData, errState := os.ReadFile(stateJSONPath)
-	require.NoError(t, errState)
-	assert.JSONEq(t, `{"status":"working"}`, string(stateData))
-}
-
-func TestBuildWorkflowRunnerDefaultRetrospectiveDisabledCreatesNoArtifacts(t *testing.T) {
-	dir := t.TempDir()
-	goalContent := `---
-flow: |
-  "worker"
-models: {}
----
-# Test Goal
-`
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
-
-	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
-	require.True(t, ok)
-	defer cleanup()
-
-	assert.Empty(t, runner.retroDir)
-	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
-	assert.Nil(t, runner.retroLogs.stdout)
-	assert.Nil(t, runner.retroLogs.stderr)
-	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
-	assert.NoFileExists(t, filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md"))
-}
-
-func TestBuildWorkflowRunnerDisabledRetrospectivePrunesExplicitFlowNode(t *testing.T) {
-	dir := t.TempDir()
-	goalContent := `---
-flow: |
-  "worker" -> "retrospective"
-models: {}
----
-# Test Goal
-`
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
-
-	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
-	require.True(t, ok)
-	defer cleanup()
-
-	assert.Empty(t, runner.retroDir)
-	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
-	assert.NotContains(t, runner.flowDag.getSuccessors("worker"), "retrospective")
-	assert.NotContains(t, runner.flowDag.getSuccessors("coordinator"), "retrospective")
-	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
-}
-
-func TestBuildWorkflowRunnerRetrospectiveEnabledCreatesArtifacts(t *testing.T) {
-	dir := t.TempDir()
-	goalContent := `---
-retrospective: true
-flow: |
-  "worker"
-models: {}
----
-# Test Goal
-`
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte(goalContent), 0o644))
-
-	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
-	require.True(t, ok)
-	defer cleanup()
-
-	assert.NotEmpty(t, runner.retroDir)
-	assert.Contains(t, runner.flowDag.Nodes, "retrospective")
-	assert.NotNil(t, runner.retroLogs.stdout)
-	assert.NotNil(t, runner.retroLogs.stderr)
-	assert.DirExists(t, runner.retroDir)
-	assert.FileExists(t, filepath.Join(runner.retroDir, "GOAL.md"))
-}
-
-func TestBuildWorkflowRunnerIgnoresLegacyDisableRetrospectiveConfig(t *testing.T) {
-	dir := t.TempDir()
-	goalContent := `---
-retrospective: true
-flow: |
-  "worker"
-models: {}
----
-# Test Goal
-`
-	requiredFiles := map[string]string{
-		"GOAL.md":   goalContent,
-		"sgai.json": `{"disable_retrospective": true}`,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, canResumeWorkflow(tt.wfState, tt.newChecksum))
+		})
 	}
-	for name, content := range requiredFiles {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644))
-	}
-
-	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
-	require.True(t, ok)
-	defer cleanup()
-
-	assert.NotEmpty(t, runner.retroDir)
-	assert.Contains(t, runner.flowDag.Nodes, "retrospective")
-	assert.DirExists(t, runner.retroDir)
 }
 
-func TestBuildWorkflowRunnerDisabledRetrospectiveSanitizesResumedState(t *testing.T) {
-	dir := t.TempDir()
-	goalContent := `---
-retrospective: false
-flow: |
-  "worker" -> "retrospective"
-models: {}
----
-# Test Goal
-`
-	goalPath := filepath.Join(dir, "GOAL.md")
-	require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0o644))
-
-	checksum, errChecksum := computeGoalChecksum(goalPath)
+func TestStopSessionPreservesOriginalGoalChecksum(t *testing.T) {
+	server, rootDir := setupTestServer(t)
+	workspacePath := setupTestWorkspace(t, rootDir, "changed-goal")
+	goalPath := filepath.Join(workspacePath, "GOAL.md")
+	require.NoError(t, os.WriteFile(goalPath, []byte("original goal"), 0o644))
+	originalChecksum, errChecksum := computeGoalChecksum(goalPath)
 	require.NoError(t, errChecksum)
 
-	statePath := filepath.Join(dir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status:          state.StatusWorking,
-		GoalChecksum:    checksum,
-		CurrentAgent:    "retrospective",
-		InteractionMode: state.ModeRetrospective,
-		VisitCounts:     map[string]int{"coordinator": 1, "retrospective": 1},
-		Navigate:        &state.NavigationRequest{To: "retrospective", Reason: "run retrospective"},
+	coord, errCoord := state.NewCoordinatorWith(statePath(workspacePath), state.Workflow{
+		Status:       state.StatusWorking,
+		GoalChecksum: originalChecksum,
 	})
 	require.NoError(t, errCoord)
+	server.sessions[workspacePath] = &session{coord: coord, running: true}
 
-	runner, cleanup, ok := buildWorkflowRunner(dir, "", nil, nil)
-	require.True(t, ok)
-	defer cleanup()
+	require.NoError(t, os.WriteFile(goalPath, []byte("changed goal"), 0o644))
+	changedChecksum, errChangedChecksum := computeGoalChecksum(goalPath)
+	require.NoError(t, errChangedChecksum)
+	require.NotEqual(t, originalChecksum, changedChecksum)
 
-	assert.Empty(t, runner.retroDir)
-	assert.NotContains(t, runner.flowDag.Nodes, "retrospective")
-	assert.NotEqual(t, "retrospective", runner.wfState.CurrentAgent)
-	assert.NotEqual(t, state.ModeRetrospective, runner.wfState.InteractionMode)
-	assert.NotContains(t, runner.wfState.VisitCounts, "retrospective")
-	assert.Nil(t, runner.wfState.Navigate)
-	assert.NoDirExists(t, filepath.Join(dir, ".sgai", "retrospectives"))
-	assert.NoFileExists(t, filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md"))
+	server.stopSession(workspacePath)
 
-	persistedCoord, errPersisted := state.NewCoordinator(statePath)
-	require.NoError(t, errPersisted)
-	persisted := persistedCoord.State()
-	assert.NotEqual(t, "retrospective", persisted.CurrentAgent)
-	assert.NotEqual(t, state.ModeRetrospective, persisted.InteractionMode)
-	assert.NotContains(t, persisted.VisitCounts, "retrospective")
-	assert.Nil(t, persisted.Navigate)
+	freshCoord, errFresh := state.NewCoordinator(statePath(workspacePath))
+	require.NoError(t, errFresh)
+	wfState := freshCoord.State()
+	assert.Equal(t, originalChecksum, wfState.GoalChecksum)
+	assert.False(t, canResumeWorkflow(wfState, changedChecksum))
 }
 
-func TestHandleWorkingLoop(t *testing.T) {
-	cfg := multiModelConfig{paddedsgai: "test", agent: "builder"}
-	sessionID := "session-123"
-
-	t.Run("incrementsCounter", func(t *testing.T) {
-		got := handleWorkingLoop(cfg, &sessionID, 0)
-		assert.Equal(t, 1, got)
-		assert.Equal(t, "session-123", sessionID)
-	})
-
-	t.Run("resetsOnMaxIterations", func(t *testing.T) {
-		sid := "session-456"
-		got := handleWorkingLoop(cfg, &sid, maxConsecutiveWorkingIterations-1)
-		assert.Equal(t, 0, got)
-		assert.Empty(t, sid)
-	})
-}
-
-func TestUnlockInteractiveForRetrospective(t *testing.T) {
-	t.Run("nonRetrospectiveAgent", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-			InteractionMode: state.ModeBuilding,
-		})
-		require.NoError(t, errCoord)
-
-		wfState := coord.State()
-		unlockInteractiveForRetrospective(&wfState, "coordinator", coord, "test")
-		assert.Equal(t, state.ModeBuilding, wfState.InteractionMode)
-	})
-
-	t.Run("retrospectiveAlreadyInMode", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-			InteractionMode: state.ModeRetrospective,
-		})
-		require.NoError(t, errCoord)
-
-		wfState := coord.State()
-		unlockInteractiveForRetrospective(&wfState, "retrospective", coord, "test")
-		assert.Equal(t, state.ModeRetrospective, wfState.InteractionMode)
-	})
-
-	t.Run("retrospectiveUnlocks", func(t *testing.T) {
-		dir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		statePath := filepath.Join(sgaiDir, "state.json")
-		coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-			InteractionMode: state.ModeBuilding,
-		})
-		require.NoError(t, errCoord)
-
-		wfState := coord.State()
-		unlockInteractiveForRetrospective(&wfState, "retrospective", coord, "test")
-		assert.Equal(t, state.ModeRetrospective, wfState.InteractionMode)
-	})
-}
-
-func TestCopyProjectManagementToRetrospective(t *testing.T) {
-	t.Run("emptyRetrospectiveDir", func(_ *testing.T) {
-		copyProjectManagementToRetrospective("/tmp", "")
-	})
-
-	t.Run("noPMFile", func(t *testing.T) {
-		dir := t.TempDir()
-		retroDir := t.TempDir()
-		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
-		copyProjectManagementToRetrospective(dir, retroDir)
-		_, err := os.Stat(filepath.Join(retroDir, "PROJECT_MANAGEMENT.md"))
-		assert.True(t, os.IsNotExist(err))
-	})
-
-	t.Run("copiesPMFile", func(t *testing.T) {
-		dir := t.TempDir()
-		retroDir := t.TempDir()
-		sgaiDir := filepath.Join(dir, ".sgai")
-		require.NoError(t, os.MkdirAll(sgaiDir, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(sgaiDir, "PROJECT_MANAGEMENT.md"), []byte("# PM\nSome content"), 0o644))
-
-		copyProjectManagementToRetrospective(dir, retroDir)
-
-		content, err := os.ReadFile(filepath.Join(retroDir, "PROJECT_MANAGEMENT.md"))
-		require.NoError(t, err)
-		assert.Contains(t, string(content), "Some content")
-	})
+func TestParseYAMLFrontmatterFromFileMissingGoal(t *testing.T) {
+	metadata, errParse := parseYAMLFrontmatterFromFile(filepath.Join(t.TempDir(), "GOAL.md"))
+	require.NoError(t, errParse)
+	assert.Empty(t, metadata.Agents)
+	assert.Empty(t, metadata.Model)
 }

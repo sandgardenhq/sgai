@@ -209,7 +209,7 @@ curl -s $BASE_URL/api/v1/workspaces/my-project/goal
 Response:
 ```json
 {
-  "content": "---\nflow: ...\n---\n\n- [ ] Task 1\n"
+  "content": "---\nagents:\n  - \"general-purpose\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n\n- [ ] Task 1\n"
 }
 ```
 

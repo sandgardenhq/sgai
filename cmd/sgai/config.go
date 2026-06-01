@@ -88,14 +88,13 @@ func validateProjectConfig(config *projectConfig) error {
 		return nil
 	}
 
-	validModels, err := fetchValidModels()
-	if err != nil {
-		return fmt.Errorf("validating config: %w", err)
+	catalog, errModels := fetchValidModels()
+	if errModels != nil {
+		return fmt.Errorf("validating defaultModel in config file: %w", errModels)
 	}
 
-	baseModel, _ := parseModelAndVariant(config.DefaultModel)
-	if !validModels[baseModel] {
-		return fmt.Errorf("invalid defaultModel in config file: %s", config.DefaultModel)
+	if errValidate := validateModelSpec(catalog, config.DefaultModel); errValidate != nil {
+		return fmt.Errorf("invalid defaultModel in config file: %w", errValidate)
 	}
 
 	return nil
@@ -106,15 +105,8 @@ func applyConfigDefaults(config *projectConfig, metadata *GoalMetadata) {
 		return
 	}
 
-	if metadata.Models == nil {
-		metadata.Models = make(map[string]any)
-	}
-
-	for agent := range metadata.Models {
-		models := getModelsForAgent(metadata.Models, agent)
-		if len(models) == 0 {
-			metadata.Models[agent] = config.DefaultModel
-		}
+	if metadata.Model == "" {
+		metadata.Model = config.DefaultModel
 	}
 }
 
