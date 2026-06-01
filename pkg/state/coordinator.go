@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -28,6 +29,7 @@ type Coordinator struct {
 	agentCancel context.CancelFunc
 
 	onUpdate func()
+	logFunc  func(string)
 }
 
 // NewCoordinator creates a Coordinator for the given state.json path.
@@ -86,6 +88,25 @@ func (c *Coordinator) OnUpdate(fn func()) {
 	c.mu.Unlock()
 }
 
+// SetLogFunc registers a callback for coordinator diagnostic log lines.
+func (c *Coordinator) SetLogFunc(fn func(string)) {
+	c.mu.Lock()
+	c.logFunc = fn
+	c.mu.Unlock()
+}
+
+func (c *Coordinator) log(args ...any) {
+	c.mu.Lock()
+	logFunc := c.logFunc
+	c.mu.Unlock()
+
+	if logFunc != nil {
+		logFunc(strings.TrimSpace(fmt.Sprintln(args...)))
+		return
+	}
+	log.Println(args...)
+}
+
 // UpdateState applies fn to the workflow under the coordinator lock and saves
 // the result to disk for retrospective persistence.
 func (c *Coordinator) UpdateState(fn func(*Workflow)) error {
@@ -125,7 +146,7 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 	if existingCh != nil {
 		select {
 		case buffered := <-existingCh:
-			log.Println("askandwait: collected buffered answer from previous call")
+			c.log("askandwait: collected buffered answer from previous call")
 			c.mu.Lock()
 			if c.currentResponseCh == existingCh {
 				c.currentResponseCh = nil
@@ -155,16 +176,16 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 		c.mu.Unlock()
 		return "", fmt.Errorf("saving question state: %w", err)
 	}
-	log.Println("askandwait: question state set, status changed to waiting-for-human")
+	c.log("askandwait: question state set, status changed to waiting-for-human")
 
-	log.Println("askandwait: blocking for human answer")
+	c.log("askandwait: blocking for human answer")
 	var answer string
 	select {
 	case <-ctx.Done():
-		log.Println("askandwait: context cancelled:", ctx.Err())
+		c.log("askandwait: context cancelled:", ctx.Err())
 		return "", ctx.Err()
 	case answer = <-responseCh:
-		log.Println("askandwait: answer received from human")
+		c.log("askandwait: answer received from human")
 	}
 
 	c.mu.Lock()
@@ -178,7 +199,7 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 }
 
 func (c *Coordinator) clearWaitingState() {
-	log.Println("askandwait: clearing waiting state")
+	c.log("askandwait: clearing waiting state")
 	if err := c.UpdateState(func(wf *Workflow) {
 		wf.MultiChoiceQuestion = nil
 		wf.HumanMessage = ""
@@ -186,7 +207,7 @@ func (c *Coordinator) clearWaitingState() {
 			wf.Status = StatusWorking
 		}
 	}); err != nil {
-		log.Println("failed to clear waiting state:", err)
+		c.log("failed to clear waiting state:", err)
 	}
 }
 
@@ -200,15 +221,15 @@ func (c *Coordinator) Respond(answer string) {
 	c.mu.Unlock()
 
 	if responseCh == nil {
-		log.Println("askandwait: no pending question, discarding response")
+		c.log("askandwait: no pending question, discarding response")
 		return
 	}
 
 	select {
 	case responseCh <- answer:
-		log.Println("askandwait: response queued for delivery")
+		c.log("askandwait: response queued for delivery")
 	default:
-		log.Println("askandwait: response channel full, response discarded")
+		c.log("askandwait: response channel full, response discarded")
 	}
 }
 
