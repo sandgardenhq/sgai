@@ -360,11 +360,17 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 		result := cfg.coord.State()
 		return state.Workflow{}, "", &result
 	}
+	cfg.coord.SetLogFunc(func(message string) {
+		if _, err := fmt.Fprintln(stdoutOut, formatLogTimestamp(time.Now())+prefix+"  → "+message); err != nil {
+			log.Println("write failed:", err)
+		}
+	})
 
 	processExited := make(chan struct{})
 	go terminateProcessGroupOnCancel(agentCtx, cmd, processExited)
 
 	errWait := cmd.Wait()
+	cfg.coord.SetLogFunc(nil)
 	close(processExited)
 	cfg.coord.Stop()
 	agentCancel()
