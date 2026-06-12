@@ -37,7 +37,7 @@ fi
 
 func TestParseExportedSessionCollectsStepFinish(t *testing.T) {
 	data := []byte(`[
-		{"type":"step_finish","sessionID":"session-1","timestamp":1700000000000,"part":{"cost":0.02,"model":"openai/gpt-5.5","tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}}
+		{"type":"step-finish","sessionID":"session-1","timestamp":1700000000000,"model":"openai/gpt-5.5","cost":0.02,"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}
 	]`)
 
 	steps, children, err := parseExportedSession(data, "session-1", "openai/gpt-5.5")
