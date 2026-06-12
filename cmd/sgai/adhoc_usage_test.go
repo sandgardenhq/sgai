@@ -79,7 +79,7 @@ func TestReconcileAdhocUsageWritesGlobalUsageForOriginWorkspace(t *testing.T) {
 	exportSessionBytes = func(dir, sessionID string) ([]byte, error) {
 		assert.Equal(t, workspacePath, dir)
 		assert.Equal(t, "adhoc-full-chain-session", sessionID)
-		return []byte(fmt.Sprintf(`{"type":"step_finish","sessionID":"adhoc-full-chain-session","timestamp":%d,"model":"openai/gpt-5.5","part":{"cost":0.042,"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":20,"write":10}}}}`, timestamp.UnixMilli())), nil
+		return []byte(fmt.Sprintf(`{"type":"step-finish","sessionID":"adhoc-full-chain-session","timestamp":%d,"model":"openai/gpt-5.5","cost":0.042,"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":20,"write":10}}}`, timestamp.UnixMilli())), nil
 	}
 	fetchModelsDevCatalog = func() ([]byte, error) {
 		return nil, errors.New("pricing unavailable in test")
@@ -133,7 +133,7 @@ func TestReconcileAdhocUsageAttributesForkWorkspaceToRootWorkspace(t *testing.T)
 	exportSessionBytes = func(dir, sessionID string) ([]byte, error) {
 		assert.Equal(t, forkWorkspacePath, dir)
 		assert.Equal(t, "adhoc-fork-session", sessionID)
-		return []byte(fmt.Sprintf(`{"type":"step_finish","sessionID":"adhoc-fork-session","timestamp":%d,"model":"openai/gpt-5.5","part":{"cost":0.084,"tokens":{"input":2000,"output":400}}}`, timestamp.UnixMilli())), nil
+		return []byte(fmt.Sprintf(`{"type":"step-finish","sessionID":"adhoc-fork-session","timestamp":%d,"model":"openai/gpt-5.5","cost":0.084,"tokens":{"input":2000,"output":400}}`, timestamp.UnixMilli())), nil
 	}
 	fetchModelsDevCatalog = func() ([]byte, error) {
 		return nil, errors.New("pricing unavailable in test")
