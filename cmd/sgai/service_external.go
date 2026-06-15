@@ -191,6 +191,7 @@ func (s *Server) deleteExternalForkService(forkDir string) (deleteExternalForkRe
 
 	forkName := filepath.Base(forkDir)
 	s.stopSession(forkDir)
+	s.backfillWorkspaceUsageBeforeRemoval(forkDir)
 
 	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
 	forgetCmd.Dir = rootDir

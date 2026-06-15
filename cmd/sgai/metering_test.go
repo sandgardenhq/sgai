@@ -36,9 +36,12 @@ fi
 }
 
 func TestParseExportedSessionCollectsStepFinish(t *testing.T) {
-	data := []byte(`[
-		{"type":"step_finish","sessionID":"session-1","timestamp":1700000000000,"part":{"cost":0.02,"model":"openai/gpt-5.5","tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}}
-	]`)
+	data := []byte(`{
+		"messages":[{
+			"info":{"metadata":{"time":{"created":1700000000000,"completed":1700000001000}}},
+			"parts":[{"type":"step-finish","sessionID":"session-1","cost":0.02,"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}]
+		}]
+	}`)
 
 	steps, children, err := parseExportedSession(data, "session-1", "openai/gpt-5.5")
 
@@ -48,12 +51,14 @@ func TestParseExportedSessionCollectsStepFinish(t *testing.T) {
 	assert.Equal(t, "session-1", steps[0].SessionID)
 	assert.Equal(t, 1000, steps[0].Part.Tokens.Input)
 	assert.Equal(t, 300, steps[0].Part.Tokens.Cache.Read)
+	assert.Equal(t, int64(1700000001000), steps[0].Timestamp)
 }
 
 func TestParseExportedSessionCollectsTaskChildren(t *testing.T) {
 	data := []byte(`{
-		"type":"tool",
-		"part":{"tool":"task","state":{"output":"done","metadata":{"sessionID":"child-1"}}}
+		"messages":[{
+			"parts":[{"type":"tool","tool":"task","state":{"output":"done","metadata":{"sessionID":"child-1"}}}]
+		}]
 	}`)
 
 	_, children, err := parseExportedSession(data, "parent-1", "openai/gpt-5.5")
@@ -66,8 +71,8 @@ func TestCollectExportedSessionUsageDedupesRecursiveChildren(t *testing.T) {
 	originalExport := exportSessionBytes
 	t.Cleanup(func() { exportSessionBytes = originalExport })
 	exports := map[string][]byte{
-		"parent": []byte(`{"type":"tool","part":{"tool":"task","state":{"output":{"sessionID":"child"}}}}`),
-		"child":  []byte(`{"type":"tool","part":{"tool":"task","state":{"output":{"sessionID":"parent"}}}}`),
+		"parent": []byte(`{"messages":[{"parts":[{"type":"tool","tool":"task","state":{"output":{"sessionID":"child"}}}]}]}`),
+		"child":  []byte(`{"messages":[{"parts":[{"type":"tool","tool":"task","state":{"output":{"sessionID":"parent"}}}]}]}`),
 	}
 	exportSessionBytes = func(_ string, sessionID string) ([]byte, error) {
 		return exports[sessionID], nil

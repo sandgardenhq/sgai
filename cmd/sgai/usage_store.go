@@ -208,7 +208,8 @@ func (s *usageStore) replaceUsage(source string, ctx usageWorkspaceContext, sess
 	}()
 
 	for _, session := range sessions {
-		for index, step := range session.Steps {
+		steps := usageSessionSteps(session)
+		for index, step := range steps {
 			stepID := step.StepID
 			if stepID == "" {
 				stepID = fmt.Sprintf("%s-step-%d", session.SessionID, index+1)
@@ -228,6 +229,40 @@ func (s *usageStore) replaceUsage(source string, ctx usageWorkspaceContext, sess
 		return fmt.Errorf("committing usage transaction: %w", errCommit)
 	}
 	return nil
+}
+
+func usageSessionSteps(session state.SessionUsage) []state.StepCost {
+	if len(session.Steps) > 0 {
+		return session.Steps
+	}
+	if !hasSessionUsage(session) {
+		return nil
+	}
+	return []state.StepCost{{
+		StepID:                     session.SessionID + "-summary",
+		Agent:                      session.Agent,
+		SessionID:                  session.SessionID,
+		Cost:                       sessionSummaryCost(session),
+		MeteredReportedCost:        session.MeteredReportedCost,
+		APIEquivalentCost:          session.APIEquivalentCost,
+		APIEquivalentCostAvailable: session.APIEquivalentCostAvailable,
+		Tokens:                     session.Tokens,
+	}}
+}
+
+func hasSessionUsage(session state.SessionUsage) bool {
+	return session.MeteredReportedCost != 0 || session.APIEquivalentCost != 0 || tokenUsageTotal(session.Tokens) != 0
+}
+
+func sessionSummaryCost(session state.SessionUsage) float64 {
+	if session.APIEquivalentCostAvailable {
+		return session.APIEquivalentCost
+	}
+	return session.MeteredReportedCost
+}
+
+func tokenUsageTotal(tokens state.TokenUsage) int {
+	return tokens.Input + tokens.Output + tokens.Reasoning + tokens.CacheRead + tokens.CacheWrite
 }
 
 func (s *usageStore) query(q usageQuery) (usageResponse, error) {
@@ -489,47 +524,87 @@ func (s *Server) handleAPIUsage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
+func (s *Server) handleAPIUsageRefresh(w http.ResponseWriter, r *http.Request) {
+	s.backfillGlobalUsage()
+	s.handleAPIUsage(w, r)
+}
+
 func (s *Server) backfillGlobalUsage() {
 	store, errStore := s.ensureUsageStore()
 	if errStore != nil || store == nil {
 		log.Println("usage backfill skipped:", errStore)
 		return
 	}
-	workspacePaths, errWorkspacePaths := usageBackfillWorkspacePaths(s.rootDir)
+	workspacePaths, errWorkspacePaths := s.usageBackfillWorkspacePaths()
 	if errWorkspacePaths != nil {
 		log.Println("usage backfill skipped:", errWorkspacePaths)
 		return
 	}
 	for _, workspacePath := range workspacePaths {
-		wf, ok := readWorkflowForUsageBackfill(filepath.Join(workspacePath, ".sgai", "state.json"))
-		if !ok {
-			continue
-		}
-		ctx := usageContextForWorkspace(workspacePath)
-		sessions := usageBackfillSessions(ctx, wf)
-		if errReplace := store.replaceWorkspaceUsage(ctx, sessions); errReplace != nil {
-			log.Println("usage backfill failed for", workspacePath, ":", errReplace)
-		}
+		s.backfillWorkspaceUsage(store, workspacePath)
 	}
 }
 
-func usageBackfillWorkspacePaths(rootDir string) ([]string, error) {
-	entries, errReadDir := os.ReadDir(rootDir)
-	if errReadDir != nil {
-		return nil, errReadDir
+func (s *Server) backfillWorkspaceUsage(store *usageStore, workspacePath string) {
+	wf, ok := readWorkflowForUsageBackfill(filepath.Join(workspacePath, ".sgai", "state.json"))
+	if !ok {
+		return
 	}
-	workspacePaths := []string{rootDir}
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
+	ctx := usageContextForWorkspace(workspacePath)
+	sessions := usageBackfillSessions(ctx, wf)
+	if len(sessions) == 0 {
+		return
+	}
+	if errReplace := store.replaceWorkspaceUsage(ctx, sessions); errReplace != nil {
+		log.Println("usage backfill failed for", workspacePath, ":", errReplace)
+	}
+}
+
+func (s *Server) backfillWorkspaceUsageBeforeRemoval(workspacePath string) {
+	store, errStore := s.ensureUsageStore()
+	if errStore != nil || store == nil {
+		log.Println("usage backfill before removal skipped:", errStore)
+		return
+	}
+	s.backfillWorkspaceUsage(store, workspacePath)
+}
+
+func (s *Server) usageBackfillWorkspacePaths() ([]string, error) {
+	groups, errScan := s.scanWorkspaceGroups()
+	if errScan != nil {
+		return nil, errScan
+	}
+	seen := map[string]bool{}
+	var workspacePaths []string
+	addPath := func(path string) {
+		if path == "" {
+			return
 		}
-		workspacePaths = append(workspacePaths, filepath.Join(rootDir, entry.Name()))
+		resolved := resolveSymlinks(path)
+		if resolved == "" {
+			resolved = path
+		}
+		if seen[resolved] {
+			return
+		}
+		seen[resolved] = true
+		workspacePaths = append(workspacePaths, path)
+	}
+	addPath(s.rootDir)
+	for _, group := range groups {
+		addPath(group.Root.Directory)
+		for _, fork := range group.Forks {
+			addPath(fork.Directory)
+		}
 	}
 	return workspacePaths, nil
 }
 
 func usageBackfillSessions(ctx usageWorkspaceContext, wf state.Workflow) []state.SessionUsage {
 	if hasSessionSteps(wf.Cost.BySession) {
+		return wf.Cost.BySession
+	}
+	if hasSessionSummaries(wf.Cost.BySession) {
 		return wf.Cost.BySession
 	}
 	return agentStepSessions(ctx, wf.Cost.ByAgent)
@@ -544,24 +619,47 @@ func hasSessionSteps(sessions []state.SessionUsage) bool {
 	return false
 }
 
+func hasSessionSummaries(sessions []state.SessionUsage) bool {
+	for _, session := range sessions {
+		if hasSessionUsage(session) {
+			return true
+		}
+	}
+	return false
+}
+
 func agentStepSessions(ctx usageWorkspaceContext, agents []state.AgentCost) []state.SessionUsage {
 	var sessions []state.SessionUsage
 	for index, agent := range agents {
-		if len(agent.Steps) == 0 {
+		if len(agent.Steps) == 0 && tokenUsageTotal(agent.Tokens) == 0 && agent.Cost == 0 && agent.MeteredReportedCost == 0 && agent.APIEquivalentCost == 0 {
 			continue
 		}
 		sessionID := agentBackfillSessionID(ctx, agent.Agent, index)
-		steps := make([]state.StepCost, 0, len(agent.Steps))
-		for _, step := range agent.Steps {
-			if step.Agent == "" {
-				step.Agent = agent.Agent
+		steps := agent.Steps
+		if len(steps) == 0 {
+			steps = []state.StepCost{{
+				StepID:                     sessionID + "-summary",
+				Agent:                      agent.Agent,
+				SessionID:                  sessionID,
+				Cost:                       agent.Cost,
+				MeteredReportedCost:        agent.MeteredReportedCost,
+				APIEquivalentCost:          agent.APIEquivalentCost,
+				APIEquivalentCostAvailable: agent.APIEquivalentCostAvailable,
+				Tokens:                     agent.Tokens,
+			}}
+		} else {
+			steps = make([]state.StepCost, 0, len(agent.Steps))
+			for _, step := range agent.Steps {
+				if step.Agent == "" {
+					step.Agent = agent.Agent
+				}
+				if step.SessionID == "" {
+					step.SessionID = sessionID
+				}
+				steps = append(steps, step)
 			}
-			if step.SessionID == "" {
-				step.SessionID = sessionID
-			}
-			steps = append(steps, step)
 		}
-		sessions = append(sessions, state.SessionUsage{SessionID: sessionID, Agent: agent.Agent, Steps: steps})
+		sessions = append(sessions, state.SessionUsage{SessionID: sessionID, Agent: agent.Agent, Model: "", Tokens: agent.Tokens, MeteredReportedCost: agent.MeteredReportedCost, APIEquivalentCost: agent.APIEquivalentCost, APIEquivalentCostAvailable: agent.APIEquivalentCostAvailable, Steps: steps})
 	}
 	return sessions
 }

@@ -70,6 +70,7 @@ func (b *signalBroker) notify() {
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/state", s.handleAPIState)
 	mux.HandleFunc("GET /api/v1/usage", s.handleAPIUsage)
+	mux.HandleFunc("POST /api/v1/usage/refresh", s.handleAPIUsageRefresh)
 	mux.HandleFunc("GET /api/v1/signal", s.handleSignalStream)
 	mux.HandleFunc("GET /api/v1/agents", s.handleAPIAgents)
 	mux.HandleFunc("GET /api/v1/skills", s.handleAPISkills)
@@ -1687,6 +1688,7 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 	forkName := filepath.Base(forkDir)
 
 	s.stopSession(forkDir)
+	s.backfillWorkspaceUsageBeforeRemoval(forkDir)
 
 	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
 	forgetCmd.Dir = rootPath

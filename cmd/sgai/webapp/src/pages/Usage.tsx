@@ -230,9 +230,10 @@ export function Usage() {
     rootProject: searchParams.get("rootProject") || "",
   }), [searchParams]);
 
-  const loadUsage = useCallback(() => {
+  const loadUsage = useCallback((refresh = false) => {
     dispatchUsage({ type: "loading" });
-    void api.usage.get(filters)
+    const request = refresh ? api.usage.refresh(filters) : api.usage.get(filters);
+    void request
       .then((loadedUsage) => dispatchUsage({ type: "loaded", usage: loadedUsage }))
       .catch((err: unknown) => {
         dispatchUsage({ type: "failed", error: err instanceof Error ? err.message : "Failed to load usage" });
@@ -270,7 +271,7 @@ export function Usage() {
             Track approximate inference spend and token activity across all SGAI workspaces.
           </p>
         </div>
-        <Button variant="outline" onClick={loadUsage} disabled={loading}>
+        <Button variant="outline" onClick={() => loadUsage(true)} disabled={loading}>
           <RefreshCw className={cn("mr-2 size-4", loading && "animate-spin")} />
           Refresh
         </Button>
