@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Square } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ function RunTabSkeleton() {
   );
 }
 
-export function RunTab({ workspaceName }: RunTabProps): JSX.Element | null {
+export function RunTab({ workspaceName }: RunTabProps): ReactNode {
   const {
     models,
     modelsLoading,

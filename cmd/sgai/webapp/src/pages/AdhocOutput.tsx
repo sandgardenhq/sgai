@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, Play, Square } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +9,7 @@ import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { PromptHistory } from "@/components/PromptHistory";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 
-export function AdhocOutput(): JSX.Element {
+export function AdhocOutput(): ReactNode {
   const { name: workspaceName = "" } = useParams<{ name: string }>();
   const [searchParams] = useSearchParams();
   const autoRunRef = useRef(false);

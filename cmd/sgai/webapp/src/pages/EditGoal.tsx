@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,7 @@ import { triggerFactoryRefresh, useFactoryState } from "@/lib/factory-state";
 import { ArrowLeft, Save, Loader2, Check } from "lucide-react";
 import { Link } from "react-router";
 
-export function EditGoal(): JSX.Element {
+export function EditGoal(): ReactNode {
   const { name: workspaceName = "" } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const [{ content, isLoading, isSaving, error, saveSuccess }, updateState] = useReducer(
