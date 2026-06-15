@@ -33,7 +33,7 @@ var exportSessionBytes = func(dir, sessionID string) ([]byte, error) {
 
 	cmd := exec.Command("opencode", "export", sessionID)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
+	cmd.Env = buildBaseOpenCodeEnv(dir)
 	cmd.Stdout = tmpFile
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
