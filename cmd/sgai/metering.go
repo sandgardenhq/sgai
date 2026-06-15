@@ -81,6 +81,47 @@ type exportedSessionUsage struct {
 	Steps           []exportedStep
 }
 
+type exportedTranscript struct {
+	Messages []exportedMessage `json:"messages"`
+}
+
+type exportedMessage struct {
+	Info  exportedMessageInfo `json:"info"`
+	Parts []exportedPart      `json:"parts"`
+}
+
+type exportedMessageInfo struct {
+	Metadata exportedMessageMetadata `json:"metadata"`
+}
+
+type exportedMessageMetadata struct {
+	Time exportedMessageTime `json:"time"`
+}
+
+type exportedMessageTime struct {
+	Created   int64 `json:"created"`
+	Completed int64 `json:"completed"`
+}
+
+type exportedPart struct {
+	SessionID string             `json:"sessionID"`
+	Type      string             `json:"type"`
+	Tool      string             `json:"tool"`
+	Model     string             `json:"model"`
+	Cost      float64            `json:"cost"`
+	Tokens    partTokens         `json:"tokens"`
+	State     *exportedToolState `json:"state"`
+}
+
+type exportedToolState struct {
+	Output   toolOutput           `json:"output"`
+	Metadata exportedToolMetadata `json:"metadata"`
+}
+
+type exportedToolMetadata struct {
+	SessionID string `json:"sessionID"`
+}
+
 type pricingCatalog map[string]struct {
 	Models map[string]struct {
 		Cost map[string]any `json:"cost"`
@@ -178,16 +219,26 @@ func collectExportedSessionUsage(dir, agent, sessionID, parentSessionID, fallbac
 }
 
 func parseExportedSession(data []byte, defaultSessionID, fallbackModel string) ([]exportedStep, []string, error) {
-	values, err := parseJSONValues(data)
-	if err != nil {
+	var transcript exportedTranscript
+	if err := json.Unmarshal(bytes.TrimSpace(data), &transcript); err != nil {
 		return nil, nil, err
 	}
 
 	var steps []exportedStep
 	childSeen := map[string]bool{}
-	for _, value := range values {
-		collectExportedSteps(value, defaultSessionID, fallbackModel, &steps)
-		collectChildSessionIDs(value, defaultSessionID, childSeen)
+	for _, message := range transcript.Messages {
+		timestamp := message.Info.Metadata.Time.Completed
+		if timestamp == 0 {
+			timestamp = message.Info.Metadata.Time.Created
+		}
+		for _, exportedPart := range message.Parts {
+			if exportedPart.Type == "step-finish" {
+				if step, ok := exportedStepFromPart(exportedPart, defaultSessionID, fallbackModel, timestamp); ok {
+					steps = append(steps, step)
+				}
+			}
+			collectExportedTaskChildSessionIDs(exportedPart, defaultSessionID, childSeen)
+		}
 	}
 
 	childSessionIDs := make([]string, 0, len(childSeen))
@@ -224,85 +275,40 @@ func parseJSONValues(data []byte) ([]any, error) {
 	return values, nil
 }
 
-func collectExportedSteps(value any, defaultSessionID, fallbackModel string, steps *[]exportedStep) {
-	switch typed := value.(type) {
-	case []any:
-		for _, item := range typed {
-			collectExportedSteps(item, defaultSessionID, fallbackModel, steps)
-		}
-	case map[string]any:
-		if stringValue(typed["type"]) == "step_finish" {
-			data, err := json.Marshal(typed)
-			if err == nil {
-				var event streamEvent
-				if err := json.Unmarshal(data, &event); err == nil {
-					sessionID := event.SessionID
-					if sessionID == "" {
-						sessionID = defaultSessionID
-					}
-					model := event.Model
-					if model == "" {
-						model = event.Part.Model
-					}
-					if model == "" {
-						model = fallbackModel
-					}
-					*steps = append(*steps, exportedStep{SessionID: sessionID, Part: event.Part, Timestamp: event.Timestamp, Model: model})
-				}
-			}
-		}
-		for _, item := range typed {
-			collectExportedSteps(item, defaultSessionID, fallbackModel, steps)
-		}
+func exportedStepFromPart(exportedPart exportedPart, defaultSessionID, fallbackModel string, timestamp int64) (exportedStep, bool) {
+	if exportedPart.Cost == 0 && exportedPart.Tokens.Input == 0 && exportedPart.Tokens.Output == 0 && exportedPart.Tokens.Reasoning == 0 && exportedPart.Tokens.Cache.Read == 0 && exportedPart.Tokens.Cache.Write == 0 {
+		return exportedStep{}, false
 	}
+	sessionID := exportedPart.SessionID
+	if sessionID == "" {
+		sessionID = defaultSessionID
+	}
+	model := exportedPart.Model
+	if model == "" {
+		model = fallbackModel
+	}
+	return exportedStep{SessionID: sessionID, Part: part{SessionID: sessionID, Type: exportedPart.Type, Model: model, Cost: exportedPart.Cost, Tokens: exportedPart.Tokens}, Timestamp: timestamp, Model: model}, true
 }
 
-func collectChildSessionIDs(value any, parentSessionID string, childSeen map[string]bool) {
-	switch typed := value.(type) {
-	case []any:
-		for _, item := range typed {
-			collectChildSessionIDs(item, parentSessionID, childSeen)
-		}
-	case map[string]any:
-		if isTaskToolObject(typed) {
-			collectSessionIDStrings(typed, parentSessionID, childSeen)
-		}
-		for _, item := range typed {
-			collectChildSessionIDs(item, parentSessionID, childSeen)
-		}
+func collectExportedTaskChildSessionIDs(exportedPart exportedPart, parentSessionID string, childSeen map[string]bool) {
+	if !isTaskToolName(exportedPart.Tool) || exportedPart.State == nil {
+		return
 	}
-}
-
-func isTaskToolObject(value map[string]any) bool {
-	if tool := strings.ToLower(stringValue(value["tool"])); tool == "task" || tool == "tasks" {
-		return true
+	if exportedPart.State.Metadata.SessionID != "" && exportedPart.State.Metadata.SessionID != parentSessionID {
+		childSeen[exportedPart.State.Metadata.SessionID] = true
 	}
-	if title := strings.ToLower(stringValue(value["title"])); strings.Contains(title, "task") {
-		return true
-	}
-	return false
-}
-
-func collectSessionIDStrings(value any, parentSessionID string, childSeen map[string]bool) {
-	switch typed := value.(type) {
-	case []any:
-		for _, item := range typed {
-			collectSessionIDStrings(item, parentSessionID, childSeen)
-		}
-	case map[string]any:
-		for key, item := range typed {
-			lowerKey := strings.ToLower(key)
-			if lowerKey == "sessionid" || lowerKey == "session_id" || lowerKey == "session" {
-				if sessionID := stringValue(item); sessionID != "" && sessionID != parentSessionID {
-					childSeen[sessionID] = true
-				}
-			}
-			collectSessionIDStrings(item, parentSessionID, childSeen)
+	for _, sessionID := range exportedPart.State.Output.sessionIDs() {
+		if sessionID != "" && sessionID != parentSessionID {
+			childSeen[sessionID] = true
 		}
 	}
 }
 
 func replaceReconciledSessions(wf *state.Workflow, usage []exportedSessionUsage, catalog pricingCatalog, catalogErr error) {
+	if !hasExportedUsageSteps(usage) {
+		return
+	}
+
 	reconciled := map[string]bool{}
 	for _, session := range usage {
 		reconciled[session.SessionID] = true
@@ -320,6 +326,15 @@ func replaceReconciledSessions(wf *state.Workflow, usage []exportedSessionUsage,
 		wf.Cost.BySession = append(wf.Cost.BySession, buildStateSessionUsage(session, catalog, catalogErr))
 	}
 	rebuildCostAggregates(wf)
+}
+
+func hasExportedUsageSteps(usage []exportedSessionUsage) bool {
+	for _, session := range usage {
+		if len(session.Steps) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func buildStateSessionUsage(session exportedSessionUsage, catalog pricingCatalog, catalogErr error) state.SessionUsage {

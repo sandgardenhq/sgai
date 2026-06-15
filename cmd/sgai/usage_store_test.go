@@ -293,6 +293,68 @@ func TestUsageAPIReturnsTypedEmptyResponse(t *testing.T) {
 	assert.NotNil(t, got.Filters.RootProjects)
 }
 
+func TestUsageRefreshBackfillsBeforeQuery(t *testing.T) {
+	rootDir := t.TempDir()
+	workspaceDir := filepath.Join(rootDir, "refresh-workspace")
+	writeWorkflowStateForUsageTest(t, workspaceDir, state.Workflow{Cost: state.SessionCost{BySession: []state.SessionUsage{{
+		SessionID: "refresh-session",
+		Agent:     "coordinator",
+		Model:     "openai/gpt-5.5",
+		Steps: []state.StepCost{{
+			StepID:    "refresh-step",
+			Agent:     "coordinator",
+			SessionID: "refresh-session",
+			Cost:      1.50,
+			Tokens:    state.TokenUsage{Input: 150},
+			Timestamp: "2026-05-12T01:00:00Z",
+		}},
+	}}}})
+	store := openTestUsageStore(t)
+	server := NewServer(rootDir)
+	server.usageStore = store
+
+	resp := serveUsageHTTPMethod(server, http.MethodPost, "/api/v1/usage/refresh?from=2026-05-12&to=2026-05-12")
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	var got usageResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &got))
+	assert.InDelta(t, 1.50, got.Totals.Cost, 0.0001)
+	assert.Equal(t, state.TokenUsage{Input: 150}, got.Totals.Tokens)
+	require.Len(t, got.Rows, 1)
+}
+
+func TestUsageBackfillBeforeDeletePreservesHistoricalRows(t *testing.T) {
+	rootDir := t.TempDir()
+	workspaceDir := filepath.Join(rootDir, "delete-workspace")
+	writeWorkflowStateForUsageTest(t, workspaceDir, state.Workflow{Cost: state.SessionCost{BySession: []state.SessionUsage{{
+		SessionID: "delete-session",
+		Agent:     "coordinator",
+		Model:     "openai/gpt-5.5",
+		Steps: []state.StepCost{{
+			StepID:    "delete-step",
+			Agent:     "coordinator",
+			SessionID: "delete-session",
+			Cost:      2.25,
+			Tokens:    state.TokenUsage{Input: 225},
+			Timestamp: "2026-05-13T01:00:00Z",
+		}},
+	}}}})
+	store := openTestUsageStore(t)
+	server := NewServer(rootDir)
+	server.usageStore = store
+
+	result, errDelete := server.deleteWorkspaceService(workspaceDir)
+	resp, errQuery := store.query(usageQuery{From: mustDate(t, "2026-05-13"), To: mustDate(t, "2026-05-13")})
+
+	require.NoError(t, errDelete)
+	assert.True(t, result.Deleted)
+	require.NoError(t, errQuery)
+	assert.NoDirExists(t, workspaceDir)
+	assert.InDelta(t, 2.25, resp.Totals.Cost, 0.0001)
+	assert.Equal(t, state.TokenUsage{Input: 225}, resp.Totals.Tokens)
+	require.Len(t, resp.Rows, 1)
+}
+
 func TestUsageBackfillSkipsMalformedStateAndStaysIdempotent(t *testing.T) {
 	rootDir := t.TempDir()
 	goodDir := filepath.Join(rootDir, "good")
@@ -374,7 +436,37 @@ func TestUsageBackfillIncludesRootWorkspaceState(t *testing.T) {
 	assert.Equal(t, rootDir, rootRow.RootWorkspacePath)
 }
 
-func TestUsageBackfillClearsStaleRowsForValidEmptyState(t *testing.T) {
+func TestUsageBackfillIncludesExternalWorkspace(t *testing.T) {
+	rootDir := t.TempDir()
+	externalDir := filepath.Join(t.TempDir(), "external-workspace")
+	writeWorkflowStateForUsageTest(t, externalDir, state.Workflow{Cost: state.SessionCost{BySession: []state.SessionUsage{{
+		SessionID: "external-session",
+		Agent:     "go",
+		Model:     "openai/gpt-5.5",
+		Steps: []state.StepCost{{
+			StepID:    "external-step",
+			Agent:     "go",
+			SessionID: "external-session",
+			Cost:      7.00,
+			Tokens:    state.TokenUsage{Input: 700},
+			Timestamp: "2026-05-14T01:00:00Z",
+		}},
+	}}}})
+	store := openTestUsageStore(t)
+	server := NewServer(rootDir)
+	server.usageStore = store
+	server.externalDirs[resolveSymlinks(externalDir)] = true
+
+	server.backfillGlobalUsage()
+	resp, errQuery := store.query(usageQuery{From: mustDate(t, "2026-05-14"), To: mustDate(t, "2026-05-14")})
+
+	require.NoError(t, errQuery)
+	assert.InDelta(t, 7.00, resp.Totals.Cost, 0.0001)
+	require.Len(t, resp.Rows, 1)
+	assert.Equal(t, "external-workspace", resp.Rows[0].Project)
+}
+
+func TestUsageBackfillKeepsHistoricalRowsForValidEmptyState(t *testing.T) {
 	rootDir := t.TempDir()
 	workspaceDir := filepath.Join(rootDir, "empty-after-usage")
 	writeWorkflowStateForUsageTest(t, workspaceDir, state.Workflow{Cost: state.SessionCost{BySession: []state.SessionUsage{{
@@ -400,8 +492,32 @@ func TestUsageBackfillClearsStaleRowsForValidEmptyState(t *testing.T) {
 	resp, errQuery := store.query(usageQuery{From: mustDate(t, "2026-05-09"), To: mustDate(t, "2026-05-09")})
 
 	require.NoError(t, errQuery)
-	assert.Empty(t, resp.Rows)
-	assert.InDelta(t, 0, resp.Totals.Cost, 0.0001)
+	require.Len(t, resp.Rows, 1)
+	assert.InDelta(t, 6.00, resp.Totals.Cost, 0.0001)
+}
+
+func TestUsageStoreWritesSessionSummaryWhenStepsAreMissing(t *testing.T) {
+	store := openTestUsageStore(t)
+	ctx := testUsageContext(t)
+	require.NoError(t, store.replaceSessionUsage("session", ctx, []state.SessionUsage{{
+		SessionID:                    "summary-session",
+		Agent:                        "coordinator",
+		Model:                        "openai/gpt-5.5",
+		Tokens:                       state.TokenUsage{Input: 120, Output: 30, Reasoning: 10, CacheRead: 500},
+		MeteredReportedCost:          0.50,
+		APIEquivalentCost:            0.75,
+		APIEquivalentCostAvailable:   true,
+		APIEquivalentCostUnavailable: "",
+	}}))
+
+	today := dateOnly(time.Now().UTC())
+	resp, errQuery := store.query(usageQuery{From: today, To: today})
+
+	require.NoError(t, errQuery)
+	require.Len(t, resp.Rows, 1)
+	assert.InDelta(t, 0.75, resp.Totals.Cost, 0.0001)
+	assert.InDelta(t, 0.50, resp.Totals.MeteredReportedCost, 0.0001)
+	assert.Equal(t, state.TokenUsage{Input: 120, Output: 30, Reasoning: 10, CacheRead: 500}, resp.Totals.Tokens)
 }
 
 func TestUsageBackfillImportsAgentStepsWhenSessionsHaveNoUsableSteps(t *testing.T) {
@@ -569,9 +685,13 @@ func mustDate(t *testing.T, value string) time.Time {
 }
 
 func serveUsageHTTP(server *Server, target string) *httptest.ResponseRecorder {
+	return serveUsageHTTPMethod(server, http.MethodGet, target)
+}
+
+func serveUsageHTTPMethod(server *Server, method, target string) *httptest.ResponseRecorder {
 	mux := http.NewServeMux()
 	server.registerAPIRoutes(mux)
-	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req := httptest.NewRequest(method, target, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	return rec
