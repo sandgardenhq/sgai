@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 const opencodeMCPTimeout = 43200000
@@ -95,14 +96,22 @@ func sgaiExecutablePath() string {
 	return "sgai"
 }
 
+func buildBaseOpenCodeEnv(dir string) []string {
+	env := slices.DeleteFunc(os.Environ(), func(e string) bool {
+		return len(e) >= 4 && e[:4] == "PWD="
+	})
+	return append(env,
+		"PWD="+dir,
+		"OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"))
+}
+
 func buildManagedOpenCodeEnv(dir, mcpURL, agentIdentity, interactiveEnv string) []string {
 	configContent, errConfig := buildOpenCodeConfigContent(os.Getenv("OPENCODE_CONFIG_CONTENT"), sgaiExecutablePath(), mcpURL, agentIdentity)
 	if errConfig != nil {
 		logFatalConfigContent(errConfig)
 	}
 
-	return append(os.Environ(),
-		"OPENCODE_CONFIG_DIR="+filepath.Join(dir, ".sgai"),
+	return append(buildBaseOpenCodeEnv(dir),
 		"OPENCODE_CONFIG_CONTENT="+configContent,
 		"SGAI_MCP_URL="+mcpURL,
 		"SGAI_AGENT_IDENTITY="+agentIdentity,
