@@ -16,7 +16,7 @@ For tests:
 use listen address `-listen-addr 127.0.0.1:0` (observe the port number and use that from this moment on)
 use directory ./verification
 use `make build` to generate the binary
-Do not add tests whose only purpose is to assert that removed implementation details remain absent. Prefer tests for the new positive behavior and delete tests for behavior that no longer exists.
+Never add tests whose only purpose is to assert that removed implementation details remain absent. Prefer tests for the new positive behavior and delete tests for behavior that no longer exists.
 
 In terms of layout, UI, style, when something doesn't fit a container, use ellipsis with tooltip - refer to https://picocss.com/docs/tooltip
 

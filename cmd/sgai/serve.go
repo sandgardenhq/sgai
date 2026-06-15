@@ -475,6 +475,7 @@ func (s *Server) stopSession(workspacePath string) {
 	s.mu.Unlock()
 
 	if sess != nil {
+		var coord *state.Coordinator
 		sess.mu.Lock()
 		if sess.cancel != nil {
 			sess.cancel()
@@ -482,8 +483,12 @@ func (s *Server) stopSession(workspacePath string) {
 		if sess.mcpCloseFn != nil {
 			sess.mcpCloseOnce.Do(sess.mcpCloseFn)
 		}
+		coord = sess.coord
 		sess.running = false
 		sess.mu.Unlock()
+		if coord != nil {
+			coord.Stop()
+		}
 		sess.clearActiveAgents()
 	}
 

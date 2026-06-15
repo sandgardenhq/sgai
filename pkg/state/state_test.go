@@ -1,10 +1,12 @@
 package state
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,6 +112,42 @@ func TestNeedsHumanInput(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestAskAndWaitKeepsQuestionInMemoryOnly(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	coord, errCoord := NewCoordinatorWith(statePath, Workflow{Status: StatusWorking})
+	require.NoError(t, errCoord)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, errAsk := coord.AskAndWait(ctx, &MultiChoiceQuestion{
+			Questions: []QuestionItem{{Question: "Pick one", Choices: []string{"A", "B"}}},
+		}, "Pick one")
+		errCh <- errAsk
+	}()
+
+	require.Eventually(t, func() bool {
+		return coord.State().NeedsHumanInput()
+	}, time.Second, 10*time.Millisecond)
+
+	persisted, errPersisted := NewCoordinator(statePath)
+	require.NoError(t, errPersisted)
+	assert.False(t, persisted.State().NeedsHumanInput())
+	assert.Empty(t, persisted.State().HumanMessage)
+	assert.Nil(t, persisted.State().MultiChoiceQuestion)
+
+	cancel()
+	select {
+	case errAsk := <-errCh:
+		require.ErrorIs(t, errAsk, context.Canceled)
+	case <-time.After(time.Second):
+		require.Fail(t, "AskAndWait did not return after cancellation")
+	}
+	assert.False(t, coord.State().NeedsHumanInput())
 }
 
 func TestTokenUsageAdd(t *testing.T) {

@@ -40,6 +40,7 @@ func NewCoordinator(path string) (*Coordinator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading coordinator state: %w", err)
 	}
+	wf = transientFreeWorkflow(wf)
 	return &Coordinator{
 		wf:       wf,
 		savePath: path,
@@ -66,7 +67,7 @@ func NewCoordinatorWith(path string, wf Workflow) (*Coordinator, error) {
 		wf:       wf,
 		savePath: path,
 	}
-	if err := save(path, wf); err != nil {
+	if err := save(path, transientFreeWorkflow(wf)); err != nil {
 		return nil, fmt.Errorf("saving initial coordinator state: %w", err)
 	}
 	return c, nil
@@ -113,9 +114,10 @@ func (c *Coordinator) UpdateState(fn func(*Workflow)) error {
 	c.mu.Lock()
 	fn(&c.wf)
 	snapshot := c.wf
+	persistent := transientFreeWorkflow(snapshot)
 	notify := c.onUpdate
 	c.mu.Unlock()
-	if err := save(c.savePath, snapshot); err != nil {
+	if err := save(c.savePath, persistent); err != nil {
 		return err
 	}
 	if notify != nil {
@@ -124,13 +126,29 @@ func (c *Coordinator) UpdateState(fn func(*Workflow)) error {
 	return nil
 }
 
-// AskAndWait sets the question state on the workflow, saves it, and blocks until
-// the human partner answers via Respond or the context is cancelled.
-// After the answer arrives, it clears the waiting state before returning.
-// On context cancellation, the question state is preserved so the UI
-// notification (⚠) remains visible for the human partner, and the response
-// channel is kept alive so a subsequent call can immediately collect a buffered
-// answer.
+func (c *Coordinator) updateTransientState(fn func(*Workflow)) {
+	c.mu.Lock()
+	fn(&c.wf)
+	notify := c.onUpdate
+	c.mu.Unlock()
+	if notify != nil {
+		notify()
+	}
+}
+
+func transientFreeWorkflow(wf Workflow) Workflow {
+	wf.HumanMessage = ""
+	wf.MultiChoiceQuestion = nil
+	if wf.Status == StatusWaitingForHuman {
+		wf.Status = StatusWorking
+	}
+	return wf
+}
+
+// AskAndWait sets the question state in memory and blocks until the human
+// partner answers via Respond or the context is cancelled.
+// After the answer arrives or the context is cancelled, it clears the waiting
+// state before returning.
 // It returns the human's answer string or a context error.
 //
 // Each call creates its own response channel (channel-in-channel pattern) so
@@ -164,18 +182,11 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 	c.currentResponseCh = responseCh
 	c.mu.Unlock()
 
-	if err := c.UpdateState(func(wf *Workflow) {
+	c.updateTransientState(func(wf *Workflow) {
 		wf.MultiChoiceQuestion = question
 		wf.HumanMessage = humanMessage
 		wf.Status = StatusWaitingForHuman
-	}); err != nil {
-		c.mu.Lock()
-		if c.currentResponseCh == responseCh {
-			c.currentResponseCh = nil
-		}
-		c.mu.Unlock()
-		return "", fmt.Errorf("saving question state: %w", err)
-	}
+	})
 	c.log("askandwait: question state set, status changed to waiting-for-human")
 
 	c.log("askandwait: blocking for human answer")
@@ -183,6 +194,12 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 	select {
 	case <-ctx.Done():
 		c.log("askandwait: context cancelled:", ctx.Err())
+		c.mu.Lock()
+		if c.currentResponseCh == responseCh {
+			c.currentResponseCh = nil
+		}
+		c.mu.Unlock()
+		c.clearWaitingState()
 		return "", ctx.Err()
 	case answer = <-responseCh:
 		c.log("askandwait: answer received from human")
@@ -200,36 +217,35 @@ func (c *Coordinator) AskAndWait(ctx context.Context, question *MultiChoiceQuest
 
 func (c *Coordinator) clearWaitingState() {
 	c.log("askandwait: clearing waiting state")
-	if err := c.UpdateState(func(wf *Workflow) {
+	c.updateTransientState(func(wf *Workflow) {
 		wf.MultiChoiceQuestion = nil
 		wf.HumanMessage = ""
 		if IsHumanPending(wf.Status) {
 			wf.Status = StatusWorking
 		}
-	}); err != nil {
-		c.log("failed to clear waiting state:", err)
-	}
+	})
 }
 
 // Respond delivers the human's answer to the blocked AskAndWait call.
 // The state is cleared by AskAndWait after it receives the answer.
-// Respond does not block. If no AskAndWait is currently waiting, the answer
-// is silently discarded.
-func (c *Coordinator) Respond(answer string) {
+// Respond does not block. It reports whether the answer was queued for delivery.
+func (c *Coordinator) Respond(answer string) bool {
 	c.mu.Lock()
 	responseCh := c.currentResponseCh
 	c.mu.Unlock()
 
 	if responseCh == nil {
 		c.log("askandwait: no pending question, discarding response")
-		return
+		return false
 	}
 
 	select {
 	case responseCh <- answer:
 		c.log("askandwait: response queued for delivery")
+		return true
 	default:
 		c.log("askandwait: response channel full, response discarded")
+		return false
 	}
 }
 
@@ -284,11 +300,21 @@ func (c *Coordinator) IsShuttingDown() bool {
 	return c.doneTimer != nil
 }
 
-// Stop cancels the watchdog timer if it is running.
+// Stop cancels the watchdog timer if it is running and clears transient state.
 func (c *Coordinator) Stop() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.doneTimer != nil {
 		c.doneTimer.Stop()
+	}
+	c.currentResponseCh = nil
+	c.wf.MultiChoiceQuestion = nil
+	c.wf.HumanMessage = ""
+	if IsHumanPending(c.wf.Status) {
+		c.wf.Status = StatusWorking
+	}
+	notify := c.onUpdate
+	c.mu.Unlock()
+	if notify != nil {
+		notify()
 	}
 }

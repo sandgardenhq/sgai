@@ -394,6 +394,10 @@ type mcpContext struct {
 
 type emptyResult struct{}
 
+type textOutput struct {
+	Text string `json:"text"`
+}
+
 func (c *mcpContext) findSkillsHandler(_ context.Context, _ *mcp.CallToolRequest, args findSkillsArgs) (*mcp.CallToolResult, emptyResult, error) {
 	result, err := findSkills(c.workingDir, args.Name)
 	if err != nil {
@@ -444,24 +448,24 @@ func (c *mcpContext) projectTodoReadHandler(_ context.Context, _ *mcp.CallToolRe
 	}, emptyResult{}, nil
 }
 
-func (c *mcpContext) askUserQuestionHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserQuestionArgs) (*mcp.CallToolResult, emptyResult, error) {
+func (c *mcpContext) askUserQuestionHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserQuestionArgs) (*mcp.CallToolResult, textOutput, error) {
 	result, err := askUserQuestion(ctx, c.coord, args)
 	if err != nil {
-		return nil, emptyResult{}, err
+		return nil, textOutput{}, err
 	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
+	}, textOutput{Text: result}, nil
 }
 
-func (c *mcpContext) askUserWorkGateHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserWorkGateArgs) (*mcp.CallToolResult, emptyResult, error) {
+func (c *mcpContext) askUserWorkGateHandler(ctx context.Context, _ *mcp.CallToolRequest, args askUserWorkGateArgs) (*mcp.CallToolResult, textOutput, error) {
 	result, err := askUserWorkGate(ctx, c.coord, args.Summary)
 	if err != nil {
-		return nil, emptyResult{}, err
+		return nil, textOutput{}, err
 	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: result}},
-	}, emptyResult{}, nil
+	}, textOutput{Text: result}, nil
 }
 
 func askUserQuestion(ctx context.Context, coord *state.Coordinator, args askUserQuestionArgs) (string, error) {
