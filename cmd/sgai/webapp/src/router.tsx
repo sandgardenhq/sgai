@@ -12,9 +12,9 @@ import {
   DashboardUsageRoute,
   DashboardWorkspaceRoute,
   EditGoalRoute,
-  FullDiffRoute,
   NewWorkspaceRoute,
   ResponseMultiChoiceRoute,
+  StaleDiffRedirectRoute,
   SkillDetailRoute,
   SkillListRoute,
   SnippetDetailRoute,
@@ -84,8 +84,12 @@ export const router = createBrowserRouter([
         element: <AdhocOutputRoute />,
       },
       {
+        path: "workspaces/:name/diff",
+        element: <StaleDiffRedirectRoute />,
+      },
+      {
         path: "workspace/:name/diff",
-        element: <FullDiffRoute />,
+        element: <StaleDiffRedirectRoute />,
       },
       {
         path: "workspaces/:name/*",

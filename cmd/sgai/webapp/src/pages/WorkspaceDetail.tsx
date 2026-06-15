@@ -25,11 +25,8 @@ import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
-const MessagesTab = lazy(() => import("./tabs/MessagesTab").then((m) => ({ default: m.MessagesTab })));
 const LogTab = lazy(() => import("./tabs/LogTab").then((m) => ({ default: m.LogTab })));
 const RunTab = lazy(() => import("./tabs/RunTab").then((m) => ({ default: m.RunTab })));
-const ChangesTab = lazy(() => import("./tabs/ChangesTab").then((m) => ({ default: m.ChangesTab })));
-const CommitsTab = lazy(() => import("./tabs/CommitsTab").then((m) => ({ default: m.CommitsTab })));
 const EventsTab = lazy(() => import("./tabs/EventsTab").then((m) => ({ default: m.EventsTab })));
 const ForksTab = lazy(() => import("./tabs/ForksTab").then((m) => ({ default: m.ForksTab })));
 
@@ -76,12 +73,11 @@ function WorkspaceDetailSkeleton() {
 const TABS = [
   { key: "progress", label: "Progress" },
   { key: "log", label: "Log" },
-  { key: "changes", label: "Diffs" },
-  { key: "commits", label: "Commits" },
-  { key: "messages", label: "Messages" },
   { key: "internals", label: "Internals" },
   { key: "run", label: "Run" },
 ] as const;
+
+const REMOVED_TABS = new Set(["changes", "commits", "messages", "diff"]);
 
 const ROOT_TABS = [
   { key: "forks", label: "Forks" },
@@ -214,6 +210,13 @@ export function WorkspaceDetail(): ReactNode {
       navigate(`/workspaces/${encodedName}/progress`, { replace: true });
     }
   }, [detail, hasForks, activeTab, navigate, workspaceName]);
+
+  useEffect(() => {
+    if (!detail || detail.name !== workspaceName || !REMOVED_TABS.has(activeTab)) return;
+    const encodedName = encodeURIComponent(detail.name);
+    const defaultTab = detail.isRoot && hasForks ? "forks" : "progress";
+    navigate(`/workspaces/${encodedName}/${defaultTab}`, { replace: true });
+  }, [activeTab, detail, hasForks, navigate, workspaceName]);
 
   if (loading && !detail) return <WorkspaceDetailSkeleton />;
 
@@ -964,12 +967,6 @@ function TabContent({
       return <EventsTab workspaceName={workspaceName} goalContent={goalContent} actions={actions} />;
     case "log":
       return <LogTab workspaceName={workspaceName} />;
-    case "changes":
-      return <ChangesTab workspaceName={workspaceName} />;
-    case "commits":
-      return <CommitsTab workspaceName={workspaceName} />;
-    case "messages":
-      return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
       return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
 

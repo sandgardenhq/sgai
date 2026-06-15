@@ -1,4 +1,5 @@
 import { Suspense, lazy, type ReactNode } from "react";
+import { Navigate, useParams } from "react-router";
 import { Skeleton } from "./components/ui/skeleton";
 
 const Dashboard = lazy(() =>
@@ -63,9 +64,6 @@ const EditGoal = lazy(() =>
 );
 const AdhocOutput = lazy(() =>
   import("./pages/AdhocOutput").then((m) => ({ default: m.AdhocOutput })),
-);
-const FullDiffPage = lazy(() =>
-  import("./pages/FullDiffPage").then((m) => ({ default: m.FullDiffPage })),
 );
 const Usage = lazy(() =>
   import("./pages/Usage").then((m) => ({ default: m.Usage })),
@@ -208,8 +206,10 @@ export function AdhocOutputRoute() {
   return <PageRoute><AdhocOutput /></PageRoute>;
 }
 
-export function FullDiffRoute() {
-  return <PageRoute><FullDiffPage /></PageRoute>;
+export function StaleDiffRedirectRoute() {
+  const { name } = useParams<{ name: string }>();
+  const workspaceName = encodeURIComponent(name ?? "");
+  return <Navigate to={`/workspaces/${workspaceName}/progress`} replace />;
 }
 
 function PageRoute({ children }: { children: ReactNode }) {

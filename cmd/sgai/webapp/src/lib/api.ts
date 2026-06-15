@@ -26,8 +26,6 @@ import type {
   ApiDeleteForkResponse,
   ApiDeleteWorkspaceResponse,
   ApiResetWorkspaceResponse,
-  ApiDiffResponse,
-  ApiDeleteMessageResponse,
   ApiAttachWorkspaceResponse,
   ApiDetachWorkspaceResponse,
   ApiBrowseDirectoriesResponse,
@@ -184,10 +182,6 @@ export const api = {
       fetchJSON<ApiResetWorkspaceResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/reset`,
         { method: "POST" },
-      ),
-    getDiff: (name: string) =>
-      fetchJSON<ApiDiffResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
       ),
     forkTemplate: (name: string) =>
       fetchJSON<ApiForkTemplateResponse>(

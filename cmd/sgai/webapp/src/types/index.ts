@@ -40,8 +40,6 @@ export interface ApiWorkspaceEntry {
   events: ApiEventEntry[];
   projectTodos: ApiTodoEntry[];
   agentTodos: ApiTodoEntry[];
-  changes: ApiChangesData;
-  commits: ApiCommitEntry[];
   forks?: ApiForkEntry[];
   log: ApiLogEntry[];
   pendingQuestion?: ApiPendingQuestionResponse;
@@ -281,31 +279,6 @@ export interface ApiTodoEntry {
 export interface ApiLogEntry {
   prefix: string;
   text: string;
-}
-
-export interface ApiDiffLine {
-  lineNumber: number;
-  text: string;
-  class: string;
-}
-
-interface ApiChangesData {
-  description: string;
-  diffLines: ApiDiffLine[];
-}
-
-export interface ApiDiffResponse {
-  diff: string;
-}
-
-export interface ApiCommitEntry {
-  changeId: string;
-  commitId: string;
-  workspaces?: string[];
-  timestamp: string;
-  bookmarks?: string[];
-  description: string;
-  graphChar: string;
 }
 
 export interface ApiEventEntry {

@@ -334,120 +334,6 @@ func TestBuildAPIResponseText(t *testing.T) {
 	}
 }
 
-func TestBuildCommitEntries(t *testing.T) {
-	tests := []struct {
-		name     string
-		commits  []jjCommit
-		expected []apiCommitEntry
-	}{
-		{
-			name:     "emptyCommits",
-			commits:  []jjCommit{},
-			expected: []apiCommitEntry{},
-		},
-		{
-			name: "singleCommit",
-			commits: []jjCommit{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{"ws1"},
-					Timestamp:   "2 hours ago",
-					Bookmarks:   []string{"main"},
-					Description: "Test commit",
-					GraphChar:   "@",
-				},
-			},
-			expected: []apiCommitEntry{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{"ws1"},
-					Timestamp:   "2 hours ago",
-					Bookmarks:   []string{"main"},
-					Description: "Test commit",
-					GraphChar:   "@",
-				},
-			},
-		},
-		{
-			name: "multipleCommits",
-			commits: []jjCommit{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{"ws1"},
-					Timestamp:   "2 hours ago",
-					Bookmarks:   []string{"main"},
-					Description: "First commit",
-					GraphChar:   "@",
-				},
-				{
-					ChangeID:    "xyz789",
-					CommitID:    "uvw012",
-					Workspaces:  []string{"ws2"},
-					Timestamp:   "1 day ago",
-					Bookmarks:   []string{"feature"},
-					Description: "Second commit",
-					GraphChar:   "o",
-				},
-			},
-			expected: []apiCommitEntry{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{"ws1"},
-					Timestamp:   "2 hours ago",
-					Bookmarks:   []string{"main"},
-					Description: "First commit",
-					GraphChar:   "@",
-				},
-				{
-					ChangeID:    "xyz789",
-					CommitID:    "uvw012",
-					Workspaces:  []string{"ws2"},
-					Timestamp:   "1 day ago",
-					Bookmarks:   []string{"feature"},
-					Description: "Second commit",
-					GraphChar:   "o",
-				},
-			},
-		},
-		{
-			name: "commitWithEmptyFields",
-			commits: []jjCommit{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{},
-					Timestamp:   "1 hour ago",
-					Bookmarks:   []string{},
-					Description: "",
-					GraphChar:   "@",
-				},
-			},
-			expected: []apiCommitEntry{
-				{
-					ChangeID:    "abc123",
-					CommitID:    "def456",
-					Workspaces:  []string{},
-					Timestamp:   "1 hour ago",
-					Bookmarks:   []string{},
-					Description: "",
-					GraphChar:   "@",
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := buildCommitEntries(tt.commits)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestConvertJJCommitsForAPI(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		result := convertJJCommitsForAPI(nil)
@@ -867,24 +753,10 @@ func TestReadNewestForkGoalAllEmptyContent(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-func TestCollectJJChangesNoJJInstalled(t *testing.T) {
-	dir := t.TempDir()
-	lines, desc := collectJJChanges(dir)
-	assert.Nil(t, lines)
-	assert.Empty(t, desc)
-}
-
 func TestCollectJJFullDiffNoJJInstalled(t *testing.T) {
 	dir := t.TempDir()
 	result := collectJJFullDiff(dir)
 	assert.Empty(t, result)
-}
-
-func TestCollectJJChangesCachedResult(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "changes-ws")
-	result := srv.collectJJChangesCached(wsDir)
-	_ = result
 }
 
 func TestResolveForkDirExplicitPath(t *testing.T) {

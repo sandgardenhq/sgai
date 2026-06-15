@@ -42,8 +42,6 @@ const createMockWorkspace = (overrides = {}) => ({
   events: [],
   projectTodos: [],
   agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
   log: [],
   external: false,
   ...overrides,
@@ -176,6 +174,26 @@ describe("WorkspaceDetail", () => {
     mockTriggerFactoryRefresh.mockClear();
     mockRespond.mockClear();
     mockNavigate.mockClear();
+  });
+
+  it("does not render removed repository tabs", async () => {
+    renderWorkspaceDetail();
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Workspace")).toBeTruthy();
+    });
+
+    expect(screen.queryByRole("link", { name: "Diffs" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Commits" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Messages" })).toBeNull();
+  });
+
+  it.each(["changes", "commits", "messages", "diff"])("redirects stale %s tab state to progress", async (tab) => {
+    renderWorkspaceDetail("test-workspace", tab);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/workspaces/test-workspace/progress", { replace: true });
+    });
   });
 
   describe("start/stop buttons work", () => {

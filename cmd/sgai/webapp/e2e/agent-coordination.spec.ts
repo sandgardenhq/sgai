@@ -113,7 +113,7 @@ test.describe("Agent Coordination Workflow", () => {
     await expect(page.getByRole("link", { name: "PROJECT_MANAGEMENT.md" })).toBeVisible();
   });
 
-  test("view changes tab shows diffs", async ({ page }) => {
+  test("diffs and commits tabs are removed from workspace navigation", async ({ page }) => {
     await page.waitForSelector("text=Workspaces", { timeout: 10000 });
 
     const workspaceLink = page.locator("a[href^='/workspaces/']").first();
@@ -121,36 +121,19 @@ test.describe("Agent Coordination Workflow", () => {
 
     await page.waitForURL(/\/workspaces\/[^/]+/);
 
-    const changesTab = page.locator('a[href$="/changes"]');
-    const hasChangesTab = await changesTab.isVisible().catch(() => false);
-
-    if (hasChangesTab) {
-      await changesTab.click();
-
-      await page.waitForURL(/\/changes/);
-
-      await expect(page.locator("text=Diffs")).toBeVisible();
-    }
+    await expect(page.locator('a[href$="/changes"]')).toHaveCount(0);
+    await expect(page.locator('a[href$="/commits"]')).toHaveCount(0);
   });
 
-  test("view commits tab shows commit history", async ({ page }) => {
+  test("stale removed tab route redirects to progress", async ({ page }) => {
     await page.waitForSelector("text=Workspaces", { timeout: 10000 });
 
-    const workspaceLink = page.locator("a[href^='/workspaces/']").first();
-    await workspaceLink.click();
+    const workspaceHref = await page.locator("a[href^='/workspaces/']").first().getAttribute("href");
+    const workspacePath = workspaceHref?.replace(/\/(progress|log|internals|run|forks)$/, "");
+    expect(workspacePath).toBeTruthy();
 
-    await page.waitForURL(/\/workspaces\/[^/]+/);
-
-    const commitsTab = page.locator('a[href$="/commits"]');
-    const hasCommitsTab = await commitsTab.isVisible().catch(() => false);
-
-    if (hasCommitsTab) {
-      await commitsTab.click();
-
-      await page.waitForURL(/\/commits/);
-
-      await expect(page.locator("text=Commits")).toBeVisible();
-    }
+    await page.goto(`${workspacePath}/messages`);
+    await page.waitForURL(/\/progress$|\/forks$/);
   });
 
   test("execution time displays correctly", async ({ page }) => {

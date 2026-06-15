@@ -67,8 +67,6 @@ const mockWorkspace = {
   events: [],
   projectTodos: [],
   agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
   log: [],
   external: false,
   pendingQuestion: mockQuestion,

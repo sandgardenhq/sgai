@@ -216,11 +216,6 @@ func isEditorAvailable(command string) bool {
 	return err == nil
 }
 
-type jjChangesResult struct {
-	diffLines   []apiDiffLine
-	description string
-}
-
 // Server handles HTTP requests for the sgai serve command.
 type Server struct {
 	mu                sync.Mutex
@@ -251,13 +246,11 @@ type Server struct {
 	bookmarkFlight      singleflight[string, string]
 	bookmarkCache       *ttlCache[string, string]
 
-	jjChangesFlight    singleflight[string, jjChangesResult]
-	forkCommitsFlight  singleflight[string, int]
-	forkLogFlight      singleflight[string, []jjCommit]
-	workspaceLogFlight singleflight[string, []jjCommit]
-	stateFlight        singleflight[string, apiFactoryState]
-	stateCache         *ttlCache[string, apiFactoryState]
-	stateGeneration    uint64
+	forkCommitsFlight singleflight[string, int]
+	forkLogFlight     singleflight[string, []jjCommit]
+	stateFlight       singleflight[string, apiFactoryState]
+	stateCache        *ttlCache[string, apiFactoryState]
+	stateGeneration   uint64
 
 	usageStoreMu  sync.Mutex
 	usageStore    *usageStore
