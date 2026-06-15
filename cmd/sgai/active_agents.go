@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +14,24 @@ type activeAgent struct {
 	SessionID string
 	Model     string
 	Status    string
+}
+
+type activeAgentTaskInput struct {
+	Description  string `json:"description"`
+	Prompt       string `json:"prompt"`
+	SubagentType string `json:"subagent_type"`
+	TaskID       string `json:"task_id"`
+	Command      string `json:"command"`
+}
+
+type activeAgentTaskMetadata struct {
+	SessionID string               `json:"sessionId"`
+	Model     activeAgentTaskModel `json:"model"`
+}
+
+type activeAgentTaskModel struct {
+	ProviderID string `json:"providerID"`
+	ModelID    string `json:"modelID"`
 }
 
 type activeAgentTracker struct {
@@ -153,7 +172,7 @@ func activeAgentIDsFromPart(p part) []string {
 	addStringValue(&ids, p.CallID)
 	addStringValue(&ids, p.ID)
 	if p.State != nil {
-		addStringValue(&ids, firstStringValue(p.State.Input, "task_id", "taskId", "id"))
+		addStringValue(&ids, activeAgentInput(p).TaskID)
 	}
 	for _, sessionID := range activeAgentSessionIDs(p) {
 		addStringValue(&ids, sessionID)
@@ -170,10 +189,10 @@ func activeAgentName(p part) string {
 	if p.State == nil {
 		return ""
 	}
-	if agent := firstStringValue(p.State.Input, "subagent_type", "subagentType", "subagent", "subagent_name", "agent", "agent_type", "agentType"); agent != "" {
+	if agent := activeAgentInput(p).SubagentType; agent != "" {
 		return strings.TrimSpace(agent)
 	}
-	return strings.TrimSpace(firstStringValue(p.State.Metadata, "subagent_type", "subagentType", "subagent", "subagent_name", "agent", "agent_type", "agentType"))
+	return ""
 }
 
 func isDelegatableActiveAgentName(agent string) bool {
@@ -200,10 +219,10 @@ func activeAgentTitle(p part) string {
 	if p.State.Title != "" {
 		return p.State.Title
 	}
-	if title := firstStringValue(p.State.Input, "description", "title", "command"); title != "" {
+	if title := activeAgentInput(p).Description; title != "" {
 		return title
 	}
-	return firstStringValue(p.State.Metadata, "title", "description")
+	return ""
 }
 
 func activeAgentSessionID(p part) string {
@@ -219,10 +238,14 @@ func activeAgentSessionIDs(p part) []string {
 		return nil
 	}
 	var sessionIDs []string
-	if sessionID := firstStringValue(p.State.Metadata, "sessionId", "sessionID", "session_id", "session"); sessionID != "" {
+	addStringValue(&sessionIDs, p.SessionID)
+	if sessionID := activeAgentPartMetadata(p).SessionID; sessionID != "" {
 		addStringValue(&sessionIDs, sessionID)
 	}
-	if sessionID := firstStringValue(p.State.Input, "sessionId", "sessionID", "session_id", "session"); sessionID != "" {
+	if sessionID := activeAgentStateMetadata(p).SessionID; sessionID != "" {
+		addStringValue(&sessionIDs, sessionID)
+	}
+	if sessionID := activeAgentInput(p).TaskID; sessionID != "" {
 		addStringValue(&sessionIDs, sessionID)
 	}
 	for _, sessionID := range p.State.Output.sessionIDs() {
@@ -243,47 +266,53 @@ func activeAgentModel(p part) string {
 	if p.State == nil {
 		return ""
 	}
-	if model := modelValue(p.State.Metadata["model"]); model != "" {
+	if model := activeAgentPartMetadata(p).Model.String(); model != "" {
 		return model
 	}
-	return firstStringValue(p.State.Metadata, "modelID", "modelId", "model")
-}
-
-func modelValue(value any) string {
-	if text := stringValue(value); text != "" {
-		return text
-	}
-	model, ok := value.(map[string]any)
-	if !ok {
-		return ""
-	}
-	providerID := firstStringValue(model, "providerID", "providerId", "provider_id", "provider")
-	modelID := firstStringValue(model, "modelID", "modelId", "model_id", "id", "model")
-	if providerID != "" && modelID != "" {
-		return providerID + "/" + modelID
-	}
-	return modelID
-}
-
-func firstStringValue(values map[string]any, keys ...string) string {
-	if len(values) == 0 {
-		return ""
-	}
-	for _, key := range keys {
-		if text := stringValue(values[key]); text != "" {
-			return text
-		}
-	}
-	for _, key := range keys {
-		for existingKey, value := range values {
-			if strings.EqualFold(existingKey, key) {
-				if text := stringValue(value); text != "" {
-					return text
-				}
-			}
-		}
+	if model := activeAgentStateMetadata(p).Model.String(); model != "" {
+		return model
 	}
 	return ""
+}
+
+func (m activeAgentTaskModel) String() string {
+	if m.ProviderID != "" && m.ModelID != "" {
+		return m.ProviderID + "/" + m.ModelID
+	}
+	return m.ModelID
+}
+
+func activeAgentInput(p part) activeAgentTaskInput {
+	if p.State == nil {
+		return activeAgentTaskInput{}
+	}
+	return decodeActiveAgentMap[activeAgentTaskInput](p.State.Input)
+}
+
+func activeAgentPartMetadata(p part) activeAgentTaskMetadata {
+	return decodeActiveAgentMap[activeAgentTaskMetadata](p.Metadata)
+}
+
+func activeAgentStateMetadata(p part) activeAgentTaskMetadata {
+	if p.State == nil {
+		return activeAgentTaskMetadata{}
+	}
+	return decodeActiveAgentMap[activeAgentTaskMetadata](p.State.Metadata)
+}
+
+func decodeActiveAgentMap[T any](values map[string]any) T {
+	var result T
+	if len(values) == 0 {
+		return result
+	}
+	data, errMarshal := json.Marshal(values)
+	if errMarshal != nil {
+		return result
+	}
+	if errUnmarshal := json.Unmarshal(data, &result); errUnmarshal != nil {
+		return result
+	}
+	return result
 }
 
 func isTaskToolName(tool string) bool {
