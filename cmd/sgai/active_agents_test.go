@@ -158,6 +158,29 @@ func TestJSONPrettyWriterUpdatesActiveSubagentsFromTaskEvents(t *testing.T) {
 	assert.Equal(t, 2, notifyCount)
 }
 
+func TestJSONPrettyWriterUpdatesActiveSubagentsFromMessagePartUpdatedEvents(t *testing.T) {
+	tracker := newActiveAgentTracker()
+	notifyCount := 0
+	writer := &jsonPrettyWriter{
+		w:                     &bytes.Buffer{},
+		activeAgents:          tracker,
+		onActiveAgentsChanged: func() { notifyCount++ },
+	}
+
+	_, errWrite := writer.Write([]byte(
+		`{"type":"message.part.updated","properties":{"sessionID":"parent-session","time":1760000000000,"part":{"id":"part-1","sessionID":"child-session-1","type":"tool","callID":"call-1","tool":"task","state":{"status":"running","input":{"subagent_type":"react","description":"Build UI"},"title":"Build UI"},"metadata":{"model":{"providerID":"openai","modelID":"gpt-5.5"}}}}}` + "\n",
+	))
+
+	require.NoError(t, errWrite)
+	snapshot := tracker.snapshot()
+	require.Len(t, snapshot, 1)
+	assert.Equal(t, "react", snapshot[0].Agent)
+	assert.Equal(t, "Build UI", snapshot[0].Title)
+	assert.Equal(t, "child-session-1", snapshot[0].SessionID)
+	assert.Equal(t, "openai/gpt-5.5", snapshot[0].Model)
+	assert.Equal(t, 1, notifyCount)
+}
+
 func TestJSONPrettyWriterClearsActiveSubagentOnStructuredTaskOutput(t *testing.T) {
 	tracker := newActiveAgentTracker()
 	notifyCount := 0

@@ -37,23 +37,32 @@ func (p *prefixWriter) Write(data []byte) (int, error) {
 }
 
 type streamEvent struct {
-	Type      string `json:"type"`
-	Timestamp int64  `json:"timestamp"`
+	Type       string                `json:"type"`
+	Timestamp  int64                 `json:"timestamp"`
+	SessionID  string                `json:"sessionID"`
+	Model      string                `json:"model,omitempty"`
+	Part       part                  `json:"part"`
+	Properties streamEventProperties `json:"properties"`
+}
+
+type streamEventProperties struct {
 	SessionID string `json:"sessionID"`
-	Model     string `json:"model,omitempty"`
 	Part      part   `json:"part"`
+	Time      int64  `json:"time"`
 }
 
 type part struct {
-	ID     string     `json:"id,omitempty"`
-	CallID string     `json:"callID,omitempty"`
-	Type   string     `json:"type"`
-	Text   string     `json:"text,omitempty"`
-	Tool   string     `json:"tool,omitempty"`
-	Model  string     `json:"model,omitempty"`
-	State  *toolState `json:"state,omitempty"`
-	Cost   float64    `json:"cost,omitempty"`
-	Tokens partTokens `json:"tokens"`
+	ID        string         `json:"id,omitempty"`
+	CallID    string         `json:"callID,omitempty"`
+	SessionID string         `json:"sessionID,omitempty"`
+	Type      string         `json:"type"`
+	Text      string         `json:"text,omitempty"`
+	Tool      string         `json:"tool,omitempty"`
+	Model     string         `json:"model,omitempty"`
+	State     *toolState     `json:"state,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	Cost      float64        `json:"cost,omitempty"`
+	Tokens    partTokens     `json:"tokens"`
 }
 
 type partTokens struct {
@@ -202,9 +211,19 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 	if event.SessionID != "" {
 		j.sessionID = event.SessionID
 	}
+	if event.Properties.SessionID != "" {
+		j.sessionID = event.Properties.SessionID
+	}
 	part := event.Part
+	eventType := event.Type
+	timestamp := event.Timestamp
+	if event.Properties.Part.Type != "" {
+		part = event.Properties.Part
+		eventType = part.Type
+		timestamp = event.Properties.Time
+	}
 
-	switch event.Type {
+	switch eventType {
 	case "text":
 		if part.Text != "" {
 			j.currentText.WriteString(part.Text)
@@ -216,13 +235,13 @@ func (j *jsonPrettyWriter) processEvent(event streamEvent) {
 			j.processToolPart(part)
 		}
 
-	case "step_start":
+	case "step_start", "step-start":
 		j.flushText()
 		j.stepCounter++
 
-	case "step_finish":
+	case "step_finish", "step-finish":
 		j.flushText()
-		j.recordStepCost(part, event.Timestamp)
+		j.recordStepCost(part, timestamp)
 
 	case "reasoning":
 		j.flushText()
