@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ function TabNav({ workspaceName, activeTab, isRoot, hasForks }: TabNavProps) {
 }
 
 
-export function WorkspaceDetail(): JSX.Element | null {
+export function WorkspaceDetail(): ReactNode {
   const { name, "*": tabPath } = useParams<{ name: string; "*": string }>();
   const workspaceName = name ?? "";
   const activeTab = tabPath?.split("/")[0] || "progress";
@@ -365,40 +365,76 @@ export function WorkspaceDetail(): JSX.Element | null {
   };
 
   return (
+    <WorkspaceDetailView
+      headerProps={{
+        detail,
+        isForkedRoot,
+        displayExecTime,
+        effectiveRunning,
+        agentModelLabel,
+        fullAgentModelLabel,
+        statusLine,
+        showStatusLine,
+        actionError,
+        activeTab,
+        hasForks,
+        encodedWorkspace,
+        selfDriveLabel,
+        showComposeGoalAction,
+        showEditGoalAction,
+        showOpenEditorAction,
+        showDeleteAction,
+        isActionDisabled,
+        isEditorPending,
+        isPinPending,
+        isStartStopPending,
+        isDeletePending,
+        isResetPending,
+        navigate,
+        handleStart,
+        handleStop,
+        handleSelfDrive,
+        handlePinToggle,
+        handleOpenEditor,
+        handleReset,
+        handleDelete,
+      }}
+      actionOutputProps={{
+        actionRunError,
+        isActionRunning,
+        actionOutput,
+        actionOutputOpen,
+        actionOutputRef,
+        setActionOutputOpen,
+        stopActionRun,
+      }}
+      handleActionClick={handleActionClick}
+    />
+  );
+}
+
+interface ForkedRootActionOutputProps {
+  actionRunError: string | null;
+  isActionRunning: boolean;
+  actionOutput: string;
+  actionOutputOpen: boolean;
+  actionOutputRef: React.RefObject<HTMLPreElement | null>;
+  setActionOutputOpen: (open: boolean) => void;
+  stopActionRun: () => void;
+}
+
+interface WorkspaceDetailViewProps {
+  headerProps: WorkspaceDetailHeaderProps;
+  actionOutputProps: ForkedRootActionOutputProps;
+  handleActionClick: (action: ApiActionEntry, forkName?: string) => void;
+}
+
+function WorkspaceDetailView({ headerProps, actionOutputProps, handleActionClick }: WorkspaceDetailViewProps) {
+  const { detail, isForkedRoot, activeTab } = headerProps;
+
+  return (
     <div className="sticky-header-wrapper">
-      <WorkspaceDetailHeader
-        detail={detail}
-        isForkedRoot={isForkedRoot}
-        displayExecTime={displayExecTime}
-        effectiveRunning={effectiveRunning}
-        agentModelLabel={agentModelLabel}
-        fullAgentModelLabel={fullAgentModelLabel}
-        statusLine={statusLine}
-        showStatusLine={showStatusLine}
-        actionError={actionError}
-        activeTab={activeTab}
-        hasForks={hasForks}
-        encodedWorkspace={encodedWorkspace}
-        selfDriveLabel={selfDriveLabel}
-        showComposeGoalAction={showComposeGoalAction}
-        showEditGoalAction={showEditGoalAction}
-        showOpenEditorAction={showOpenEditorAction}
-        showDeleteAction={showDeleteAction}
-        isActionDisabled={isActionDisabled}
-        isEditorPending={isEditorPending}
-        isPinPending={isPinPending}
-        isStartStopPending={isStartStopPending}
-        isDeletePending={isDeletePending}
-        isResetPending={isResetPending}
-        navigate={navigate}
-        handleStart={handleStart}
-        handleStop={handleStop}
-        handleSelfDrive={handleSelfDrive}
-        handlePinToggle={handlePinToggle}
-        handleOpenEditor={handleOpenEditor}
-        handleReset={handleReset}
-        handleDelete={handleDelete}
-      />
+      <WorkspaceDetailHeader {...headerProps} />
 
       <div className="pt-4">
         {detail.isRoot && !detail.isFork && (
@@ -407,15 +443,7 @@ export function WorkspaceDetail(): JSX.Element | null {
           </div>
         )}
         {isForkedRoot ? (
-          <ForkedRootActionOutput
-            actionRunError={actionRunError}
-            isActionRunning={isActionRunning}
-            actionOutput={actionOutput}
-            actionOutputOpen={actionOutputOpen}
-            actionOutputRef={actionOutputRef}
-            setActionOutputOpen={setActionOutputOpen}
-            stopActionRun={stopActionRun}
-          />
+          <ForkedRootActionOutput {...actionOutputProps} />
         ) : null}
         <Suspense fallback={<TabSkeleton />}>
           <TabContent

@@ -851,7 +851,7 @@ interface DashboardContentProps {
   onSidebarResizeMouseDown: (e: React.MouseEvent) => void;
 }
 
-function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardContentProps): JSX.Element {
+function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardContentProps): ReactNode {
   const { name: selectedName } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const { setOpenMobile } = useSidebar();
@@ -967,7 +967,7 @@ interface DashboardProps {
   children: ReactNode;
 }
 
-export function Dashboard({ children }: DashboardProps): JSX.Element {
+export function Dashboard({ children }: DashboardProps): ReactNode {
   const { sidebarWidth, handleMouseDown } = useSidebarResize();
 
   const sidebarStyle = useMemo(
