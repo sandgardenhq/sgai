@@ -171,7 +171,7 @@ func TestComputeEtag(t *testing.T) {
 func TestHandleAPIStateOmitsMessages(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "state-no-messages")
-	stateJSON := `{"status":"working","messages":[{"id":1,"fromAgent":"a","toAgent":"b","body":"legacy"}]}`
+	stateJSON := `{"status":"working","messages":[{"id":1,"fromAgent":"a","toAgent":"b","body":"old"}]}`
 	require.NoError(t, os.WriteFile(filepath.Join(wsDir, ".sgai", "state.json"), []byte(stateJSON), 0o644))
 
 	w := serveHTTP(server, "GET", "/api/v1/state", "")

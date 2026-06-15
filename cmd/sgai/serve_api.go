@@ -1181,7 +1181,7 @@ func (s *Server) handleAPIRespond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.handleRespondLegacy(w, workspacePath, req)
+	http.Error(w, "no active session coordinator", http.StatusConflict)
 }
 
 func (s *Server) sessionCoordinator(workspacePath string) *state.Coordinator {
@@ -1216,6 +1216,11 @@ func (s *Server) handleRespondViaCoordinator(w http.ResponseWriter, coord *state
 		return
 	}
 
+	if !coord.Respond(responseText) {
+		http.Error(w, "no active question receiver", http.StatusConflict)
+		return
+	}
+
 	if wfState.MultiChoiceQuestion != nil && wfState.MultiChoiceQuestion.IsWorkGate {
 		approvedViaSelection := slices.Contains(req.SelectedChoices, workGateApprovalText)
 		if approvedViaSelection {
@@ -1228,44 +1233,6 @@ func (s *Server) handleRespondViaCoordinator(w http.ResponseWriter, coord *state
 				return
 			}
 		}
-	}
-
-	coord.Respond(responseText)
-
-	s.notifyStateChange()
-
-	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
-}
-
-func (s *Server) handleRespondLegacy(w http.ResponseWriter, workspacePath string, req apiRespondRequest) {
-	coord := s.workspaceCoordinator(workspacePath)
-	wfState := coord.State()
-
-	if !wfState.NeedsHumanInput() {
-		http.Error(w, "no pending question in legacy path", http.StatusConflict)
-		return
-	}
-
-	currentID := generateQuestionID(wfState)
-	if req.QuestionID != currentID {
-		http.Error(w, "question expired", http.StatusConflict)
-		return
-	}
-
-	responseText := buildAPIResponseText(req)
-	if responseText == "" {
-		http.Error(w, "response cannot be empty", http.StatusBadRequest)
-		return
-	}
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.Status = state.StatusWorking
-		wf.HumanMessage = ""
-		wf.MultiChoiceQuestion = nil
-		wf.Task = ""
-	}); errUpdate != nil {
-		http.Error(w, "failed to save state", http.StatusInternalServerError)
-		return
 	}
 
 	s.notifyStateChange()
