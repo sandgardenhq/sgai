@@ -50,6 +50,26 @@ func TestParseExportedSessionCollectsStepFinish(t *testing.T) {
 	assert.Equal(t, 300, steps[0].Part.Tokens.Cache.Read)
 }
 
+func TestParseExportedSessionCollectsStepFinishNewFormat(t *testing.T) {
+	data := []byte(`[
+		{"type":"step-finish","sessionID":"session-1","timestamp":1700000000000,"model":"openai/gpt-5.5","cost":0.02,"tokens":{"input":1000,"output":200,"reasoning":50,"cache":{"read":300,"write":20}}}
+	]`)
+
+	steps, children, err := parseExportedSession(data, "default-session", "fallback-model")
+
+	require.NoError(t, err)
+	require.Len(t, steps, 1)
+	assert.Empty(t, children)
+	assert.Equal(t, "session-1", steps[0].SessionID)
+	assert.Equal(t, 0.02, steps[0].Part.Cost)
+	assert.Equal(t, 1000, steps[0].Part.Tokens.Input)
+	assert.Equal(t, 200, steps[0].Part.Tokens.Output)
+	assert.Equal(t, 50, steps[0].Part.Tokens.Reasoning)
+	assert.Equal(t, 300, steps[0].Part.Tokens.Cache.Read)
+	assert.Equal(t, 20, steps[0].Part.Tokens.Cache.Write)
+	assert.Equal(t, "openai/gpt-5.5", steps[0].Model)
+}
+
 func TestParseExportedSessionCollectsTaskChildren(t *testing.T) {
 	data := []byte(`{
 		"type":"tool",

@@ -32,7 +32,7 @@ Ask: "Which delegate agents should be available, and what model should be used?"
 
 ## Safety Analysis Guidance
 
-Safety analysis is coordinator/reviewer skill guidance, not a routable flow node.
+Safety analysis is coordinator/reviewer `stpa-overview` guidance, not a GOAL agent or coordinator-delegation target.
 
 ```markdown
 ## Safety Analysis

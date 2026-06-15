@@ -231,7 +231,8 @@ func collectExportedSteps(value any, defaultSessionID, fallbackModel string, ste
 			collectExportedSteps(item, defaultSessionID, fallbackModel, steps)
 		}
 	case map[string]any:
-		if stringValue(typed["type"]) == "step_finish" {
+		switch stringValue(typed["type"]) {
+		case "step_finish":
 			data, err := json.Marshal(typed)
 			if err == nil {
 				var event streamEvent
@@ -250,6 +251,29 @@ func collectExportedSteps(value any, defaultSessionID, fallbackModel string, ste
 					*steps = append(*steps, exportedStep{SessionID: sessionID, Part: event.Part, Timestamp: event.Timestamp, Model: model})
 				}
 			}
+		case "step-finish":
+			sessionID := stringValue(typed["sessionID"])
+			if sessionID == "" {
+				sessionID = defaultSessionID
+			}
+			stepPart := part{
+				Cost: float64Value(typed["cost"]),
+			}
+			if tokens, ok := typed["tokens"].(map[string]any); ok {
+				stepPart.Tokens.Input = intValue(tokens["input"])
+				stepPart.Tokens.Output = intValue(tokens["output"])
+				stepPart.Tokens.Reasoning = intValue(tokens["reasoning"])
+				if cache, ok := tokens["cache"].(map[string]any); ok {
+					stepPart.Tokens.Cache.Read = intValue(cache["read"])
+					stepPart.Tokens.Cache.Write = intValue(cache["write"])
+				}
+			}
+			timestamp := int64Value(typed["timestamp"])
+			model := stringValue(typed["model"])
+			if model == "" {
+				model = fallbackModel
+			}
+			*steps = append(*steps, exportedStep{SessionID: sessionID, Part: stepPart, Timestamp: timestamp, Model: model})
 		}
 		for _, item := range typed {
 			collectExportedSteps(item, defaultSessionID, fallbackModel, steps)
@@ -600,4 +624,24 @@ func floatField(values map[string]any, key string) (float64, bool) {
 func stringValue(value any) string {
 	text, _ := value.(string)
 	return text
+}
+
+func float64Value(value any) float64 {
+	switch v := value.(type) {
+	case float64:
+		return v
+	case json.Number:
+		f, _ := v.Float64()
+		return f
+	default:
+		return 0
+	}
+}
+
+func intValue(value any) int {
+	return int(float64Value(value))
+}
+
+func int64Value(value any) int64 {
+	return int64(float64Value(value))
 }
