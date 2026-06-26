@@ -33,7 +33,7 @@ Example:
 
 Notes:
 
-- `defaultModel` is validated using the base model name. If the value includes a variant in parentheses (for example, `provider/model (variant)`), only the base model is validated.
+- `defaultModel` uses the same model value format described below.
 
 ### Model namespaces
 
