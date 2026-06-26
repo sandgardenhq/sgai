@@ -35,6 +35,20 @@ Notes:
 
 - `defaultModel` is validated using the base model name. If the value includes a variant in parentheses (for example, `provider/model (variant)`), only the base model is validated.
 
+### Model namespaces
+
+Type: string
+
+Model values use `provider/model` syntax. Optional variants such as `(xhigh)` or `(low)` can follow the model name. Validation checks the base `provider/model` value.
+
+Current repository examples use these provider namespaces:
+
+| Namespace | Example |
+|-----------|---------|
+| `openai` | `openai/gpt-5.5 (xhigh)` |
+| `anthropic` | `anthropic/claude-sonnet-4.5` |
+| `opencode` | `opencode/glm-5` |
+
 ### `editor`
 
 Type: string
