@@ -16,10 +16,10 @@ No merged changes landed during the week of June 8.
 
 ## Week of June 15
 
-June 15 carried the broadest set of changes. Workflow control shifted from the message bus to explicit navigation in MCP (`sgai mcp`, the workflow tool server), with the requested next step flowing through the shared workflow state file (`.sgai/state.json`). The related docs now match that model, while the rest of the week tightened UI checks, refreshed dependencies, fixed human response handling, corrected active subagent tracking, and made opencode runs more deterministic by setting `PWD`, the working directory environment variable, and `OPENCODE_CONFIG_DIR`.
+June 15 carried the broadest set of changes. Workflow control moved from the message bus to explicit navigation in MCP (`sgai mcp`, the workflow tool server), with the next step flowing through the shared workflow state file (`.sgai/state.json`). The surrounding docs now describe that flow, and the rest of the week focused on UI checks, dependency refreshes, human response handling, active subagent tracking, usage reconciliation, and deterministic opencode runs through explicit `PWD` and `OPENCODE_CONFIG_DIR` settings.
 
-- Workflow navigation and docs now use explicit handoff requests instead of the message bus, and the MCP and workflow state references now explain the `navigate` flow clearly.
-- The webapp now handles `react-doctor`, the React checker used in CI, more reliably after the checker exposed a regression in its output format.
+- Workflow navigation now uses explicit handoff requests, and the MCP and workflow state references now explain the `navigate` flow.
+- The webapp now handles `react-doctor`, the React checker used in CI, more reliably after a regression in its output format.
 - Dependency refreshes brought in updated `go-isatty`, `modernc.org/sqlite`, `modernc.org/libc`, and `golang.org/x/sys` modules.
 - Human response handling now processes `ask_user_question` replies directly, and active subagents, the currently tracked delegated tasks, now surface correctly in structured output.
 - Usage refresh and reconciliation now update workspace token counts before deletion or reset, which keeps usage totals aligned with the current workspace state.
@@ -28,7 +28,7 @@ June 15 carried the broadest set of changes. Workflow control shifted from the m
 
 ## Week of June 22
 
-No merged changes have landed as of June 26, so the week of June 22 remains quiet to date.
+No merged changes have landed as of June 26, so June 22 remains quiet to date.
 
 ---
 
