@@ -4,7 +4,7 @@ June split into two active weeks and two quiet ones. June 1 concentrated on diag
 
 ## Week of June 1
 
-June opened with better failure tracing and clearer usage data. The week stays focused on diagnostics first and usage visibility second.
+June opened with diagnostics and usage visibility work. The week stays focused on those two themes.
 
 ### Logging and diagnostics
 
@@ -25,7 +25,7 @@ No merged changes landed during the week of June 8.
 
 ## Week of June 15
 
-June 15 carried the broadest set of changes. Workflow control moved away from the message bus, and the rest of the week focused on runtime reliability, usage reconciliation, dependency maintenance, and cleanup.
+June 15 carried workflow navigation, runtime reliability, usage reconciliation, and maintenance updates.
 
 ### Workflow navigation and docs
 
@@ -35,11 +35,11 @@ Workflow control now uses explicit `navigate` handoffs instead of the message bu
 
 ### Runtime reliability and UI fixes
 
-The webapp now handles `react-doctor`, the React checker used in CI, more reliably after a regression in its output format. Human response handling now processes `ask_user_question` replies directly, active subagents now surface correctly in structured output, and `opencode` runs now set `PWD` and `OPENCODE_CONFIG_DIR` explicitly so CLI invocation stays deterministic across environments.
+The webapp passes `react-doctor` more reliably after a regression in its output format. Human response handling now processes `ask_user_question` replies directly, active subagents now surface correctly in structured output, and `opencode` runs set `PWD` and `OPENCODE_CONFIG_DIR` explicitly so CLI invocation stays deterministic across environments.
 
-- The webapp now handles `react-doctor`, the React checker used in CI, more reliably after a regression in its output format.
+- The webapp passes `react-doctor` more reliably after a regression in its output format.
 - Human response handling now processes `ask_user_question` replies directly, and active subagents, the currently tracked delegated tasks, now surface correctly in structured output.
-- `opencode` runs now set `PWD` and `OPENCODE_CONFIG_DIR` explicitly, so CLI invocation stays deterministic across environments.
+- `opencode` runs set `PWD` and `OPENCODE_CONFIG_DIR` explicitly, so CLI invocation stays deterministic across environments.
 
 ### Usage refresh and reconciliation
 
@@ -49,9 +49,9 @@ Usage refresh and reconciliation now update workspace token counts before deleti
 
 ### Maintenance and internal updates
 
-Dependency refreshes brought in updated `go-isatty`, `modernc.org/sqlite`, `modernc.org/libc`, and `golang.org/x/sys` modules. The obsolete explainer HTML file no longer ships with the repository.
+Dependency refreshes updated `go-isatty`, `modernc.org/sqlite`, `modernc.org/libc`, and `golang.org/x/sys` modules. The obsolete explainer HTML file no longer ships with the repository.
 
-- Dependency refreshes brought in updated `go-isatty`, `modernc.org/sqlite`, `modernc.org/libc`, and `golang.org/x/sys` modules.
+- Dependency refreshes updated `go-isatty`, `modernc.org/sqlite`, `modernc.org/libc`, and `golang.org/x/sys` modules.
 - The obsolete explainer HTML file no longer ships with the repository.
 
 ## Week of June 22
