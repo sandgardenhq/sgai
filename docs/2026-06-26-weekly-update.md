@@ -1,14 +1,14 @@
 # 2026-06-26 Weekly Update: June workflow and maintenance roundup
 
-June had two active stretches and two quiet ones. The week of June 1 focused on sharper diagnostics and usage visibility, while the week of June 15 concentrated on orchestration, documentation, and maintenance. The weeks of June 8 and June 22 stayed quiet, with no merged changes recorded by publication time.
+June split into two active weeks and two quiet ones. June 1 concentrated on diagnostics and usage visibility, and June 15 focused on orchestration, documentation, and maintenance. June 8 and June 22 stayed quiet, with no merged changes recorded by publication time.
 
 ## Week of June 1
 
-June opened with work that made failures easier to trace and usage easier to inspect. Agent failure logging now captures more of the context needed to understand what went wrong, AskAndWait, the pause that waits for a human response, now logs through the configurable path, and the new usage page gives a global view of token usage, the count of text processed by the system.
+June opened with better failure tracing and clearer usage data. Agent failure logging now captures more of the context needed to explain what went wrong, AskAndWait, the pause that waits for a human response, now logs through the configurable path, and the new usage page shows token usage, the total amount of text the system processed.
 
-- Agent failure logging now preserves more of the surrounding context, which helps narrow down broken runs faster.
+- Agent failure logging now keeps more surrounding context, which shortens the path from a failed run to the cause.
 - AskAndWait now logs through the configurable path, so human response pauses stay visible alongside the rest of the run output.
-- Global usage tracking now feeds the new `/usage` page and the backfill flow, so token consumption can be reviewed across the system.
+- Global usage tracking now feeds the new `/usage` page and the backfill flow, so token consumption stays visible across the system.
 
 ## Week of June 8
 
