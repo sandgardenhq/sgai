@@ -54,6 +54,19 @@ function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
   );
 }
 
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  switch (status) {
+    case "running":
+      return "default";
+    case "pending":
+      return "secondary";
+    case "completed":
+      return "outline";
+    default:
+      return "secondary";
+  }
+}
+
 function ActiveAgentSection({ agents }: { agents: ApiActiveAgentEntry[] }) {
   const hasActive = agents && agents.length > 0;
 
@@ -64,19 +77,6 @@ function ActiveAgentSection({ agents }: { agents: ApiActiveAgentEntry[] }) {
       </p>
     );
   }
-
-  const statusVariant = (status: string): "default" | "secondary" | "outline" => {
-    switch (status) {
-      case "running":
-        return "default";
-      case "pending":
-        return "secondary";
-      case "completed":
-        return "outline";
-      default:
-        return "secondary";
-    }
-  };
 
   return (
     <Card>
