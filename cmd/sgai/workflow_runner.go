@@ -8,9 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
-	"time"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
@@ -23,71 +20,10 @@ type workflowRunner struct {
 	wfState          state.Workflow
 	retroDir         string
 	paddedsgai       string
-	longestNameLen   int
 	mcpURL           string
 	logWriter        io.Writer
 	retroLogs        retroLogWriters
-	runtime          sessionRuntime
 	iterationCounter int
-	previousAgent    string
-}
-
-func unlockInteractiveForRetrospective(wfState *state.Workflow, currentAgent string, coord *state.Coordinator, paddedsgai string) {
-	if currentAgent != "retrospective" {
-		return
-	}
-	if wfState.InteractionMode == state.ModeRetrospective {
-		return
-	}
-	wfState.InteractionMode = state.ModeRetrospective
-	snapshot := *wfState
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		*wf = snapshot
-	}); errUpdate != nil {
-		log.Fatalln("failed to save state for retrospective unlock:", errUpdate)
-	}
-	fmt.Println("["+paddedsgai+"]", "transitioning to retrospective mode")
-}
-
-func addAgentHandoffProgress(wfState *state.Workflow, targetAgent string) {
-	progressEntry := state.ProgressEntry{
-		Timestamp:   time.Now().UTC().Format(time.RFC3339),
-		Agent:       "sgai",
-		Description: fmt.Sprintf("Handing off to %s", targetAgent),
-	}
-	wfState.Progress = append(wfState.Progress, progressEntry)
-}
-
-func markCurrentAgentInSequence(s *state.Workflow, currentAgent string) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	lastIdx := len(s.AgentSequence) - 1
-	if lastIdx >= 0 && s.AgentSequence[lastIdx].Agent == currentAgent {
-		s.AgentSequence[lastIdx].IsCurrent = true
-		return
-	}
-	for i := range s.AgentSequence {
-		s.AgentSequence[i].IsCurrent = false
-	}
-	s.AgentSequence = append(s.AgentSequence, state.AgentSequenceEntry{
-		Agent:     currentAgent,
-		StartTime: now,
-		IsCurrent: true,
-	})
-}
-
-func initVisitCounts(agents []string) map[string]int {
-	counts := make(map[string]int)
-	for _, agent := range agents {
-		counts[agent] = 0
-	}
-	return counts
-}
-
-func canResumeWorkflow(wfState state.Workflow, newChecksum string) bool {
-	if wfState.Status == "" || wfState.GoalChecksum == "" {
-		return false
-	}
-	return wfState.GoalChecksum == newChecksum
 }
 
 type retroLogWriters struct {
@@ -103,8 +39,8 @@ const (
 	resultInterrupt
 )
 
-func runWorkflow(ctx context.Context, dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator, runtime sessionRuntime) {
-	runner, cleanup, ok := buildWorkflowRunner(dir, mcpURL, logWriter, sessionCoord, runtime)
+func runWorkflow(ctx context.Context, dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
+	runner, cleanup, ok := buildWorkflowRunner(dir, mcpURL, logWriter, sessionCoord)
 	if !ok {
 		return
 	}
@@ -119,8 +55,7 @@ func (r *workflowRunner) run(ctx context.Context) {
 			return
 		}
 
-		currentAgent := r.resolveCurrentAgent()
-		result := r.runAgent(ctx, currentAgent)
+		result := r.runAgent(ctx)
 
 		switch result {
 		case resultInterrupt:
@@ -132,12 +67,8 @@ func (r *workflowRunner) run(ctx context.Context) {
 	}
 }
 
-func (r *workflowRunner) resolveCurrentAgent() string {
-	return "coordinator"
-}
-
-func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runResult {
-	r.prepareAgent(currentAgent)
+func (r *workflowRunner) runAgent(ctx context.Context) runResult {
+	r.prepareCoordinator()
 
 	var errReload error
 	r.metadata, errReload = parseYAMLFrontmatterFromFile(r.goalPath)
@@ -146,8 +77,7 @@ func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runR
 		return resultInterrupt
 	}
 
-	unlockInteractiveForRetrospective(&r.wfState, currentAgent, r.coord, r.paddedsgai)
-	r.wfState = r.executeAgent(ctx, currentAgent)
+	r.wfState = r.executeCoordinator(ctx)
 
 	if ctx.Err() != nil {
 		return resultInterrupt
@@ -158,40 +88,10 @@ func (r *workflowRunner) runAgent(ctx context.Context, currentAgent string) runR
 		return resultComplete
 	}
 
-	nextAgent := r.resolveNextAgent(currentAgent)
-	r.wfState.CurrentAgent = nextAgent
 	return resultContinue
 }
 
-func (r *workflowRunner) resolveNextAgent(_ string) string {
-	if r.wfState.Navigate != nil && r.wfState.Navigate.To != "" {
-		r.wfState.Navigate = nil
-		snapshot := r.wfState
-		if errUpdate := r.coord.UpdateState(func(wf *state.Workflow) {
-			*wf = snapshot
-		}); errUpdate != nil {
-			log.Println("failed to clear navigation request:", errUpdate)
-		}
-	}
-
-	return "coordinator"
-}
-
-func (r *workflowRunner) prepareAgent(currentAgent string) {
-	if r.previousAgent != "" && r.previousAgent != currentAgent {
-		fmt.Println("["+r.paddedsgai+"]", r.previousAgent, "->", currentAgent)
-		r.wfState.Todos = []state.TodoItem{}
-		if errOverlay := applyLayerFolderOverlay(r.dir); errOverlay != nil {
-			log.Println("failed to apply overlay on agent transition:", errOverlay)
-		}
-	}
-	r.previousAgent = currentAgent
-
-	r.wfState.CurrentAgent = currentAgent
-	r.wfState.VisitCounts[currentAgent]++
-	addAgentHandoffProgress(&r.wfState, currentAgent)
-	markCurrentAgentInSequence(&r.wfState, currentAgent)
-
+func (r *workflowRunner) prepareCoordinator() {
 	snapshot := r.wfState
 	if errUpdate := r.coord.UpdateState(func(wf *state.Workflow) {
 		*wf = snapshot
@@ -200,24 +100,82 @@ func (r *workflowRunner) prepareAgent(currentAgent string) {
 	}
 }
 
-func (r *workflowRunner) executeAgent(ctx context.Context, currentAgent string) state.Workflow {
+func (r *workflowRunner) executeCoordinator(ctx context.Context) state.Workflow {
 	cfg := agentRunConfig{
-		dir:                   r.dir,
-		goalPath:              r.goalPath,
-		agent:                 currentAgent,
-		statePath:             filepath.Join(r.dir, ".sgai", "state.json"),
-		coord:                 r.coord,
-		retrospectiveDir:      r.retroDir,
-		longestNameLen:        r.longestNameLen,
-		paddedsgai:            r.paddedsgai,
-		mcpURL:                r.mcpURL,
-		logWriter:             r.logWriter,
-		stdoutLog:             r.retroLogs.stdout,
-		stderrLog:             r.retroLogs.stderr,
-		activeAgents:          r.runtime.activeAgents,
-		onActiveAgentsChanged: r.runtime.onActiveAgentsChanged,
+		dir:              r.dir,
+		goalPath:         r.goalPath,
+		agent:            "coordinator",
+		statePath:        filepath.Join(r.dir, ".sgai", "state.json"),
+		coord:            r.coord,
+		retrospectiveDir: r.retroDir,
+		goalAgents:       r.metadata.Agents,
+		paddedsgai:       r.paddedsgai,
+		mcpURL:           r.mcpURL,
+		logWriter:        r.logWriter,
+		stdoutLog:        r.retroLogs.stdout,
+		stderrLog:        r.retroLogs.stderr,
 	}
-	return runSingleModelIteration(ctx, cfg, r.wfState, r.metadata, &r.iterationCounter)
+	wfState := r.wfState
+	var capturedSessionID string
+	var consecutiveWorkingIterations int
+	outputCapture := newRingWriter()
+
+	for {
+		if ctx.Err() != nil {
+			fmt.Println("["+cfg.paddedsgai+"]", "interrupted, stopping agent...")
+			return wfState
+		}
+
+		r.iterationCounter++
+		prefix := buildIterationPrefix(cfg.dir, r.iterationCounter)
+
+		saveState(cfg.coord, wfState)
+		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
+
+		agentArgs := buildAgentArgs(cfg.agent, r.metadata.Model, capturedSessionID)
+		agentMsg := buildAgentMessage(cfg, wfState, r.metadata)
+
+		newState, capturedSessionID, errExec := executeAgentProcess(ctx, cfg, agentArgs, agentMsg, prefix, outputCapture, wfState, r.metadata.Model)
+		if errExec != nil {
+			return *errExec
+		}
+
+		if capturedSessionID == "" {
+			log.Println("opencode session id not captured; skipping usage export")
+		}
+		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
+			exportAgentSession(cfg, capturedSessionID, r.iterationCounter)
+		}
+		if capturedSessionID != "" {
+			if errReconcile := reconcileAgentUsage(cfg.dir, cfg.coord, cfg.agent, capturedSessionID, r.metadata.Model); errReconcile != nil {
+				log.Println("failed to reconcile opencode usage:", errReconcile)
+			}
+			newState = cfg.coord.State()
+		}
+
+		switch newState.Status {
+		case state.StatusComplete:
+			return handleCompleteStatus(ctx, cfg, newState, wfState, r.metadata)
+
+		case state.StatusWaitingForHuman:
+			wfState = handleWaitingForHumanStatus(cfg, newState)
+			continue
+
+		case state.StatusAgentDone:
+			saveState(cfg.coord, newState)
+			fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "done:", newState.Task)
+			return newState
+
+		case state.StatusWorking:
+			saveState(cfg.coord, newState)
+			consecutiveWorkingIterations = handleWorkingLoop(cfg, &capturedSessionID, consecutiveWorkingIterations)
+			wfState = newState
+			continue
+
+		default:
+			log.Fatalln("["+cfg.paddedsgai+"]", "unexpected status:", newState.Status)
+		}
+	}
 }
 
 func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt string) {
@@ -229,7 +187,7 @@ func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt str
 			return
 		}
 
-		runWorkflow(ctx, r.dir, r.mcpURL, r.logWriter, r.coord, r.runtime)
+		runWorkflow(ctx, r.dir, r.mcpURL, r.logWriter, r.coord)
 
 		freshCoord, errCoord := state.NewCoordinator(stateJSONPath)
 		if errCoord != nil {
@@ -283,7 +241,7 @@ func (r *workflowRunner) handleTrigger(trigger triggerKind, goalPath string) {
 	}
 }
 
-func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator, runtime sessionRuntime) (*workflowRunner, func(), bool) {
+func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) (*workflowRunner, func(), bool) {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	goalContent, errRead := os.ReadFile(goalPath)
 	if errRead != nil {
@@ -331,27 +289,19 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 	}
 
 	wfState := coord.State()
-	newChecksum, errChecksum := computeGoalChecksum(goalPath)
-	if errChecksum != nil {
-		log.Fatalln("failed to compute GOAL.md checksum:", errChecksum)
-	}
-
-	allAgents := buildAllAgents(metadata.Agents)
-
 	workspaceName := filepath.Base(dir)
-	longestNameLen := computeLongestNameLen(allAgents)
-	paddedsgai := workspaceName + "][" + "sgai" + strings.Repeat(" ", max(0, longestNameLen-len("sgai")))
+	paddedsgai := workspaceName + "][" + "sgai"
 
 	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
 	retrospectivesBaseDir := filepath.Join(dir, ".sgai", "retrospectives")
 
 	_, errStateStat := os.Stat(stateJSONPath)
-	resuming := errStateStat == nil && canResumeWorkflow(wfState, newChecksum)
+	resuming := errStateStat == nil && wfState.Status != ""
 
 	retrospectiveOn := retrospectiveEnabled(metadata)
 	retroDir := ""
 	if retrospectiveOn {
-		retroDir = resolveRetrospectiveDir(resuming, dir, retrospectivesBaseDir, pmPath, stateJSONPath, goalPath)
+		retroDir = resolveRetrospectiveDir(resuming, dir, retrospectivesBaseDir, pmPath, goalPath)
 	}
 
 	retroStdoutLog, retroStderrLog, errRetroLogs := openRetrospectiveLogs(retroDir)
@@ -381,8 +331,6 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 		preservedMode := wfState.InteractionMode
 		freshState := state.Workflow{
 			Status:          state.StatusWorking,
-			GoalChecksum:    newChecksum,
-			VisitCounts:     initVisitCounts(allAgents),
 			InteractionMode: preservedMode,
 		}
 		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
@@ -397,39 +345,18 @@ func buildWorkflowRunner(dir string, mcpURL string, logWriter io.Writer, session
 
 	retroLogs := retroLogWriters{stdout: retroStdoutLog, stderr: retroStderrLog}
 	runner := &workflowRunner{
-		dir:            dir,
-		goalPath:       goalPath,
-		coord:          coord,
-		metadata:       metadata,
-		wfState:        wfState,
-		retroDir:       retroDir,
-		paddedsgai:     paddedsgai,
-		longestNameLen: longestNameLen,
-		mcpURL:         mcpURL,
-		logWriter:      logWriter,
-		retroLogs:      retroLogs,
-		runtime:        runtime,
+		dir:        dir,
+		goalPath:   goalPath,
+		coord:      coord,
+		metadata:   metadata,
+		wfState:    wfState,
+		retroDir:   retroDir,
+		paddedsgai: paddedsgai,
+		mcpURL:    mcpURL,
+		logWriter: logWriter,
+		retroLogs: retroLogs,
 	}
 	return runner, cleanup, true
-}
-
-func buildAllAgents(goalAgents []string) []string {
-	goalAgents = runtimeGoalAgents(goalAgents)
-	if slices.Contains(goalAgents, "coordinator") {
-		return goalAgents
-	}
-	return append([]string{"coordinator"}, goalAgents...)
-}
-
-func runtimeGoalAgents(goalAgents []string) []string {
-	agents := make([]string, 0, len(goalAgents))
-	for _, agent := range goalAgents {
-		if isRetiredWorkflowAgent(agent) {
-			continue
-		}
-		agents = append(agents, agent)
-	}
-	return agents
 }
 
 func delegatableAgents(agents []string) []string {
@@ -444,38 +371,26 @@ func delegatableAgents(agents []string) []string {
 }
 
 func isDelegatableAgent(agent string) bool {
-	return agent != "" && agent != "coordinator" && !isRetiredWorkflowAgent(agent)
+	return agent != "" && agent != "coordinator"
 }
 
-func isRetiredWorkflowAgent(agent string) bool {
-	return agent == "stpa-analyst"
-}
-
-func computeLongestNameLen(agents []string) int {
-	longest := len("sgai")
-	for _, agent := range agents {
-		longest = max(longest, len(agent))
-	}
-	return longest
-}
-
-func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath string, _ string, goalPath string) string {
+func resolveRetrospectiveDir(resuming bool, dir, retrospectivesBaseDir, pmPath, goalPath string) string {
 	if resuming {
 		retroDirRel := extractRetrospectiveDirFromProjectManagement(pmPath)
-		if retroDirRel == "" {
-			log.Fatalln("failed to read retrospective directory from PROJECT_MANAGEMENT.md during resume")
+		if retroDirRel != "" {
+			retroDir := filepath.Join(dir, retroDirRel)
+			if _, errStat := os.Stat(retroDir); errStat == nil {
+				return retroDir
+			}
+			log.Println("retrospective directory from PROJECT_MANAGEMENT.md does not exist:", retroDir)
 		}
-		retroDir := filepath.Join(dir, retroDirRel)
-		if _, errStat := os.Stat(retroDir); os.IsNotExist(errStat) {
-			log.Fatalln("retrospective directory from PROJECT_MANAGEMENT.md does not exist:", retroDir)
-		}
-		return retroDir
 	}
 
 	retroDir := filepath.Join(retrospectivesBaseDir, generateRetrospectiveDirName())
 	if errMkdir := os.MkdirAll(retroDir, 0755); errMkdir != nil {
 		log.Fatalln("failed to create retrospective directory:", errMkdir)
 	}
+	log.Println("created new retrospective directory:", retroDir)
 
 	retroDirRel, errRel := filepath.Rel(dir, retroDir)
 	if errRel != nil {

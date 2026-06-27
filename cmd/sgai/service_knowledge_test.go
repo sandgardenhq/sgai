@@ -32,8 +32,6 @@ description: Agent 2 description
 # Agent 2 Instructions`
 				agent2Path := filepath.Join(agentsDir, "agent2.md")
 				require.NoError(t, os.WriteFile(agent2Path, []byte(agent2Content), 0644))
-				retiredAgentPath := filepath.Join(agentsDir, "stpa-analyst.md")
-				require.NoError(t, os.WriteFile(retiredAgentPath, []byte("---\ndescription: retired\n---\n"), 0644))
 			},
 			validate: func(t *testing.T, result listAgentsResult) {
 				assert.Len(t, result.Agents, 2)
@@ -43,7 +41,6 @@ description: Agent 2 description
 				}
 				assert.True(t, agentNames["agent1"])
 				assert.True(t, agentNames["agent2"])
-				assert.False(t, agentNames["stpa-analyst"])
 			},
 		},
 		{

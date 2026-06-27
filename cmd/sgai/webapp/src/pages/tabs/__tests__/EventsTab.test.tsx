@@ -25,8 +25,6 @@ const createMockWorkspace = (overrides = {}) => ({
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "",
-  activeAgents: [],
   task: "",
   goalContent: "",
   rawGoalContent: "",
@@ -35,7 +33,6 @@ const createMockWorkspace = (overrides = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -172,27 +169,6 @@ describe("EventsTab", () => {
       });
     });
 
-    it("shows agent badge for events", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        events: [
-          {
-            timestamp: "2026-03-05T10:00:00Z",
-            agent: "coordinator",
-            description: "Event 1",
-            formattedTime: "10:00 AM",
-            showDateDivider: false,
-            dateDivider: "",
-          },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("coordinator")).toBeTruthy();
-      });
-    });
-
     it("shows formatted time for events", async () => {
       mockWorkspaces = [createMockWorkspace({
         events: [
@@ -228,14 +204,12 @@ describe("EventsTab", () => {
       mockWorkspaces = [createMockWorkspace({
         needsInput: true,
         humanMessage: "Please choose an option",
-        currentAgent: "coordinator",
       })];
 
       renderEventsTab();
 
       await waitFor(() => {
         expect(screen.getByText("Please choose an option")).toBeTruthy();
-        expect(screen.getByText("coordinator")).toBeTruthy();
       });
     });
   });
@@ -270,137 +244,6 @@ describe("EventsTab", () => {
 
       renderEventsTab({ workspaceName: "nonexistent" });
       expect(screen.getByText("Failed to load events")).toBeTruthy();
-    });
-  });
-
-  describe("active agents", () => {
-    it("shows idle copy when activeAgents is empty", async () => {
-      mockWorkspaces = [createMockWorkspace({ activeAgents: [] })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("No OpenCode subagents currently active")).toBeTruthy();
-      });
-    });
-
-    it("shows active agent card when agents are running", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", title: "Implement tests", sessionId: "sess-1", model: "openai/gpt-5.5", status: "running" },
-          { id: "task-2", agent: "react", title: "Build UI", sessionId: "sess-2", model: "openai/gpt-4", status: "pending" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("go")).toBeTruthy();
-        expect(screen.getByText("react")).toBeTruthy();
-        expect(screen.getByText("running")).toBeTruthy();
-        expect(screen.getByText("pending")).toBeTruthy();
-      });
-    });
-
-    it("shows agent title when available", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", title: "Implement tests", status: "running" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Implement tests")).toBeTruthy();
-      });
-    });
-
-    it("truncates long task titles with tooltip title attribute", async () => {
-      const longTitle = "A".repeat(80);
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", title: longTitle, status: "running" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText(longTitle)).toBeTruthy();
-        const titleEl = screen.getByText(longTitle);
-        expect(titleEl.getAttribute("title")).toBe(longTitle);
-      });
-    });
-
-    it("renders without activeAgents (legacy/missing data)", async () => {
-      mockWorkspaces = [createMockWorkspace({ activeAgents: undefined as any })];
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("No OpenCode subagents currently active")).toBeTruthy();
-      });
-    });
-
-    it("shows completed status badge variant", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-3", agent: "docs", title: "Write docs", status: "completed" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("completed")).toBeTruthy();
-      });
-    });
-
-    it("renders data-testid attribute on each agent row", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", status: "running" },
-          { id: "task-2", agent: "react", status: "pending" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("active-agent-go")).toBeTruthy();
-        expect(screen.getByTestId("active-agent-react")).toBeTruthy();
-      });
-    });
-
-    it("stores model and sessionId on activeAgent entry", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", title: "Implement tests", sessionId: "sess-1", model: "openai/gpt-5.5", status: "running" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        const titleEl = screen.getByText("Implement tests");
-        expect(titleEl.getAttribute("title")).toBe("Implement tests");
-        expect(screen.getByText("go")).toBeTruthy();
-        expect(screen.getByText("running")).toBeTruthy();
-      });
-    });
-
-    it("does not show idle copy when agents are active", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        activeAgents: [
-          { id: "task-1", agent: "go", status: "running" },
-        ],
-      })];
-
-      renderEventsTab();
-
-      await waitFor(() => {
-        expect(screen.queryByText("No OpenCode subagents currently active")).toBeNull();
-      });
     });
   });
 

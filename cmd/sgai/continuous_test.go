@@ -143,7 +143,6 @@ func TestUpdateContinuousModeState(t *testing.T) {
 
 	snapshot := coord.State()
 	assert.Equal(t, "running tests", snapshot.Task)
-	assert.Equal(t, "test-agent", snapshot.CurrentAgent)
 	assert.Len(t, snapshot.Progress, 1)
 	assert.Equal(t, "test-agent", snapshot.Progress[0].Agent)
 	assert.Equal(t, "started test execution", snapshot.Progress[0].Description)
@@ -174,7 +173,6 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
 		Status:          state.StatusComplete,
 		InteractionMode: state.ModeSelfDrive,
-		CurrentAgent:    "backend-developer",
 	})
 	require.NoError(t, err)
 
@@ -183,7 +181,6 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	snapshot := coord.State()
 	assert.Equal(t, state.StatusWorking, snapshot.Status)
 	assert.Equal(t, state.ModeContinuous, snapshot.InteractionMode)
-	assert.Equal(t, "coordinator", snapshot.CurrentAgent)
 }
 
 func TestPrependSteeringMessage(t *testing.T) {
@@ -328,9 +325,7 @@ func TestWatchForTriggerSteeringMessage(t *testing.T) {
 	require.NoError(t, errChecksum)
 
 	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Navigate: &state.NavigationRequest{To: "coordinator", Reason: "please fix"},
-	})
+	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusAgentDone})
 	require.NoError(t, errCoord)
 
 	result := watchForTrigger(ctx, dir, coord, checksum, 0, "")

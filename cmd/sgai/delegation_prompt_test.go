@@ -11,7 +11,7 @@ import (
 )
 
 func TestComposeCoordinatorPromptTemplateCoordinatorSections(t *testing.T) {
-	result := composeCoordinatorPromptTemplate("coordinator")
+	result := composeCoordinatorPromptTemplate()
 
 	assert.Contains(t, result, promptSectionPreamble)
 	assert.Contains(t, result, promptSectionHumanCommDirect)
@@ -29,17 +29,15 @@ func TestBuildCoordinatorDelegationMessageIncludesConfiguredSubagents(t *testing
 	require.NoError(t, os.MkdirAll(agentsDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(agentsDir, "react.md"), []byte("---\ndescription: React cleanup\n---\n"), 0o644))
 
-	msg := buildCoordinatorDelegationMessage([]string{"coordinator", "react"}, map[string]int{"coordinator": 2, "react": 1}, dir, state.ModeBuilding)
+	msg := buildCoordinatorDelegationMessage([]string{"coordinator", "react"}, dir, state.ModeInteractive)
 
 	assert.Contains(t, msg, "react: React cleanup")
 	assert.NotContains(t, delegationSection(msg), "coordinator")
-	assert.Contains(t, msg, "coordinator: 2 visits")
-	assert.Contains(t, msg, "react: 1 visits")
-	assert.Contains(t, msg, promptSectionBuildingMode)
+	assert.Contains(t, msg, promptSectionInteractiveMode)
 }
 
 func TestPromptSkillInstructionsUseRegisteredLoaderSyntax(t *testing.T) {
-	result := composeCoordinatorPromptTemplate("coordinator")
+	result := composeCoordinatorPromptTemplate()
 
 	assert.Contains(t, result, `find_skills({"name":"set-workflow-state"})`)
 	assert.Contains(t, result, `skill({"name":"set-workflow-state"})`)

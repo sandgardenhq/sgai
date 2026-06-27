@@ -64,8 +64,6 @@ func parseYAMLFrontmatter(content []byte) (GoalMetadata, error) {
 	if err := yaml.Unmarshal(yamlContent, &metadata); err != nil {
 		return GoalMetadata{}, fmt.Errorf("failed to parse YAML frontmatter: %w", err)
 	}
-	metadata.Agents = runtimeGoalAgents(metadata.Agents)
-
 	return metadata, nil
 }
 

@@ -18,11 +18,9 @@ const (
 
 // InteractionMode constants define the possible interaction modes of a sgai session.
 const (
-	ModeSelfDrive     = "self-drive"
-	ModeBrainstorming = "brainstorming"
-	ModeBuilding      = "building"
-	ModeRetrospective = "retrospective"
-	ModeContinuous    = "continuous"
+	ModeInteractive = "interactive"
+	ModeSelfDrive   = "self-drive"
+	ModeContinuous  = "continuous"
 )
 
 // IsHumanPending reports whether the given status indicates the workflow
@@ -53,14 +51,6 @@ type TodoItem struct {
 	Content  string `json:"content"`
 	Status   string `json:"status"`
 	Priority string `json:"priority"`
-}
-
-// AgentSequenceEntry represents an agent's visit in the workflow sequence.
-// It tracks when the agent started and whether it is the current agent.
-type AgentSequenceEntry struct {
-	Agent     string `json:"agent"`
-	StartTime string `json:"startTime"`
-	IsCurrent bool   `json:"isCurrent"`
 }
 
 // ProgressEntry represents a single progress log entry.
@@ -163,13 +153,8 @@ type Workflow struct {
 	Progress            []ProgressEntry      `json:"progress"`
 	HumanMessage        string               `json:"humanMessage"`
 	MultiChoiceQuestion *MultiChoiceQuestion `json:"multiChoiceQuestion,omitempty"`
-	Navigate            *NavigationRequest   `json:"navigate,omitempty"`
-	GoalChecksum        string               `json:"goalChecksum"`
-	VisitCounts         map[string]int       `json:"visitCounts,omitempty"`
-	CurrentAgent        string               `json:"currentAgent,omitempty"`
 	Todos               []TodoItem           `json:"todos,omitempty"`
 	ProjectTodos        []TodoItem           `json:"projectTodos,omitempty"`
-	AgentSequence       []AgentSequenceEntry `json:"agentSequence,omitempty"`
 	SessionID           string               `json:"sessionId,omitempty"`
 
 	Cost SessionCost `json:"cost"`
@@ -186,16 +171,10 @@ type Workflow struct {
 	SummaryManual bool `json:"summaryManual,omitempty"`
 }
 
-// NavigationRequest asks the runner to route to another DAG agent.
-type NavigationRequest struct {
-	To     string `json:"to"`
-	Reason string `json:"reason,omitempty"`
-}
-
 // ToolsAllowed reports whether the current interaction mode permits
 // human-interaction tools (ask_user_question, ask_user_work_gate).
 func (w Workflow) ToolsAllowed() bool {
-	return w.InteractionMode == ModeBrainstorming || w.InteractionMode == ModeRetrospective
+	return w.InteractionMode == ModeInteractive
 }
 
 func load(path string) (Workflow, error) {
@@ -206,9 +185,6 @@ func load(path string) (Workflow, error) {
 	var wf Workflow
 	if err := json.Unmarshal(data, &wf); err != nil {
 		return Workflow{}, err
-	}
-	if wf.VisitCounts == nil {
-		wf.VisitCounts = make(map[string]int)
 	}
 	return wf, nil
 }

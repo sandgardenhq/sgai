@@ -2,11 +2,9 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,36 +115,28 @@ func TestLockedWriterPlainTextPassthrough(t *testing.T) {
 	assert.Equal(t, "plain text", buf.String())
 }
 
-func TestLockedWriterFormatsJSONEventsForHumanReadableAdhocOutput(t *testing.T) {
+func TestLockedWriterPassesThroughSessionIDLine(t *testing.T) {
 	var mu sync.Mutex
 	var buf bytes.Buffer
 	w := &lockedWriter{mu: &mu, buf: &buf}
-	event, errJSON := json.Marshal(streamEvent{Type: "text", SessionID: "adhoc-output-session", Part: part{Text: "done for humans"}, Timestamp: time.Now().UnixMilli()})
-	assert.NoError(t, errJSON)
 
-	_, errWrite := w.Write(append(event, '\n'))
+	_, errWrite := w.Write([]byte(`{"sessionID":"adhoc-output-session"}` + "\n"))
 
 	assert.NoError(t, errWrite)
-	assert.Contains(t, buf.String(), "done for humans")
-	assert.NotContains(t, buf.String(), `{"type":"text"`)
-	assert.NotContains(t, buf.String(), `"sessionID":"adhoc-output-session"`)
+	assert.Equal(t, `{"sessionID":"adhoc-output-session"}`+"\n", buf.String())
 }
 
-func TestLockedWriterFormatsJSONEventsAcrossChunkedWrites(t *testing.T) {
+func TestLockedWriterPassesThroughChunkedOutput(t *testing.T) {
 	var mu sync.Mutex
 	var buf bytes.Buffer
 	w := &lockedWriter{mu: &mu, buf: &buf}
-	event, errJSON := json.Marshal(streamEvent{Type: "text", SessionID: "adhoc-chunk-session", Part: part{Text: "chunked human output"}, Timestamp: time.Now().UnixMilli()})
-	assert.NoError(t, errJSON)
 
-	_, errFirst := w.Write(event[:20])
-	_, errSecond := w.Write(append(event[20:], '\n'))
+	_, errFirst := w.Write([]byte("chunked "))
+	_, errSecond := w.Write([]byte("human output\n"))
 
 	assert.NoError(t, errFirst)
 	assert.NoError(t, errSecond)
-	assert.Contains(t, buf.String(), "chunked human output")
-	assert.NotContains(t, buf.String(), `{"type":"text"`)
-	assert.NotContains(t, buf.String(), `"sessionID":"adhoc-chunk-session"`)
+	assert.Equal(t, "chunked human output\n", buf.String())
 }
 
 func TestAnsiEscapePatternMatches(t *testing.T) {

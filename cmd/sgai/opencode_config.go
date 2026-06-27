@@ -11,8 +11,14 @@ import (
 const opencodeMCPTimeout = 43200000
 
 type openCodeConfigContent struct {
-	MCP   map[string]json.RawMessage `json:"mcp,omitempty"`
+	MCP   map[string]json.RawMessage     `json:"mcp,omitempty"`
+	Agent map[string]openCodeAgentConfig `json:"agent,omitempty"`
 	extra map[string]json.RawMessage
+}
+
+type openCodeAgentConfig struct {
+	Permission map[string]json.RawMessage `json:"permission,omitempty"`
+	extra      map[string]json.RawMessage
 }
 
 type openCodeLocalMCP struct {
@@ -34,6 +40,12 @@ func (c *openCodeConfigContent) UnmarshalJSON(data []byte) error {
 		}
 		delete(c.extra, "mcp")
 	}
+	if rawAgent, ok := fields["agent"]; ok {
+		if errUnmarshal := json.Unmarshal(rawAgent, &c.Agent); errUnmarshal != nil {
+			return errUnmarshal
+		}
+		delete(c.extra, "agent")
+	}
 	return nil
 }
 
@@ -48,6 +60,43 @@ func (c openCodeConfigContent) MarshalJSON() ([]byte, error) {
 			return nil, errMarshal
 		}
 		fields["mcp"] = mcpData
+	}
+	if len(c.Agent) > 0 {
+		agentData, errMarshal := json.Marshal(c.Agent)
+		if errMarshal != nil {
+			return nil, errMarshal
+		}
+		fields["agent"] = agentData
+	}
+	return json.Marshal(fields)
+}
+
+func (c *openCodeAgentConfig) UnmarshalJSON(data []byte) error {
+	fields := map[string]json.RawMessage{}
+	if errUnmarshal := json.Unmarshal(data, &fields); errUnmarshal != nil {
+		return errUnmarshal
+	}
+	c.extra = fields
+	if rawPermission, ok := fields["permission"]; ok {
+		if errUnmarshal := json.Unmarshal(rawPermission, &c.Permission); errUnmarshal != nil {
+			return errUnmarshal
+		}
+		delete(c.extra, "permission")
+	}
+	return nil
+}
+
+func (c openCodeAgentConfig) MarshalJSON() ([]byte, error) {
+	fields := map[string]json.RawMessage{}
+	for key, value := range c.extra {
+		fields[key] = value
+	}
+	if len(c.Permission) > 0 {
+		permissionData, errMarshal := json.Marshal(c.Permission)
+		if errMarshal != nil {
+			return nil, errMarshal
+		}
+		fields["permission"] = permissionData
 	}
 	return json.Marshal(fields)
 }

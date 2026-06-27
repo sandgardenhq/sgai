@@ -12,9 +12,15 @@ permission:
   question: deny
   plan_enter: deny
   plan_exit: deny
+  task:
+    "*": deny
 ---
 
 # Retrospective Agent
+
+## Explicit State Updates
+
+When giving state updates, be explicit about your agent or Task subagent name, current phase, completed work, evidence, blockers, next action, and next owner. Avoid vague updates like `working`, `done`, or `handoff complete` without concrete detail.
 
 ## WHAT YOU ARE: Post-Completion Factory Improvement Analyst
 
@@ -101,7 +107,7 @@ Select which to approve (multi-select):
 - 2. Create db-migration-testing skill
 ```
 
-Then set status to `agent-done` without `navigate` to yield control back to the coordinator by default. The coordinator will relay the multi-select question to the human and append the answer indicating which numbered items were approved. When all categories have been presented and responses received, apply approved changes and write:
+Then set status to `agent-done` to yield control back to the coordinator. The coordinator will relay the multi-select question to the human and append the answer indicating which numbered items were approved. When all categories have been presented and responses received, apply approved changes and write:
 
 ```
 ## RETRO_COMPLETE

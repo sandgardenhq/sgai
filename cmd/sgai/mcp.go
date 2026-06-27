@@ -216,12 +216,6 @@ type updateWorkflowStateArgs struct {
 	Status      workflowStatus `json:"status" jsonschema:"Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete"`
 	Task        string         `json:"task" jsonschema:"Current task being worked on (e.g. 'Writing tests for auth endpoints'). Use empty string to clear. Be specific about what you're doing."`
 	AddProgress string         `json:"addProgress" jsonschema:"Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps."`
-	Navigate    *navigateArgs  `json:"navigate,omitempty" jsonschema:"Optional navigation request. Only valid with status 'agent-done'. The target must be an available agent."`
-}
-
-type navigateArgs struct {
-	To     string `json:"to" jsonschema:"The available agent to run next."`
-	Reason string `json:"reason,omitempty" jsonschema:"Why this navigation is needed."`
 }
 
 type projectTodoWriteArgs struct {
@@ -259,14 +253,14 @@ var (
 	schemaAskUserWorkGate  = mustSchema[askUserWorkGateArgs]()
 )
 
-func startMCPHTTPServer(workingDir string, coord *state.Coordinator, availableAgents []string) (string, func(), error) {
+func startMCPHTTPServer(workingDir string, coord *state.Coordinator) (string, func(), error) {
 	listener, errListen := net.Listen("tcp", "127.0.0.1:0")
 	if errListen != nil {
 		return "", nil, fmt.Errorf("failed to listen on random port: %w", errListen)
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.Handle("/mcp", buildMCPHTTPHandler(workingDir, coord, availableAgents))
+	serveMux.Handle("/mcp", buildMCPHTTPHandler(workingDir, coord))
 
 	httpServer := &http.Server{Handler: serveMux}
 	go func() {
@@ -299,38 +293,24 @@ func parseAgentIdentityHeader(r *http.Request) string {
 	return name
 }
 
-func resolveCallerAgent(headerAgent string, coord *state.Coordinator) string {
-	if headerAgent != "coordinator" {
-		return headerAgent
-	}
-	if currentAgent := coord.State().CurrentAgent; currentAgent != "" && currentAgent != "coordinator" {
-		return currentAgent
-	}
-	return "coordinator"
-}
-
-func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator, availableAgents []string) http.Handler {
+func buildMCPHTTPHandler(workingDir string, coord *state.Coordinator) http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return buildMCPServer(workingDir, r, coord, availableAgents)
+		return buildMCPServer(workingDir, r, coord)
 	}, nil)
 }
 
-func buildMCPServer(workingDir string, r *http.Request, coord *state.Coordinator, availableAgents []string) *mcp.Server {
-	agentName := resolveCallerAgent(parseAgentIdentityHeader(r), coord)
+func buildMCPServer(workingDir string, r *http.Request, coord *state.Coordinator) *mcp.Server {
+	agentName := parseAgentIdentityHeader(r)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "sgai"}, nil)
-	mcpCtx := &mcpContext{workingDir: workingDir, coord: coord, availableAgents: availableAgents, agentName: agentName}
+	mcpCtx := &mcpContext{workingDir: workingDir, coord: coord, agentName: agentName}
 
-	registerCommonTools(server, mcpCtx, agentName)
-
-	if agentName == "coordinator" {
-		registerCoordinatorTools(server, mcpCtx, workingDir)
-	}
+	registerTools(server, mcpCtx)
 
 	return server
 }
 
-func registerCommonTools(server *mcp.Server, mcpCtx *mcpContext, agentName string) {
+func registerTools(server *mcp.Server, mcpCtx *mcpContext) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_skills",
 		Description: "Search for skills by name or keywords. Returns skill names and descriptions. Use the 'skill' tool to load a skill's full content.",
@@ -343,16 +323,13 @@ func registerCommonTools(server *mcp.Server, mcpCtx *mcpContext, agentName strin
 		InputSchema: schemaFindSnippets,
 	}, mcpCtx.findSnippetsHandler)
 
-	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema(agentName)
+	updateWorkflowStateSchema, updateWorkflowStateDescription := buildUpdateWorkflowStateSchema()
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_workflow_state",
 		Description: updateWorkflowStateDescription,
 		InputSchema: updateWorkflowStateSchema,
 	}, mcpCtx.updateWorkflowStateHandler)
 
-}
-
-func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, _ string) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "project_todowrite",
 		Description: todoWriteDescription,
@@ -386,10 +363,9 @@ func registerCoordinatorTools(server *mcp.Server, mcpCtx *mcpContext, _ string) 
 }
 
 type mcpContext struct {
-	workingDir      string
-	coord           *state.Coordinator
-	availableAgents []string
-	agentName       string
+	workingDir string
+	coord      *state.Coordinator
+	agentName  string
 }
 
 type emptyResult struct{}
@@ -419,7 +395,7 @@ func (c *mcpContext) findSnippetsHandler(_ context.Context, _ *mcp.CallToolReque
 }
 
 func (c *mcpContext) updateWorkflowStateHandler(_ context.Context, _ *mcp.CallToolRequest, args updateWorkflowStateArgs) (*mcp.CallToolResult, emptyResult, error) {
-	result, err := updateWorkflowState(c.coord, c.agentName, c.availableAgents, args)
+	result, err := updateWorkflowState(c.coord, c.agentName, args)
 	if err != nil {
 		return nil, emptyResult{}, err
 	}
@@ -547,6 +523,13 @@ func askUserWorkGate(ctx context.Context, coord *state.Coordinator, summary stri
 	answer, err := coord.AskAndWait(ctx, question, questionText)
 	if err != nil {
 		return "", fmt.Errorf("waiting for human response: %w", err)
+	}
+	if strings.Contains(answer, workGateApprovalText) {
+		if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
+			wf.InteractionMode = state.ModeSelfDrive
+		}); errUpdate != nil {
+			return "", fmt.Errorf("updating interaction mode: %w", errUpdate)
+		}
 	}
 
 	return "Presented work gate question to user:\n\nQuestion: " + questionText + "\n  Choices: [DEFINITION IS COMPLETE, BUILD MAY BEGIN, Not ready yet, need more clarification]\n  MultiSelect: false\n\nHuman response: " + answer, nil
@@ -865,7 +848,7 @@ func findSnippetsByFuzzyMatch(langDir string, entries []os.DirEntry, query strin
 	return strings.Join(matches, "\n"), nil
 }
 
-func updateWorkflowState(coord *state.Coordinator, callerAgent string, availableAgents []string, args updateWorkflowStateArgs) (string, error) {
+func updateWorkflowState(coord *state.Coordinator, callerAgent string, args updateWorkflowStateArgs) (string, error) {
 	var (
 		response        string
 		statusPreserved bool
@@ -875,21 +858,12 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, available
 		return "Error: workflow coordinator not available.", nil
 	}
 
-	if errNavigate := validateNavigationRequest(args, availableAgents); errNavigate != "" {
-		return errNavigate, nil
-	}
-
 	errUpdate := coord.UpdateState(func(currentState *state.Workflow) {
 		if currentState.Progress == nil {
 			currentState.Progress = []state.ProgressEntry{}
 		}
 
 		statusPreserved = state.IsHumanPending(currentState.Status)
-		if hasNavigationRequest(args.Navigate) && statusPreserved {
-			response = "Error: navigate cannot be used while waiting for human response."
-			return
-		}
-
 		if args.Status != "" && !statusPreserved {
 			status := strings.Trim(string(args.Status), "\"'")
 			if !slices.Contains(state.ValidStatuses, status) {
@@ -911,7 +885,7 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, available
 		}
 
 		if currentState.Status == state.StatusAgentDone || currentState.Status == state.StatusComplete {
-			pendingCount := countPendingTodos(*currentState, currentState.CurrentAgent)
+			pendingCount := countPendingTodos(*currentState, callerAgent)
 			if pendingCount > 0 {
 				response = fmt.Sprintf("Error: Cannot transition to '%s' with %d pending TODO items. Please complete all TODO items first.", currentState.Status, pendingCount)
 				return
@@ -920,15 +894,6 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, available
 
 		if (currentState.Status == state.StatusComplete || currentState.Status == state.StatusAgentDone) && currentState.Task != "" {
 			currentState.Task = ""
-		}
-
-		if hasNavigationRequest(args.Navigate) && response == "" {
-			currentState.Navigate = &state.NavigationRequest{
-				To:     strings.TrimSpace(args.Navigate.To),
-				Reason: strings.TrimSpace(args.Navigate.Reason),
-			}
-		} else if response == "" {
-			currentState.Navigate = nil
 		}
 
 		if response == "" {
@@ -943,9 +908,6 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, available
 			}
 			if args.AddProgress != "" {
 				response += fmt.Sprintf("  Added progress note: %s\n", args.AddProgress)
-			}
-			if currentState.Navigate != nil {
-				response += fmt.Sprintf("  Navigate to: %s\n", currentState.Navigate.To)
 			}
 			response += fmt.Sprintf("  Total progress notes: %d", len(currentState.Progress))
 		}
@@ -965,31 +927,6 @@ func updateWorkflowState(coord *state.Coordinator, callerAgent string, available
 	}
 
 	return response, nil
-}
-
-func validateNavigationRequest(args updateWorkflowStateArgs, availableAgents []string) string {
-	if !hasNavigationRequest(args.Navigate) {
-		return ""
-	}
-	status := strings.Trim(string(args.Status), "\"'")
-	if status != state.StatusAgentDone {
-		return "Error: navigate is only valid with status 'agent-done'."
-	}
-	targetAgent := strings.TrimSpace(args.Navigate.To)
-	if targetAgent == "" {
-		return "Error: navigate.to is required."
-	}
-	if !slices.Contains(availableAgents, targetAgent) {
-		return fmt.Sprintf("Error: Agent '%s' is not in the available agents. Valid agents are: %s", targetAgent, strings.Join(availableAgents, ", "))
-	}
-	return ""
-}
-
-func hasNavigationRequest(navigate *navigateArgs) bool {
-	if navigate == nil {
-		return false
-	}
-	return strings.TrimSpace(navigate.To) != "" || strings.TrimSpace(navigate.Reason) != ""
 }
 
 func projectTodoWrite(coord *state.Coordinator, todos []state.TodoItem) (string, error) {
@@ -1032,20 +969,15 @@ func projectTodoRead(coord *state.Coordinator) (string, error) {
 	return formatTodoList(coord.State().ProjectTodos), nil
 }
 
-func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, string) {
-	statusEnum := []any{"working", "agent-done"}
-	description := "Update the workflow state file (.sgai/state.json). Use this tool to track your progress throughout your work. Update regularly after each major step. Examples: Set task when starting work, add progress notes as you complete steps, mark complete when done."
-
-	if currentAgent == "coordinator" {
-		statusEnum = append(statusEnum, "complete")
-	}
+func buildUpdateWorkflowStateSchema() (*jsonschema.Schema, string) {
+	description := "Update the workflow state file (.sgai/state.json). Use this tool to track progress throughout your work. Update regularly after each major step. Make progress notes explicit: identify coordinator direct work or the Task subagent name, current phase, completed work, evidence, blockers, next action, and next owner."
 
 	schema := &jsonschema.Schema{
 		Type: "object",
 		Properties: map[string]*jsonschema.Schema{
 			"status": {
 				Type:        "string",
-				Enum:        statusEnum,
+				Enum:        []any{"working", "agent-done", "complete"},
 				Description: "Overall workflow status: 'working' (actively working - may need iteration) or 'agent-done' (agent's work done - needs goal verification) or 'complete' (goals verified as achieved). Valid values: working, agent-done, complete",
 			},
 			"task": {
@@ -1055,21 +987,6 @@ func buildUpdateWorkflowStateSchema(currentAgent string) (*jsonschema.Schema, st
 			"addProgress": {
 				Type:        "string",
 				Description: "Add a progress note to track what you've accomplished. This will be appended to the progress array. Use this frequently to document your steps.",
-			},
-			"navigate": {
-				Type:        "object",
-				Description: "Optional navigation request. Only valid with status 'agent-done'. The target must be an available agent.",
-				Properties: map[string]*jsonschema.Schema{
-					"to": {
-						Type:        "string",
-						Description: "The available agent to run next.",
-					},
-					"reason": {
-						Type:        "string",
-						Description: "Why this navigation is needed.",
-					},
-				},
-				Required: []string{"to"},
 			},
 		},
 		Required: []string{"status", "task", "addProgress"},

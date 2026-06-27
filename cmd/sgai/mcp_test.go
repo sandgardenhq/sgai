@@ -54,7 +54,7 @@ func TestAskUserQuestionNoQuestions(t *testing.T) {
 	statePath := filepath.Join(dir, "state.json")
 	coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
 		Status:          state.StatusWorking,
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, err)
 
@@ -68,7 +68,7 @@ func TestAskUserQuestionEmptyChoices(t *testing.T) {
 	statePath := filepath.Join(dir, "state.json")
 	coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
 		Status:          state.StatusWorking,
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, err)
 
@@ -160,17 +160,15 @@ func newTestMCPContext(t *testing.T) (*mcpContext, string) {
 
 	statePath := filepath.Join(sgaiDir, "state.json")
 	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		Status:       state.StatusWorking,
-		CurrentAgent: "test-agent",
-		Progress:     []state.ProgressEntry{},
+		Status:   state.StatusWorking,
+		Progress: []state.ProgressEntry{},
 	})
 	require.NoError(t, errCoord)
 
 	ctx := &mcpContext{
-		workingDir:      dir,
-		coord:           coord,
-		availableAgents: []string{"coordinator", "test-agent", "reviewer"},
-		agentName:       "test-agent",
+		workingDir: dir,
+		coord:      coord,
+		agentName:  "test-agent",
 	}
 	return ctx, dir
 }
@@ -375,72 +373,14 @@ func TestParseAgentIdentityHeader(t *testing.T) {
 	}
 }
 
-func TestResolveCallerAgent(t *testing.T) {
-	tests := []struct {
-		name         string
-		headerAgent  string
-		currentAgent string
-		expected     string
-	}{
-		{
-			name:         "nonCoordinatorHeader",
-			headerAgent:  "go",
-			currentAgent: "react",
-			expected:     "go",
-		},
-		{
-			name:         "coordinatorHeaderWithCurrentAgent",
-			headerAgent:  "coordinator",
-			currentAgent: "go",
-			expected:     "go",
-		},
-		{
-			name:         "coordinatorHeaderWithCoordinatorCurrent",
-			headerAgent:  "coordinator",
-			currentAgent: "coordinator",
-			expected:     "coordinator",
-		},
-		{
-			name:         "coordinatorHeaderWithEmptyCurrent",
-			headerAgent:  "coordinator",
-			currentAgent: "",
-			expected:     "coordinator",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			statePath := filepath.Join(tmpDir, "state.json")
-			coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-				CurrentAgent: tt.currentAgent,
-			})
-			require.NoError(t, err)
-			result := resolveCallerAgent(tt.headerAgent, coord)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestBuildUpdateWorkflowStateSchema(t *testing.T) {
-	t.Run("coordinatorAgent", func(t *testing.T) {
-		schema, desc := buildUpdateWorkflowStateSchema("coordinator")
-		assert.NotNil(t, schema)
-		assert.NotEmpty(t, desc)
-		assert.Contains(t, desc, "workflow state")
-		statusProp := schema.Properties["status"]
-		assert.NotNil(t, statusProp)
-		assert.Len(t, statusProp.Enum, 3)
-	})
-
-	t.Run("nonCoordinatorAgent", func(t *testing.T) {
-		schema, desc := buildUpdateWorkflowStateSchema("backend-developer")
-		assert.NotNil(t, schema)
-		assert.NotEmpty(t, desc)
-		statusProp := schema.Properties["status"]
-		assert.NotNil(t, statusProp)
-		assert.Len(t, statusProp.Enum, 2)
-	})
+	schema, desc := buildUpdateWorkflowStateSchema()
+	assert.NotNil(t, schema)
+	assert.NotEmpty(t, desc)
+	assert.Contains(t, desc, "workflow state")
+	statusProp := schema.Properties["status"]
+	assert.NotNil(t, statusProp)
+	assert.Len(t, statusProp.Enum, 3)
 }
 
 func TestMustSchema(t *testing.T) {
@@ -600,9 +540,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 		{
 			name: "agentDoneWithPendingTodos",
 			initialState: state.Workflow{
-				Status:       state.StatusWorking,
-				CurrentAgent: "test-agent",
-				Progress:     []state.ProgressEntry{},
+				Status:   state.StatusWorking,
+				Progress: []state.ProgressEntry{},
 				Todos: []state.TodoItem{
 					{Content: "pending task", Status: "pending", Priority: "high"},
 				},
@@ -614,9 +553,8 @@ func TestUpdateWorkflowState(t *testing.T) {
 		{
 			name: "agentDoneClearsTask",
 			initialState: state.Workflow{
-				Status:       state.StatusWorking,
-				CurrentAgent: "test-agent",
-				Progress:     []state.ProgressEntry{},
+				Status:   state.StatusWorking,
+				Progress: []state.ProgressEntry{},
 			},
 			callerAgent:  "test-agent",
 			args:         updateWorkflowStateArgs{Status: "agent-done", Task: "some task"},
@@ -647,7 +585,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "nilCoordinator" {
-				result, err := updateWorkflowState(nil, tt.callerAgent, []string{"coordinator", "builder"}, tt.args)
+				result, err := updateWorkflowState(nil, tt.callerAgent, tt.args)
 				require.NoError(t, err)
 				assert.Contains(t, result, tt.wantContains)
 				return
@@ -658,7 +596,7 @@ func TestUpdateWorkflowState(t *testing.T) {
 			coord, err := state.NewCoordinatorWith(statePath, tt.initialState)
 			require.NoError(t, err)
 
-			result, err := updateWorkflowState(coord, tt.callerAgent, []string{"coordinator", "builder"}, tt.args)
+			result, err := updateWorkflowState(coord, tt.callerAgent, tt.args)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -667,105 +605,6 @@ func TestUpdateWorkflowState(t *testing.T) {
 			assert.Contains(t, result, tt.wantContains)
 		})
 	}
-}
-
-func TestUpdateWorkflowStateNavigate(t *testing.T) {
-	t.Run("storesValidNavigate", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status:   "agent-done",
-			Navigate: &navigateArgs{To: "reviewer", Reason: "needs review"},
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "Navigate to: reviewer")
-		require.NotNil(t, coord.State().Navigate)
-		assert.Equal(t, "reviewer", coord.State().Navigate.To)
-		assert.Equal(t, "needs review", coord.State().Navigate.Reason)
-	})
-
-	t.Run("rejectsNavigateWithoutAgentDone", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status:   "working",
-			Navigate: &navigateArgs{To: "reviewer"},
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "navigate is only valid")
-		assert.Nil(t, coord.State().Navigate)
-	})
-
-	t.Run("ignoresEmptyNavigateWithoutAgentDone", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status:      "working",
-			Task:        "keep working",
-			AddProgress: "made progress",
-			Navigate:    &navigateArgs{},
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "State updated successfully")
-		assert.Nil(t, coord.State().Navigate)
-	})
-
-	t.Run("rejectsUnknownNavigateTarget", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status:   "agent-done",
-			Navigate: &navigateArgs{To: "unknown"},
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "not in the available agents")
-		assert.Nil(t, coord.State().Navigate)
-	})
-
-	t.Run("rejectsNavigateWhileWaitingForHuman", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWaitingForHuman})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status:   "agent-done",
-			Navigate: &navigateArgs{To: "reviewer"},
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "waiting for human response")
-		assert.Nil(t, coord.State().Navigate)
-	})
-
-	t.Run("clearsStaleNavigate", func(t *testing.T) {
-		statePath := filepath.Join(t.TempDir(), "state.json")
-		coord, err := state.NewCoordinatorWith(statePath, state.Workflow{
-			Status:   state.StatusWorking,
-			Navigate: &state.NavigationRequest{To: "reviewer", Reason: "old request"},
-		})
-		require.NoError(t, err)
-
-		result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder", "reviewer"}, updateWorkflowStateArgs{
-			Status: "working",
-			Task:   "continue normally",
-		})
-
-		require.NoError(t, err)
-		assert.Contains(t, result, "State updated successfully")
-		assert.Nil(t, coord.State().Navigate)
-	})
 }
 
 func TestFormatTodoList(t *testing.T) {
@@ -1055,7 +894,7 @@ func TestStartMCPHTTPServer(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
-	url, closeFn, err := startMCPHTTPServer(t.TempDir(), coord, []string{"builder"})
+	url, closeFn, err := startMCPHTTPServer(t.TempDir(), coord)
 	require.NoError(t, err)
 	assert.NotEmpty(t, url)
 	assert.NotNil(t, closeFn)
@@ -1068,7 +907,7 @@ func TestBuildMCPHTTPHandler(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
-	handler := buildMCPHTTPHandler(t.TempDir(), coord, []string{"builder"})
+	handler := buildMCPHTTPHandler(t.TempDir(), coord)
 	assert.NotNil(t, handler)
 }
 
@@ -1077,7 +916,7 @@ func TestBuildMCPServerInternal(t *testing.T) {
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
 	r, _ := http.NewRequest("GET", "/", nil)
-	server := buildMCPServer(t.TempDir(), r, coord, []string{"builder"})
+	server := buildMCPServer(t.TempDir(), r, coord)
 	assert.NotNil(t, server)
 }
 
@@ -1087,37 +926,17 @@ func TestBuildMCPServerWithAgentHeader(t *testing.T) {
 	require.NoError(t, errCoord)
 	r, _ := http.NewRequest("GET", "/", nil)
 	r.Header.Set("X-Sgai-Agent-Identity", "builder|")
-	server := buildMCPServer(t.TempDir(), r, coord, []string{"builder"})
+	server := buildMCPServer(t.TempDir(), r, coord)
 	assert.NotNil(t, server)
 }
 
-func TestRegisterCommonToolsInternal(t *testing.T) {
+func TestRegisterToolsInternal(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
 	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"builder"}, agentName: "builder"}
-	registerCommonTools(server, mcpCtx, "builder")
-	assert.NotNil(t, server)
-}
-
-func TestRegisterCoordinatorToolsInternal(t *testing.T) {
-	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
-	require.NoError(t, errCoord)
-	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"coordinator"}, agentName: "coordinator"}
-	registerCoordinatorTools(server, mcpCtx, t.TempDir())
-	assert.NotNil(t, server)
-}
-
-func TestRegisterCoordinatorToolsBrainstormingMode(t *testing.T) {
-	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeBrainstorming})
-	require.NoError(t, errCoord)
-	server := mcp.NewServer(&mcp.Implementation{Name: "test"}, nil)
-	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, availableAgents: []string{"coordinator"}, agentName: "coordinator"}
-	registerCoordinatorTools(server, mcpCtx, t.TempDir())
+	mcpCtx := &mcpContext{workingDir: t.TempDir(), coord: coord, agentName: "coordinator"}
+	registerTools(server, mcpCtx)
 	assert.NotNil(t, server)
 }
 
@@ -1153,7 +972,7 @@ func TestAskUserQuestionNilCoordinator(t *testing.T) {
 
 func TestAskUserQuestionEmptyQuestionList(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeBrainstorming})
+	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeInteractive})
 	require.NoError(t, errCoord)
 	args := askUserQuestionArgs{Questions: nil}
 	result, err := askUserQuestion(context.Background(), coord, args)
@@ -1163,7 +982,7 @@ func TestAskUserQuestionEmptyQuestionList(t *testing.T) {
 
 func TestAskUserQuestionNoChoices(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
-	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeBrainstorming})
+	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{InteractionMode: state.ModeInteractive})
 	require.NoError(t, errCoord)
 	args := askUserQuestionArgs{
 		Questions: []questionItem{{Question: "test?", Choices: nil}},
@@ -1190,7 +1009,7 @@ func TestBuildMCPHTTPHandlerCreation(t *testing.T) {
 	stateFile := filepath.Join(dir, "state.json")
 	coord, errCoord := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, errCoord)
-	handler := buildMCPHTTPHandler(dir, coord, []string{"coordinator"})
+	handler := buildMCPHTTPHandler(dir, coord)
 	assert.NotNil(t, handler)
 }
 
@@ -1251,7 +1070,7 @@ func TestFindSnippetsByNameContainsNoMatch(t *testing.T) {
 func TestAskUserQuestionWithValidCoordinator(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, err)
 
@@ -1283,7 +1102,7 @@ func TestAskUserQuestionWithValidCoordinator(t *testing.T) {
 func TestAskUserWorkGateWithValidCoordinator(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, err)
 
@@ -1420,7 +1239,7 @@ func TestUpdateWorkflowStateInvalidStatus(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
 		Status: "invalid-status",
 		Task:   "test task",
 	})
@@ -1431,13 +1250,12 @@ func TestUpdateWorkflowStateInvalidStatus(t *testing.T) {
 func TestUpdateWorkflowStateWithPendingTodos(t *testing.T) {
 	stateFile := filepath.Join(t.TempDir(), "state.json")
 	coord, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-		CurrentAgent: "builder",
 		Todos: []state.TodoItem{
 			{Content: "unfinished task", Status: "pending", Priority: "high"},
 		},
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
 		Status: "agent-done",
 		Task:   "",
 	})
@@ -1452,7 +1270,7 @@ func TestUpdateWorkflowStatePreservesHumanPendingStatus(t *testing.T) {
 		HumanMessage: "waiting",
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
 		Status:      "working",
 		Task:        "new task",
 		AddProgress: "doing stuff",
@@ -1467,7 +1285,7 @@ func TestUpdateWorkflowStateClearsTaskOnComplete(t *testing.T) {
 		Status: state.StatusWorking,
 	})
 	require.NoError(t, err)
-	result, err := updateWorkflowState(coord, "builder", []string{"coordinator", "builder"}, updateWorkflowStateArgs{
+	result, err := updateWorkflowState(coord, "builder", updateWorkflowStateArgs{
 		Status: "agent-done",
 		Task:   "should be cleared",
 	})
@@ -1503,7 +1321,7 @@ func TestBuildMCPHTTPHandlerWithHandler(t *testing.T) {
 	require.NoError(t, errCoord)
 	srv, _ := setupTestServer(t)
 	srv.rootDir = dir
-	handler := buildMCPHTTPHandler(dir, srv.workspaceCoordinator(dir), []string{"coordinator"})
+	handler := buildMCPHTTPHandler(dir, srv.workspaceCoordinator(dir))
 	assert.NotNil(t, handler)
 	assert.Implements(t, (*http.Handler)(nil), handler)
 }

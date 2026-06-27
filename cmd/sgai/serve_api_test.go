@@ -492,7 +492,7 @@ func TestConvertEventsForAPIBoost(t *testing.T) {
 func TestBuildAdhocArgs(t *testing.T) {
 	t.Run("simpleModel", func(t *testing.T) {
 		args := buildAdhocArgs("claude-opus-4")
-		assert.Equal(t, []string{"run", "-m", "claude-opus-4", "--agent", "build", "--title", "adhoc [claude-opus-4]", "--format=json"}, args)
+		assert.Equal(t, []string{"run", "-m", "claude-opus-4", "--agent", "build", "--title", "adhoc [claude-opus-4]"}, args)
 	})
 
 	t.Run("modelWithVariant", func(t *testing.T) {
@@ -1177,49 +1177,6 @@ func TestCollectAgents(t *testing.T) {
 	}
 }
 
-func TestConvertAgentSequence(t *testing.T) {
-	tests := []struct {
-		name     string
-		displays []agentSequenceDisplay
-		expected []apiAgentSequenceEntry
-	}{
-		{
-			name:     "empty",
-			displays: []agentSequenceDisplay{},
-			expected: []apiAgentSequenceEntry{},
-		},
-		{
-			name: "singleEntry",
-			displays: []agentSequenceDisplay{
-				{Agent: "agent1", Model: "model1", ElapsedTime: "1m", IsCurrent: true},
-			},
-			expected: []apiAgentSequenceEntry{
-				{Agent: "agent1", Model: "model1", ElapsedTime: "1m", IsCurrent: true},
-			},
-		},
-		{
-			name: "multipleEntries",
-			displays: []agentSequenceDisplay{
-				{Agent: "agent1", Model: "model1", ElapsedTime: "1m", IsCurrent: false},
-				{Agent: "agent2", Model: "model2", ElapsedTime: "2m", IsCurrent: true},
-				{Agent: "agent3", Model: "model3", ElapsedTime: "3m", IsCurrent: false},
-			},
-			expected: []apiAgentSequenceEntry{
-				{Agent: "agent1", Model: "model1", ElapsedTime: "1m", IsCurrent: false},
-				{Agent: "agent2", Model: "model2", ElapsedTime: "2m", IsCurrent: true},
-				{Agent: "agent3", Model: "model3", ElapsedTime: "3m", IsCurrent: false},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := convertAgentSequence(tt.displays)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestReadGoalAndPMForAPI(t *testing.T) {
 	t.Run("noGoalOrPM", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -1285,15 +1242,13 @@ func TestLoadWorkspaceState(t *testing.T) {
 
 		stateFile := filepath.Join(sgaiDir, "state.json")
 		_, err := state.NewCoordinatorWith(stateFile, state.Workflow{
-			Status:       state.StatusComplete,
-			CurrentAgent: "test-agent",
-			Progress:     []state.ProgressEntry{},
+			Status:   state.StatusComplete,
+			Progress: []state.ProgressEntry{},
 		})
 		require.NoError(t, err)
 
 		wf := server.loadWorkspaceState(workDir)
 		assert.Equal(t, state.StatusComplete, wf.Status)
-		assert.Equal(t, "test-agent", wf.CurrentAgent)
 	})
 
 	t.Run("oversizedState", func(t *testing.T) {
