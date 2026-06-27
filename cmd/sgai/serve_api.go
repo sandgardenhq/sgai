@@ -164,8 +164,6 @@ type apiWorkspaceFullState struct {
 	HasEditedGoal   bool                        `json:"hasEditedGoal"`
 	InteractiveAuto bool                        `json:"interactiveAuto"`
 	ContinuousMode  bool                        `json:"continuousMode"`
-	CurrentAgent    string                      `json:"currentAgent"`
-	ActiveAgents    []apiActiveAgent            `json:"activeAgents"`
 	Task            string                      `json:"task"`
 	GoalContent     string                      `json:"goalContent"`
 	Description     string                      `json:"description"`
@@ -176,7 +174,6 @@ type apiWorkspaceFullState struct {
 	TotalExecTime   string                      `json:"totalExecTime"`
 	LatestProgress  string                      `json:"latestProgress"`
 	HumanMessage    string                      `json:"humanMessage"`
-	AgentSequence   []apiAgentSequenceEntry     `json:"agentSequence"`
 	Cost            state.SessionCost           `json:"cost"`
 	Events          []apiEventEntry             `json:"events"`
 	ProjectTodos    []apiTodoEntry              `json:"projectTodos"`
@@ -272,11 +269,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 	badgeClass, badgeText := badgeStatus(wfState, ws.Running)
 	needsInput := wfState.NeedsHumanInput()
 
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
 	status := wfState.Status
 	if status == "" {
 		status = "-"
@@ -290,17 +282,11 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
 	}
 
-	agentSeq := convertAgentSequence(
-		prepareAgentSequenceDisplay(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress), ws.Directory),
-	)
-	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress))
-
 	reversedProgress := slices.Clone(wfState.Progress)
 	slices.Reverse(reversedProgress)
 	events := convertEventsForAPI(formatProgressForDisplay(reversedProgress))
 
 	var logLines []apiLogEntry
-	var activeAgents []apiActiveAgent
 	s.mu.Lock()
 	sess := s.sessions[ws.Directory]
 	s.mu.Unlock()
@@ -309,7 +295,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 			logLines = append(logLines, apiLogEntry{Prefix: line.prefix, Text: line.text})
 		}
 	}
-	activeAgents = activeAgentAPIEntries(sess.activeAgentSnapshot(ws.Running))
 
 	var changesResult jjChangesResult
 	if hasJJRepo(ws.Directory) {
@@ -327,7 +312,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 
 	var pendingQuestion *apiPendingQuestionResponse
 	if wfState.NeedsHumanInput() {
-		agentName := currentAgent
 		var questions []apiQuestionItem
 		if wfState.MultiChoiceQuestion != nil {
 			questions = make([]apiQuestionItem, 0, len(wfState.MultiChoiceQuestion.Questions))
@@ -342,7 +326,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		pendingQuestion = &apiPendingQuestionResponse{
 			QuestionID: generateQuestionID(wfState),
 			Type:       questionType(wfState),
-			AgentName:  agentName,
 			Message:    wfState.HumanMessage,
 			Questions:  questions,
 		}
@@ -370,8 +353,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		HasEditedGoal:   hasEditedGoal,
 		InteractiveAuto: interactiveAuto,
 		ContinuousMode:  readContinuousModePrompt(ws.Directory) != "",
-		CurrentAgent:    currentAgent,
-		ActiveAgents:    activeAgents,
 		Task:            wfState.Task,
 		GoalContent:     goalContent,
 		Description:     description,
@@ -379,10 +360,9 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		FullGoalContent: fullGoalContent,
 		PMContent:       pmContent,
 		HasProjectMgmt:  hasProjectMgmt,
-		TotalExecTime:   totalExecTime,
+		TotalExecTime:   calculateTotalExecutionTime(wfState.Progress, ws.Running),
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		HumanMessage:    wfState.HumanMessage,
-		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
 		Events:          events,
 		ProjectTodos:    convertTodosForAPI(wfState.ProjectTodos),
@@ -554,9 +534,6 @@ func collectAgents(workspacePath string) []apiAgentEntry {
 			return nil
 		}
 		name := strings.TrimSuffix(p, ".md")
-		if isRetiredWorkflowAgent(name) {
-			return nil
-		}
 		content, errRead := fs.ReadFile(agentsFS, p)
 		if errRead != nil {
 			return nil
@@ -846,13 +823,6 @@ type apiActionEntry struct {
 	Description string `json:"description,omitempty"`
 }
 
-type apiAgentSequenceEntry struct {
-	Agent       string `json:"agent"`
-	Model       string `json:"model"`
-	ElapsedTime string `json:"elapsedTime"`
-	IsCurrent   bool   `json:"isCurrent"`
-}
-
 func loadActionsForAPI(workspacePath string) []apiActionEntry {
 	config, errLoad := loadProjectConfig(workspacePath)
 	if errLoad != nil || config == nil || config.Actions == nil {
@@ -892,14 +862,6 @@ func readGoalAndPMForAPI(dir string) (goalContent, rawGoalContent, fullGoalConte
 	}
 
 	return goalContent, rawGoalContent, fullGoalContent, pmContent, hasProjectMgmt
-}
-
-func convertAgentSequence(displays []agentSequenceDisplay) []apiAgentSequenceEntry {
-	result := make([]apiAgentSequenceEntry, 0, len(displays))
-	for _, d := range displays {
-		result = append(result, apiAgentSequenceEntry(d))
-	}
-	return result
 }
 
 type apiCreateWorkspaceRequest struct {
@@ -1148,7 +1110,6 @@ type apiQuestionItem struct {
 type apiPendingQuestionResponse struct {
 	QuestionID string            `json:"questionId"`
 	Type       string            `json:"type"`
-	AgentName  string            `json:"agentName"`
 	Message    string            `json:"message"`
 	Questions  []apiQuestionItem `json:"questions,omitempty"`
 }
@@ -1222,20 +1183,6 @@ func (s *Server) handleRespondViaCoordinator(w http.ResponseWriter, coord *state
 		return
 	}
 
-	if wfState.MultiChoiceQuestion != nil && wfState.MultiChoiceQuestion.IsWorkGate {
-		approvedViaSelection := slices.Contains(req.SelectedChoices, workGateApprovalText)
-		if approvedViaSelection {
-			if err := coord.UpdateState(func(wf *state.Workflow) {
-				if wf.InteractionMode == state.ModeBrainstorming {
-					wf.InteractionMode = state.ModeBuilding
-				}
-			}); err != nil {
-				http.Error(w, "failed to save work gate approval", http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
 	s.notifyStateChange()
 
 	writeJSON(w, apiRespondResponse{Success: true, Message: "response submitted"})
@@ -1283,15 +1230,7 @@ func (s *Server) handleAPIStartSession(w http.ResponseWriter, r *http.Request) {
 	coord := s.workspaceCoordinator(workspacePath)
 	continuousPrompt := readContinuousModePrompt(workspacePath)
 
-	var interactionMode string
-	switch {
-	case continuousPrompt != "":
-		interactionMode = state.ModeContinuous
-	case req.Auto:
-		interactionMode = state.ModeSelfDrive
-	default:
-		interactionMode = state.ModeBrainstorming
-	}
+	interactionMode := startInteractionMode(req.Auto, continuousPrompt)
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.InteractionMode = interactionMode
@@ -2005,7 +1944,7 @@ func (s *Server) handleAPIAdhoc(w http.ResponseWriter, r *http.Request) {
 
 func buildAdhocArgs(modelSpec string) []string {
 	baseModel, variant := parseModelAndVariant(modelSpec)
-	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]", "--format=json"}
+	args := []string{"run", "-m", baseModel, "--agent", "build", "--title", "adhoc [" + modelSpec + "]"}
 	if variant != "" {
 		args = append(args, "--variant", variant)
 	}

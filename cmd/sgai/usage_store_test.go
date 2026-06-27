@@ -652,12 +652,6 @@ func TestUsageBackfillKeepsAgentFallbackRowsDistinctAcrossWorkspaces(t *testing.
 	require.Len(t, resp.Rows, 2)
 }
 
-func TestBuildAdhocArgsRequestsJSONForUsageCapture(t *testing.T) {
-	args := buildAdhocArgs("openai/gpt-5.5")
-
-	assert.Contains(t, args, "--format=json")
-}
-
 func openTestUsageStore(t *testing.T) *usageStore {
 	t.Helper()
 	store, err := openUsageStore(filepath.Join(t.TempDir(), "usage.sqlite"))

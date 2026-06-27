@@ -35,7 +35,6 @@ Response:
       "status": "working",
       "badgeClass": "badge-running",
       "badgeText": "Running",
-      "currentAgent": "go",
       "task": "Writing authentication endpoints",
       "latestProgress": "Created JWT middleware",
       "cost": {
@@ -64,7 +63,6 @@ Response:
 | `needsInput` | Blocked waiting for human response |
 | `inProgress` | Work is actively happening |
 | `status` | Workflow status: "working", "agent-done", "complete", etc. |
-| `currentAgent` | Currently executing agent |
 | `task` | Current task being worked on |
 | `latestProgress` | Most recent progress note |
 | `pendingQuestion` | Non-null when human input needed |

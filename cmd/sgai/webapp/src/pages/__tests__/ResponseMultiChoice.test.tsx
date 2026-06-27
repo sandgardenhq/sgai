@@ -14,7 +14,6 @@ beforeEach(() => {
 const mockQuestion = {
   questionId: "q-123",
   type: "multi-choice" as const,
-  agentName: "coordinator",
   message: "What approach should we take?",
   questions: [
     {
@@ -53,7 +52,6 @@ const mockWorkspace = {
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "coordinator",
   task: "Waiting for response",
   goalContent: "# Test Goal",
   rawGoalContent: "# Test Goal",
@@ -62,7 +60,6 @@ const mockWorkspace = {
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -152,12 +149,11 @@ describe("ResponseMultiChoice", () => {
   });
 
   describe("display retrospective questions", () => {
-    it("displays agent name badge", async () => {
+    it("displays response required title", async () => {
       renderResponseMultiChoice();
 
       await waitFor(() => {
-        const coordinatorElements = screen.queryAllByText(/coordinator/);
-        expect(coordinatorElements.length).toBeGreaterThan(0);
+        expect(screen.getByText("Response Required")).toBeTruthy();
       });
     });
 

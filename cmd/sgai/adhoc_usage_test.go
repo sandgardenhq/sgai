@@ -12,54 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFindAdhocSessionIDFromRealisticJSONOutput(t *testing.T) {
-	tests := []struct {
-		name string
-		data string
-		want string
-	}{
-		{
-			name: "newlineDelimitedStreamEvent",
-			data: `{"type":"session","sessionID":"adhoc-stream-session"}` + "\n" +
-				`{"type":"text","sessionID":"adhoc-stream-session","part":{"text":"done"}}` + "\n",
-			want: "adhoc-stream-session",
-		},
-		{
-			name: "nestedSessionMetadata",
-			data: `{"type":"message","metadata":{"session":{"id":"adhoc-nested-session"}}}` + "\n",
-			want: "adhoc-nested-session",
-		},
-		{
-			name: "stringEncodedNestedMetadata",
-			data: `{"type":"event","message":"{\"session\":{\"id\":\"adhoc-string-session\"}}"}` + "\n",
-			want: "adhoc-string-session",
-		},
-		{
-			name: "topLevelSessionIDWinsOverNestedChildSession",
-			data: `{"type":"event","sessionID":"adhoc-origin-session","session":{"id":"child-session"},"metadata":{"session":{"id":"metadata-session"}}}` + "\n",
-			want: "adhoc-origin-session",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := findAdhocSessionID([]byte(tt.data))
-
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestFindAdhocSessionIDPrefersTopLevelSessionIDDeterministically(t *testing.T) {
-	data := []byte(`{"type":"event","sessionID":"adhoc-origin-session","session":{"id":"child-session"},"metadata":{"session":{"id":"metadata-session"}}}`)
-
-	for range 200 {
-		got := findAdhocSessionID(data)
-
-		assert.Equal(t, "adhoc-origin-session", got)
-	}
-}
-
 func TestReconcileAdhocUsageWritesGlobalUsageForOriginWorkspace(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	workspacePath := setupTestWorkspace(t, rootDir, "adhoc-origin")
@@ -85,10 +37,7 @@ func TestReconcileAdhocUsageWritesGlobalUsageForOriginWorkspace(t *testing.T) {
 		return nil, errors.New("pricing unavailable in test")
 	}
 
-	output := `{"type":"session","metadata":{"session":{"id":"adhoc-full-chain-session"}}}` + "\n" +
-		`{"type":"text","sessionID":"adhoc-full-chain-session","part":{"text":"human readable result"}}` + "\n"
-
-	server.reconcileAdhocUsage(workspacePath, output, "openai/gpt-5.5")
+	server.reconcileAdhocUsage(workspacePath, "adhoc-full-chain-session", "openai/gpt-5.5")
 
 	storePath := filepath.Join(configDir, "sgai", "usage.sqlite")
 	store, errOpen := openUsageStore(storePath)
@@ -139,7 +88,7 @@ func TestReconcileAdhocUsageAttributesForkWorkspaceToRootWorkspace(t *testing.T)
 		return nil, errors.New("pricing unavailable in test")
 	}
 
-	server.reconcileAdhocUsage(forkWorkspacePath, `{"type":"session","sessionID":"adhoc-fork-session"}`, "openai/gpt-5.5")
+	server.reconcileAdhocUsage(forkWorkspacePath, "adhoc-fork-session", "openai/gpt-5.5")
 
 	storePath := filepath.Join(configDir, "sgai", "usage.sqlite")
 	store, errOpen := openUsageStore(storePath)

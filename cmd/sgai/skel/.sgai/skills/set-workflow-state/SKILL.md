@@ -101,13 +101,13 @@ Use `ask_user_question` to present structured multi-choice questions to the huma
 
 ## Coordinator Handoffs
 
-Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus optional `sgai_update_workflow_state({status: "agent-done", navigate: {to, reason}})` requests when the current runtime has made another agent available.
+Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus `sgai_update_workflow_state({status: "agent-done"})` to yield control.
 
 ### How Handoffs Work
 
 1. **Record the handoff**: Append the work request, blocker, or decision to `.sgai/PROJECT_MANAGEMENT.md`.
 
-2. **Request a specific next agent only when appropriate**: Set `status: "agent-done"` with `navigate: {to: "agent-name", reason: "..."}` only for an agent that the coordinator or current handoff explicitly made available.
+2. **Yield control when done**: Set `status: "agent-done"` after recording durable handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
 
 3. **Default to coordinator**: When no messages are pending, control returns to the coordinator.
 
@@ -117,8 +117,8 @@ Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus
 
 - `.sgai/PROJECT_MANAGEMENT.md` is the durable coordination ledger
 - Only coordinator can set `status: "complete"` to end the entire workflow
-- The current handoff and available-agent list provide context for any explicit navigation request
-- Agents never navigate to themselves
-- The coordinator must never navigate to `coordinator`; it should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
+- The current handoff and available-agent list provide context for coordinator delegation
+- Agents never route to themselves
+- The coordinator should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
 
 ---

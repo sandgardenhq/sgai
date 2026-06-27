@@ -20,11 +20,6 @@ func dotSGAILinePresent(content []byte) bool {
 }
 
 func initializeWorkspaceDir(dir string) error {
-	sgaiDir := filepath.Join(dir, ".sgai")
-	if _, errStat := os.Stat(sgaiDir); errStat == nil {
-		return nil
-	}
-
 	if errUnpack := unpackSkeleton(dir); errUnpack != nil {
 		return fmt.Errorf("failed to unpack skeleton: %w", errUnpack)
 	}

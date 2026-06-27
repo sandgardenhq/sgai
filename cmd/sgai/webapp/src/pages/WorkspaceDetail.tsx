@@ -246,12 +246,11 @@ export function WorkspaceDetail(): ReactNode {
   const displayExecTime = execTimeSeconds !== null
     ? formatExecTime(execTimeSeconds)
     : fallbackExecTime;
-  const agentLabel = detail.currentAgent?.trim();
   const modelLabel = detail.currentModel
     ? detail.currentModel.split("/").pop() ?? detail.currentModel
     : "";
-  const agentModelLabel = [agentLabel, modelLabel].filter(Boolean).join(" | ");
-  const fullAgentModelLabel = [detail.currentAgent, detail.currentModel].filter(Boolean).join(" | ");
+  const agentModelLabel = modelLabel;
+  const fullAgentModelLabel = detail.currentModel ?? "";
   const statusLine = detail.task?.trim() || detail.status?.trim();
   const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);

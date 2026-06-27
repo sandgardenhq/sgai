@@ -15,7 +15,7 @@ import (
 )
 
 func buildAgentArgs(agent, modelSpec, sessionID string) []string {
-	args := []string{"run", "--format=json", "--agent", agent}
+	args := []string{"run", "--agent", agent}
 	if modelSpec != "" {
 		model, variant := parseModelAndVariant(modelSpec)
 		args = append(args, "--model", model)
@@ -54,7 +54,9 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 	stderrOut := buildAgentOutputWriter(os.Stderr, cfg.logWriter, cfg.stderrLog)
 	stdoutOut := buildAgentOutputWriter(os.Stdout, cfg.logWriter, cfg.stdoutLog)
 	stderrWriter := &prefixWriter{prefix: prefix + " ", w: stderrOut}
-	jsonWriter := &jsonPrettyWriter{prefix: prefix + " ", w: stdoutOut, coord: cfg.coord, currentAgent: cfg.agent, activeAgents: cfg.activeAgents, onActiveAgentsChanged: cfg.onActiveAgentsChanged}
+	stdoutWriter := &prefixWriter{prefix: prefix + " ", w: stdoutOut}
+	stdoutPassthrough := io.MultiWriter(stdoutWriter, outputCapture)
+	sessionIDCapture := &sessionIDCaptureWriter{detectedWriter: stdoutPassthrough, passthrough: stdoutPassthrough}
 
 	cfg.coord.ResetAgentDoneWatchdog()
 	agentCtx, agentCancel := context.WithCancel(ctx)
@@ -66,11 +68,10 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 	cmd.Env = buildAgentEnv(cfg, wfState, modelSpec)
 	cmd.Stdin = strings.NewReader(agentMsg)
 	cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
-	cmd.Stdout = io.MultiWriter(jsonWriter, outputCapture)
+	cmd.Stdout = sessionIDCapture
 
 	if errStart := cmd.Start(); errStart != nil {
 		agentCancel()
-		clearActiveAgentsForRun(cfg)
 		fmt.Fprintln(os.Stderr, "failed to start opencode:", errStart)
 		if errUpdate := cfg.coord.UpdateState(func(wf *state.Workflow) {
 			wf.Status = state.StatusAgentDone
@@ -97,7 +98,6 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 	agentCancel()
 
 	if errWait != nil {
-		clearActiveAgentsForRun(cfg)
 		if ctx.Err() != nil {
 			fmt.Println("["+cfg.paddedsgai+"]", "interrupted during agent execution")
 			return state.Workflow{}, "", &wfState
@@ -115,15 +115,8 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 		return state.Workflow{}, "", &result
 	}
 
-	jsonWriter.Flush()
-	clearActiveAgentsForRun(cfg)
-	return cfg.coord.State(), jsonWriter.sessionID, nil
-}
-
-func clearActiveAgentsForRun(cfg agentRunConfig) {
-	if cfg.activeAgents != nil && cfg.activeAgents.clear() && cfg.onActiveAgentsChanged != nil {
-		cfg.onActiveAgentsChanged()
-	}
+	sessionIDCapture.Flush()
+	return cfg.coord.State(), sessionIDCapture.sessionID, nil
 }
 
 func exportAgentSession(cfg agentRunConfig, sessionID string, iteration int) {

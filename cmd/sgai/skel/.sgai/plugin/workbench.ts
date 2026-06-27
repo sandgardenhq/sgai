@@ -4,26 +4,25 @@ import { join } from 'path';
 
 export const Workbench: Plugin = async ({ directory }) => {
   const stateFilePath = join(directory, ".sgai", "state.json");
-
+  const knownSessionIDs: Record<string, boolean> = {}
   return {
     config: async (config: any) => {
       config.snapshot = false;
       config.share = "disabled";
       config.autoupdate = false;
-      if (!config.instructions) {
-        config.instructions = [];
-      }
-      config.instructions?.unshift(directory + "/.sgai/AGENTS.md");
-      config.model = "opencode/big-pickle";
     },
     tool: {},
     event: async (input: { event: any; client: any }) => {
-      if (input.event.type === "todo.updated") {
-        const currentAgent = process.env.OPENCODE_AGENT_NAME || "unknown";
-        if (currentAgent === "coordinator") {
-          return;
+      const eventSessionID = sessionIDFromEvent(input?.event);
+      if (eventSessionID !== "") {
+        const sessionID = eventSessionID;
+        const agent = agentNameFromEvent(input.event);
+        if (agent !== "" && !knownSessionIDs[sessionID]) {
+          knownSessionIDs[sessionID] = true;
+          console.log(JSON.stringify({ sessionID, agent }));
         }
-
+      }
+      if (input.event.type === "todo.updated") {
         try {
           let currentState: any;
           try {
@@ -37,7 +36,7 @@ export const Workbench: Plugin = async ({ directory }) => {
 
           await writeFile(stateFilePath, JSON.stringify(currentState, null, 2));
         } catch (error: any) {
-          console.error("\033[1m|\033[0m  \033[0;31mWorkbench\033[0m   Error saving todos: " + error.message + "\033[0m");
+          console.error("Error saving todos: " + error.message);
         }
       }
 
@@ -50,8 +49,8 @@ export const Workbench: Plugin = async ({ directory }) => {
               parts: [{
                 type: "text",
                 text: `🔄 **Conversation Compacted**\n\n` +
-                      `To maintain context within limits, earlier messages have been summarized.\n\n` +
-                      `You MUST re-read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md before continuing.`,
+                  `To maintain context within limits, earlier messages have been summarized.\n\n` +
+                  `You MUST re-read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md before continuing.`,
                 metadata: {
                   source: "compaction-detector",
                   timestamp: Date.now()
@@ -60,32 +59,56 @@ export const Workbench: Plugin = async ({ directory }) => {
             }
           });
         } catch (error: any) {
-          console.error("\033[1m|\033[0m  \033[0;31mWorkbench\033[0m   Error handling compaction: " + error.message + "\033[0m");
+          console.error("Error handling compaction: " + error.message);
         }
-      }
-    },
-    "tool.execute.before": async (input: any, output: any) => {
-      let currentAgent = "unknown";
-      try {
-        const content = await readFile(stateFilePath, 'utf8');
-        const state = JSON.parse(content);
-        currentAgent = state.currentAgent || "unknown";
-      } catch (error) {
-        // State file doesn't exist or is invalid - use fallback
-      }
-
-      const isWriteTool = input.tool === "edit" || input.tool === "write";
-      const targetPath = output?.args?.filePath || "";
-      const isGoalFile = targetPath.endsWith("GOAL.md") || targetPath.includes("/GOAL.md");
-
-      if (isWriteTool && isGoalFile && currentAgent !== "coordinator") {
-        throw new Error(
-          `GOAL.md is protected and can only be modified by the coordinator agent.\n\n` +
-          `You are currently running as '${currentAgent}'.\n\n` +
-          `If you need to request changes to GOAL.md, append the request to .sgai/PROJECT_MANAGEMENT.md and yield to coordinator with workflow navigation.\n\n` +
-          `The coordinator will review your request and make the appropriate changes.`
-        );
       }
     }
   }
+}
+
+function agentNameFromEvent(event: any): string {
+  switch (event?.type) {
+    case "message.updated": {
+      const info = event.properties?.info;
+      if (info?.role === "user" && typeof info.agent === "string") {
+        return cleanAgentName(info.agent);
+      }
+      return "";
+    }
+    case "message.part.updated": {
+      const part = event.properties?.part;
+      if (part?.type === "subtask" && typeof part.agent === "string") {
+        return cleanAgentName(part.agent);
+      }
+      if (part?.type === "agent" && typeof part.name === "string") {
+        return cleanAgentName(part.name);
+      }
+      return "";
+    }
+    default:
+      return "";
+  }
+}
+
+function sessionIDFromEvent(event: any): string {
+  switch (event?.type) {
+    case "message.updated":
+      return cleanSessionID(event.properties?.info?.sessionID);
+    case "message.part.updated":
+      return cleanSessionID(event.properties?.part?.sessionID);
+    default:
+      return cleanSessionID(event?.properties?.sessionID);
+  }
+}
+
+function cleanAgentName(value: string): string {
+  const trimmed = value.trim();
+  return trimmed === "unknown" ? "" : trimmed;
+}
+
+function cleanSessionID(value: any): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim();
 }

@@ -343,7 +343,7 @@ Before presenting any suggestion, verify the target path:
 ```
 // append to .sgai/PROJECT_MANAGEMENT.md:
 // RETRO_COMPLETE: No actionable improvements identified for this session. Analysis summary: Read X/Y session JSONs, session state.json (from [path used]) showed Z agent visits and handoff context. Per-category findings: [brief summary of each category observation from Step 1.5].
-sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No actionable suggestions found after thorough analysis. Recorded RETRO_COMPLETE.", navigate: {to: "coordinator", reason: "retrospective complete"} })
+sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No actionable suggestions found after thorough analysis. Recorded RETRO_COMPLETE." })
 // STOP HERE. Make NO more tool calls. Your turn is OVER.
 // This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
@@ -354,7 +354,7 @@ sgai_update_workflow_state({ status: "agent-done", task: "", addProgress: "No ac
 ### Step 5: Present Changes for Approval
 
 **MANDATORY YIELD PROTOCOL:** After every `RETRO_QUESTION` entry appended to `.sgai/PROJECT_MANAGEMENT.md` in this step, you MUST:
-1. Immediately call `sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "retrospective question"}})`
+1. Immediately call `sgai_update_workflow_state({status: "agent-done"})`
 2. STOP making tool calls — your turn is over
 
 **MANDATORY:** You MUST append at least one `RETRO_QUESTION:` entry for the coordinator during your run. This is NOT optional. If you found zero suggestions, follow the "No Suggestions Case" above instead.
@@ -370,7 +370,7 @@ For each non-empty category, append a single `RETRO_QUESTION` with this structur
 // RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (N proposals)
 // [include all proposals, evidence, diffs/content, rationale, and selection options]
 // Then yield immediately
-sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills category RETRO_QUESTION for coordinator", navigate: {to: "coordinator", reason: "retrospective question"} })
+sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills category RETRO_QUESTION for coordinator" })
 // STOP HERE. Make NO more tool calls. Your turn is OVER.
 // This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
@@ -382,7 +382,7 @@ sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human resp
 // append to .sgai/PROJECT_MANAGEMENT.md:
 // RETRO_QUESTION [MULTI-SELECT]: **Skills Changes** (2 proposals)
 // [include proposals, evidence, diffs/content, rationale, and selection options]
-sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills RETRO_QUESTION for coordinator", navigate: {to: "coordinator", reason: "retrospective question"} })
+sgai_update_workflow_state({ status: "agent-done", task: "Waiting for human response via coordinator", addProgress: "Recorded Skills RETRO_QUESTION for coordinator" })
 // STOP HERE. Your turn is OVER.
 // This means: no file reads, no file writes, no bash, NOTHING.
 // Extra tool calls cause system deadlock requiring manual SIGTERM.
@@ -520,4 +520,4 @@ Before marking done, verify:
 - [ ] Applied changes to correct locations (sgai/ overlay or AGENTS.md)
 - [ ] Updated `.sgai/SGAI_NOTES.md` with "Status: complete" after Step 6
 - [ ] Set workflow state to agent-done
-- [ ] After EVERY `RETRO_QUESTION` or `RETRO_COMPLETE` entry, immediately called sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "..."}}) and stopped
+- [ ] After EVERY `RETRO_QUESTION` or `RETRO_COMPLETE` entry, immediately called sgai_update_workflow_state({status: "agent-done"}) and stopped

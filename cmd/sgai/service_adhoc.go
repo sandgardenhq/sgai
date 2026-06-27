@@ -48,7 +48,6 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 
 	st.running = true
 	st.output.Reset()
-	st.rawOutput.Reset()
 	st.selectedModel = strings.TrimSpace(model)
 	st.promptText = strings.TrimSpace(prompt)
 
@@ -59,11 +58,12 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	cmd.Env = buildBaseOpenCodeEnv(workspacePath)
 	cmd.Stdin = strings.NewReader(st.promptText)
 	writer := &lockedWriter{mu: &st.mu, buf: &st.output}
-	rawWriter := &lockedWriter{mu: &st.mu, buf: &st.rawOutput, raw: true}
-	prefix := fmt.Sprintf("[%s][adhoc:0000]", filepath.Base(workspacePath))
+	prefix := fmt.Sprintf("[%s:%04d]", filepath.Base(workspacePath), 0)
 	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-	cmd.Stdout = io.MultiWriter(stdoutPW, writer, rawWriter)
+	stdoutPassthrough := io.MultiWriter(stdoutPW, writer)
+	sessionIDCapture := &sessionIDCaptureWriter{detectedWriter: stdoutPassthrough, passthrough: stdoutPassthrough}
+	cmd.Stdout = sessionIDCapture
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
@@ -94,18 +94,19 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	go func() {
 		defer close(done)
 		errWait := cmd.Wait()
+		sessionIDCapture.Flush()
 		st.mu.Lock()
 		if errWait != nil {
 			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
 		}
-		rawOutput := st.rawOutput.String()
+		capturedSessionID := sessionIDCapture.sessionID
 		selectedModel := st.selectedModel
 		st.running = false
 		st.cmd = nil
 		st.done = nil
 		st.mu.Unlock()
 		if errWait == nil {
-			s.reconcileAdhocUsage(workspacePath, rawOutput, selectedModel)
+			s.reconcileAdhocUsage(workspacePath, capturedSessionID, selectedModel)
 		}
 	}()
 

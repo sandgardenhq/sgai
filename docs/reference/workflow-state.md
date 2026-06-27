@@ -39,24 +39,15 @@ Common fields include:
 - `progress` (array of objects with `timestamp`, `agent`, `description`)
 - `multiChoiceQuestion` (object with `questions`, each with `question`, `choices`, `multiSelect`)
 - `visitCounts` (object map of agent name to integer)
-- `currentAgent` (string)
-- `navigate` (object with `to` and `reason`, consumed by the runner)
 - `todos` (array of todo items)
 - `projectTodos` (array of todo items)
 - `agentSequence` (array with `agent`, `startTime`, `isCurrent`)
 - `sessionId` (string)
 - `cost` (object with `totalCost`, `totalTokens`, and `byAgent`)
 
-## Navigation
+## Handoffs
 
-Agents request a specific next agent by setting `navigate` through the MCP `update_workflow_state` tool with `status: "agent-done"`.
-
-The `navigate` object includes:
-
-- `to` (string)
-- `reason` (string)
-
-The runner consumes and clears `navigate` after selecting the requested agent. Shared work notes and handoffs belong in `.sgai/PROJECT_MANAGEMENT.md`, not `.sgai/state.json`.
+Agents return control by setting `status: "agent-done"` through the MCP `update_workflow_state` tool. Shared work notes and handoffs belong in `.sgai/PROJECT_MANAGEMENT.md`, not `.sgai/state.json`.
 
 ## TODO items
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestModeSectionForMode(t *testing.T) {
@@ -29,28 +30,16 @@ func TestModeSectionForMode(t *testing.T) {
 			wantCoordPlan: true,
 		},
 		{
-			name:          "building",
-			mode:          state.ModeBuilding,
+			name:          "interactive",
+			mode:          state.ModeInteractive,
 			wantNonEmpty:  true,
 			wantCoordPlan: true,
-		},
-		{
-			name:          "retrospective",
-			mode:          state.ModeRetrospective,
-			wantNonEmpty:  true,
-			wantCoordPlan: true,
-		},
-		{
-			name:          "brainstorming",
-			mode:          state.ModeBrainstorming,
-			wantNonEmpty:  true,
-			wantCoordPlan: false,
 		},
 		{
 			name:          "unknown",
 			mode:          "unknown-mode",
 			wantNonEmpty:  true,
-			wantCoordPlan: false,
+			wantCoordPlan: true,
 		},
 	}
 
@@ -80,55 +69,45 @@ func TestCoordinatorPromptsSayRetrospectiveIsOptIn(t *testing.T) {
 			assert.NoError(t, errRead)
 
 			prompt := string(content)
-			assert.NotContains(t, prompt, "default: enabled when absent or truish")
 			assert.Contains(t, prompt, "default: disabled when absent or empty")
 		})
 	}
 }
 
-func TestBuildingModePromptDoesNotSayRetrospectiveIsMandatory(t *testing.T) {
-	_, coordPlan := modeSectionForMode(state.ModeBuilding)
+func TestApprovedExecutionModesSuppressWorkflowChoiceQuestions(t *testing.T) {
+	for _, mode := range []string{state.ModeInteractive, state.ModeSelfDrive} {
+		t.Run(mode, func(t *testing.T) {
+			modeSection, _ := modeSectionForMode(mode)
 
-	assert.NotContains(t, coordPlan, "retrospective step is MANDATORY")
-	assert.NotContains(t, coordPlan, "Do NOT mark status:complete until the retrospective has finished")
+			assert.Contains(t, modeSection, "Do NOT ask workflow-choice questions")
+			assert.Contains(t, modeSection, "task decomposition")
+			assert.Contains(t, modeSection, "direct implementation")
+			assert.Contains(t, modeSection, "plan mode")
+		})
+	}
 }
 
 func TestCoordinatorDelegationPromptStatesCoordinatorOwnedSubagentDelegation(t *testing.T) {
-	prompt := buildCoordinatorDelegationMessage([]string{"coordinator", "go-reviewer"}, map[string]int{"coordinator": 1, "go-reviewer": 0}, t.TempDir(), state.ModeBuilding)
+	prompt := buildCoordinatorDelegationMessage([]string{"coordinator", "go-reviewer"}, t.TempDir(), state.ModeInteractive)
 
-	assert.Contains(t, prompt, "SGAI runs this top-level OpenCode session as the coordinator")
-	assert.Contains(t, prompt, "Delegate to available subagents through OpenCode's subagent/delegation mechanisms")
-	assert.Contains(t, prompt, "Available OpenCode Subagents for Delegation")
+	assert.Contains(t, prompt, "SGAI runs this top-level session as the coordinator")
+	assert.Contains(t, prompt, "Delegate by calling the Task tool")
+	assert.Contains(t, prompt, "Do not use bash, shell commands, opencode, or opencode run to delegate work")
+	assert.Contains(t, prompt, "Available Task Subagents for Delegation")
 	assert.Contains(t, prompt, "go-reviewer")
 	assert.Contains(t, prompt, ".sgai/PROJECT_MANAGEMENT.md is the shared ledger for inter-agent state, handoffs, blockers, questions, and completion evidence")
-	assert.Contains(t, prompt, "do not use navigate to cycle SGAI through the GOAL agents")
+	assert.Contains(t, prompt, "delegate with the Task tool only")
 }
 
-func TestNonCoordinatorPromptReturnsThroughDelegationAndLedgerHandoff(t *testing.T) {
-	prompt := composeCoordinatorPromptTemplate("go")
+func TestCoordinatorSkeletonDeniesOnlyOpencodeBashDelegation(t *testing.T) {
+	content, errRead := os.ReadFile("skel/.sgai/agent/coordinator.md")
+	require.NoError(t, errRead)
+	prompt := string(content)
 
-	assert.Contains(t, prompt, "append QUESTION: <your question> to PROJECT_MANAGEMENT.md")
-	assert.Contains(t, prompt, "return through OpenCode's subagent/delegation mechanism")
-	assert.Contains(t, prompt, "only the coordinator can mark checkboxes")
-	assert.Contains(t, prompt, "append status updates to .sgai/PROJECT_MANAGEMENT.md")
-}
-
-func TestModePromptsDoNotPresentRetrospectiveAsMandatory(t *testing.T) {
-	tests := []struct {
-		name string
-		mode string
-	}{
-		{name: "building", mode: state.ModeBuilding},
-		{name: "retrospective", mode: state.ModeRetrospective},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			modeSection, coordPlan := modeSectionForMode(tt.mode)
-			prompt := modeSection + "\n" + coordPlan
-
-			assert.NotContains(t, prompt, "mandatory")
-			assert.NotContains(t, prompt, "Do NOT skip the retrospective")
-		})
-	}
+	assert.NotContains(t, prompt, "\n  bash: deny\n")
+	assert.Contains(t, prompt, "  bash:\n")
+	assert.Contains(t, prompt, "    opencode: deny")
+	assert.Contains(t, prompt, "    \"opencode *\": deny")
+	assert.Contains(t, prompt, "    \"*/opencode\": deny")
+	assert.Contains(t, prompt, "    \"*/opencode *\": deny")
 }
