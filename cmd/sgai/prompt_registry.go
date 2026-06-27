@@ -14,25 +14,22 @@ RIGHT NOW, you must read @GOAL.md and @.sgai/PROJECT_MANAGEMENT.md, then work to
 
 const promptSectionHumanCommDirect = `if you want to tell me something, use ask_user_question to present structured questions;`
 
-const promptSectionHumanCommNonCoordinator = `if you want to tell me something, make sure you must call sgai_update_workflow_state (set blocked and a blocked message);`
-
-const promptSectionMessaging = `.sgai/PROJECT_MANAGEMENT.md is the shared ledger for inter-agent state, handoffs, blockers, questions, and completion evidence. Read it before acting and append concise sections when handing work off or reporting completion.`
+const promptSectionMessaging = `.sgai/PROJECT_MANAGEMENT.md is the shared ledger for inter-agent state, handoffs, blockers, questions, and completion evidence. Read it before acting and append concise coordinator sections when handing work off or reporting completion. Coordinator state updates must be explicit: current phase, concrete work completed, next action, blocker if any, and the expected owner of the next step.`
 
 const promptSectionProjectManagementMonitor = `Use .sgai/PROJECT_MANAGEMENT.md to monitor inter-agent communication and workflow history.`
 
 const promptSectionWorkFocus = `Critically, you must strictly do the work that you are an expert in, and leave other work to other agents.`
 
 const promptSectionDelegation = `## Delegation
-SGAI runs this top-level OpenCode session as the coordinator. Use available OpenCode subagents for delegation instead of routing the SGAI runtime between agents:
+SGAI runs this top-level session as the coordinator. Use the Task tool for subagent delegation instead of routing the SGAI runtime between agents:
 - Append handoffs, blockers, questions, or completion evidence to .sgai/PROJECT_MANAGEMENT.md
-- Delegate to available subagents through OpenCode's subagent/delegation mechanisms
-- Use sgai_update_workflow_state for durable status only; do not use navigate to cycle SGAI through the GOAL agents
+- Make every coordinator state update explicit about current phase, completed work, next step, blocker status, and handoff target
+- Delegate by calling the Task tool with one of the available subagent types listed below
+- Do not use bash, shell commands, opencode, or opencode run to delegate work
+- Use sgai_update_workflow_state for durable status only; delegate with the Task tool only
 
-## Available OpenCode Subagents for Delegation
+## Available Task Subagents for Delegation
 %AGENTS_LIST%
-
-## Visit Counts
-%VISIT_COUNTS%
 
 </UserInstructions>.
 
@@ -44,6 +41,7 @@ You are running in Self-Drive mode. This means:
 - The ask_user_question and ask_user_work_gate tools DO NOT EXIST
 - Skip the BRAINSTORMING step entirely - go directly to work
 - Skip the WORK-GATE step entirely - it is implicitly approved
+- Do NOT ask workflow-choice questions such as task decomposition, write spec first, direct implementation, or plan mode
 - If your instructions say to brainstorm or ask for approval, SKIP those steps completely
 `
 
@@ -51,36 +49,20 @@ const promptSectionSelfDriveModeCoordinator = `- Your master plan starts at read
 - Proceed directly: read GOAL.md → create PROJECT_MANAGEMENT.md → delegate to agents → verify → complete
 `
 
-const promptSectionBuildingMode = `# BUILDING MODE ACTIVE
-You are running in Building mode. The brainstorming and work-gate phases are complete.
-- The human partner has approved the definition — proceed directly to work
-- Skip the BRAINSTORMING step entirely - it is already done
-- Skip the WORK-GATE step entirely - it is already approved
-- Do NOT use ask_user_question or ask_user_work_gate during the building phase
-- If GOAL.md enables retrospective with retrospective: true, handle retrospective work as coordinator-owned analysis before completion
+const promptSectionInteractiveMode = `# INTERACTIVE MODE ACTIVE
+You are running in Interactive mode. This means:
+- Human interaction tools may be available to the coordinator only
+- Non-coordinator subagents must not ask the human directly
+- Check GOAL.md and .sgai/PROJECT_MANAGEMENT.md to determine whether brainstorming, work gate, implementation, verification, or retrospective work is currently needed
+- If the work gate is already approved in .sgai/PROJECT_MANAGEMENT.md, Do NOT ask workflow-choice questions such as task decomposition, write spec first, direct implementation, or plan mode
 `
 
-const promptSectionBuildingModeCoordinator = `- Your master plan: read GOAL.md → delegate to agents → verify with project-critic → complete
-- When delegated work is done, invoke the project-critic wrapper subagent to verify all GOAL.md checkboxes are genuinely complete
-- If GOAL.md enables retrospective with retrospective: true, perform coordinator-owned retrospective analysis before final completion
-`
-
-const promptSectionRetrospectiveMode = `# RETROSPECTIVE MODE ACTIVE
-You are running in Retrospective mode. The building phase is complete.
-- Human interaction tools (ask_user_question) are re-enabled
-- The coordinator owns retrospective analysis, human questions, and final completion decisions
-- Analyze session artifacts, ask any needed human questions directly, and record outcomes in PROJECT_MANAGEMENT.md
-- This phase runs only when GOAL.md explicitly opts in with retrospective: true
-`
-
-const promptSectionRetrospectiveModeCoordinator = `- Perform coordinator-owned retrospective analysis before final completion
-- Ask the human direct retrospective questions when needed, then record answers in PROJECT_MANAGEMENT.md
-- Complete when the coordinator-owned retrospective is done and project completion criteria are satisfied
+const promptSectionInteractiveModeCoordinator = `- Read GOAL.md and .sgai/PROJECT_MANAGEMENT.md, then continue from the durable ledger state
+- If the work gate is already approved, delegate implementation with the Task tool and verify completion
+- If requirements or approval are genuinely missing, ask the human through the appropriate question tool
 `
 
 const promptSectionPostSkillsCoordinator = `IMPORTANT: YOU COMMUNICATE WITH THE HUMAN ONLY VIA ask_user_question (structured multi-choice questions).`
-
-const promptSectionPostSkillsNonCoordinator = `IMPORTANT: If you need human clarification, append QUESTION: <your question> to PROJECT_MANAGEMENT.md, then finish with sgai_update_workflow_state({status:"agent-done"}) so control returns through OpenCode's subagent/delegation mechanism. The coordinator will handle human communication.`
 
 const promptSectionGuidelines = `# PRODUCTIVE WORK GUIDELINES
 BEFORE calling sgai_update_workflow_state, ask yourself:
@@ -91,6 +73,7 @@ BEFORE calling sgai_update_workflow_state, ask yourself:
 
 ANTI-PATTERN: Repeatedly calling sgai_update_workflow_state({status:"working"}) without doing real work creates infinite loops.
 GOOD PATTERN: Read files -> Write code -> Run tests -> THEN sgai_update_workflow_state with appropriate status.
+GOOD STATUS DETAIL: "coordinator direct verified repository validation, reviewed go test ./cmd/sgai results, no blockers, next owner coordinator for completion review".
 
 # COMPLETION GATE
 CRITICALLY IMPORTANT: IF YOUR LAST MESSAGE IS NOT A TOOL CALL, THE HUMAN PARTNER WILL NOT SEE IT.
@@ -99,7 +82,7 @@ EXCEPTION: After calling sgai_update_workflow_state({status:"agent-done"}), you 
 
 # CRITICAL: WHAT HAPPENS AFTER "agent-done"
 When you set status: "agent-done":
-1. The OpenCode subagent/delegation mechanism returns control to the coordinator
+1. The Task subagent delegation mechanism returns control to the coordinator
 2. Use PROJECT_MANAGEMENT.md for any handoff details the coordinator must read
 3. You should STOP making tool calls - your turn is over
 4. Do NOT call sgai_update_workflow_state multiple times with the same status
@@ -109,17 +92,12 @@ GOOD PATTERN: Do your work -> Call sgai_update_workflow_state({status:"agent-don
 
 const promptSectionTailCoordinator = `IMPORTANT: You are the SOLE owner of GOAL.md checkboxes. When delegated work is confirmed complete, you MUST mark the corresponding checkbox by changing '- [ ]' to '- [x]'. Use find_skills({"name":"project-completion-verification"}) to discover the skill, then skill({"name":"project-completion-verification"}) to check status and mark items. Look for 'GOAL COMPLETE:' PROJECT_MANAGEMENT.md entries from agents as triggers.`
 
-const promptSectionTailNonCoordinator = `IMPORTANT: When you complete a task listed in GOAL.md, you MUST append a PROJECT_MANAGEMENT.md entry starting with GOAL COMPLETE: [exact checkbox text from GOAL.md], then finish so control returns to the coordinator through OpenCode's subagent/delegation mechanism. Do NOT attempt to edit GOAL.md yourself - only the coordinator can mark checkboxes.`
-
-const promptSectionCommonTail = `IMPORTANT: use .sgai/PROJECT_MANAGEMENT.md to communicate with other agents and use OpenCode subagent/delegation handoff to return control to the coordinator
+const promptSectionCommonTail = `IMPORTANT: use .sgai/PROJECT_MANAGEMENT.md to communicate with other agents and use the Task subagent delegation handoff to return control to the coordinator
+IMPORTANT: Coordinator state updates must be explicit. Include what changed, what evidence exists, what remains, and who owns the next step.
 IMPORTANT: You must search for known skills with find_skills({"name":""}) (for all skills), find_skills({"name":"skill-name"}) (for specific skills), or find_skills({"name":"keywords"}) (for skills by keywords) before doing any work, then use skill({"name":"skill-name"}) to get the skill content when available.
 IMPORTANT: You must to search for language specific code snippets with sgai_find_snippets()`
 
-const promptSectionCoordinatorMessagingTail = `IMPORTANT: As coordinator, record your own status with sgai_update_workflow_state or .sgai/PROJECT_MANAGEMENT.md instead of routing to yourself.`
-
-const promptSectionNonCoordinatorMessagingTail = `IMPORTANT: append status updates to .sgai/PROJECT_MANAGEMENT.md. When coordinator action is needed, finish and return through OpenCode's subagent/delegation mechanism.`
-
-const promptSectionBrainstormingMode = "CRITICAL: think hard and ASK ME QUESTIONS BEFORE BUILDING\n"
+const promptSectionCoordinatorMessagingTail = `IMPORTANT: As coordinator, record your own status with sgai_update_workflow_state or .sgai/PROJECT_MANAGEMENT.md instead of routing to yourself. Say "coordinator direct" for your own work and identify Task subagents in the Task prompt you send them.`
 
 const promptSectionContinuousMode = `# CONTINUOUS MODE ACTIVE
 You are running in Continuous Mode. This means:
@@ -143,7 +121,7 @@ type promptOptions struct {
 }
 
 func composePrompt(opts promptOptions) string {
-	base := composeCoordinatorPromptTemplate(opts.agent)
+	base := composeCoordinatorPromptTemplate()
 
 	if opts.modeSection == "" {
 		return base
@@ -166,11 +144,9 @@ func modeSectionForMode(interactionMode string) (modeSection, coordinatorPlan st
 		return promptSectionSelfDriveMode, promptSectionSelfDriveModeCoordinator
 	case state.ModeContinuous:
 		return promptSectionContinuousMode, promptSectionContinuousModeCoordinator
-	case state.ModeBuilding:
-		return promptSectionBuildingMode, promptSectionBuildingModeCoordinator
-	case state.ModeRetrospective:
-		return promptSectionRetrospectiveMode, promptSectionRetrospectiveModeCoordinator
+	case state.ModeInteractive:
+		return promptSectionInteractiveMode, promptSectionInteractiveModeCoordinator
 	default:
-		return promptSectionBrainstormingMode, ""
+		return promptSectionInteractiveMode, promptSectionInteractiveModeCoordinator
 	}
 }

@@ -21,7 +21,7 @@ func TestStartSessionService(t *testing.T) {
 		setupFunc   func(*testing.T, string)
 		wantErr     bool
 		errContains string
-		validate    func(*testing.T, startSessionResult2)
+		validate    func(*testing.T, startSessionServiceResult)
 	}{
 		{
 			name: "startSessionInBrainstormingMode",
@@ -33,7 +33,7 @@ func TestStartSessionService(t *testing.T) {
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
 			wantErr: false,
-			validate: func(t *testing.T, result startSessionResult2) {
+			validate: func(t *testing.T, result startSessionServiceResult) {
 				assert.Equal(t, "running", result.Status)
 				assert.True(t, result.Running)
 			},
@@ -48,7 +48,7 @@ func TestStartSessionService(t *testing.T) {
 				require.NoError(t, os.WriteFile(goalPath, []byte(goalContent), 0644))
 			},
 			wantErr: false,
-			validate: func(t *testing.T, result startSessionResult2) {
+			validate: func(t *testing.T, result startSessionServiceResult) {
 				assert.Equal(t, "running", result.Status)
 				assert.True(t, result.Running)
 			},
@@ -84,6 +84,27 @@ func TestStartSessionService(t *testing.T) {
 
 			server.stopSessionService(workspacePath)
 			time.Sleep(100 * time.Millisecond)
+		})
+	}
+}
+
+func TestStartInteractionModeUsesRuntimeModes(t *testing.T) {
+	tests := []struct {
+		name             string
+		auto             bool
+		continuousPrompt string
+		expected         string
+	}{
+		{name: "newInteractiveSessionStartsInteractive", expected: state.ModeInteractive},
+		{name: "autoStartsSelfDrive", auto: true, expected: state.ModeSelfDrive},
+		{name: "continuousStartsContinuous", continuousPrompt: "run forever", expected: state.ModeContinuous},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := startInteractionMode(tt.auto, tt.continuousPrompt)
+
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -139,7 +160,7 @@ func TestRespondServiceDeliversToAskUserQuestion(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "respond-delivery")
 	coord, errCoord := state.NewCoordinatorWith(statePath(wsDir), state.Workflow{
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, errCoord)
 
@@ -443,14 +464,21 @@ func TestRespondViaCoordinatorServiceWorkGateApproval(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
 
 	coord, errCoord := state.NewCoordinatorWith(statePath(workspacePath), state.Workflow{
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, errCoord)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)
+	resultCh := make(chan string, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		_, _ = askUserWorkGate(ctx, coord, "summary")
+		result, errAsk := askUserWorkGate(ctx, coord, "summary")
+		if errAsk != nil {
+			errCh <- errAsk
+			return
+		}
+		resultCh <- result
 	}()
 
 	require.Eventually(t, func() bool {
@@ -466,9 +494,17 @@ func TestRespondViaCoordinatorServiceWorkGateApproval(t *testing.T) {
 	result, err := server.respondViaCoordinatorService(coord, req)
 	require.NoError(t, err)
 	assert.True(t, result.Success)
+	select {
+	case errAsk := <-errCh:
+		require.NoError(t, errAsk)
+	case answer := <-resultCh:
+		assert.Contains(t, answer, workGateApprovalText)
+	case <-ctx.Done():
+		require.NoError(t, ctx.Err())
+	}
 
 	wfState := coord.State()
-	assert.Equal(t, state.ModeBuilding, wfState.InteractionMode)
+	assert.Equal(t, state.ModeSelfDrive, wfState.InteractionMode)
 }
 
 func TestHandleRespondViaCoordinatorNoQuestion(t *testing.T) {
@@ -525,7 +561,7 @@ func TestRespondViaCoordinatorWorkGateApproval(t *testing.T) {
 
 	statePath := filepath.Join(wsDir, ".sgai", "state.json")
 	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{
-		InteractionMode: state.ModeBrainstorming,
+		InteractionMode: state.ModeInteractive,
 	})
 	require.NoError(t, errCoord)
 
@@ -565,7 +601,14 @@ func TestRespondViaCoordinatorWorkGateApproval(t *testing.T) {
 	}
 
 	updatedState := coord.State()
-	assert.Equal(t, state.ModeBuilding, updatedState.InteractionMode)
+	assert.Equal(t, state.ModeSelfDrive, updatedState.InteractionMode)
+
+	blockedResult, errQuestion := askUserQuestion(ctx, coord, askUserQuestionArgs{
+		Questions: []questionItem{{Question: "How should I proceed?", Choices: []string{"Ask again"}}},
+	})
+	require.NoError(t, errQuestion)
+	assert.Contains(t, blockedResult, "Questions are not allowed")
+	assert.False(t, coord.State().NeedsHumanInput())
 }
 
 func TestStopSessionServiceRunningSession(t *testing.T) {

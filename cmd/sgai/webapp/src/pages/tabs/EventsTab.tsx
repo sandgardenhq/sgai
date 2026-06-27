@@ -1,16 +1,14 @@
 import { useState, useTransition, type MouseEvent } from "react";
-import { ChevronRight, Square, ArrowRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronRight, Square } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import { ActionBar } from "./SessionTab";
-import type { ApiEventEntry, ApiActionEntry, ApiActiveAgentEntry } from "@/types";
+import type { ApiEventEntry, ApiActionEntry } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
@@ -31,10 +29,9 @@ function EventsTabSkeleton() {
   );
 }
 
-function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
+function NeedsInputBanner({ needsInput, humanMessage }: {
   needsInput: boolean;
   humanMessage: string;
-  currentAgent: string;
 }) {
   if (!needsInput || !humanMessage) {
     return null;
@@ -43,84 +40,9 @@ function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
   return (
     <Card>
       <CardContent className="p-3 bg-yellow-50">
-        <p className="text-sm font-medium">
-          <Badge variant="default">{currentAgent}</Badge>
-        </p>
         <blockquote className="mt-2 text-sm italic border-l-2 pl-3 text-muted-foreground">
           {humanMessage}
         </blockquote>
-      </CardContent>
-    </Card>
-  );
-}
-
-function statusVariant(status: string): "default" | "secondary" | "outline" {
-  switch (status) {
-    case "running":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "completed":
-      return "outline";
-    default:
-      return "secondary";
-  }
-}
-
-function ActiveAgentSection({ agents }: { agents: ApiActiveAgentEntry[] }) {
-  const hasActive = agents && agents.length > 0;
-
-  if (!hasActive) {
-    return (
-      <p className="text-sm italic text-muted-foreground">
-        No OpenCode subagents currently active
-      </p>
-    );
-  }
-
-  return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          Active Subagents
-        </div>
-        <div className="flex items-start gap-2">
-          <Badge variant="outline" className="shrink-0 mt-0.5 text-[0.65rem]">
-            coordinator
-          </Badge>
-          <ArrowRight className="size-3 text-muted-foreground mt-1.5 shrink-0" aria-hidden="true" />
-          <div className="flex flex-wrap gap-x-3 gap-y-1.5 min-w-0 flex-1">
-            {agents.map((agent) => (
-              <div key={agent.id} className="flex items-center gap-1.5 max-w-full" data-testid={`active-agent-${agent.agent}`}>
-                <span
-                  className={`size-1.5 rounded-full shrink-0 ${
-                    agent.status === "running" ? "bg-green-500" : "bg-muted-foreground"
-                  }`}
-                />
-                <Badge variant="default" className="text-[0.65rem] px-1.5 py-0">
-                  {agent.agent}
-                </Badge>
-                <Badge variant={statusVariant(agent.status)} className="text-[0.6rem] px-1.5 py-0">
-                  {agent.status}
-                </Badge>
-                {agent.title && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground truncate max-w-[160px] inline-block" title={agent.title}>
-                        {agent.title}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[300px] break-words">
-                      <p className="text-xs">{agent.title}</p>
-                      {agent.model && <p className="text-[0.65rem] opacity-70 mt-0.5">{agent.model}</p>}
-                      {agent.sessionId && <p className="text-[0.6rem] opacity-50 mt-0.5">Session: {agent.sessionId}</p>}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
@@ -156,9 +78,6 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
                   <time className="text-xs text-muted-foreground whitespace-nowrap">
                     {event.formattedTime}
                   </time>
-                  <Badge variant="secondary" className="text-[0.65rem] px-2 py-0">
-                    {event.agent}
-                  </Badge>
                 </div>
                 <span className="text-sm break-words">{event.description}</span>
               </div>
@@ -267,9 +186,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
       <NeedsInputBanner
         needsInput={workspace.needsInput}
         humanMessage={workspace.humanMessage}
-        currentAgent={workspace.currentAgent}
       />
-      <ActiveAgentSection agents={workspace.activeAgents} />
       {goalContent && (
         <details className="group">
           <summary className="cursor-pointer font-semibold text-sm mb-2 flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">

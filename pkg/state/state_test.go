@@ -216,6 +216,21 @@ func TestWorkflowToolsAllowed(t *testing.T) {
 			workflow: Workflow{},
 			expected: false,
 		},
+		{
+			name:     "interactiveTrue",
+			workflow: Workflow{InteractionMode: ModeInteractive},
+			expected: true,
+		},
+		{
+			name:     "selfDriveFalse",
+			workflow: Workflow{InteractionMode: ModeSelfDrive},
+			expected: false,
+		},
+		{
+			name:     "continuousFalse",
+			workflow: Workflow{InteractionMode: ModeContinuous},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {

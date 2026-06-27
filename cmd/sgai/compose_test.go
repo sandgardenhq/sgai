@@ -78,13 +78,6 @@ func TestBuildGOALContentOmitsEmptyAgentsList(t *testing.T) {
 	assert.Contains(t, content, "model: \"openai/gpt-5.5 (xhigh)\"")
 }
 
-func TestActiveComposerAgentsSkipsSTPAAnalyst(t *testing.T) {
-	agents := activeComposerAgents([]composerAgentConf{{Name: "go", Selected: true}, {Name: "stpa-analyst", Selected: true}, {Name: "coordinator", Selected: true}})
-
-	require.Len(t, agents, 1)
-	assert.Equal(t, "go", agents[0].Name)
-}
-
 func TestWorkflowTemplatesDoNotExposeCoordinatorAsSelectableAgent(t *testing.T) {
 	for _, tmpl := range workflowTemplates() {
 		t.Run(tmpl.ID, func(t *testing.T) {

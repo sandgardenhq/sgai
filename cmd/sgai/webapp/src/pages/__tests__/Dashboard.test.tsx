@@ -28,7 +28,6 @@ const createMockWorkspace = (overrides: Record<string, unknown> = {}) => ({
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "",
   task: "",
   goalContent: "",
   rawGoalContent: "",
@@ -37,7 +36,6 @@ const createMockWorkspace = (overrides: Record<string, unknown> = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -63,7 +61,6 @@ const mockWorkspaces = [
     pinned: true,
     isRoot: true,
     description: "Test Workspace 2",
-    currentAgent: "coordinator",
     task: "Working on task",
     totalExecTime: "1m 30s",
     forks: [

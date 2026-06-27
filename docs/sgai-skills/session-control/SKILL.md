@@ -73,7 +73,7 @@ If already stopped: `"message": "session already stopped"`
 
 ## Steer an Agent
 
-Inject a steering instruction into a running session without stopping it. The instruction is recorded in `.sgai/PROJECT_MANAGEMENT.md` and workflow state navigates to the coordinator.
+Inject a steering instruction into a running session without stopping it. The instruction is recorded in `.sgai/PROJECT_MANAGEMENT.md` and workflow state yields control back to the coordinator.
 
 **Endpoint:** `POST /api/v1/workspaces/{name}/steer`
 
@@ -108,7 +108,6 @@ Use the full state endpoint to check session status:
 ```bash
 STATE=$(curl -s $BASE_URL/api/v1/state)
 RUNNING=$(echo $STATE | jq '.workspaces[] | select(.name=="my-project") | .running')
-AGENT=$(echo $STATE | jq -r '.workspaces[] | select(.name=="my-project") | .currentAgent')
 TASK=$(echo $STATE | jq -r '.workspaces[] | select(.name=="my-project") | .task')
 ```
 
@@ -118,7 +117,6 @@ Key workspace state fields for session monitoring:
 |-------|------|-------------|
 | `running` | bool | Is session active? |
 | `inProgress` | bool | Is work actively happening? |
-| `currentAgent` | string | Which agent is currently running |
 | `task` | string | Current task description |
 | `status` | string | Workflow status string |
 | `latestProgress` | string | Most recent progress note |

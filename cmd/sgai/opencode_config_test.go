@@ -10,8 +10,14 @@ import (
 )
 
 type testOpenCodeConfig struct {
-	Username string                     `json:"username"`
-	MCP      map[string]testOpenCodeMCP `json:"mcp"`
+	Username string                             `json:"username"`
+	MCP      map[string]testOpenCodeMCP         `json:"mcp"`
+	Agent    map[string]testOpenCodeAgentConfig `json:"agent"`
+}
+
+type testOpenCodeAgentConfig struct {
+	Mode       string                     `json:"mode"`
+	Permission map[string]json.RawMessage `json:"permission"`
 }
 
 type testOpenCodeMCP struct {

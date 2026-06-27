@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
 
-type startSessionResult2 struct {
+type startSessionServiceResult struct {
 	Name           string
 	Status         string
 	Running        bool
@@ -18,28 +17,20 @@ type startSessionResult2 struct {
 	AlreadyRunning bool
 }
 
-func (s *Server) startSessionService(workspacePath string, auto bool) (startSessionResult2, error) {
+func (s *Server) startSessionService(workspacePath string, auto bool) (startSessionServiceResult, error) {
 	if s.classifyWorkspaceCached(workspacePath) == workspaceRoot {
-		return startSessionResult2{}, fmt.Errorf("root workspace cannot start agentic work")
+		return startSessionServiceResult{}, fmt.Errorf("root workspace cannot start agentic work")
 	}
 
 	coord := s.workspaceCoordinator(workspacePath)
 	continuousPrompt := readContinuousModePrompt(workspacePath)
 
-	var interactionMode string
-	switch {
-	case continuousPrompt != "":
-		interactionMode = state.ModeContinuous
-	case auto:
-		interactionMode = state.ModeSelfDrive
-	default:
-		interactionMode = state.ModeBrainstorming
-	}
+	interactionMode := startInteractionMode(auto, continuousPrompt)
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.InteractionMode = interactionMode
 	}); errUpdate != nil {
-		return startSessionResult2{}, fmt.Errorf("failed to save workflow state: %w", errUpdate)
+		return startSessionServiceResult{}, fmt.Errorf("failed to save workflow state: %w", errUpdate)
 	}
 
 	result := s.startSession(workspacePath)
@@ -47,7 +38,7 @@ func (s *Server) startSessionService(workspacePath string, auto bool) (startSess
 	name := filepath.Base(workspacePath)
 
 	if result.alreadyRunning {
-		return startSessionResult2{
+		return startSessionServiceResult{
 			Name:           name,
 			Status:         "running",
 			Running:        true,
@@ -57,17 +48,28 @@ func (s *Server) startSessionService(workspacePath string, auto bool) (startSess
 	}
 
 	if result.startError != nil {
-		return startSessionResult2{}, result.startError
+		return startSessionServiceResult{}, result.startError
 	}
 
 	s.notifyStateChange()
 
-	return startSessionResult2{
+	return startSessionServiceResult{
 		Name:    name,
 		Status:  "running",
 		Running: true,
 		Message: "session started",
 	}, nil
+}
+
+func startInteractionMode(auto bool, continuousPrompt string) string {
+	switch {
+	case continuousPrompt != "":
+		return state.ModeContinuous
+	case auto:
+		return state.ModeSelfDrive
+	default:
+		return state.ModeInteractive
+	}
 }
 
 type stopSessionResult struct {
@@ -154,19 +156,6 @@ func (s *Server) respondViaCoordinatorService(coord *state.Coordinator, req apiR
 		return respondResult{}, fmt.Errorf("no active question receiver")
 	}
 
-	if wfState.MultiChoiceQuestion != nil && wfState.MultiChoiceQuestion.IsWorkGate {
-		approvedViaSelection := slices.Contains(req.SelectedChoices, workGateApprovalText)
-		if approvedViaSelection {
-			if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-				if wf.InteractionMode == state.ModeBrainstorming {
-					wf.InteractionMode = state.ModeBuilding
-				}
-			}); errUpdate != nil {
-				return respondResult{}, fmt.Errorf("failed to save work gate approval: %w", errUpdate)
-			}
-		}
-	}
-
 	s.notifyStateChange()
 
 	return respondResult{Success: true, Message: "response submitted"}, nil
@@ -187,7 +176,6 @@ func (s *Server) steerService(workspacePath, message string) (steerResult, error
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Status = state.StatusAgentDone
-		wf.Navigate = &state.NavigationRequest{To: "coordinator", Reason: steerBody}
 	}); errUpdate != nil {
 		return steerResult{}, fmt.Errorf("failed to save state: %w", errUpdate)
 	}

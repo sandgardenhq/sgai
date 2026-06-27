@@ -128,9 +128,6 @@ export function ResponseMultiChoice() {
 
             </div>
           )}
-          <Badge variant="secondary" className="w-fit">
-            Agent: {question.agentName}
-          </Badge>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>

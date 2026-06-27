@@ -31,13 +31,12 @@ const (
 	continuousModePollInterval = 2 * time.Second
 )
 
-func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator, runtime sessionRuntime) {
+func runContinuousWorkflow(ctx context.Context, dir string, continuousPrompt string, mcpURL string, logWriter io.Writer, sessionCoord *state.Coordinator) {
 	runner := &workflowRunner{
 		dir:       dir,
 		mcpURL:    mcpURL,
 		logWriter: logWriter,
 		coord:     sessionCoord,
-		runtime:   runtime,
 	}
 	runner.runContinuous(ctx, continuousPrompt)
 }
@@ -110,7 +109,7 @@ func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, 
 		if errFresh == nil {
 			coord = freshCoord
 		}
-		if coord.State().Navigate != nil {
+		if coord.State().Status == state.StatusAgentDone {
 			return triggerSteering
 		}
 
@@ -165,7 +164,6 @@ func updateContinuousModeState(coord *state.Coordinator, task, agent, progressMs
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Task = task
-		wf.CurrentAgent = agent
 		wf.Progress = append(wf.Progress, state.ProgressEntry{
 			Timestamp:   timestamp,
 			Agent:       agent,
@@ -193,8 +191,6 @@ func resetWorkflowForNextCycle(coord *state.Coordinator) {
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Status = state.StatusWorking
 		wf.InteractionMode = state.ModeContinuous
-		wf.CurrentAgent = "coordinator"
-		wf.Navigate = nil
 	}); errUpdate != nil {
 		log.Println("failed to reset workflow for next cycle:", errUpdate)
 	}

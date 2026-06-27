@@ -38,7 +38,6 @@ func TestBuildAgentArgsCoordinatorModelVariant(t *testing.T) {
 
 	assert.Equal(t, []string{
 		"run",
-		"--format=json",
 		"--agent",
 		"coordinator",
 		"--model",
@@ -51,66 +50,36 @@ func TestBuildAgentArgsCoordinatorModelVariant(t *testing.T) {
 	}, args)
 }
 
+func TestBuildAgentPrefixUsesWorkspaceAndIteration(t *testing.T) {
+	prefix := buildIterationPrefix(filepath.Join("tmp", "swift-blue-oa5a"), 1)
+
+	assert.Equal(t, "[swift-blue-oa5a:0001]", prefix)
+}
+
 func TestBuildAgentMessageListsConfiguredAgentsForCoordinatorDelegation(t *testing.T) {
 	dir := t.TempDir()
 	agentsDir := filepath.Join(dir, ".sgai", "agent")
 	require.NoError(t, os.MkdirAll(agentsDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(agentsDir, "go.md"), []byte("---\ndescription: Go backend work\n---\n"), 0o644))
 
-	msg := buildAgentMessage(agentRunConfig{dir: dir, agent: "coordinator"}, state.Workflow{VisitCounts: map[string]int{"coordinator": 1, "go": 0}}, GoalMetadata{Agents: []string{"go"}})
+	msg := buildAgentMessage(agentRunConfig{dir: dir, agent: "coordinator"}, state.Workflow{}, GoalMetadata{Agents: []string{"go"}})
 
-	assert.Contains(t, msg, "## Available OpenCode Subagents for Delegation")
+	assert.Contains(t, msg, "## Available Task Subagents for Delegation")
 	assert.Contains(t, msg, "go: Go backend work")
 	assert.NotContains(t, delegationSection(msg), "coordinator")
-	assert.Contains(t, msg, "coordinator: 1 visits")
-	assert.Contains(t, msg, "go: 0 visits")
 }
 
 func delegationSection(msg string) string {
-	start := strings.Index(msg, "## Available OpenCode Subagents for Delegation")
+	start := strings.Index(msg, "## Available Task Subagents for Delegation")
 	if start < 0 {
 		return ""
 	}
 	section := msg[start:]
-	end := strings.Index(section, "## Visit Counts")
+	end := strings.Index(section, "\n\n")
 	if end < 0 {
 		return section
 	}
 	return section[:end]
-}
-
-func TestHandleCompleteStatusDoesNotRouteRetrospectiveAgent(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".sgai"), 0o755))
-	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, ".sgai", "state.json"), state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := handleCompleteStatus(t.Context(), agentRunConfig{dir: dir, agent: "coordinator", coord: coord, paddedsgai: "sgai"}, state.Workflow{Status: state.StatusComplete, VisitCounts: map[string]int{}}, state.Workflow{}, GoalMetadata{Retrospective: "true", Agents: []string{"go", "retrospective"}})
-
-	assert.Equal(t, state.StatusComplete, result.Status)
-	assert.Nil(t, result.Navigate)
-}
-
-func TestBuildAllAgentsExcludesSTPAAnalyst(t *testing.T) {
-	agents := buildAllAgents([]string{"go", "stpa-analyst", "react"})
-
-	assert.Equal(t, []string{"coordinator", "go", "react"}, agents)
-}
-
-func TestParseYAMLFrontmatterExcludesSTPAAnalyst(t *testing.T) {
-	content := []byte(`---
-agents:
-  - go
-  - stpa-analyst
-  - react
----
-# Goal
-`)
-
-	metadata, errParse := parseYAMLFrontmatter(content)
-
-	require.NoError(t, errParse)
-	assert.Equal(t, []string{"go", "react"}, metadata.Agents)
 }
 
 func TestModelFromGoalReadsTopLevelModel(t *testing.T) {

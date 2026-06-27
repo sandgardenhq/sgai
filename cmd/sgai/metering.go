@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -247,32 +246,6 @@ func parseExportedSession(data []byte, defaultSessionID, fallbackModel string) (
 	}
 	slices.Sort(childSessionIDs)
 	return steps, childSessionIDs, nil
-}
-
-func parseJSONValues(data []byte) ([]any, error) {
-	trimmed := bytes.TrimSpace(data)
-	if len(trimmed) == 0 {
-		return nil, nil
-	}
-	var value any
-	if err := json.Unmarshal(trimmed, &value); err == nil {
-		return []any{value}, nil
-	}
-
-	dec := json.NewDecoder(bytes.NewReader(trimmed))
-	var values []any
-	for {
-		var item any
-		err := dec.Decode(&item)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, item)
-	}
-	return values, nil
 }
 
 func exportedStepFromPart(exportedPart exportedPart, defaultSessionID, fallbackModel string, timestamp int64) (exportedStep, bool) {

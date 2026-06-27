@@ -22,30 +22,6 @@ Primary Go wrapper agent that coordinates Go implementation and review by delega
 
 ---
 
-## c4-code
-
-Expert C4 Code-level documentation specialist that analyzes code directories to create comprehensive C4 code-level documentation. This agent extracts function signatures, arguments, dependencies, and code structure at the most granular level of the C4 model. It supports multiple programming paradigms (OOP, functional, procedural) and generates Mermaid diagrams for code relationships. Use this agent when documenting code at the lowest C4 level for individual directories and code modules, forming the foundation for higher-level C4 documentation.
-
----
-
-## c4-component
-
-Expert C4 Component-level documentation specialist that synthesizes C4 Code-level documentation into Component-level architecture. This agent identifies component boundaries, defines interfaces, maps relationships between components, and creates component diagrams. It groups related code files into logical components based on domain, technical, or organizational boundaries. Use this agent when synthesizing code-level documentation into logical components for architectural understanding.
-
----
-
-## c4-container
-
-Expert C4 Container-level documentation specialist that synthesizes Component-level documentation into Container-level architecture. This agent maps components to deployment units (Docker, Kubernetes, cloud services), documents container interfaces as OpenAPI/Swagger specifications, and creates container diagrams showing high-level technology choices. Use this agent when synthesizing components into deployment containers and documenting system deployment architecture.
-
----
-
-## c4-context
-
-Expert C4 Context-level documentation specialist that creates high-level system context diagrams and documentation. This agent identifies personas, maps user journeys, documents system features, and captures external dependencies. It synthesizes container and component documentation into stakeholder-friendly context diagrams that show the system, its users, and external systems. Use this agent when creating the highest-level C4 system context documentation that non-technical stakeholders can understand.
-
----
-
 ## cli-output-style-adjuster
 
 Adjusts source code CLI output style for minimal, plain-text output following Unix philosophy principles. This agent scans source code files and applies style transformations to ensure outputs are clean, lowercase, emoji-free, use plain ASCII characters, are silent on success, and properly direct errors to stderr. It works across multiple programming languages (Go, Python, JavaScript, Rust, etc.) and processes recently changed files based on version control diffs.

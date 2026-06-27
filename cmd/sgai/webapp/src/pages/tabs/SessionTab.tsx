@@ -2,7 +2,6 @@ import { useState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -250,7 +249,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const { workspaces } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
-  const agentSequence = workspace?.agentSequence ?? [];
   const cost = workspace?.cost;
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
@@ -344,37 +342,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
       </Card>
 
       {cost && <CostSection cost={cost} />}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Agent Sequence</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {agentSequence && agentSequence.length > 0 ? (
-            <ScrollArea className="max-h-[300px]">
-              <ol className="list-decimal list-inside space-y-1 text-sm">
-                {agentSequence.map((entry) => (
-                  <li key={`${entry.agent}-${entry.elapsedTime}`} className="flex items-center gap-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className={entry.isCurrent ? "font-bold" : ""}>
-                          {entry.agent}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{entry.model ? `${entry.agent} | ${entry.model}` : entry.agent}</TooltipContent>
-                    </Tooltip>
-                    <span className="text-xs text-muted-foreground">
-                      ({entry.elapsedTime})
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </ScrollArea>
-          ) : (
-            <p className="text-sm italic text-muted-foreground">No agent sequence yet</p>
-          )}
-        </CardContent>
-      </Card>
 
       {hasProjectMgmt && (
         <details className="group">

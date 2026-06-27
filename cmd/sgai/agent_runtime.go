@@ -14,95 +14,27 @@ import (
 )
 
 type agentRunConfig struct {
-	dir                   string
-	goalPath              string
-	agent                 string
-	statePath             string
-	coord                 *state.Coordinator
-	retrospectiveDir      string
-	longestNameLen        int
-	paddedsgai            string
-	mcpURL                string
-	logWriter             io.Writer
-	stdoutLog             io.Writer
-	stderrLog             io.Writer
-	activeAgents          *activeAgentTracker
-	onActiveAgentsChanged func()
+	dir              string
+	goalPath         string
+	agent            string
+	statePath        string
+	coord            *state.Coordinator
+	retrospectiveDir string
+	goalAgents       []string
+	paddedsgai       string
+	mcpURL           string
+	logWriter        io.Writer
+	stdoutLog        io.Writer
+	stderrLog        io.Writer
 }
 
-func runSingleModelIteration(ctx context.Context, cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
-	paddedAgentName := cfg.agent + strings.Repeat(" ", max(0, cfg.longestNameLen-len(cfg.agent)))
-	var capturedSessionID string
-	var consecutiveWorkingIterations int
-	outputCapture := newRingWriter()
-
-	for {
-		if ctx.Err() != nil {
-			fmt.Println("["+cfg.paddedsgai+"]", "interrupted, stopping agent...")
-			return wfState
-		}
-
-		*iterationCounter++
-		prefix := buildAgentPrefix(cfg.dir, paddedAgentName, *iterationCounter)
-
-		saveState(cfg.coord, wfState)
-		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
-
-		agentArgs := buildAgentArgs(cfg.agent, metadata.Model, capturedSessionID)
-		agentMsg := buildAgentMessage(cfg, wfState, metadata)
-
-		newState, capturedSessionID, errExec := executeAgentProcess(ctx, cfg, agentArgs, agentMsg, prefix, outputCapture, wfState, metadata.Model)
-		if errExec != nil {
-			return *errExec
-		}
-
-		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
-			exportAgentSession(cfg, capturedSessionID, *iterationCounter)
-		}
-		if capturedSessionID != "" {
-			if errReconcile := reconcileAgentUsage(cfg.dir, cfg.coord, cfg.agent, capturedSessionID, metadata.Model); errReconcile != nil {
-				log.Println("failed to reconcile opencode usage:", errReconcile)
-			}
-			newState = cfg.coord.State()
-		}
-
-		if newState.VisitCounts == nil {
-			newState.VisitCounts = make(map[string]int)
-		}
-
-		switch newState.Status {
-		case state.StatusComplete:
-			return handleCompleteStatus(ctx, cfg, newState, wfState, metadata)
-
-		case state.StatusWaitingForHuman:
-			wfState = handleWaitingForHumanStatus(cfg, newState)
-			continue
-
-		case state.StatusAgentDone:
-			saveState(cfg.coord, newState)
-			fmt.Println("["+cfg.paddedsgai+"]", "agent", cfg.agent, "done:", newState.Task)
-			return newState
-
-		case state.StatusWorking:
-			saveState(cfg.coord, newState)
-			consecutiveWorkingIterations = handleWorkingLoop(cfg, &capturedSessionID, consecutiveWorkingIterations)
-			wfState = newState
-			continue
-
-		default:
-			log.Fatalln("["+cfg.paddedsgai+"]", "unexpected status:", newState.Status)
-		}
-	}
-}
-
-func buildAgentPrefix(dir, paddedAgentName string, iteration int) string {
+func buildIterationPrefix(dir string, iteration int) string {
 	workspaceName := filepath.Base(dir)
-	return fmt.Sprintf("[%s][%s:%04d]", workspaceName, paddedAgentName, iteration)
+	return fmt.Sprintf("[%s:%04d]", workspaceName, iteration)
 }
 
 func buildAgentMessage(cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata) string {
-	allAgents := buildAllAgents(metadata.Agents)
-	msg := buildCoordinatorDelegationMessage(allAgents, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
+	msg := buildCoordinatorDelegationMessage(metadata.Agents, cfg.dir, wfState.InteractionMode)
 
 	pendingTodosCount := countPendingTodos(wfState, cfg.agent)
 	if pendingTodosCount > 0 {

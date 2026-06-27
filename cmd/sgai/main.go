@@ -1,3 +1,4 @@
+// Command sgai is CLI for AI-powered software factory
 package main
 
 import (
