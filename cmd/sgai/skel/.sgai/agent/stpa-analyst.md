@@ -56,7 +56,7 @@ Append your report to `.sgai/PROJECT_MANAGEMENT.md` for the requesting agent:
 - [any concerns that need attention]
 ```
 
-After writing the report, set `status: agent-done` and navigate back to the requesting agent.
+After writing the report, set `status: agent-done` and record the handoff in `.sgai/PROJECT_MANAGEMENT.md`.
 
 ---
 

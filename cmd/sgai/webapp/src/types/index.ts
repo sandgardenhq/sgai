@@ -24,7 +24,6 @@ export interface ApiWorkspaceEntry {
   hasEditedGoal: boolean;
   interactiveAuto: boolean;
   continuousMode: boolean;
-  currentAgent: string;
   activeAgents: ApiActiveAgentEntry[];
   task: string;
   goalContent: string;
@@ -35,7 +34,6 @@ export interface ApiWorkspaceEntry {
   totalExecTime: string;
   latestProgress: string;
   humanMessage: string;
-  agentSequence: ApiAgentSequenceEntry[];
   cost: ApiSessionCost;
   events: ApiEventEntry[];
   projectTodos: ApiTodoEntry[];
@@ -47,13 +45,6 @@ export interface ApiWorkspaceEntry {
   pendingQuestion?: ApiPendingQuestionResponse;
   actions?: ApiActionEntry[];
   external?: boolean;
-}
-
-interface ApiAgentSequenceEntry {
-  agent: string;
-  model: string;
-  elapsedTime: string;
-  isCurrent: boolean;
 }
 
 export interface ApiActionEntry {
@@ -139,7 +130,6 @@ interface MultiChoiceQuestion {
 export interface ApiPendingQuestionResponse {
   questionId: string;
   type: "multi-choice" | "work-gate" | "free-text" | "";
-  agentName: string;
   message: string;
   questions?: MultiChoiceQuestion[];
 }

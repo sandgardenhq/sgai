@@ -20,7 +20,7 @@ type agentRunConfig struct {
 	statePath             string
 	coord                 *state.Coordinator
 	retrospectiveDir      string
-	longestNameLen        int
+	goalAgents            []string
 	paddedsgai            string
 	mcpURL                string
 	logWriter             io.Writer
@@ -31,7 +31,6 @@ type agentRunConfig struct {
 }
 
 func runSingleModelIteration(ctx context.Context, cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata, iterationCounter *int) state.Workflow {
-	paddedAgentName := cfg.agent + strings.Repeat(" ", max(0, cfg.longestNameLen-len(cfg.agent)))
 	var capturedSessionID string
 	var consecutiveWorkingIterations int
 	outputCapture := newRingWriter()
@@ -43,7 +42,7 @@ func runSingleModelIteration(ctx context.Context, cfg agentRunConfig, wfState st
 		}
 
 		*iterationCounter++
-		prefix := buildAgentPrefix(cfg.dir, paddedAgentName, *iterationCounter)
+		prefix := buildAgentPrefix(cfg.dir, cfg.agent, *iterationCounter)
 
 		saveState(cfg.coord, wfState)
 		copyProjectManagementToRetrospective(cfg.dir, cfg.retrospectiveDir)
@@ -64,10 +63,6 @@ func runSingleModelIteration(ctx context.Context, cfg agentRunConfig, wfState st
 				log.Println("failed to reconcile opencode usage:", errReconcile)
 			}
 			newState = cfg.coord.State()
-		}
-
-		if newState.VisitCounts == nil {
-			newState.VisitCounts = make(map[string]int)
 		}
 
 		switch newState.Status {
@@ -101,8 +96,7 @@ func buildAgentPrefix(dir, paddedAgentName string, iteration int) string {
 }
 
 func buildAgentMessage(cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata) string {
-	allAgents := buildAllAgents(metadata.Agents)
-	msg := buildCoordinatorDelegationMessage(allAgents, wfState.VisitCounts, cfg.dir, wfState.InteractionMode)
+	msg := buildCoordinatorDelegationMessage(metadata.Agents, cfg.dir, wfState.InteractionMode)
 
 	pendingTodosCount := countPendingTodos(wfState, cfg.agent)
 	if pendingTodosCount > 0 {

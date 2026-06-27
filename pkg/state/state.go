@@ -55,14 +55,6 @@ type TodoItem struct {
 	Priority string `json:"priority"`
 }
 
-// AgentSequenceEntry represents an agent's visit in the workflow sequence.
-// It tracks when the agent started and whether it is the current agent.
-type AgentSequenceEntry struct {
-	Agent     string `json:"agent"`
-	StartTime string `json:"startTime"`
-	IsCurrent bool   `json:"isCurrent"`
-}
-
 // ProgressEntry represents a single progress log entry.
 type ProgressEntry struct {
 	Timestamp   string `json:"timestamp"`
@@ -163,13 +155,8 @@ type Workflow struct {
 	Progress            []ProgressEntry      `json:"progress"`
 	HumanMessage        string               `json:"humanMessage"`
 	MultiChoiceQuestion *MultiChoiceQuestion `json:"multiChoiceQuestion,omitempty"`
-	Navigate            *NavigationRequest   `json:"navigate,omitempty"`
-	GoalChecksum        string               `json:"goalChecksum"`
-	VisitCounts         map[string]int       `json:"visitCounts,omitempty"`
-	CurrentAgent        string               `json:"currentAgent,omitempty"`
 	Todos               []TodoItem           `json:"todos,omitempty"`
 	ProjectTodos        []TodoItem           `json:"projectTodos,omitempty"`
-	AgentSequence       []AgentSequenceEntry `json:"agentSequence,omitempty"`
 	SessionID           string               `json:"sessionId,omitempty"`
 
 	Cost SessionCost `json:"cost"`
@@ -186,12 +173,6 @@ type Workflow struct {
 	SummaryManual bool `json:"summaryManual,omitempty"`
 }
 
-// NavigationRequest asks the runner to route to another DAG agent.
-type NavigationRequest struct {
-	To     string `json:"to"`
-	Reason string `json:"reason,omitempty"`
-}
-
 // ToolsAllowed reports whether the current interaction mode permits
 // human-interaction tools (ask_user_question, ask_user_work_gate).
 func (w Workflow) ToolsAllowed() bool {
@@ -206,9 +187,6 @@ func load(path string) (Workflow, error) {
 	var wf Workflow
 	if err := json.Unmarshal(data, &wf); err != nil {
 		return Workflow{}, err
-	}
-	if wf.VisitCounts == nil {
-		wf.VisitCounts = make(map[string]int)
 	}
 	return wf, nil
 }

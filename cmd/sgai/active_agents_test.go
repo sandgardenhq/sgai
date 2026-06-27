@@ -206,7 +206,7 @@ func TestBuildWorkspaceFullStateExposesMemoryOnlyActiveSubagents(t *testing.T) {
 	server, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "active-agents")
 	statePath := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking, CurrentAgent: "coordinator"})
+	_, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusWorking})
 	require.NoError(t, errCoord)
 	tracker := newActiveAgentTracker()
 	tracker.applyEvent(activeTaskEvent("part-1", "call-1", "running", "go", "child-session-1", "openai/gpt-5.5", "Implement backend"))
@@ -222,9 +222,9 @@ func TestBuildWorkspaceFullStateExposesMemoryOnlyActiveSubagents(t *testing.T) {
 	data, errRead := os.ReadFile(statePath)
 	require.NoError(t, errRead)
 	assert.NotContains(t, string(data), "activeAgents")
+	assert.NotContains(t, string(data), "currentAgent")
 	var persisted state.Workflow
 	require.NoError(t, json.Unmarshal(data, &persisted))
-	assert.Equal(t, "coordinator", persisted.CurrentAgent)
 }
 
 func TestBuildWorkspaceFullStateExposesEmptyActiveSubagentsForStoppedSessions(t *testing.T) {

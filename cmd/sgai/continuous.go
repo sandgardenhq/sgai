@@ -52,7 +52,7 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 
 		cmd := exec.CommandContext(ctx, "opencode", "run", "--title", "continuous-mode-prompt")
 		cmd.Dir = dir
-		cmd.Env = buildManagedOpenCodeEnv(dir, mcpURL, "continuous-mode", "auto")
+		cmd.Env = buildManagedOpenCodeEnv(dir, mcpURL, "continuous-mode", "auto", nil)
 		cmd.Stdin = strings.NewReader(prompt)
 
 		if errRun := cmd.Run(); errRun != nil {
@@ -110,7 +110,7 @@ func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, 
 		if errFresh == nil {
 			coord = freshCoord
 		}
-		if coord.State().Navigate != nil {
+		if coord.State().Status == state.StatusAgentDone {
 			return triggerSteering
 		}
 
@@ -165,7 +165,6 @@ func updateContinuousModeState(coord *state.Coordinator, task, agent, progressMs
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Task = task
-		wf.CurrentAgent = agent
 		wf.Progress = append(wf.Progress, state.ProgressEntry{
 			Timestamp:   timestamp,
 			Agent:       agent,
@@ -193,8 +192,6 @@ func resetWorkflowForNextCycle(coord *state.Coordinator) {
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Status = state.StatusWorking
 		wf.InteractionMode = state.ModeContinuous
-		wf.CurrentAgent = "coordinator"
-		wf.Navigate = nil
 	}); errUpdate != nil {
 		log.Println("failed to reset workflow for next cycle:", errUpdate)
 	}

@@ -30,7 +30,6 @@ const createMockWorkspace = (overrides = {}) => ({
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "",
   task: "",
   goalContent: "",
   rawGoalContent: "",
@@ -39,7 +38,6 @@ const createMockWorkspace = (overrides = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -289,32 +287,6 @@ describe("SessionTab", () => {
 
       await waitFor(() => {
         expect(screen.getByText("By Agent (2 agents)")).toBeTruthy();
-      });
-    });
-  });
-
-  describe("agent sequence", () => {
-    it("shows empty state when no agent sequence", async () => {
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("No agent sequence yet")).toBeTruthy();
-      });
-    });
-
-    it("displays agent sequence when available", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        agentSequence: [
-          { agent: "coordinator", model: "opencode/glm-5", elapsedTime: "1m", isCurrent: true },
-          { agent: "developer", model: "opencode/glm-5", elapsedTime: "2m", isCurrent: false },
-        ],
-      })];
-
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("coordinator")).toBeTruthy();
-        expect(screen.getByText("developer")).toBeTruthy();
       });
     });
   });

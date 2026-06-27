@@ -154,7 +154,7 @@ After every deployment, verify by:
 Report deployment status to the coordinator by appending to `.sgai/PROJECT_MANAGEMENT.md`, then yield with navigation:
 
 ```
-sgai_update_workflow_state({status: "agent-done", navigate: {to: "coordinator", reason: "deployment status ready"}})
+sgai_update_workflow_state({status: "agent-done"})
 ```
 
 If you encounter issues requiring human intervention, write `QUESTION: <describe the issue>` in `.sgai/PROJECT_MANAGEMENT.md` before yielding to coordinator.

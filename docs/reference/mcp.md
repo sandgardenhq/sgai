@@ -40,7 +40,6 @@ Input fields:
 - `status`
 - `task`
 - `addProgress`
-- `navigate`
 
 #### Status values depend on the current agent
 
@@ -57,26 +56,22 @@ When the current agent is `coordinator`, it also allows:
 
 Transitions to `agent-done` or `complete` fail if there are pending TODO items.
 
-#### Navigation
+#### Handoff
 
-Agents request a non-default next agent with `navigate` while setting `status` to `agent-done`.
+Agents return control with `status` set to `agent-done`.
 
 Input:
 
 ```json
 {
   "status": "agent-done",
-  "navigate": {
-    "to": "reviewer",
-    "reason": "review is needed before continuing"
-  }
+  "task": "",
+  "addProgress": "Implementation complete"
 }
 ```
 
 Notes:
 
-- `navigate` is only valid with `status: "agent-done"`.
-- `navigate.to` must name an agent made available by the current coordinator handoff/runtime context; omit it when the coordinator should choose the next delegation.
 - Shared context and handoff notes belong in `.sgai/PROJECT_MANAGEMENT.md`.
 
 ### `project_todowrite` (coordinator only)

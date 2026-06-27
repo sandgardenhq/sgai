@@ -164,7 +164,6 @@ type apiWorkspaceFullState struct {
 	HasEditedGoal   bool                        `json:"hasEditedGoal"`
 	InteractiveAuto bool                        `json:"interactiveAuto"`
 	ContinuousMode  bool                        `json:"continuousMode"`
-	CurrentAgent    string                      `json:"currentAgent"`
 	ActiveAgents    []apiActiveAgent            `json:"activeAgents"`
 	Task            string                      `json:"task"`
 	GoalContent     string                      `json:"goalContent"`
@@ -176,7 +175,6 @@ type apiWorkspaceFullState struct {
 	TotalExecTime   string                      `json:"totalExecTime"`
 	LatestProgress  string                      `json:"latestProgress"`
 	HumanMessage    string                      `json:"humanMessage"`
-	AgentSequence   []apiAgentSequenceEntry     `json:"agentSequence"`
 	Cost            state.SessionCost           `json:"cost"`
 	Events          []apiEventEntry             `json:"events"`
 	ProjectTodos    []apiTodoEntry              `json:"projectTodos"`
@@ -272,11 +270,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 	badgeClass, badgeText := badgeStatus(wfState, ws.Running)
 	needsInput := wfState.NeedsHumanInput()
 
-	currentAgent := wfState.CurrentAgent
-	if currentAgent == "" {
-		currentAgent = "Unknown"
-	}
-
 	status := wfState.Status
 	if status == "" {
 		status = "-"
@@ -289,11 +282,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		body := extractBody(data)
 		hasEditedGoal = len(strings.TrimSpace(string(body))) > 0
 	}
-
-	agentSeq := convertAgentSequence(
-		prepareAgentSequenceDisplay(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress), ws.Directory),
-	)
-	totalExecTime := calculateTotalExecutionTime(wfState.AgentSequence, ws.Running, getLastActivityTime(wfState.Progress))
 
 	reversedProgress := slices.Clone(wfState.Progress)
 	slices.Reverse(reversedProgress)
@@ -327,7 +315,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 
 	var pendingQuestion *apiPendingQuestionResponse
 	if wfState.NeedsHumanInput() {
-		agentName := currentAgent
 		var questions []apiQuestionItem
 		if wfState.MultiChoiceQuestion != nil {
 			questions = make([]apiQuestionItem, 0, len(wfState.MultiChoiceQuestion.Questions))
@@ -342,7 +329,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		pendingQuestion = &apiPendingQuestionResponse{
 			QuestionID: generateQuestionID(wfState),
 			Type:       questionType(wfState),
-			AgentName:  agentName,
 			Message:    wfState.HumanMessage,
 			Questions:  questions,
 		}
@@ -370,7 +356,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		HasEditedGoal:   hasEditedGoal,
 		InteractiveAuto: interactiveAuto,
 		ContinuousMode:  readContinuousModePrompt(ws.Directory) != "",
-		CurrentAgent:    currentAgent,
 		ActiveAgents:    activeAgents,
 		Task:            wfState.Task,
 		GoalContent:     goalContent,
@@ -379,10 +364,9 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		FullGoalContent: fullGoalContent,
 		PMContent:       pmContent,
 		HasProjectMgmt:  hasProjectMgmt,
-		TotalExecTime:   totalExecTime,
+		TotalExecTime:   calculateTotalExecutionTime(wfState.Progress, ws.Running),
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		HumanMessage:    wfState.HumanMessage,
-		AgentSequence:   agentSeq,
 		Cost:            wfState.Cost,
 		Events:          events,
 		ProjectTodos:    convertTodosForAPI(wfState.ProjectTodos),
@@ -846,13 +830,6 @@ type apiActionEntry struct {
 	Description string `json:"description,omitempty"`
 }
 
-type apiAgentSequenceEntry struct {
-	Agent       string `json:"agent"`
-	Model       string `json:"model"`
-	ElapsedTime string `json:"elapsedTime"`
-	IsCurrent   bool   `json:"isCurrent"`
-}
-
 func loadActionsForAPI(workspacePath string) []apiActionEntry {
 	config, errLoad := loadProjectConfig(workspacePath)
 	if errLoad != nil || config == nil || config.Actions == nil {
@@ -892,14 +869,6 @@ func readGoalAndPMForAPI(dir string) (goalContent, rawGoalContent, fullGoalConte
 	}
 
 	return goalContent, rawGoalContent, fullGoalContent, pmContent, hasProjectMgmt
-}
-
-func convertAgentSequence(displays []agentSequenceDisplay) []apiAgentSequenceEntry {
-	result := make([]apiAgentSequenceEntry, 0, len(displays))
-	for _, d := range displays {
-		result = append(result, apiAgentSequenceEntry(d))
-	}
-	return result
 }
 
 type apiCreateWorkspaceRequest struct {
@@ -1148,7 +1117,6 @@ type apiQuestionItem struct {
 type apiPendingQuestionResponse struct {
 	QuestionID string            `json:"questionId"`
 	Type       string            `json:"type"`
-	AgentName  string            `json:"agentName"`
 	Message    string            `json:"message"`
 	Questions  []apiQuestionItem `json:"questions,omitempty"`
 }

@@ -45,7 +45,6 @@ Response shape:
       "needsInput": false,
       "inProgress": false,
       "status": "agent-done",
-      "currentAgent": "coordinator",
       "task": "Planning implementation",
       "pendingQuestion": null
     }

@@ -12,9 +12,6 @@ permission:
   todowrite: deny
   todoread: deny
   question: deny
-  task:
-    "*": deny
-    "project-critic": allow
   plan_enter: deny
   plan_exit: deny
 ---
@@ -96,8 +93,8 @@ This trigger takes priority over general skill discovery.
 Agents coordinate through `.sgai/PROJECT_MANAGEMENT.md` and coordinator-first delegation.
 
 - Write durable handoffs, decisions, blockers, and questions into `.sgai/PROJECT_MANAGEMENT.md`.
-- Yield to an available delegate with `sgai_update_workflow_state({status: "agent-done", navigate: {to: "agent-name", reason: "why"}})` when the runtime provides workflow-state handoff navigation.
-- `navigate.to` must name an available delegate exposed for this run.
+- Delegate through available OpenCode subagents.
+- Use `sgai_update_workflow_state` only for durable workflow status.
 - Do not use legacy routing tools; they are not available.
 
 ## Human Communication and Answer Logging
@@ -266,7 +263,7 @@ When `.sgai/PROJECT_MANAGEMENT.md` contains a retrospective entry with "RETRO_QU
 sgai_ask_user_question({questions: [{question: "[content from RETRO_QUESTION message]", choices: [...], multiSelect: false}]})
 // Step 2: After receiving human's answer, append it to .sgai/PROJECT_MANAGEMENT.md
 // Step 3: Yield control to retrospective
-sgai_update_workflow_state({status: "agent-done", navigate: {to: "retrospective", reason: "human answered retrospective question"}})
+sgai_update_workflow_state({status: "agent-done"})
 ```
 
 ### ANTI-PATTERN: Fabricating Human Answers
@@ -282,10 +279,10 @@ sgai_update_workflow_state({status: "agent-done", navigate: {to: "retrospective"
   1. Check GOAL.md frontmatter for `retrospective:` key (default: disabled when absent or empty)
   2. If disabled (absent, empty, or falsish value like "no", "false", "off", "0"), skip to MARK-COMPLETE
   3. If enabled AND the session is running in interactive mode:
-     - Append a retrospective handoff entry to `.sgai/PROJECT_MANAGEMENT.md`, then navigate to the retrospective agent:
-       ```
-       sgai_update_workflow_state({status: "agent-done", navigate: {to: "retrospective", reason: "run post-completion retrospective"}})
-       ```
+     - Append a retrospective handoff entry to `.sgai/PROJECT_MANAGEMENT.md`, then yield control:
+        ```
+        sgai_update_workflow_state({status: "agent-done"})
+        ```
      - When the retrospective agent writes "RETRO_QUESTION:" entries, follow the IRON LAW: RETRO_QUESTION Relay procedure above — you MUST call `ask_user_question` to relay the question to the human partner
      - When the retrospective agent writes "RETRO_COMPLETE:", proceed to MARK-COMPLETE
   4. If enabled but running in self-drive mode: skip retrospective and proceed to MARK-COMPLETE (retrospective requires human interaction)
@@ -301,8 +298,8 @@ The `sgai_find_snippets` tool is available for finding code snippets by language
 YOU MUST NEVER PROCEED WITH CODING YOURSELF - YOU MUST DELEGATE IMPLEMENTATION TO AVAILABLE OPENCODE SUBAGENTS.
 
 ## Agent Handoff
-When the runtime exposes workflow-state handoff navigation, target only available delegate agents:
-{"status": "agent-done", "navigate": {"to": "agent-name", "reason": "why"}}
+Use OpenCode subagents for delegation. Use `sgai_update_workflow_state` only to record durable status:
+{"status": "agent-done"}
 
 # Task Management
 

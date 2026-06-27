@@ -47,7 +47,12 @@ func buildAgentEnv(cfg agentRunConfig, wfState state.Workflow, modelSpec string)
 		agentIdentity = cfg.agent + "|" + model + "|" + variant
 	}
 
-	return buildManagedOpenCodeEnv(cfg.dir, cfg.mcpURL, agentIdentity, interactiveEnv)
+	var coordinatorTaskAgents []string
+	if cfg.agent == "coordinator" {
+		coordinatorTaskAgents = coordinatorTaskTargets(cfg.goalAgents)
+	}
+
+	return buildManagedOpenCodeEnv(cfg.dir, cfg.mcpURL, agentIdentity, interactiveEnv, coordinatorTaskAgents)
 }
 
 func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []string, agentMsg, prefix string, outputCapture *ringWriter, wfState state.Workflow, modelSpec string) (state.Workflow, string, *state.Workflow) {

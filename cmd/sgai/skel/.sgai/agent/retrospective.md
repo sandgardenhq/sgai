@@ -101,7 +101,7 @@ Select which to approve (multi-select):
 - 2. Create db-migration-testing skill
 ```
 
-Then set status to `agent-done` without `navigate` to yield control back to the coordinator by default. The coordinator will relay the multi-select question to the human and append the answer indicating which numbered items were approved. When all categories have been presented and responses received, apply approved changes and write:
+Then set status to `agent-done` to yield control back to the coordinator. The coordinator will relay the multi-select question to the human and append the answer indicating which numbered items were approved. When all categories have been presented and responses received, apply approved changes and write:
 
 ```
 ## RETRO_COMPLETE

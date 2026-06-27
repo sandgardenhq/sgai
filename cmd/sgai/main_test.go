@@ -57,13 +57,11 @@ func TestBuildAgentMessageListsConfiguredAgentsForCoordinatorDelegation(t *testi
 	require.NoError(t, os.MkdirAll(agentsDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(agentsDir, "go.md"), []byte("---\ndescription: Go backend work\n---\n"), 0o644))
 
-	msg := buildAgentMessage(agentRunConfig{dir: dir, agent: "coordinator"}, state.Workflow{VisitCounts: map[string]int{"coordinator": 1, "go": 0}}, GoalMetadata{Agents: []string{"go"}})
+	msg := buildAgentMessage(agentRunConfig{dir: dir, agent: "coordinator"}, state.Workflow{}, GoalMetadata{Agents: []string{"go"}})
 
 	assert.Contains(t, msg, "## Available OpenCode Subagents for Delegation")
 	assert.Contains(t, msg, "go: Go backend work")
 	assert.NotContains(t, delegationSection(msg), "coordinator")
-	assert.Contains(t, msg, "coordinator: 1 visits")
-	assert.Contains(t, msg, "go: 0 visits")
 }
 
 func delegationSection(msg string) string {
@@ -72,7 +70,7 @@ func delegationSection(msg string) string {
 		return ""
 	}
 	section := msg[start:]
-	end := strings.Index(section, "## Visit Counts")
+	end := strings.Index(section, "\n\n")
 	if end < 0 {
 		return section
 	}
@@ -85,16 +83,9 @@ func TestHandleCompleteStatusDoesNotRouteRetrospectiveAgent(t *testing.T) {
 	coord, errCoord := state.NewCoordinatorWith(filepath.Join(dir, ".sgai", "state.json"), state.Workflow{})
 	require.NoError(t, errCoord)
 
-	result := handleCompleteStatus(t.Context(), agentRunConfig{dir: dir, agent: "coordinator", coord: coord, paddedsgai: "sgai"}, state.Workflow{Status: state.StatusComplete, VisitCounts: map[string]int{}}, state.Workflow{}, GoalMetadata{Retrospective: "true", Agents: []string{"go", "retrospective"}})
+	result := handleCompleteStatus(t.Context(), agentRunConfig{dir: dir, agent: "coordinator", coord: coord, paddedsgai: "sgai"}, state.Workflow{Status: state.StatusComplete}, state.Workflow{}, GoalMetadata{Retrospective: "true", Agents: []string{"go", "retrospective"}})
 
 	assert.Equal(t, state.StatusComplete, result.Status)
-	assert.Nil(t, result.Navigate)
-}
-
-func TestBuildAllAgentsExcludesSTPAAnalyst(t *testing.T) {
-	agents := buildAllAgents([]string{"go", "stpa-analyst", "react"})
-
-	assert.Equal(t, []string{"coordinator", "go", "react"}, agents)
 }
 
 func TestParseYAMLFrontmatterExcludesSTPAAnalyst(t *testing.T) {

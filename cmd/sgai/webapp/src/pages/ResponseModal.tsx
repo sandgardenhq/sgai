@@ -7,7 +7,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
@@ -69,13 +68,7 @@ export function ResponseModal({
         <DialogHeader>
           <DialogTitle>Response Required</DialogTitle>
           <DialogDescription>
-            {question ? (
-              <Badge variant="secondary" className="mt-1">
-                Agent: {question.agentName}
-              </Badge>
-            ) : (
-              <span>Loading agent question&hellip;</span>
-            )}
+            {question ? "Answer the pending question to continue." : "Loading question..."}
           </DialogDescription>
         </DialogHeader>
 

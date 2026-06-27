@@ -419,9 +419,7 @@ func (s *Server) startSession(workspacePath string) startSessionResult {
 	sess.coord = coord
 	sess.mu.Unlock()
 
-	availableAgents := workspaceGoalAgents(workspacePath)
-
-	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath, coord, availableAgents)
+	mcpURL, mcpCloseFn, errMCP := startMCPHTTPServer(workspacePath, coord)
 	if errMCP != nil {
 		sess.mu.Lock()
 		sess.running = false
@@ -652,104 +650,6 @@ func renderMarkdown(content []byte) (string, error) {
 	return buf.String(), nil
 }
 
-type agentSequenceDisplay struct {
-	Agent       string
-	Model       string
-	ElapsedTime string
-	IsCurrent   bool
-}
-
-func prepareAgentSequenceDisplay(sequence []state.AgentSequenceEntry, running bool, lastActivityTime string, workspacePath string) []agentSequenceDisplay {
-	now := time.Now().UTC()
-	result := make([]agentSequenceDisplay, 0, len(sequence))
-
-	var endTime time.Time
-	if !running && lastActivityTime != "" {
-		if parsed, err := time.Parse(time.RFC3339, lastActivityTime); err == nil {
-			endTime = parsed
-		}
-	}
-
-	for i, entry := range sequence {
-		startTime, err := time.Parse(time.RFC3339, entry.StartTime)
-		if err != nil {
-			log.Println("prepareAgentSequenceDisplay: skipping entry with invalid timestamp:", entry.StartTime, err)
-			continue
-		}
-		var elapsed time.Duration
-		isLastEntry := i+1 >= len(sequence)
-		switch {
-		case entry.IsCurrent && running:
-			elapsed = now.Sub(startTime)
-		case !isLastEntry:
-			nextStartTime, err := time.Parse(time.RFC3339, sequence[i+1].StartTime)
-			if err != nil {
-				elapsed = now.Sub(startTime)
-			} else {
-				elapsed = nextStartTime.Sub(startTime)
-			}
-		case running:
-			elapsed = now.Sub(startTime)
-		case !endTime.IsZero():
-			elapsed = endTime.Sub(startTime)
-		}
-		elapsedStr := formatDuration(elapsed)
-		var model string
-		if workspacePath != "" {
-			model = modelFromGoal(workspacePath)
-		}
-		result = append(result, agentSequenceDisplay{
-			Agent:       entry.Agent,
-			Model:       model,
-			ElapsedTime: elapsedStr,
-			IsCurrent:   entry.IsCurrent,
-		})
-	}
-	slices.Reverse(result)
-	return result
-}
-
-func calculateTotalExecutionTime(sequence []state.AgentSequenceEntry, running bool, lastActivityTime string) string {
-	if len(sequence) == 0 {
-		return ""
-	}
-
-	startTime, err := time.Parse(time.RFC3339, sequence[0].StartTime)
-	if err != nil {
-		return ""
-	}
-
-	var endTime time.Time
-	switch {
-	case running:
-		endTime = time.Now().UTC()
-	case lastActivityTime != "":
-		parsed, err := time.Parse(time.RFC3339, lastActivityTime)
-		if err != nil {
-			return ""
-		}
-		endTime = parsed
-	default:
-		return ""
-	}
-
-	elapsed := endTime.Sub(startTime)
-	return formatDuration(elapsed)
-}
-
-func workspaceGoalAgents(workspacePath string) []string {
-	goalPath := filepath.Join(workspacePath, "GOAL.md")
-	goalContent, errRead := os.ReadFile(goalPath)
-	if errRead != nil {
-		return nil
-	}
-	metadata, errParse := parseYAMLFrontmatter(goalContent)
-	if errParse != nil {
-		return nil
-	}
-	return buildAllAgents(metadata.Agents)
-}
-
 func getLatestProgress(progress []state.ProgressEntry) string {
 	if len(progress) == 0 {
 		return "-"
@@ -757,11 +657,28 @@ func getLatestProgress(progress []state.ProgressEntry) string {
 	return progress[len(progress)-1].Description
 }
 
-func getLastActivityTime(progress []state.ProgressEntry) string {
+func calculateTotalExecutionTime(progress []state.ProgressEntry, running bool) string {
 	if len(progress) == 0 {
 		return ""
 	}
-	return progress[len(progress)-1].Timestamp
+
+	startTime, errStart := time.Parse(time.RFC3339, progress[0].Timestamp)
+	if errStart != nil {
+		return ""
+	}
+
+	var endTime time.Time
+	if running {
+		endTime = time.Now().UTC()
+	} else {
+		parsed, errEnd := time.Parse(time.RFC3339, progress[len(progress)-1].Timestamp)
+		if errEnd != nil {
+			return ""
+		}
+		endTime = parsed
+	}
+
+	return formatDuration(endTime.Sub(startTime))
 }
 
 type workspaceInfo struct {

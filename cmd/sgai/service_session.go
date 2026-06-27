@@ -187,7 +187,6 @@ func (s *Server) steerService(workspacePath, message string) (steerResult, error
 
 	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
 		wf.Status = state.StatusAgentDone
-		wf.Navigate = &state.NavigationRequest{To: "coordinator", Reason: steerBody}
 	}); errUpdate != nil {
 		return steerResult{}, fmt.Errorf("failed to save state: %w", errUpdate)
 	}

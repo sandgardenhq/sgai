@@ -26,13 +26,10 @@ const promptSectionDelegation = `## Delegation
 SGAI runs this top-level OpenCode session as the coordinator. Use available OpenCode subagents for delegation instead of routing the SGAI runtime between agents:
 - Append handoffs, blockers, questions, or completion evidence to .sgai/PROJECT_MANAGEMENT.md
 - Delegate to available subagents through OpenCode's subagent/delegation mechanisms
-- Use sgai_update_workflow_state for durable status only; do not use navigate to cycle SGAI through the GOAL agents
+- Use sgai_update_workflow_state for durable status only; delegate with OpenCode subagents only
 
 ## Available OpenCode Subagents for Delegation
 %AGENTS_LIST%
-
-## Visit Counts
-%VISIT_COUNTS%
 
 </UserInstructions>.
 

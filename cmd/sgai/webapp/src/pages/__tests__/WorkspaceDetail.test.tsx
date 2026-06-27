@@ -28,7 +28,6 @@ const createMockWorkspace = (overrides = {}) => ({
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "",
   task: "",
   goalContent: "# Test Goal",
   rawGoalContent: "# Test Goal",
@@ -37,7 +36,6 @@ const createMockWorkspace = (overrides = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -353,17 +351,15 @@ describe("WorkspaceDetail", () => {
       });
     });
 
-    it("displays current agent", async () => {
+    it("displays running status", async () => {
       mockWorkspaces[0] = createMockWorkspace({
         running: true,
-        currentAgent: "coordinator",
       });
 
       renderWorkspaceDetail();
 
       await waitFor(() => {
-        const coordinatorElements = screen.queryAllByText(/coordinator/);
-        expect(coordinatorElements.length).toBeGreaterThan(0);
+        expect(screen.getByText("running")).toBeTruthy();
       });
     });
   });

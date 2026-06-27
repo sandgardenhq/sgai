@@ -31,10 +31,9 @@ function EventsTabSkeleton() {
   );
 }
 
-function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
+function NeedsInputBanner({ needsInput, humanMessage }: {
   needsInput: boolean;
   humanMessage: string;
-  currentAgent: string;
 }) {
   if (!needsInput || !humanMessage) {
     return null;
@@ -43,9 +42,6 @@ function NeedsInputBanner({ needsInput, humanMessage, currentAgent }: {
   return (
     <Card>
       <CardContent className="p-3 bg-yellow-50">
-        <p className="text-sm font-medium">
-          <Badge variant="default">{currentAgent}</Badge>
-        </p>
         <blockquote className="mt-2 text-sm italic border-l-2 pl-3 text-muted-foreground">
           {humanMessage}
         </blockquote>
@@ -267,7 +263,6 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
       <NeedsInputBanner
         needsInput={workspace.needsInput}
         humanMessage={workspace.humanMessage}
-        currentAgent={workspace.currentAgent}
       />
       <ActiveAgentSection agents={workspace.activeAgents} />
       {goalContent && (

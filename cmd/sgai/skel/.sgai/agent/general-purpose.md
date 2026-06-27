@@ -114,8 +114,8 @@ You track progress and manage your work:
 Coordinate with other agents through `.sgai/PROJECT_MANAGEMENT.md` and workflow state:
 
 - Record implementation status, blockers, decisions, and handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
-- Return control by setting `sgai_update_workflow_state({status: "agent-done", task: "", addProgress: "Work complete; returning control to coordinator"})`; omit `navigate` unless the current handoff explicitly made a non-coordinator next agent available.
-- Use `navigate.to` only for an explicitly available non-coordinator delegate named in the current handoff; otherwise leave routing to the coordinator.
+- Return control by setting `sgai_update_workflow_state({status: "agent-done", task: "", addProgress: "Work complete; returning control to coordinator"})`.
+- Leave routing to the coordinator and OpenCode subagent delegation.
 - Do not use legacy routing tools; they are not available.
 
 ---

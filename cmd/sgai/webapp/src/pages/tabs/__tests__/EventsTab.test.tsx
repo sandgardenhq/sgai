@@ -25,7 +25,6 @@ const createMockWorkspace = (overrides = {}) => ({
   hasEditedGoal: false,
   interactiveAuto: false,
   continuousMode: false,
-  currentAgent: "",
   activeAgents: [],
   task: "",
   goalContent: "",
@@ -35,7 +34,6 @@ const createMockWorkspace = (overrides = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  agentSequence: [],
   cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
@@ -228,14 +226,12 @@ describe("EventsTab", () => {
       mockWorkspaces = [createMockWorkspace({
         needsInput: true,
         humanMessage: "Please choose an option",
-        currentAgent: "coordinator",
       })];
 
       renderEventsTab();
 
       await waitFor(() => {
         expect(screen.getByText("Please choose an option")).toBeTruthy();
-        expect(screen.getByText("coordinator")).toBeTruthy();
       });
     });
   });

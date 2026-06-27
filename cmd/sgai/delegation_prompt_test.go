@@ -29,12 +29,10 @@ func TestBuildCoordinatorDelegationMessageIncludesConfiguredSubagents(t *testing
 	require.NoError(t, os.MkdirAll(agentsDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(agentsDir, "react.md"), []byte("---\ndescription: React cleanup\n---\n"), 0o644))
 
-	msg := buildCoordinatorDelegationMessage([]string{"coordinator", "react"}, map[string]int{"coordinator": 2, "react": 1}, dir, state.ModeBuilding)
+	msg := buildCoordinatorDelegationMessage([]string{"coordinator", "react"}, dir, state.ModeBuilding)
 
 	assert.Contains(t, msg, "react: React cleanup")
 	assert.NotContains(t, delegationSection(msg), "coordinator")
-	assert.Contains(t, msg, "coordinator: 2 visits")
-	assert.Contains(t, msg, "react: 1 visits")
 	assert.Contains(t, msg, promptSectionBuildingMode)
 }
 
