@@ -62,8 +62,7 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
 	stdoutPassthrough := io.MultiWriter(stdoutPW, writer)
-	sessionIDCapture := &sessionIDCaptureWriter{detectedWriter: stdoutPassthrough, passthrough: stdoutPassthrough}
-	cmd.Stdout = sessionIDCapture
+	cmd.Stdout = stdoutPassthrough
 	cmd.Stderr = io.MultiWriter(stderrPW, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
@@ -94,20 +93,14 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	go func() {
 		defer close(done)
 		errWait := cmd.Wait()
-		sessionIDCapture.Flush()
 		st.mu.Lock()
 		if errWait != nil {
 			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
 		}
-		capturedSessionID := sessionIDCapture.sessionID
-		selectedModel := st.selectedModel
 		st.running = false
 		st.cmd = nil
 		st.done = nil
 		st.mu.Unlock()
-		if errWait == nil {
-			s.reconcileAdhocUsage(workspacePath, capturedSessionID, selectedModel)
-		}
 	}()
 
 	s.notifyStateChange()

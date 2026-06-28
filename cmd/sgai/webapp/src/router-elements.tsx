@@ -67,9 +67,6 @@ const AdhocOutput = lazy(() =>
 const FullDiffPage = lazy(() =>
   import("./pages/FullDiffPage").then((m) => ({ default: m.FullDiffPage })),
 );
-const Usage = lazy(() =>
-  import("./pages/Usage").then((m) => ({ default: m.Usage })),
-);
 
 function PageSkeleton() {
   return (
@@ -108,10 +105,6 @@ function DashboardWithWorkspace() {
   return <Dashboard><WorkspaceDetail /></Dashboard>;
 }
 
-function DashboardWithUsage() {
-  return <Dashboard><Usage /></Dashboard>;
-}
-
 export function DashboardEmptyRoute() {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
@@ -124,14 +117,6 @@ export function DashboardWorkspaceRoute() {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
       <DashboardWithWorkspace />
-    </Suspense>
-  );
-}
-
-export function DashboardUsageRoute() {
-  return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardWithUsage />
     </Suspense>
   );
 }

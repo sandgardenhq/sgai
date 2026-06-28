@@ -38,7 +38,6 @@ const createMockWorkspace = (overrides = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
   agentTodos: [],
@@ -249,44 +248,6 @@ describe("SessionTab", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Write tests")).toBeTruthy();
-      });
-    });
-  });
-
-  describe("cost section", () => {
-    it("displays cost tracking when cost data is present", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        cost: {
-          totalCost: 1.2345,
-          totalTokens: { input: 1000, output: 500, reasoning: 0, cacheRead: 200, cacheWrite: 0 },
-          byAgent: [],
-        },
-      })];
-
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Cost Tracking")).toBeTruthy();
-        expect(screen.getByText("$1.2345")).toBeTruthy();
-      });
-    });
-
-    it("shows per-agent costs when available", async () => {
-      mockWorkspaces = [createMockWorkspace({
-        cost: {
-          totalCost: 1.5,
-          totalTokens: { input: 1000, output: 500 },
-          byAgent: [
-            { agent: "coordinator", cost: 0.75, steps: [] },
-            { agent: "developer", cost: 0.75, steps: [] },
-          ],
-        },
-      })];
-
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("By Agent (2 agents)")).toBeTruthy();
       });
     });
   });

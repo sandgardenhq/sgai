@@ -24,7 +24,6 @@ export interface ApiWorkspaceEntry {
   totalExecTime: string;
   latestProgress: string;
   humanMessage: string;
-  cost: ApiSessionCost;
   events: ApiEventEntry[];
   projectTodos: ApiTodoEntry[];
   agentTodos: ApiTodoEntry[];
@@ -150,105 +149,6 @@ export interface ApiModelEntry {
 export interface ApiModelsResponse {
   models: ApiModelEntry[];
   defaultModel?: string;
-}
-
-interface ApiSessionCost {
-  totalCost: number;
-  meteredReportedCost?: number;
-  apiEquivalentCost?: number;
-  apiEquivalentCostAvailable?: boolean;
-  apiEquivalentCostUnavailable?: string;
-  totalTokens: ApiTokenUsage;
-  byAgent: ApiAgentCost[];
-  bySession?: ApiSessionUsage[];
-}
-
-interface ApiTokenUsage {
-  input: number;
-  output: number;
-  reasoning: number;
-  cacheRead: number;
-  cacheWrite: number;
-}
-
-export type ApiUsageTokenUsage = ApiTokenUsage;
-
-export interface ApiUsageTotals {
-  cost: number;
-  meteredReportedCost: number;
-  apiEquivalentCost: number;
-  apiEquivalentCostAvailable: boolean;
-  tokens: ApiUsageTokenUsage;
-}
-
-export interface ApiUsageDailyPoint {
-  date: string;
-  cost: number;
-}
-
-export interface ApiUsageRow {
-  date: string;
-  project: string;
-  rootProject: string;
-  workspacePath: string;
-  rootWorkspacePath: string;
-  source: string;
-  cost: number;
-  meteredReportedCost: number;
-  apiEquivalentCost: number;
-  apiEquivalentCostAvailable: boolean;
-  tokens: ApiUsageTokenUsage;
-}
-
-export interface ApiUsageFilters {
-  projects: string[];
-  rootProjects: string[];
-}
-
-export interface ApiUsageResponse {
-  totals: ApiUsageTotals;
-  daily: ApiUsageDailyPoint[];
-  rows: ApiUsageRow[];
-  filters: ApiUsageFilters;
-  warning?: string;
-}
-
-export interface ApiStepCost {
-  stepId: string;
-  agent: string;
-  sessionId?: string;
-  cost: number;
-  meteredReportedCost?: number;
-  apiEquivalentCost?: number;
-  apiEquivalentCostAvailable?: boolean;
-  apiEquivalentCostUnavailable?: string;
-  tokens: ApiTokenUsage;
-  timestamp: string;
-}
-
-export interface ApiAgentCost {
-  agent: string;
-  cost: number;
-  meteredReportedCost?: number;
-  apiEquivalentCost?: number;
-  apiEquivalentCostAvailable?: boolean;
-  apiEquivalentCostUnavailable?: string;
-  tokens: ApiTokenUsage;
-  steps: ApiStepCost[];
-}
-
-interface ApiSessionUsage {
-  sessionId: string;
-  parentSessionId?: string;
-  agent: string;
-  model?: string;
-  childSessionIds?: string[];
-  tokens: ApiTokenUsage;
-  meteredReportedCost: number;
-  apiEquivalentCost?: number;
-  apiEquivalentCostAvailable?: boolean;
-  apiEquivalentCostUnavailable?: string;
-  steps: ApiStepCost[];
 }
 
 export interface ApiTodoEntry {

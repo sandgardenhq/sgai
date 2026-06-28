@@ -69,8 +69,6 @@ func (b *signalBroker) notify() {
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/state", s.handleAPIState)
-	mux.HandleFunc("GET /api/v1/usage", s.handleAPIUsage)
-	mux.HandleFunc("POST /api/v1/usage/refresh", s.handleAPIUsageRefresh)
 	mux.HandleFunc("GET /api/v1/signal", s.handleSignalStream)
 	mux.HandleFunc("GET /api/v1/agents", s.handleAPIAgents)
 	mux.HandleFunc("GET /api/v1/skills", s.handleAPISkills)
@@ -174,7 +172,6 @@ type apiWorkspaceFullState struct {
 	TotalExecTime   string                      `json:"totalExecTime"`
 	LatestProgress  string                      `json:"latestProgress"`
 	HumanMessage    string                      `json:"humanMessage"`
-	Cost            state.SessionCost           `json:"cost"`
 	Events          []apiEventEntry             `json:"events"`
 	ProjectTodos    []apiTodoEntry              `json:"projectTodos"`
 	AgentTodos      []apiTodoEntry              `json:"agentTodos"`
@@ -363,7 +360,6 @@ func (s *Server) buildWorkspaceFullState(ws workspaceInfo, groups []workspaceGro
 		TotalExecTime:   calculateTotalExecutionTime(wfState.Progress, ws.Running),
 		LatestProgress:  getLatestProgress(wfState.Progress),
 		HumanMessage:    wfState.HumanMessage,
-		Cost:            wfState.Cost,
 		Events:          events,
 		ProjectTodos:    convertTodosForAPI(wfState.ProjectTodos),
 		AgentTodos:      convertTodosForAPI(wfState.Todos),
@@ -1627,7 +1623,6 @@ func (s *Server) handleAPIDeleteFork(w http.ResponseWriter, r *http.Request) {
 	forkName := filepath.Base(forkDir)
 
 	s.stopSession(forkDir)
-	s.backfillWorkspaceUsageBeforeRemoval(forkDir)
 
 	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
 	forgetCmd.Dir = rootPath

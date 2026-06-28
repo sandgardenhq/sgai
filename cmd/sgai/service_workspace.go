@@ -230,7 +230,6 @@ func (s *Server) deleteForkService(workspacePath, forkDir string, confirm bool) 
 
 	forkName := filepath.Base(validatedForkDir)
 	s.stopSession(validatedForkDir)
-	s.backfillWorkspaceUsageBeforeRemoval(validatedForkDir)
 
 	forgetCmd := exec.Command("jj", "workspace", "forget", forkName)
 	forgetCmd.Dir = workspacePath
@@ -344,7 +343,6 @@ func (s *Server) resetWorkspaceService(workspacePath string) (resetWorkspaceResu
 
 func (s *Server) deleteWorkspaceService(workspacePath string) (deleteWorkspaceResult, error) {
 	s.stopSession(workspacePath)
-	s.backfillWorkspaceUsageBeforeRemoval(workspacePath)
 
 	if errRemove := os.RemoveAll(workspacePath); errRemove != nil {
 		return deleteWorkspaceResult{}, fmt.Errorf("failed to remove workspace directory: %w", errRemove)

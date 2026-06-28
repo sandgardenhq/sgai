@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -132,4 +133,33 @@ func exportAgentSession(cfg agentRunConfig, sessionID string, iteration int) {
 	if errWrite := os.WriteFile(sessionFile, output, 0644); errWrite != nil {
 		log.Fatalln("failed to export session:", errWrite)
 	}
+}
+
+func exportSessionBytes(dir, sessionID string) ([]byte, error) {
+	tmpFile, errCreate := os.CreateTemp("", "sgai-opencode-export-*.json")
+	if errCreate != nil {
+		return nil, errCreate
+	}
+	tmpPath := tmpFile.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+
+	cmd := exec.Command("opencode", "export", sessionID)
+	cmd.Dir = dir
+	cmd.Env = buildBaseOpenCodeEnv(dir)
+	cmd.Stdout = tmpFile
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if errRun := cmd.Run(); errRun != nil {
+		_ = tmpFile.Close()
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("opencode export failed: %w: %s", errRun, msg)
+		}
+		return nil, fmt.Errorf("opencode export failed: %w", errRun)
+	}
+	if errClose := tmpFile.Close(); errClose != nil {
+		return nil, errClose
+	}
+	return os.ReadFile(tmpPath)
 }

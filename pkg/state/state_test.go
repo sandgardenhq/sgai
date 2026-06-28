@@ -150,61 +150,6 @@ func TestAskAndWaitKeepsQuestionInMemoryOnly(t *testing.T) {
 	assert.False(t, coord.State().NeedsHumanInput())
 }
 
-func TestTokenUsageAdd(t *testing.T) {
-	tests := []struct {
-		name     string
-		t1       TokenUsage
-		t2       TokenUsage
-		expected TokenUsage
-	}{
-		{
-			name: "addTwoUsages",
-			t1: TokenUsage{
-				Input:     50,
-				Output:    30,
-				Reasoning: 20,
-			},
-			t2: TokenUsage{
-				Input:     100,
-				Output:    60,
-				Reasoning: 40,
-			},
-			expected: TokenUsage{
-				Input:     150,
-				Output:    90,
-				Reasoning: 60,
-			},
-		},
-		{
-			name: "addZeroUsage",
-			t1: TokenUsage{
-				Input:     50,
-				Output:    30,
-				Reasoning: 20,
-			},
-			t2: TokenUsage{},
-			expected: TokenUsage{
-				Input:     50,
-				Output:    30,
-				Reasoning: 20,
-			},
-		},
-		{
-			name:     "addTwoZeroUsages",
-			t1:       TokenUsage{},
-			t2:       TokenUsage{},
-			expected: TokenUsage{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.t1.Add(tt.t2)
-			assert.Equal(t, tt.expected, tt.t1)
-		})
-	}
-}
-
 func TestWorkflowToolsAllowed(t *testing.T) {
 	tests := []struct {
 		name     string
