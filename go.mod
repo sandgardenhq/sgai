@@ -10,7 +10,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/goldmark v1.8.2
 	github.com/yuin/goldmark-emoji v1.0.6
-	modernc.org/sqlite v1.52.0
+	modernc.org/sqlite v1.53.0
 	sigs.k8s.io/yaml v1.6.0
 )
 
