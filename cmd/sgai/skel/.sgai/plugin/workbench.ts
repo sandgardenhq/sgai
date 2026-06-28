@@ -1,9 +1,10 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { readFile, writeFile } from 'fs/promises';
+import { appendFile, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 export const Workbench: Plugin = async ({ directory }) => {
   const stateFilePath = join(directory, ".sgai", "state.json");
+  const sessionsFilePath = join(directory, ".sgai", "sessions.jsonl");
   const knownSessionIDs: Record<string, boolean> = {}
   return {
     config: async (config: any) => {
@@ -19,7 +20,13 @@ export const Workbench: Plugin = async ({ directory }) => {
         const agent = agentNameFromEvent(input.event);
         if (agent !== "" && !knownSessionIDs[sessionID]) {
           knownSessionIDs[sessionID] = true;
-          console.log(JSON.stringify({ sessionID, agent }));
+          const line = JSON.stringify({ sessionID, agent });
+          console.log(line);
+          try {
+            await appendFile(sessionsFilePath, line + "\n");
+          } catch (error: any) {
+            console.error("Error appending session: " + error.message);
+          }
         }
       }
       if (input.event.type === "todo.updated") {
