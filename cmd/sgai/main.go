@@ -33,6 +33,9 @@ func main() {
 			log.Fatalln("internal mcp failed:", err)
 		}
 		return
+	case "token-stats":
+		cmdTokenStats(os.Args[2:])
+		return
 	case "help", "-h", "--help":
 		printUsage()
 		return
@@ -47,7 +50,7 @@ func main() {
 
 func requiresOpencode(subcommand string) bool {
 	switch subcommand {
-	case "help", "-h", "--help", "internal-mcp":
+	case "help", "-h", "--help", "internal-mcp", "token-stats":
 		return false
 	default:
 		return true
@@ -59,6 +62,7 @@ func printUsage() {
 
 Usage:
   sgai [--listen-addr addr]    Start web server (default)
+  sgai token-stats <path>      Aggregate token usage for a workspace
 
 Options:
   --listen-addr   HTTP server listen address (default: 127.0.0.1:8080)
@@ -67,5 +71,7 @@ Examples:
   sgai
       Start web UI on localhost:8080
   sgai --listen-addr 0.0.0.0:8080
-      Start web UI accessible externally`)
+      Start web UI accessible externally
+  sgai token-stats ./my-workspace
+      Print token usage broken down by agent and model`)
 }
