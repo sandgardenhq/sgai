@@ -38,7 +38,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { BarChart3, Loader2, Inbox, Trash2, FolderPlus, Link as LinkIcon } from "lucide-react";
+import { Loader2, Inbox, Trash2, FolderPlus, Link as LinkIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
@@ -837,11 +837,6 @@ function MobileHeader({ workspaces, loading, error }: { workspaces: ApiWorkspace
       {!loading && !error && (
         <SidebarHeaderIndicators workspaces={workspaces} />
       )}
-      <Button variant="ghost" size="icon" asChild aria-label="Global usage">
-        <Link to="/usage">
-          <BarChart3 className="size-4" />
-        </Link>
-      </Button>
     </div>
   );
 }
@@ -898,15 +893,6 @@ function DashboardContent({ children, onSidebarResizeMouseDown }: DashboardConte
         </SidebarHeader>
         <Separator />
         <SidebarContent onClickCapture={handleSidebarNavigation}>
-          <div className="px-1 py-2">
-            <Button variant="ghost" className="w-full justify-start" asChild>
-              <Link to="/usage">
-                <BarChart3 className="mr-2 size-4" />
-                Global usage (Beta)
-              </Link>
-            </Button>
-          </div>
-          <Separator />
           <ScrollArea className="flex-1 px-1 py-2">
             {loading && <WorkspaceTreeSkeleton />}
 

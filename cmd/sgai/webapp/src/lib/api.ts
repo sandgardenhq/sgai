@@ -31,7 +31,6 @@ import type {
   ApiAttachWorkspaceResponse,
   ApiDetachWorkspaceResponse,
   ApiBrowseDirectoriesResponse,
-  ApiUsageResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -68,27 +67,6 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  usage: {
-    get: (filters: { from?: string; to?: string; project?: string; rootProject?: string } = {}) => {
-      const params = new URLSearchParams();
-      if (filters.from) params.set("from", filters.from);
-      if (filters.to) params.set("to", filters.to);
-      if (filters.project) params.set("project", filters.project);
-      if (filters.rootProject) params.set("rootProject", filters.rootProject);
-      const query = params.toString();
-      return fetchJSON<ApiUsageResponse>(`/api/v1/usage${query ? `?${query}` : ""}`);
-    },
-    refresh: (filters: { from?: string; to?: string; project?: string; rootProject?: string } = {}) => {
-      const params = new URLSearchParams();
-      if (filters.from) params.set("from", filters.from);
-      if (filters.to) params.set("to", filters.to);
-      if (filters.project) params.set("project", filters.project);
-      if (filters.rootProject) params.set("rootProject", filters.rootProject);
-      const query = params.toString();
-      return fetchJSON<ApiUsageResponse>(`/api/v1/usage/refresh${query ? `?${query}` : ""}`, { method: "POST" });
-    },
-  },
-
   workspaces: {
     create: (name: string) =>
       fetchJSON<ApiCreateWorkspaceResponse>("/api/v1/workspaces", {

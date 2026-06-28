@@ -74,77 +74,6 @@ type MultiChoiceQuestion struct {
 	IsWorkGate bool           `json:"isWorkGate,omitempty"`
 }
 
-// TokenUsage tracks token counts from a step.
-type TokenUsage struct {
-	Input      int `json:"input"`
-	Output     int `json:"output"`
-	Reasoning  int `json:"reasoning"`
-	CacheRead  int `json:"cacheRead"`
-	CacheWrite int `json:"cacheWrite"`
-}
-
-// Add accumulates token counts from another TokenUsage into this one.
-func (t *TokenUsage) Add(other TokenUsage) {
-	t.Input += other.Input
-	t.Output += other.Output
-	t.Reasoning += other.Reasoning
-	t.CacheRead += other.CacheRead
-	t.CacheWrite += other.CacheWrite
-}
-
-// StepCost tracks cost for a single step.
-type StepCost struct {
-	StepID                       string     `json:"stepId"`
-	Agent                        string     `json:"agent"`
-	SessionID                    string     `json:"sessionId,omitempty"`
-	Cost                         float64    `json:"cost"`
-	MeteredReportedCost          float64    `json:"meteredReportedCost,omitempty"`
-	APIEquivalentCost            float64    `json:"apiEquivalentCost,omitempty"`
-	APIEquivalentCostAvailable   bool       `json:"apiEquivalentCostAvailable,omitempty"`
-	APIEquivalentCostUnavailable string     `json:"apiEquivalentCostUnavailable,omitempty"`
-	Tokens                       TokenUsage `json:"tokens"`
-	Timestamp                    string     `json:"timestamp"`
-}
-
-// AgentCost aggregates costs for an agent.
-type AgentCost struct {
-	Agent                        string     `json:"agent"`
-	Cost                         float64    `json:"cost"`
-	MeteredReportedCost          float64    `json:"meteredReportedCost,omitempty"`
-	APIEquivalentCost            float64    `json:"apiEquivalentCost,omitempty"`
-	APIEquivalentCostAvailable   bool       `json:"apiEquivalentCostAvailable,omitempty"`
-	APIEquivalentCostUnavailable string     `json:"apiEquivalentCostUnavailable,omitempty"`
-	Tokens                       TokenUsage `json:"tokens"`
-	Steps                        []StepCost `json:"steps"`
-}
-
-// SessionUsage tracks reconciled usage for an opencode session.
-type SessionUsage struct {
-	SessionID                    string     `json:"sessionId"`
-	ParentSessionID              string     `json:"parentSessionId,omitempty"`
-	Agent                        string     `json:"agent"`
-	Model                        string     `json:"model,omitempty"`
-	ChildSessionIDs              []string   `json:"childSessionIds,omitempty"`
-	Tokens                       TokenUsage `json:"tokens"`
-	MeteredReportedCost          float64    `json:"meteredReportedCost"`
-	APIEquivalentCost            float64    `json:"apiEquivalentCost,omitempty"`
-	APIEquivalentCostAvailable   bool       `json:"apiEquivalentCostAvailable,omitempty"`
-	APIEquivalentCostUnavailable string     `json:"apiEquivalentCostUnavailable,omitempty"`
-	Steps                        []StepCost `json:"steps"`
-}
-
-// SessionCost tracks all costs for the session.
-type SessionCost struct {
-	TotalCost                    float64        `json:"totalCost"`
-	MeteredReportedCost          float64        `json:"meteredReportedCost,omitempty"`
-	APIEquivalentCost            float64        `json:"apiEquivalentCost,omitempty"`
-	APIEquivalentCostAvailable   bool           `json:"apiEquivalentCostAvailable,omitempty"`
-	APIEquivalentCostUnavailable string         `json:"apiEquivalentCostUnavailable,omitempty"`
-	TotalTokens                  TokenUsage     `json:"totalTokens"`
-	ByAgent                      []AgentCost    `json:"byAgent"`
-	BySession                    []SessionUsage `json:"bySession,omitempty"`
-}
-
 // Workflow represents the complete workflow state for a sgai session.
 // It tracks progress and workflow status.
 type Workflow struct {
@@ -156,8 +85,6 @@ type Workflow struct {
 	Todos               []TodoItem           `json:"todos,omitempty"`
 	ProjectTodos        []TodoItem           `json:"projectTodos,omitempty"`
 	SessionID           string               `json:"sessionId,omitempty"`
-
-	Cost SessionCost `json:"cost"`
 
 	InteractionMode string `json:"interactionMode,omitempty"`
 

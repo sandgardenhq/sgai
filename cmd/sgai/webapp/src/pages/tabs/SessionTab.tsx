@@ -8,7 +8,7 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
-import type { ApiAgentCost, ApiSessionCost, ApiStepCost, ApiTodoEntry, ApiActionEntry } from "@/types";
+import type { ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
   workspaceName: string;
@@ -44,138 +44,6 @@ export function ActionBar({ actions, isRunning, onActionClick }: ActionBarProps)
         </Tooltip>
       ))}
     </div>
-  );
-}
-
-function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`;
-}
-
-function formatStepCost(cost: number): string {
-  return `$${cost.toFixed(6)}`;
-}
-
-function CostSection({ cost }: { cost: ApiSessionCost }) {
-  const totalInput = (cost.totalTokens?.input ?? 0) + (cost.totalTokens?.cacheRead ?? 0);
-  const displayedCostLabel = cost.apiEquivalentCostAvailable ? "API-Equivalent Cost" : "Total Cost";
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Cost Tracking</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground text-xs">{displayedCostLabel}</span>
-            <div className="font-semibold">{formatCost(cost.totalCost)}</div>
-          </div>
-          {cost.meteredReportedCost !== undefined && (
-            <div>
-              <span className="text-muted-foreground text-xs">Reported Cost</span>
-              <div className="font-semibold">{formatCost(cost.meteredReportedCost)}</div>
-            </div>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">
-                <span className="text-muted-foreground text-xs">Total Input</span>
-                <div className="font-semibold">{totalInput.toLocaleString()}</div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>Total input = new tokens + cached tokens</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">
-                <span className="text-muted-foreground text-xs">New Tokens</span>
-                <div className="font-semibold">{(cost.totalTokens?.input ?? 0).toLocaleString()}</div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>Newly processed tokens (not from cache)</TooltipContent>
-          </Tooltip>
-          <div>
-            <span className="text-muted-foreground text-xs">Output Tokens</span>
-            <div className="font-semibold">{(cost.totalTokens?.output ?? 0).toLocaleString()}</div>
-          </div>
-          <div>
-            <span className="text-muted-foreground text-xs">Reasoning</span>
-            <div className="font-semibold">{(cost.totalTokens?.reasoning ?? 0).toLocaleString()}</div>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">
-                <span className="text-muted-foreground text-xs">Cache Read</span>
-                <div className="font-semibold">{(cost.totalTokens?.cacheRead ?? 0).toLocaleString()}</div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>Tokens served from prompt cache</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">
-                <span className="text-muted-foreground text-xs">Cache Write</span>
-                <div className="font-semibold">{(cost.totalTokens?.cacheWrite ?? 0).toLocaleString()}</div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>Tokens written into prompt cache</TooltipContent>
-          </Tooltip>
-        </div>
-
-        {!cost.apiEquivalentCostAvailable && cost.apiEquivalentCostUnavailable && (
-          <p className="mt-3 text-xs text-muted-foreground">API-equivalent cost unavailable: {cost.apiEquivalentCostUnavailable}</p>
-        )}
-
-        {cost.byAgent && cost.byAgent.length > 0 && (
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              By Agent ({cost.byAgent.length} agents)
-            </summary>
-            <div className="mt-2 space-y-2">
-              {cost.byAgent.map((agent: ApiAgentCost) => (
-                <AgentCostDetail key={agent.agent} agentCost={agent} />
-              ))}
-            </div>
-          </details>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function AgentCostDetail({ agentCost }: { agentCost: ApiAgentCost }) {
-  return (
-    <details className="ml-2">
-      <summary className="cursor-pointer text-sm flex items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="font-medium truncate max-w-[200px]">{agentCost.agent}</span>
-          </TooltipTrigger>
-          <TooltipContent>{agentCost.agent}</TooltipContent>
-        </Tooltip>
-        <span className="text-muted-foreground">{formatCost(agentCost.cost)}</span>
-        {agentCost.meteredReportedCost !== undefined && agentCost.apiEquivalentCostAvailable && (
-          <span className="text-xs text-muted-foreground">reported {formatCost(agentCost.meteredReportedCost)}</span>
-        )}
-        <span className="text-xs text-muted-foreground">({agentCost.steps?.length ?? 0} steps)</span>
-      </summary>
-      {agentCost.steps && agentCost.steps.length > 0 && (
-        <div className="ml-4 mt-1 space-y-0.5">
-          {agentCost.steps.map((step: ApiStepCost) => (
-            <div key={`${step.stepId}-${step.timestamp}`} className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="truncate max-w-[150px] cursor-help">{step.stepId}</span>
-                </TooltipTrigger>
-                <TooltipContent>{step.stepId}</TooltipContent>
-              </Tooltip>
-              <span>{formatStepCost(step.cost)}</span>
-              <span>({step.tokens.input} in, {step.tokens.output} out, {step.tokens.reasoning} reasoning, {step.tokens.cacheRead} cache read, {step.tokens.cacheWrite} cache write)</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </details>
   );
 }
 
@@ -249,7 +117,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
   const { workspaces } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
 
-  const cost = workspace?.cost;
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
 
@@ -340,8 +207,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
           <TasksSection projectTodos={projectTodos} agentTodos={agentTodos} />
         </CardContent>
       </Card>
-
-      {cost && <CostSection cost={cost} />}
 
       {hasProjectMgmt && (
         <details className="group">

@@ -146,12 +146,6 @@ func (r *workflowRunner) executeCoordinator(ctx context.Context) state.Workflow 
 		if cfg.retrospectiveDir != "" && capturedSessionID != "" && shouldLogAgent(cfg.dir, cfg.agent) {
 			exportAgentSession(cfg, capturedSessionID, r.iterationCounter)
 		}
-		if capturedSessionID != "" {
-			if errReconcile := reconcileAgentUsage(cfg.dir, cfg.coord, cfg.agent, capturedSessionID, r.metadata.Model); errReconcile != nil {
-				log.Println("failed to reconcile opencode usage:", errReconcile)
-			}
-			newState = cfg.coord.State()
-		}
 
 		switch newState.Status {
 		case state.StatusComplete:

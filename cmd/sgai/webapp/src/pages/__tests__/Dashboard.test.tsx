@@ -36,7 +36,6 @@ const createMockWorkspace = (overrides: Record<string, unknown> = {}) => ({
   totalExecTime: "",
   latestProgress: "",
   humanMessage: "",
-  cost: { totalCost: 0, totalTokens: { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 }, byAgent: [] },
   events: [],
   projectTodos: [],
   agentTodos: [],

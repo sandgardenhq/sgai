@@ -9,7 +9,6 @@ import {
   ComposePreviewRoute,
   ComposeTemplateRoute,
   DashboardEmptyRoute,
-  DashboardUsageRoute,
   DashboardWorkspaceRoute,
   EditGoalRoute,
   FullDiffRoute,
@@ -38,10 +37,6 @@ export const router = createBrowserRouter([
       {
         path: "trees",
         element: <Navigate to="/" replace />,
-      },
-      {
-        path: "usage",
-        element: <DashboardUsageRoute />,
       },
       {
         path: "workspaces/new",
