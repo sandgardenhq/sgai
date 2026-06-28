@@ -39,8 +39,6 @@ const createMockWorkspace = (overrides: Record<string, unknown> = {}) => ({
   events: [],
   projectTodos: [],
   agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
   log: [],
   external: false,
   ...overrides,

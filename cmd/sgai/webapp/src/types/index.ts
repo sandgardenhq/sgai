@@ -27,12 +27,11 @@ export interface ApiWorkspaceEntry {
   events: ApiEventEntry[];
   projectTodos: ApiTodoEntry[];
   agentTodos: ApiTodoEntry[];
-  changes: ApiChangesData;
-  commits: ApiCommitEntry[];
   forks?: ApiForkEntry[];
   log: ApiLogEntry[];
   pendingQuestion?: ApiPendingQuestionResponse;
   actions?: ApiActionEntry[];
+  currentModel?: string;
   external?: boolean;
 }
 
@@ -181,31 +180,6 @@ export interface ApiLogEntry {
   text: string;
 }
 
-export interface ApiDiffLine {
-  lineNumber: number;
-  text: string;
-  class: string;
-}
-
-interface ApiChangesData {
-  description: string;
-  diffLines: ApiDiffLine[];
-}
-
-export interface ApiDiffResponse {
-  diff: string;
-}
-
-export interface ApiCommitEntry {
-  changeId: string;
-  commitId: string;
-  workspaces?: string[];
-  timestamp: string;
-  bookmarks?: string[];
-  description: string;
-  graphChar: string;
-}
-
 export interface ApiEventEntry {
   timestamp: string;
   formattedTime: string;
@@ -327,11 +301,6 @@ export interface ApiResetWorkspaceResponse {
 export interface ApiUpdateGoalResponse {
   updated: boolean;
   workspace: string;
-}
-
-export interface ApiSteerResponse {
-  success: boolean;
-  message: string;
 }
 
 export interface ApiTogglePinResponse {

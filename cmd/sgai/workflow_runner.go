@@ -207,7 +207,7 @@ func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt str
 
 		autoDuration, cronExpr := readContinuousModeAutoCron(r.dir)
 
-		trigger := watchForTrigger(ctx, r.dir, r.coord, checksum, autoDuration, cronExpr)
+		trigger := watchForTrigger(ctx, r.dir, checksum, autoDuration, cronExpr)
 		if trigger == triggerNone {
 			return
 		}
@@ -217,21 +217,7 @@ func (r *workflowRunner) runContinuous(ctx context.Context, continuousPrompt str
 			r.coord = reloadedCoord
 		}
 
-		r.handleTrigger(trigger, goalPath)
 		resetWorkflowForNextCycle(r.coord)
-	}
-}
-
-func (r *workflowRunner) handleTrigger(trigger triggerKind, goalPath string) {
-	if trigger != triggerSteering {
-		return
-	}
-	steeringMessage := readPendingSteeringMessage(r.dir)
-	if steeringMessage == "" {
-		return
-	}
-	if errPrepend := prependSteeringMessage(goalPath, steeringMessage); errPrepend != nil {
-		log.Println("failed to prepend steering message:", errPrepend)
 	}
 }
 

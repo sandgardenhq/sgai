@@ -230,20 +230,3 @@ Response:
   "workspace": "my-project"
 }
 ```
-
-## Get Workspace Diff
-
-Get the current jj diff for a workspace.
-
-**Endpoint:** `GET /api/v1/workspaces/{name}/diff`
-
-```bash
-curl -s $BASE_URL/api/v1/workspaces/my-project/diff
-```
-
-Response:
-```json
-{
-  "diff": "diff --git a/file.go b/file.go\n..."
-}
-```

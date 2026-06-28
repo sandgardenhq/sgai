@@ -2,12 +2,11 @@ import { useState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
-import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
+import { useFactoryState } from "@/lib/factory-state";
 import type { ApiTodoEntry, ApiActionEntry } from "@/types";
 
 interface SessionTabProps {
@@ -107,10 +106,6 @@ function TasksSection({ projectTodos, agentTodos }: { projectTodos: ApiTodoEntry
 }
 
 export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: SessionTabProps) {
-  const [steerMessage, setSteerMessage] = useState("");
-  const [steerError, setSteerError] = useState<string | null>(null);
-  const [steerSuccess, setSteerSuccess] = useState(false);
-  const [isSteering, startSteerTransition] = useTransition();
   const [pmOpenError, setPmOpenError] = useState<string | null>(null);
   const [isPmOpenPending, startPmOpenTransition] = useTransition();
 
@@ -119,38 +114,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
 
   const projectTodos = workspace?.projectTodos ?? [];
   const agentTodos = workspace?.agentTodos ?? [];
-
-  const submitSteer = () => {
-    if (!workspaceName || !steerMessage.trim()) return;
-    setSteerError(null);
-    setSteerSuccess(false);
-    startSteerTransition(async () => {
-      try {
-        const response = await api.workspaces.steer(workspaceName, steerMessage.trim());
-        triggerFactoryRefresh();
-        if (response.success) {
-          setSteerSuccess(true);
-          setSteerMessage("");
-        } else {
-          setSteerError(response.message || "Failed to submit steering message");
-        }
-      } catch (err) {
-        setSteerError(err instanceof Error ? err.message : "Failed to submit steering message");
-      }
-    });
-  };
-
-  const handleSteerSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    submitSteer();
-  };
-
-  const handleSteerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      submitSteer();
-    }
-  };
 
   const handleOpenProjectManagement = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -168,37 +131,6 @@ export function SessionTab({ workspaceName, pmContent, hasProjectMgmt }: Session
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Steer Next Turn</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSteerSubmit} className="space-y-3">
-            <div className="space-y-2">
-              <Textarea
-                id="steer-message"
-                value={steerMessage}
-                onChange={(event) => setSteerMessage(event.target.value)}
-                onKeyDown={handleSteerKeyDown}
-                placeholder="Enter re-steering instruction..."
-                rows={4}
-                className="resize-y"
-                disabled={isSteering}
-              />
-            </div>
-            {steerError && (
-              <p className="text-sm text-destructive">{steerError}</p>
-            )}
-            {steerSuccess && !steerError && (
-              <p className="text-sm text-primary">Steering instruction sent.</p>
-            )}
-            <Button type="submit" disabled={isSteering || !steerMessage.trim()}>
-              Send steering instruction
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Tasks</CardTitle>

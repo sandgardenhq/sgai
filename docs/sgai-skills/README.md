@@ -13,7 +13,7 @@ This skill explains the cyclical probe/poll/act workflow for orchestrating sgai 
 | Skill | Description |
 |-------|-------------|
 | [workspace-management](workspace-management/SKILL.md) | Create, fork, delete, rename workspaces |
-| [session-control](session-control/SKILL.md) | Start/stop sessions, steer agents |
+| [session-control](session-control/SKILL.md) | Start/stop sessions |
 | [human-interaction](human-interaction/SKILL.md) | Respond to questions and work gates |
 | [monitoring](monitoring/SKILL.md) | List workspaces, get state, diffs, SVGs |
 | [knowledge](knowledge/SKILL.md) | Agents, skills, snippets, models |

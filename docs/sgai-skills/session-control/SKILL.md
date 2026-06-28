@@ -1,6 +1,6 @@
 ---
 name: session-control
-description: Start, stop, and steer agentic sessions in sgai workspaces. Use when you need to launch AI agent sessions, halt running sessions, or inject steering instructions to guide the agent mid-execution without stopping it.
+description: Start and stop agentic sessions in sgai workspaces. Use when you need to launch AI agent sessions or halt running sessions.
 compatibility: Requires a running sgai server with workspaces that have a GOAL.md configured.
 ---
 
@@ -70,36 +70,6 @@ Response:
 ```
 
 If already stopped: `"message": "session already stopped"`
-
-## Steer an Agent
-
-Inject a steering instruction into a running session without stopping it. The instruction is recorded in `.sgai/PROJECT_MANAGEMENT.md` and workflow state yields control back to the coordinator.
-
-**Endpoint:** `POST /api/v1/workspaces/{name}/steer`
-
-```bash
-curl -X POST $BASE_URL/api/v1/workspaces/my-project/steer \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Focus on the authentication module first, skip the dashboard for now"}'
-```
-
-Request:
-```json
-{"message": "Focus on the authentication module first, skip the dashboard for now"}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "steering instruction added"
-}
-```
-
-Notes:
-- The steering instruction is recorded as a human steering entry internally
-- Workflow state requests coordinator as the next agent so the instruction is processed next
-- This works while a session is running or even when stopped; it is picked up on the next run
 
 ## Check Running Status
 

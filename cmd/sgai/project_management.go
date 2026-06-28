@@ -28,20 +28,6 @@ func appendProjectManagementSection(dir, title, body string) error {
 	return errWrite
 }
 
-func readPendingSteeringMessage(dir string) string {
-	pmPath := filepath.Join(dir, ".sgai", "PROJECT_MANAGEMENT.md")
-	data, errRead := os.ReadFile(pmPath)
-	if errRead != nil {
-		return ""
-	}
-	content := string(data)
-	idx := strings.LastIndex(content, "## Human Steering")
-	if idx < 0 {
-		return ""
-	}
-	return strings.TrimSpace(content[idx:])
-}
-
 func copyProjectManagementToRetrospective(dir, retrospectiveDir string) {
 	if retrospectiveDir == "" {
 		return

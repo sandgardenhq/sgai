@@ -3,6 +3,7 @@ import { ChevronRight, Square } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
@@ -213,8 +214,6 @@ function TokenUsageBox({ workspaceName }: { workspaceName: string }) {
                 <th className="py-1 pr-3 text-right">Input</th>
                 <th className="py-1 pr-3 text-right">Output</th>
                 <th className="py-1 pr-3 text-right">Cached In</th>
-                <th className="py-1 pr-3 text-right">Cached Out</th>
-                <th className="py-1 pr-3 text-right">Other</th>
                 <th className="py-1 pr-3 text-right">Reasoning</th>
                 <th className="py-1 pr-3 text-right">Total</th>
                 <th className="py-1 text-right">Sessions</th>
@@ -228,8 +227,6 @@ function TokenUsageBox({ workspaceName }: { workspaceName: string }) {
                   <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.input)}</td>
                   <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.output)}</td>
                   <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.cacheRead)}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.cacheWrite)}</td>
-                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.other)}</td>
                   <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.reasoning)}</td>
                   <td className="py-1 pr-3 text-right tabular-nums font-semibold">{formatTokens(row.total)}</td>
                   <td className="py-1 text-right tabular-nums">{row.sessionCount}</td>
@@ -242,8 +239,6 @@ function TokenUsageBox({ workspaceName }: { workspaceName: string }) {
                 <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.input)}</td>
                 <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.output)}</td>
                 <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.cacheRead)}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.cacheWrite)}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.other)}</td>
                 <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.reasoning)}</td>
                 <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.total)}</td>
                 <td className="py-1 text-right tabular-nums">{t.sessionCount}</td>
@@ -274,6 +269,9 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
 
   const { workspaces, fetchStatus } = useFactoryState();
   const workspace = workspaces.find((ws) => ws.name === workspaceName);
+
+  const statusLine = workspace?.task?.trim() || workspace?.status?.trim();
+  const showStatusLine = Boolean(statusLine);
 
   const handleOpenGoal = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -309,6 +307,22 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
 
   return (
     <div className="space-y-4">
+      {showStatusLine && (
+        <div className="flex flex-wrap items-center gap-2">
+          {statusLine && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="text-sm text-muted-foreground truncate max-w-[320px] md:max-w-[520px]"
+                >
+                  {statusLine}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{statusLine}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )}
       {hasActions && (
         <div className="space-y-3">
           <ActionBar

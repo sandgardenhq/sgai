@@ -354,26 +354,6 @@ func registerSessionTools(server *mcp.Server, ctx *externalMCPContext) {
 		return result, emptyResult{}, err
 	})
 
-	type steerAgentArgs struct {
-		Workspace string `json:"workspace" jsonschema:"The workspace name"`
-		Message   string `json:"message" jsonschema:"The steering instruction message"`
-	}
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "steer_agent",
-		Description: "Send a steering instruction to the running agent.",
-		InputSchema: mustSchema[steerAgentArgs](),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, args steerAgentArgs) (*mcp.CallToolResult, emptyResult, error) {
-		workspacePath, err := ctx.resolveWorkspacePath(args.Workspace)
-		if err != nil {
-			return nil, emptyResult{}, err
-		}
-		steerRes, err := ctx.srv.steerService(workspacePath, args.Message)
-		if err != nil {
-			return textResult("error: " + err.Error()), emptyResult{}, nil
-		}
-		result, err := jsonResult(steerRes)
-		return result, emptyResult{}, err
-	})
 }
 
 func registerKnowledgeTools(server *mcp.Server, ctx *externalMCPContext) {

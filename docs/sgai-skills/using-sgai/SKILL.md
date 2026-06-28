@@ -25,7 +25,7 @@ The core pattern for driving sgai is a continuous loop:
 LOOP:
   1. PROBE  → GET /api/v1/state          # Discover all workspaces + status
   2. CHECK  → pendingQuestion != null?   # Does any workspace need human input?
-  3. ACT    → based on workspace status  # Start, steer, respond, or wait
+  3. ACT    → based on workspace status  # Start, respond, or wait
   4. WAIT   → poll again after delay     # Repeat
 ```
 
@@ -86,7 +86,7 @@ Question types:
 |----------------|--------|
 | `needsInput: true` | Call respond endpoint with answer |
 | `running: false` and has goal | Start session |
-| `running: true` | Monitor / optionally steer |
+| `running: true` | Monitor |
 | Session complete | Check results, start next task |
 
 ### Step 4: Respond to Questions
@@ -108,7 +108,7 @@ curl -s -X POST $BASE_URL/api/v1/workspaces/{name}/respond \
 For detailed documentation on specific operations:
 
 - [workspace-management](../workspace-management/SKILL.md) — Create, fork, delete, rename workspaces
-- [session-control](../session-control/SKILL.md) — Start/stop sessions, steer agents
+- [session-control](../session-control/SKILL.md) — Start/stop sessions
 - [human-interaction](../human-interaction/SKILL.md) — Respond to questions and work gates
 - [monitoring](../monitoring/SKILL.md) — List workspaces, get state, diffs, SVGs
 - [knowledge](../knowledge/SKILL.md) — Agents, skills, snippets

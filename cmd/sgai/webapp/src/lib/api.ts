@@ -20,14 +20,11 @@ import type {
   ApiUpdateGoalResponse,
   ApiAdhocResponse,
   ApiModelsResponse,
-  ApiSteerResponse,
   ApiTogglePinResponse,
   ApiOpenEditorResponse,
   ApiDeleteForkResponse,
   ApiDeleteWorkspaceResponse,
   ApiResetWorkspaceResponse,
-  ApiDiffResponse,
-  ApiDeleteMessageResponse,
   ApiAttachWorkspaceResponse,
   ApiDetachWorkspaceResponse,
   ApiBrowseDirectoriesResponse,
@@ -124,11 +121,6 @@ export const api = {
         { method: "DELETE" },
       ),
 
-    steer: (name: string, message: string) =>
-      fetchJSON<ApiSteerResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/steer`,
-        { method: "POST", body: JSON.stringify({ message }) },
-      ),
     togglePin: (name: string) =>
       fetchJSON<ApiTogglePinResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/pin`,
@@ -163,10 +155,6 @@ export const api = {
       fetchJSON<ApiResetWorkspaceResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/reset`,
         { method: "POST" },
-      ),
-    getDiff: (name: string) =>
-      fetchJSON<ApiDiffResponse>(
-        `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
       ),
     tokenStats: (name: string) =>
       fetchJSON<ApiTokenUsageResponse>(

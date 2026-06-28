@@ -1,6 +1,6 @@
 ---
 name: monitoring
-description: Monitor sgai workspace status, events, progress, diffs, and workflow diagrams. Use when you need to observe what agents are doing, track progress, get the current state of all workspaces, subscribe to real-time updates via SSE, or inspect code changes.
+description: Monitor sgai workspace status, events, progress, and workflow diagrams. Use when you need to observe what agents are doing, track progress, get the current state of all workspaces, or subscribe to real-time updates via SSE.
 compatibility: Requires a running sgai server. SSE streaming requires a client that supports Server-Sent Events.
 ---
 
@@ -46,7 +46,6 @@ Response:
       "events": [...],
       "projectTodos": [...],
       "agentTodos": [...],
-      "commits": [...],
       "log": [...],
       "pendingQuestion": null,
       "forks": []
@@ -144,23 +143,6 @@ while true; do
 done
 ```
 
-## Get Workspace Diff
-
-Get the current code changes (jj diff) for a workspace.
-
-**Endpoint:** `GET /api/v1/workspaces/{name}/diff`
-
-```bash
-curl -s $BASE_URL/api/v1/workspaces/my-project/diff
-```
-
-Response:
-```json
-{
-  "diff": "diff --git a/cmd/api/auth.go b/cmd/api/auth.go\nnew file mode 100644\n..."
-}
-```
-
 ## Monitor Agent Sequence
 
 The `agentSequence` field shows the execution history:
@@ -207,26 +189,6 @@ Todo format:
     "content": "Implement JWT authentication",
     "status": "in_progress",
     "priority": "high"
-  }
-]
-```
-
-## Monitor Commit History
-
-```bash
-curl -s $BASE_URL/api/v1/state | jq '.workspaces[0].commits'
-```
-
-Response:
-```json
-[
-  {
-    "changeId": "abc123",
-    "commitId": "def456",
-    "timestamp": "2026-02-27T17:00:00Z",
-    "bookmarks": ["main"],
-    "description": "cmd/api: add authentication endpoints",
-    "graphChar": "◆"
   }
 ]
 ```

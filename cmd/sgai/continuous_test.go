@@ -183,99 +183,6 @@ func TestResetWorkflowForNextCycle(t *testing.T) {
 	assert.Equal(t, state.ModeContinuous, snapshot.InteractionMode)
 }
 
-func TestPrependSteeringMessage(t *testing.T) {
-	tests := []struct {
-		name         string
-		existingGoal string
-		message      string
-		expected     string
-		skipCreate   bool
-	}{
-		{
-			name:         "noFrontmatter",
-			existingGoal: "# My Goal\n\nSome content",
-			message:      "Steering message",
-			expected:     "Steering message\n\n# My Goal\n\nSome content",
-		},
-		{
-			name: "withFrontmatter",
-			existingGoal: `---
-agents:
-  - go
-model: openai/gpt-5.5
----
-# My Goal
-
-Some content`,
-			message: "Steering message",
-			expected: `---
-agents:
-  - go
-model: openai/gpt-5.5
----
-
-Steering message
-
-# My Goal
-
-Some content`,
-		},
-		{
-			name: "emptyGoal",
-			existingGoal: `---
----
-`,
-			message:  "Steering message",
-			expected: "---\n---\n\nSteering message\n\n",
-		},
-		{
-			name:         "emptyContent",
-			existingGoal: "",
-			message:      "Steering message",
-			expected:     "Steering message\n\n",
-			skipCreate:   true,
-		},
-		{
-			name: "unclosedFrontmatter",
-			existingGoal: `---
-agents:
-  - go
-# My Goal`,
-			message:  "Steering message",
-			expected: "Steering message\n\n---\nagents:\n  - go\n# My Goal",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			goalPath := filepath.Join(tmpDir, "GOAL.md")
-			if tt.existingGoal != "" && !tt.skipCreate {
-				require.NoError(t, os.WriteFile(goalPath, []byte(tt.existingGoal), 0644))
-			}
-
-			err := prependSteeringMessage(goalPath, tt.message)
-			if tt.skipCreate {
-				assert.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-
-			content, err := os.ReadFile(goalPath)
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, string(content))
-		})
-	}
-}
-
-func TestPrependSteeringMessageNoFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	goalPath := filepath.Join(tmpDir, "GOAL.md")
-
-	err := prependSteeringMessage(goalPath, "test message")
-	assert.Error(t, err)
-}
-
 func TestWatchForTriggerCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -285,11 +192,7 @@ func TestWatchForTriggerCancelledContext(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sgaiDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "GOAL.md"), []byte("# Goal"), 0644))
 
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, "checksum123", 0, "")
+	result := watchForTrigger(ctx, dir, "checksum123", 0, "")
 	assert.Equal(t, triggerNone, result)
 }
 
@@ -303,33 +206,8 @@ func TestWatchForTriggerGoalChanged(t *testing.T) {
 	goalPath := filepath.Join(dir, "GOAL.md")
 	require.NoError(t, os.WriteFile(goalPath, []byte("# Goal version 2"), 0644))
 
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, "stale-checksum", 0, "")
+	result := watchForTrigger(ctx, dir, "stale-checksum", 0, "")
 	assert.Equal(t, triggerGoal, result)
-}
-
-func TestWatchForTriggerSteeringMessage(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	t.Cleanup(cancel)
-
-	dir := t.TempDir()
-	sgaiDir := filepath.Join(dir, ".sgai")
-	require.NoError(t, os.MkdirAll(sgaiDir, 0755))
-	goalPath := filepath.Join(dir, "GOAL.md")
-	require.NoError(t, os.WriteFile(goalPath, []byte("# Goal"), 0644))
-
-	checksum, errChecksum := computeGoalChecksum(goalPath)
-	require.NoError(t, errChecksum)
-
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{Status: state.StatusAgentDone})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, checksum, 0, "")
-	assert.Equal(t, triggerSteering, result)
 }
 
 func TestWatchForTriggerAutoTimer(t *testing.T) {
@@ -345,11 +223,7 @@ func TestWatchForTriggerAutoTimer(t *testing.T) {
 	checksum, errChecksum := computeGoalChecksum(goalPath)
 	require.NoError(t, errChecksum)
 
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, checksum, 1*time.Millisecond, "")
+	result := watchForTrigger(ctx, dir, checksum, 1*time.Millisecond, "")
 	assert.Equal(t, triggerAuto, result)
 }
 
@@ -366,11 +240,7 @@ func TestWatchForTriggerCronWithAutoFallback(t *testing.T) {
 	checksum, errChecksum := computeGoalChecksum(goalPath)
 	require.NoError(t, errChecksum)
 
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, checksum, 1*time.Millisecond, "* * * * *")
+	result := watchForTrigger(ctx, dir, checksum, 1*time.Millisecond, "* * * * *")
 	assert.Equal(t, triggerAuto, result)
 }
 
@@ -387,18 +257,13 @@ func TestWatchForTriggerInvalidCronExpression(t *testing.T) {
 	checksum, errChecksum := computeGoalChecksum(goalPath)
 	require.NoError(t, errChecksum)
 
-	statePath := filepath.Join(sgaiDir, "state.json")
-	coord, errCoord := state.NewCoordinatorWith(statePath, state.Workflow{})
-	require.NoError(t, errCoord)
-
-	result := watchForTrigger(ctx, dir, coord, checksum, 1*time.Millisecond, "invalid cron")
+	result := watchForTrigger(ctx, dir, checksum, 1*time.Millisecond, "invalid cron")
 	assert.Equal(t, triggerAuto, result)
 }
 
 func TestTriggerKindConstants(t *testing.T) {
 	assert.Equal(t, triggerKind(""), triggerNone)
 	assert.Equal(t, triggerKind("goal-changed"), triggerGoal)
-	assert.Equal(t, triggerKind("steering-message"), triggerSteering)
 	assert.Equal(t, triggerKind("auto-timer"), triggerAuto)
 	assert.Equal(t, triggerKind("cron-schedule"), triggerCron)
 }
