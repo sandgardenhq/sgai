@@ -31,6 +31,7 @@ import type {
   ApiAttachWorkspaceResponse,
   ApiDetachWorkspaceResponse,
   ApiBrowseDirectoriesResponse,
+  ApiTokenUsageResponse,
 } from "../types";
 
 class ApiError extends Error {
@@ -166,6 +167,10 @@ export const api = {
     getDiff: (name: string) =>
       fetchJSON<ApiDiffResponse>(
         `/api/v1/workspaces/${encodeURIComponent(name)}/diff`,
+      ),
+    tokenStats: (name: string) =>
+      fetchJSON<ApiTokenUsageResponse>(
+        `/api/v1/workspaces/${encodeURIComponent(name)}/token-stats`,
       ),
     forkTemplate: (name: string) =>
       fetchJSON<ApiForkTemplateResponse>(

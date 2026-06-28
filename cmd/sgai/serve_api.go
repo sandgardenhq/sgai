@@ -97,6 +97,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/goal", s.handleAPIOpenEditorGoal)
 	mux.HandleFunc("POST /api/v1/workspaces/{name}/open-editor/project-management", s.handleAPIOpenEditorProjectManagement)
 	mux.HandleFunc("GET /api/v1/workspaces/{name}/diff", s.handleAPIWorkspaceDiff)
+	mux.HandleFunc("GET /api/v1/workspaces/{name}/token-stats", s.handleAPITokenStats)
 	mux.HandleFunc("GET /api/v1/models", s.handleAPIListModels)
 	mux.HandleFunc("GET /api/v1/compose", s.handleAPIComposeState)
 	mux.HandleFunc("POST /api/v1/compose", s.handleAPIComposeSave)
@@ -1018,6 +1019,31 @@ func (s *Server) handleAPIWorkspaceDiff(w http.ResponseWriter, r *http.Request) 
 
 	diff := collectJJFullDiff(workspacePath)
 	writeJSON(w, apiFullDiffResponse{Diff: diff})
+}
+
+func (s *Server) handleAPITokenStats(w http.ResponseWriter, r *http.Request) {
+	workspacePath, ok := s.resolveWorkspaceFromPath(w, r)
+	if !ok {
+		return
+	}
+
+	sessionIDs, errSessions := readSessionsJSONL(filepath.Join(workspacePath, ".sgai", "sessions.jsonl"))
+	if errSessions != nil {
+		writeJSON(w, tokenUsage{Rows: []tokenUsageRow{}})
+		return
+	}
+
+	dbPath := resolveOpencodeDBPath()
+	usage, errQuery := queryTokenUsage(dbPath, sessionIDs)
+	if errQuery != nil {
+		log.Println("failed to query token usage:", errQuery)
+		writeJSON(w, tokenUsage{Rows: []tokenUsageRow{}})
+		return
+	}
+	if usage.Rows == nil {
+		usage.Rows = []tokenUsageRow{}
+	}
+	writeJSON(w, usage)
 }
 
 type apiEventEntry struct {

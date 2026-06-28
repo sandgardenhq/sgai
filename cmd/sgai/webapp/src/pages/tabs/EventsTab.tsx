@@ -1,6 +1,6 @@
-import { useState, useTransition, type MouseEvent } from "react";
+import { useState, useEffect, useReducer, useTransition, type MouseEvent } from "react";
 import { ChevronRight, Square } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useFactoryState } from "@/lib/factory-state";
 import { useAdhocRun } from "@/hooks/useAdhocRun";
 import { ActionBar } from "./SessionTab";
-import type { ApiEventEntry, ApiActionEntry } from "@/types";
+import type { ApiEventEntry, ApiActionEntry, ApiTokenUsageResponse, ApiTokenUsageRow } from "@/types";
 
 interface EventsTabProps {
   workspaceName: string;
@@ -86,6 +86,173 @@ function EventTimeline({ events }: { events: ApiEventEntry[] }) {
         );
       })}
     </div>
+  );
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function modelDisplay(raw: string): string {
+  if (!raw) return "";
+  try {
+    const desc = JSON.parse(raw) as { id?: string; providerID?: string; variant?: string };
+    const parts: string[] = [];
+    if (desc.providerID) parts.push(desc.providerID);
+    if (desc.id) parts.push(desc.id);
+    if (desc.variant && desc.variant !== "default") parts.push(desc.variant);
+    return parts.join("/");
+  } catch {
+    return raw;
+  }
+}
+
+type TokenUsageState = {
+  usage: ApiTokenUsageResponse | null;
+  error: string | null;
+};
+
+type TokenUsageAction =
+  | { type: "loaded"; usage: ApiTokenUsageResponse }
+  | { type: "error"; message: string };
+
+const initialTokenUsageState: TokenUsageState = { usage: null, error: null };
+
+function tokenUsageReducer(state: TokenUsageState, action: TokenUsageAction): TokenUsageState {
+  switch (action.type) {
+    case "loaded":
+      return { usage: action.usage, error: null };
+    case "error":
+      return { ...state, error: action.message };
+  }
+}
+
+function TokenUsageBox({ workspaceName }: { workspaceName: string }) {
+  const [state, dispatch] = useReducer(tokenUsageReducer, initialTokenUsageState);
+  const { usage, error } = state;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchUsage = () => {
+      api.workspaces.tokenStats(workspaceName)
+        .then((data) => {
+          if (cancelled) return;
+          dispatch({ type: "loaded", usage: data });
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          dispatch({ type: "error", message: err instanceof Error ? err.message : "Failed to load token usage" });
+        });
+    };
+
+    fetchUsage();
+    const interval = setInterval(fetchUsage, 15_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [workspaceName]);
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Token Usage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!usage) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Token Usage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-20 w-full rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!usage.rows || usage.rows.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Token Usage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm italic text-muted-foreground">No token usage recorded yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const t = usage.totals;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Token Usage</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground border-b">
+                <th className="py-1 pr-3">Agent</th>
+                <th className="py-1 pr-3">Model</th>
+                <th className="py-1 pr-3 text-right">Input</th>
+                <th className="py-1 pr-3 text-right">Output</th>
+                <th className="py-1 pr-3 text-right">Cached In</th>
+                <th className="py-1 pr-3 text-right">Cached Out</th>
+                <th className="py-1 pr-3 text-right">Other</th>
+                <th className="py-1 pr-3 text-right">Reasoning</th>
+                <th className="py-1 pr-3 text-right">Total</th>
+                <th className="py-1 text-right">Sessions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usage.rows.map((row: ApiTokenUsageRow, i: number) => (
+                <tr key={`${row.agent}-${row.model}-${i}`} className="border-b last:border-0">
+                  <td className="py-1 pr-3 truncate max-w-[120px]" title={row.agent}>{row.agent}</td>
+                  <td className="py-1 pr-3 truncate max-w-[180px]" title={modelDisplay(row.model)}>{modelDisplay(row.model)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.input)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.output)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.cacheRead)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.cacheWrite)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.other)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(row.reasoning)}</td>
+                  <td className="py-1 pr-3 text-right tabular-nums font-semibold">{formatTokens(row.total)}</td>
+                  <td className="py-1 text-right tabular-nums">{row.sessionCount}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-semibold border-t-2">
+                <td className="py-1 pr-3" colSpan={2}>TOTAL</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.input)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.output)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.cacheRead)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.cacheWrite)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.other)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.reasoning)}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">{formatTokens(t.total)}</td>
+                <td className="py-1 text-right tabular-nums">{t.sessionCount}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -187,6 +354,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
         needsInput={workspace.needsInput}
         humanMessage={workspace.humanMessage}
       />
+      <TokenUsageBox workspaceName={workspaceName} />
       {goalContent && (
         <details className="group">
           <summary className="cursor-pointer font-semibold text-sm mb-2 flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">
@@ -222,6 +390,7 @@ export function EventsTab({ workspaceName, goalContent, actions }: EventsTabProp
       )}
       <Card>
         <CardContent className="p-4">
+          <h3 className="text-base font-semibold mb-2">Events</h3>
           <EventTimeline events={workspace.events ?? []} />
         </CardContent>
       </Card>

@@ -131,24 +131,27 @@ func resolveOpencodeDataDir() string {
 }
 
 type tokenUsageRow struct {
-	Agent            string
-	Model            string
-	Input            int64
-	Output           int64
-	CacheRead        int64
-	CacheWrite       int64
-	Reasoning        int64
-	Other            int64
-	Total            int64
-	SessionCount     int64
+	Agent        string `json:"agent"`
+	Model        string `json:"model"`
+	Input        int64  `json:"input"`
+	Output       int64  `json:"output"`
+	CacheRead    int64  `json:"cacheRead"`
+	CacheWrite   int64  `json:"cacheWrite"`
+	Reasoning    int64  `json:"reasoning"`
+	Other        int64  `json:"other"`
+	Total        int64  `json:"total"`
+	SessionCount int64  `json:"sessionCount"`
 }
 
 type tokenUsage struct {
-	Rows   []tokenUsageRow
-	Totals tokenUsageRow
+	Rows   []tokenUsageRow `json:"rows"`
+	Totals tokenUsageRow   `json:"totals"`
 }
 
 func queryTokenUsage(dbPath string, sessionIDs []string) (tokenUsage, error) {
+	if len(sessionIDs) == 0 {
+		return tokenUsage{Rows: []tokenUsageRow{}}, nil
+	}
 	dsn := "file:" + dbPath + "?mode=ro&_pragma=busy_timeout(5000)"
 	placeholders := make([]any, len(sessionIDs))
 	placeList := make([]string, len(sessionIDs))
