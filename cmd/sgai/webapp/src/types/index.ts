@@ -151,6 +151,24 @@ export interface ApiModelsResponse {
   defaultModel?: string;
 }
 
+export interface ApiTokenUsageRow {
+  agent: string;
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  reasoning: number;
+  other: number;
+  total: number;
+  sessionCount: number;
+}
+
+export interface ApiTokenUsageResponse {
+  rows: ApiTokenUsageRow[];
+  totals: ApiTokenUsageRow;
+}
+
 export interface ApiTodoEntry {
   id: string;
   content: string;

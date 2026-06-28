@@ -62,6 +62,7 @@ mock.module("@/lib/api", () => ({
       adhoc: mock(() => Promise.resolve({ output: "", running: false })),
       adhocStatus: mock(() => Promise.resolve({ output: "", running: false })),
       adhocStop: mock(() => Promise.resolve({ output: "", running: false })),
+      tokenStats: mock(() => Promise.resolve({ rows: [], totals: { agent: "", model: "", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, other: 0, total: 0, sessionCount: 0 } })),
     },
     models: {
       list: mock(() => Promise.resolve({ models: [], defaultModel: "" })),
