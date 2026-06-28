@@ -605,6 +605,34 @@ describe("WorkspaceDetail", () => {
     });
   });
 
+  describe("fork editor visibility", () => {
+    it("shows fork editor for standalone workspaces", async () => {
+      mockWorkspaces = [createMockWorkspace({ name: "standalone", isRoot: false, isFork: false })];
+
+      renderWorkspaceDetail("standalone");
+
+      expect(await screen.findByText("Create Fork")).toBeTruthy();
+    });
+
+    it("shows fork editor for root workspaces", async () => {
+      mockWorkspaces = [createMockWorkspace({ name: "root", isRoot: true, isFork: false })];
+
+      renderWorkspaceDetail("root");
+
+      expect(await screen.findByText("Create Fork")).toBeTruthy();
+    });
+
+    it("hides fork editor for fork workspaces", async () => {
+      mockWorkspaces = [createMockWorkspace({ name: "fork-ws", isRoot: false, isFork: true })];
+
+      renderWorkspaceDetail("fork-ws");
+
+      await waitFor(() => {
+        expect(screen.queryByText("Create Fork")).toBeNull();
+      });
+    });
+  });
+
   describe("error handling", () => {
     it("shows error message when start fails", async () => {
       const user = userEvent.setup();

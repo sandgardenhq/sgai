@@ -437,7 +437,7 @@ function WorkspaceDetailView({ headerProps, actionOutputProps, handleActionClick
       <WorkspaceDetailHeader {...headerProps} />
 
       <div className="pt-4">
-        {detail.isRoot && !detail.isFork && (
+        {!detail.isFork && (
           <div className="mb-6">
             <InlineForkEditor workspaceName={detail.name} />
           </div>

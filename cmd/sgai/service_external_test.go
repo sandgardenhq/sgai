@@ -459,3 +459,21 @@ func TestClassifyWorkspace(t *testing.T) {
 		})
 	}
 }
+
+func TestIsStaleWorkingCopyError(t *testing.T) {
+	t.Run("staleMessage", func(t *testing.T) {
+		err := assert.AnError
+		output := []byte("Error: The working copy is stale (not updated since operation ab82785bb434).")
+		assert.True(t, isStaleWorkingCopyError(output, err))
+	})
+
+	t.Run("nonStaleError", func(t *testing.T) {
+		err := assert.AnError
+		output := []byte("Error: some other failure")
+		assert.False(t, isStaleWorkingCopyError(output, err))
+	})
+
+	t.Run("nilError", func(t *testing.T) {
+		assert.False(t, isStaleWorkingCopyError([]byte("anything"), nil))
+	})
+}

@@ -707,13 +707,11 @@ func classifyWorkspace(dir string) workspaceKind {
 	if !info.IsDir() {
 		return workspaceFork
 	}
-	cmd := exec.Command("jj", "workspace", "list")
-	cmd.Dir = dir
-	output, errExec := cmd.Output()
-	if errExec != nil {
+	output, errList := runJJWorkspaceList(dir)
+	if errList != nil {
 		return workspaceStandalone
 	}
-	trimmed := strings.TrimSpace(string(output))
+	trimmed := strings.TrimSpace(output)
 	if trimmed == "" {
 		return workspaceStandalone
 	}
@@ -722,6 +720,35 @@ func classifyWorkspace(dir string) workspaceKind {
 		return workspaceRoot
 	}
 	return workspaceStandalone
+}
+
+func runJJWorkspaceList(dir string) (string, error) {
+	listCmd := exec.Command("jj", "workspace", "list")
+	listCmd.Dir = dir
+	output, errList := listCmd.CombinedOutput()
+	if errList == nil {
+		return string(output), nil
+	}
+	if !isStaleWorkingCopyError(output, errList) {
+		return "", errList
+	}
+	recoverCmd := exec.Command("jj", "workspace", "update-stale")
+	recoverCmd.Dir = dir
+	recoverOutput, errRecover := recoverCmd.CombinedOutput()
+	if errRecover != nil {
+		return "", fmt.Errorf("stale working copy recovery failed: %w: %s", errRecover, recoverOutput)
+	}
+	retryCmd := exec.Command("jj", "workspace", "list")
+	retryCmd.Dir = dir
+	output, errRetry := retryCmd.CombinedOutput()
+	if errRetry != nil {
+		return "", errRetry
+	}
+	return string(output), nil
+}
+
+func isStaleWorkingCopyError(output []byte, err error) bool {
+	return err != nil && strings.Contains(string(output), "working copy is stale")
 }
 
 func (s *Server) classifyWorkspaceCached(dir string) workspaceKind {
