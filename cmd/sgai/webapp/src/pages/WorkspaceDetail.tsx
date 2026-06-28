@@ -85,6 +85,7 @@ const TABS = [
 
 const ROOT_TABS = [
   { key: "forks", label: "Forks" },
+  { key: "internals", label: "Internals" },
 ] as const;
 
 interface TabNavProps {
@@ -205,7 +206,7 @@ export function WorkspaceDetail(): ReactNode {
     if (detail.name !== workspaceName) return;
     const encodedName = encodeURIComponent(detail.name);
 
-    if (hasForks && activeTab !== "forks") {
+    if (hasForks && activeTab !== "forks" && activeTab !== "internals") {
       navigate(`/workspaces/${encodedName}/forks`, { replace: true });
       return;
     }
@@ -658,30 +659,6 @@ function WorkspaceDetailActions({
       <Button
         type="button"
         size="sm"
-        variant="outline"
-        onClick={() => navigate(`/workspaces/${encodedWorkspace}/skills`)}
-      >
-        Skills
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => navigate(`/workspaces/${encodedWorkspace}/snippets`)}
-      >
-        Snippets
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => navigate(`/workspaces/${encodedWorkspace}/agents`)}
-      >
-        Agents
-      </Button>
-      <Button
-        type="button"
-        size="sm"
         variant={detail.pinned ? "secondary" : "outline"}
         onClick={handlePinToggle}
         disabled={isPinPending}
@@ -940,6 +917,24 @@ function TabSkeleton() {
   );
 }
 
+function InternalsButtonBar({ workspaceName }: { workspaceName: string }) {
+  const encodedWorkspace = encodeURIComponent(workspaceName);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Internal links">
+      <Button type="button" size="sm" variant="outline" asChild>
+        <Link to={`/workspaces/${encodedWorkspace}/skills`}>Skills</Link>
+      </Button>
+      <Button type="button" size="sm" variant="outline" asChild>
+        <Link to={`/workspaces/${encodedWorkspace}/snippets`}>Snippets</Link>
+      </Button>
+      <Button type="button" size="sm" variant="outline" asChild>
+        <Link to={`/workspaces/${encodedWorkspace}/agents`}>Agents</Link>
+      </Button>
+    </div>
+  );
+}
+
 function TabContent({
   activeTab,
   workspaceName,
@@ -971,7 +966,12 @@ function TabContent({
     case "messages":
       return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
-      return <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />;
+      return (
+        <div className="space-y-4">
+          <InternalsButtonBar workspaceName={workspaceName} />
+          <SessionTab workspaceName={workspaceName} pmContent={pmContent} hasProjectMgmt={hasProjectMgmt} />
+        </div>
+      );
 
     case "run":
       return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
