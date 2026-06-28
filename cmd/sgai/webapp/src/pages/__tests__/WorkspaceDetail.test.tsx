@@ -571,6 +571,44 @@ describe("WorkspaceDetail", () => {
     });
   });
 
+  describe("internal links", () => {
+    it("shows skills snippets and agents in the internals tab", async () => {
+      renderWorkspaceDetail("test-workspace", "internals");
+
+      const toolbar = await screen.findByRole("toolbar", { name: "Internal links" });
+
+      expect(toolbar.querySelector('a[href="/workspaces/test-workspace/skills"]')?.textContent).toBe("Skills");
+      expect(toolbar.querySelector('a[href="/workspaces/test-workspace/snippets"]')?.textContent).toBe("Snippets");
+      expect(toolbar.querySelector('a[href="/workspaces/test-workspace/agents"]')?.textContent).toBe("Agents");
+    });
+
+    it("does not show internal links in the progress header actions", async () => {
+      renderWorkspaceDetail();
+
+      await waitFor(() => {
+        expect(screen.queryByRole("toolbar", { name: "Internal links" })).toBeNull();
+      });
+    });
+
+    it("keeps internals reachable for forked roots", async () => {
+      mockWorkspaces = [
+        createMockWorkspace({
+          name: "forked-root",
+          isRoot: true,
+          isFork: false,
+          forks: [{ name: "child", dir: "/child", running: false, needsInput: false, inProgress: false, pinned: false, description: "Child", commitAhead: 0, commits: [] }],
+        }),
+      ];
+
+      renderWorkspaceDetail("forked-root", "internals");
+
+      const internalsLink = await screen.findByRole("link", { name: "Internals" });
+
+      expect(internalsLink.getAttribute("aria-current")).toBe("page");
+      expect(await screen.findByRole("toolbar", { name: "Internal links" })).toBeTruthy();
+    });
+  });
+
   describe("error handling", () => {
     it("shows error message when start fails", async () => {
       const user = userEvent.setup();
