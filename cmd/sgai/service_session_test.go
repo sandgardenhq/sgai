@@ -203,74 +203,6 @@ func TestRespondServiceDeliversToAskUserQuestion(t *testing.T) {
 	}
 }
 
-func TestSteerService(t *testing.T) {
-	tests := []struct {
-		name        string
-		message     string
-		setupFunc   func(*testing.T, string)
-		wantErr     bool
-		errContains string
-		validate    func(*testing.T, steerResult)
-	}{
-		{
-			name:    "steerWithValidMessage",
-			message: "Please focus on the database implementation",
-			setupFunc: func(t *testing.T, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-			},
-			wantErr: false,
-			validate: func(t *testing.T, result steerResult) {
-				assert.True(t, result.Success)
-				assert.Equal(t, "steering instruction added", result.Message)
-			},
-		},
-		{
-			name:    "steerWithEmptyMessage",
-			message: "",
-			setupFunc: func(t *testing.T, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-			},
-			wantErr:     true,
-			errContains: "message cannot be empty",
-		},
-		{
-			name:    "steerWithWhitespaceOnlyMessage",
-			message: "   \t\n  ",
-			setupFunc: func(t *testing.T, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, ".sgai"), 0755))
-			},
-			wantErr:     true,
-			errContains: "message cannot be empty",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rootDir := t.TempDir()
-			server := NewServer(rootDir)
-
-			workspacePath := filepath.Join(rootDir, "test-workspace")
-			require.NoError(t, os.MkdirAll(workspacePath, 0755))
-			tt.setupFunc(t, workspacePath)
-
-			result, err := server.steerService(workspacePath, tt.message)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-				return
-			}
-
-			require.NoError(t, err)
-			if tt.validate != nil {
-				tt.validate(t, result)
-			}
-		})
-	}
-}
-
 func TestStartSessionServiceValidation(t *testing.T) {
 	t.Skip("Integration test - requires full workflow execution with MCP server and agent coordination")
 	tests := []struct {
@@ -620,24 +552,6 @@ func TestStopSessionServiceRunningSession(t *testing.T) {
 	result := server.stopSessionService(wsDir)
 	assert.Equal(t, "session stopped", result.Message)
 	assert.False(t, result.Running)
-}
-
-func TestSteerServiceSuccessful(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-	sp := filepath.Join(wsDir, ".sgai", "state.json")
-	_, errCoord := state.NewCoordinatorWith(sp, state.Workflow{})
-	require.NoError(t, errCoord)
-	result, errSteer := server.steerService(wsDir, "do something different")
-	require.NoError(t, errSteer)
-	assert.True(t, result.Success)
-}
-
-func TestSteerServiceEmptyMessageFails(t *testing.T) {
-	server, rootDir := setupTestServer(t)
-	wsDir := setupTestWorkspace(t, rootDir, "test-ws")
-	_, errSteer := server.steerService(wsDir, "  ")
-	assert.Error(t, errSteer)
 }
 
 func TestStopSessionServiceNotRunning(t *testing.T) {

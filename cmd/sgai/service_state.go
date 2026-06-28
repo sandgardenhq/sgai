@@ -48,6 +48,16 @@ func (s *Server) workspaceDiffService(workspacePath string) workspaceDiffResult 
 	return workspaceDiffResult{Diff: collectJJFullDiff(workspacePath)}
 }
 
+func collectJJFullDiff(dir string) string {
+	diffCmd := exec.Command("jj", "diff", "--from", "default@", "--git")
+	diffCmd.Dir = dir
+	rawDiff, errDiff := diffCmd.Output()
+	if errDiff != nil {
+		return ""
+	}
+	return string(rawDiff)
+}
+
 func (s *Server) getAgentDelegationSVGService(workspacePath string) string {
 	goalPath := filepath.Join(workspacePath, "GOAL.md")
 	if _, errStat := os.Stat(goalPath); errStat != nil {

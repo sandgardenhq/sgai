@@ -436,33 +436,6 @@ func TestMCPToolRespondToQuestion(t *testing.T) {
 	assert.Contains(t, tc.Text, "error:")
 }
 
-func TestMCPToolSteerAgent(t *testing.T) {
-	t.Run("noGoal", func(t *testing.T) {
-		srv, rootDir := setupTestServer(t)
-		setupTestWorkspace(t, rootDir, "steer-mcp")
-		cs := connectMCPClient(t, srv)
-		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-			Name:      "steer_agent",
-			Arguments: map[string]any{"workspace": "steer-mcp", "message": "do something"},
-		})
-		require.NoError(t, err)
-		require.NotNil(t, result)
-	})
-
-	t.Run("withGoal", func(t *testing.T) {
-		srv, rootDir := setupTestServer(t)
-		wsDir := setupTestWorkspace(t, rootDir, "steer-mcp2")
-		require.NoError(t, os.WriteFile(filepath.Join(wsDir, "GOAL.md"), []byte("---\nagents:\n  - go\nmodel: openai/gpt-5.5\n---\n# Test"), 0644))
-		cs := connectMCPClient(t, srv)
-		result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-			Name:      "steer_agent",
-			Arguments: map[string]any{"workspace": "steer-mcp2", "message": "do something"},
-		})
-		require.NoError(t, err)
-		require.NotNil(t, result)
-	})
-}
-
 func TestMCPToolListAgents(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	setupTestWorkspace(t, rootDir, "agents-mcp")
@@ -812,19 +785,6 @@ func TestMCPToolDeleteForkNoConfirm(t *testing.T) {
 	assert.Contains(t, tc.Text, "error:")
 }
 
-func TestMCPToolSteerAgentEmpty(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "steer-empty-mcp")
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "steer_agent",
-		Arguments: map[string]any{"workspace": "steer-empty-mcp", "message": ""},
-	})
-	require.NoError(t, err)
-	tc := result.Content[0].(*mcp.TextContent)
-	assert.Contains(t, tc.Text, "error:")
-}
-
 func TestMCPToolRespondToQuestionInvalid(t *testing.T) {
 	srv, _ := setupTestServer(t)
 	cs := connectMCPClient(t, srv)
@@ -1095,18 +1055,6 @@ func TestMCPToolGetWorkspaceDiffExists(t *testing.T) {
 	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "get_workspace_diff",
 		Arguments: map[string]any{"workspace": "wsdiff-mcp"},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result)
-}
-
-func TestMCPToolSteerAgentWithMessage(t *testing.T) {
-	srv, rootDir := setupTestServer(t)
-	setupTestWorkspace(t, rootDir, "steer-msg-mcp")
-	cs := connectMCPClient(t, srv)
-	result, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "steer_agent",
-		Arguments: map[string]any{"workspace": "steer-msg-mcp", "message": "do something different"},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)

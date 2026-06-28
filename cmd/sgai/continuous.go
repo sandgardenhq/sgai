@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -19,11 +18,10 @@ import (
 type triggerKind string
 
 const (
-	triggerNone     triggerKind = ""
-	triggerGoal     triggerKind = "goal-changed"
-	triggerSteering triggerKind = "steering-message"
-	triggerAuto     triggerKind = "auto-timer"
-	triggerCron     triggerKind = "cron-schedule"
+	triggerNone triggerKind = ""
+	triggerGoal triggerKind = "goal-changed"
+	triggerAuto triggerKind = "auto-timer"
+	triggerCron triggerKind = "cron-schedule"
 )
 
 const (
@@ -67,9 +65,8 @@ func runContinuousModePrompt(ctx context.Context, dir string, prompt string, mcp
 	updateContinuousModeProgress(coord, "continuous mode prompt failed after all retries, proceeding to watch loop")
 }
 
-func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, lastChecksum string, autoDuration time.Duration, cronExpr string) triggerKind {
+func watchForTrigger(ctx context.Context, dir string, lastChecksum string, autoDuration time.Duration, cronExpr string) triggerKind {
 	goalPath := filepath.Join(dir, "GOAL.md")
-	stateJSONPath := filepath.Join(dir, ".sgai", "state.json")
 
 	var deadline time.Time
 	var deadlineTrigger triggerKind
@@ -105,59 +102,10 @@ func watchForTrigger(ctx context.Context, dir string, coord *state.Coordinator, 
 			return triggerGoal
 		}
 
-		freshCoord, errFresh := state.NewCoordinator(stateJSONPath)
-		if errFresh == nil {
-			coord = freshCoord
-		}
-		if coord.State().Status == state.StatusAgentDone {
-			return triggerSteering
-		}
-
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			return deadlineTrigger
 		}
 	}
-}
-
-func prependSteeringMessage(goalPath string, message string) error {
-	content, errRead := os.ReadFile(goalPath)
-	if errRead != nil {
-		return fmt.Errorf("reading GOAL.md: %w", errRead)
-	}
-
-	delimiter := []byte("---")
-
-	if !bytes.HasPrefix(content, delimiter) {
-		newContent := message + "\n\n" + string(content)
-		return os.WriteFile(goalPath, []byte(newContent), 0644)
-	}
-
-	rest := content[len(delimiter):]
-	if len(rest) > 0 && rest[0] == '\n' {
-		rest = rest[1:]
-	}
-
-	closingIdx := bytes.Index(rest, delimiter)
-	if closingIdx == -1 {
-		newContent := message + "\n\n" + string(content)
-		return os.WriteFile(goalPath, []byte(newContent), 0644)
-	}
-
-	frontmatterEnd := len(delimiter) + 1 + closingIdx + len(delimiter)
-	if frontmatterEnd < len(content) && content[frontmatterEnd] == '\n' {
-		frontmatterEnd++
-	}
-
-	var buf bytes.Buffer
-	buf.Write(content[:frontmatterEnd])
-	buf.WriteString("\n")
-	buf.WriteString(message)
-	buf.WriteString("\n\n")
-	if frontmatterEnd < len(content) {
-		buf.Write(content[frontmatterEnd:])
-	}
-
-	return os.WriteFile(goalPath, buf.Bytes(), 0644)
 }
 
 func updateContinuousModeState(coord *state.Coordinator, task, agent, progressMsg string) {

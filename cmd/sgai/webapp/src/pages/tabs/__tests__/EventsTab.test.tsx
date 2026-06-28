@@ -36,8 +36,6 @@ const createMockWorkspace = (overrides = {}) => ({
   events: [],
   projectTodos: [],
   agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
   log: [],
   external: false,
   ...overrides,
@@ -223,6 +221,26 @@ describe("EventsTab", () => {
     it("shows GOAL.md section when goal content is provided", () => {
       renderEventsTab({ goalContent: "# My Goal" });
       expect(screen.getByText("GOAL.md")).toBeTruthy();
+    });
+  });
+
+  describe("status line", () => {
+    it("shows status line with task text in the progress tab", async () => {
+      mockWorkspaces = [createMockWorkspace({
+        running: true,
+        task: "Writing tests for authentication",
+      })];
+      renderEventsTab();
+      await waitFor(() => {
+        expect(screen.getByText("Writing tests for authentication")).toBeTruthy();
+      });
+    });
+
+    it("does not show status line when no task or status", async () => {
+      renderEventsTab();
+      await waitFor(() => {
+        expect(screen.getByText("No events recorded yet")).toBeTruthy();
+      });
     });
   });
 

@@ -6,7 +6,9 @@
       "type": "local",
       "command": [
         "npx",
-        "@playwright/mcp@latest"
+        "@playwright/mcp@latest",
+        "--output-dir",
+        ".tmp/"
       ]
     },
     "context7": {

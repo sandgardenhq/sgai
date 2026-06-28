@@ -64,9 +64,6 @@ const EditGoal = lazy(() =>
 const AdhocOutput = lazy(() =>
   import("./pages/AdhocOutput").then((m) => ({ default: m.AdhocOutput })),
 );
-const FullDiffPage = lazy(() =>
-  import("./pages/FullDiffPage").then((m) => ({ default: m.FullDiffPage })),
-);
 
 function PageSkeleton() {
   return (
@@ -191,10 +188,6 @@ export function EditGoalRoute() {
 
 export function AdhocOutputRoute() {
   return <PageRoute><AdhocOutput /></PageRoute>;
-}
-
-export function FullDiffRoute() {
-  return <PageRoute><FullDiffPage /></PageRoute>;
 }
 
 function PageRoute({ children }: { children: ReactNode }) {

@@ -218,10 +218,6 @@ describe("API URL construction patterns", () => {
     expect(`/api/v1/workspaces/${encodeURIComponent("ws-1")}/open-editor`).toBe("/api/v1/workspaces/ws-1/open-editor");
   });
 
-  it("constructs correct steer URL", () => {
-    expect(`/api/v1/workspaces/${encodeURIComponent("ws-1")}/steer`).toBe("/api/v1/workspaces/ws-1/steer");
-  });
-
   it("constructs correct respond URL", () => {
     expect(`/api/v1/workspaces/${encodeURIComponent("ws-1")}/respond`).toBe("/api/v1/workspaces/ws-1/respond");
   });
@@ -261,10 +257,6 @@ describe("API URL construction patterns", () => {
 
   it("constructs request body for deleteWorkspace", () => {
     expect(JSON.stringify({ confirm: true })).toBe('{"confirm":true}');
-  });
-
-  it("constructs request body for steer", () => {
-    expect(JSON.stringify({ message: "go" })).toBe('{"message":"go"}');
   });
 
   it("constructs request body for updateGoal", () => {

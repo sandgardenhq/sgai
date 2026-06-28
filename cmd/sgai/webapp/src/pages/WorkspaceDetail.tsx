@@ -15,7 +15,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { NotYetAvailable } from "@/components/NotYetAvailable";
 import { InlineForkEditor } from "@/pages/InlineForkEditor";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
@@ -25,11 +24,8 @@ import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 const SessionTab = lazy(() => import("./tabs/SessionTab").then((m) => ({ default: m.SessionTab })));
-const MessagesTab = lazy(() => import("./tabs/MessagesTab").then((m) => ({ default: m.MessagesTab })));
 const LogTab = lazy(() => import("./tabs/LogTab").then((m) => ({ default: m.LogTab })));
 const RunTab = lazy(() => import("./tabs/RunTab").then((m) => ({ default: m.RunTab })));
-const ChangesTab = lazy(() => import("./tabs/ChangesTab").then((m) => ({ default: m.ChangesTab })));
-const CommitsTab = lazy(() => import("./tabs/CommitsTab").then((m) => ({ default: m.CommitsTab })));
 const EventsTab = lazy(() => import("./tabs/EventsTab").then((m) => ({ default: m.EventsTab })));
 const ForksTab = lazy(() => import("./tabs/ForksTab").then((m) => ({ default: m.ForksTab })));
 
@@ -76,9 +72,6 @@ function WorkspaceDetailSkeleton() {
 const TABS = [
   { key: "progress", label: "Progress" },
   { key: "log", label: "Log" },
-  { key: "changes", label: "Diffs" },
-  { key: "commits", label: "Commits" },
-  { key: "messages", label: "Messages" },
   { key: "internals", label: "Internals" },
   { key: "run", label: "Run" },
 ] as const;
@@ -87,6 +80,10 @@ const ROOT_TABS = [
   { key: "forks", label: "Forks" },
   { key: "internals", label: "Internals" },
 ] as const;
+
+function hasTab(tabs: readonly { key: string; label: string }[], tab: string) {
+  return tabs.some((item) => item.key === tab);
+}
 
 interface TabNavProps {
   workspaceName: string;
@@ -185,6 +182,9 @@ export function WorkspaceDetail(): ReactNode {
 
   const hasForks = (detail?.forks?.length ?? 0) > 0;
   const isForkedRoot = Boolean(detail?.isRoot && hasForks);
+  const visibleTabs = isForkedRoot ? ROOT_TABS : TABS;
+  const fallbackTab = isForkedRoot ? "forks" : "progress";
+  const displayTab = hasTab(visibleTabs, activeTab) ? activeTab : fallbackTab;
 
   const [actionOutputOpen, setActionOutputOpen] = useState(false);
   const {
@@ -202,19 +202,14 @@ export function WorkspaceDetail(): ReactNode {
   }, [startActionRun]);
 
   useEffect(() => {
-    if (!detail || !detail.isRoot) return;
+    if (!detail) return;
     if (detail.name !== workspaceName) return;
     const encodedName = encodeURIComponent(detail.name);
 
-    if (hasForks && activeTab !== "forks" && activeTab !== "internals") {
-      navigate(`/workspaces/${encodedName}/forks`, { replace: true });
-      return;
+    if (activeTab !== displayTab) {
+      navigate(`/workspaces/${encodedName}/${displayTab}`, { replace: true });
     }
-
-    if (!hasForks && activeTab === "forks") {
-      navigate(`/workspaces/${encodedName}/progress`, { replace: true });
-    }
-  }, [detail, hasForks, activeTab, navigate, workspaceName]);
+  }, [detail, activeTab, displayTab, navigate, workspaceName]);
 
   if (loading && !detail) return <WorkspaceDetailSkeleton />;
 
@@ -246,13 +241,6 @@ export function WorkspaceDetail(): ReactNode {
   const displayExecTime = execTimeSeconds !== null
     ? formatExecTime(execTimeSeconds)
     : fallbackExecTime;
-  const modelLabel = detail.currentModel
-    ? detail.currentModel.split("/").pop() ?? detail.currentModel
-    : "";
-  const agentModelLabel = modelLabel;
-  const fullAgentModelLabel = detail.currentModel ?? "";
-  const statusLine = detail.task?.trim() || detail.status?.trim();
-  const showStatusLine = !isForkedRoot && Boolean(agentModelLabel || statusLine);
   const encodedWorkspace = encodeURIComponent(detail.name);
   const selfDriveLabel = effectiveRunning ? "Self-Drive" : "Self-drive";
   const showComposeGoalAction = !effectiveRunning;
@@ -371,12 +359,8 @@ export function WorkspaceDetail(): ReactNode {
         isForkedRoot,
         displayExecTime,
         effectiveRunning,
-        agentModelLabel,
-        fullAgentModelLabel,
-        statusLine,
-        showStatusLine,
         actionError,
-        activeTab,
+        activeTab: displayTab,
         hasForks,
         encodedWorkspace,
         selfDriveLabel,
@@ -449,7 +433,6 @@ function WorkspaceDetailView({ headerProps, actionOutputProps, handleActionClick
           <TabContent
             activeTab={activeTab}
             workspaceName={detail.name}
-            currentModel={detail.currentModel}
             goalContent={detail.goalContent}
             pmContent={detail.pmContent}
             hasProjectMgmt={detail.hasProjectMgmt}
@@ -744,10 +727,6 @@ function ResetWorkspaceDialog({ disabled, pending, onReset }: ResetWorkspaceDial
 interface WorkspaceDetailHeaderProps extends WorkspaceDetailActionsConfig {
   detail: ApiWorkspaceEntry;
   displayExecTime: string;
-  agentModelLabel: string;
-  fullAgentModelLabel: string;
-  statusLine: string | undefined;
-  showStatusLine: boolean;
   actionError: string | null;
   activeTab: string;
   hasForks: boolean;
@@ -758,10 +737,6 @@ function WorkspaceDetailHeader({
   isForkedRoot,
   displayExecTime,
   effectiveRunning,
-  agentModelLabel,
-  fullAgentModelLabel,
-  statusLine,
-  showStatusLine,
   actionError,
   activeTab,
   hasForks,
@@ -809,31 +784,6 @@ function WorkspaceDetailHeader({
           />
         </div>
       </header>
-
-      {showStatusLine && (
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          {agentModelLabel && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="secondary" className="font-mono">
-                  {agentModelLabel}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>{fullAgentModelLabel || agentModelLabel}</TooltipContent>
-            </Tooltip>
-          )}
-          {statusLine && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-sm text-muted-foreground truncate max-w-[320px] md:max-w-[520px]">
-                  {statusLine}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{statusLine}</TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      )}
 
       {actionError && (
         <p className="text-sm text-destructive mb-2" role="alert">
@@ -937,7 +887,6 @@ function InternalsButtonBar({ workspaceName }: { workspaceName: string }) {
 function TabContent({
   activeTab,
   workspaceName,
-  currentModel,
   goalContent,
   pmContent,
   hasProjectMgmt,
@@ -946,7 +895,6 @@ function TabContent({
 }: {
   activeTab: string;
   workspaceName: string;
-  currentModel?: string;
   goalContent?: string;
   pmContent?: string;
   hasProjectMgmt?: boolean;
@@ -958,12 +906,6 @@ function TabContent({
       return <EventsTab workspaceName={workspaceName} goalContent={goalContent} actions={actions} />;
     case "log":
       return <LogTab workspaceName={workspaceName} />;
-    case "changes":
-      return <ChangesTab workspaceName={workspaceName} />;
-    case "commits":
-      return <CommitsTab workspaceName={workspaceName} />;
-    case "messages":
-      return <MessagesTab workspaceName={workspaceName} />;
     case "internals":
       return (
         <div className="space-y-4">
@@ -973,11 +915,11 @@ function TabContent({
       );
 
     case "run":
-      return <RunTab workspaceName={workspaceName} currentModel={currentModel} />;
+      return <RunTab workspaceName={workspaceName} />;
     case "forks":
       return <ForksTab workspaceName={workspaceName} actions={actions} onActionClick={onActionClick} />;
     default:
-      return <NotYetAvailable pageName={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab`} />;
+      return <EventsTab workspaceName={workspaceName} goalContent={goalContent} actions={actions} />;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
-import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,9 +9,7 @@ beforeEach(() => {
   document.body.style.pointerEvents = "auto";
 });
 
-const mockSteer = mock(() => Promise.resolve({ success: true, message: "ok" }));
 const mockOpenEditorPM = mock(() => Promise.resolve({ opened: true }));
-const mockTriggerFactoryRefresh = mock(() => {});
 
 const createMockWorkspace = (overrides = {}) => ({
   name: "test-workspace",
@@ -41,8 +39,6 @@ const createMockWorkspace = (overrides = {}) => ({
   events: [],
   projectTodos: [],
   agentTodos: [],
-  changes: { description: "", diffLines: [] },
-  commits: [],
   log: [],
   external: false,
   ...overrides,
@@ -56,13 +52,11 @@ mock.module("@/lib/factory-state", () => ({
     fetchStatus: "idle",
     lastFetchedAt: Date.now(),
   }),
-  triggerFactoryRefresh: mockTriggerFactoryRefresh,
 }));
 
 mock.module("@/lib/api", () => ({
   api: {
     workspaces: {
-      steer: mockSteer,
       openEditorProjectManagement: mockOpenEditorPM,
     },
   },
@@ -104,96 +98,7 @@ afterEach(() => {
 describe("SessionTab", () => {
   beforeEach(() => {
     mockWorkspaces = [createMockWorkspace()];
-    mockSteer.mockClear();
     mockOpenEditorPM.mockClear();
-    mockTriggerFactoryRefresh.mockClear();
-  });
-
-  describe("steer next turn", () => {
-    it("renders steer section with textarea", async () => {
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Steer Next Turn")).toBeTruthy();
-        expect(screen.getByPlaceholderText("Enter re-steering instruction...")).toBeTruthy();
-      });
-    });
-
-    it("shows submit button", async () => {
-      renderSessionTab();
-
-      await waitFor(() => {
-        expect(screen.getByText("Send steering instruction")).toBeTruthy();
-      });
-    });
-
-    it("disables submit when textarea is empty", async () => {
-      renderSessionTab();
-
-      await waitFor(() => {
-        const submitButton = screen.getByText("Send steering instruction");
-        expect(submitButton.hasAttribute("disabled")).toBe(true);
-      });
-    });
-
-    it("enables submit when textarea has content", async () => {
-      renderSessionTab();
-
-      const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
-      fireEvent.change(textarea, { target: { value: "go faster" } });
-
-      await waitFor(() => {
-        const submitButton = screen.getByText("Send steering instruction");
-        expect(submitButton.hasAttribute("disabled")).toBe(false);
-      });
-    });
-
-    it("calls steer API on submit", async () => {
-      const user = userEvent.setup();
-      renderSessionTab();
-
-      const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
-      fireEvent.change(textarea, { target: { value: "go faster" } });
-
-      const submitButton = screen.getByText("Send steering instruction");
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockSteer).toHaveBeenCalledWith("test-workspace", "go faster");
-      });
-    });
-
-    it("shows success message after steer", async () => {
-      const user = userEvent.setup();
-      renderSessionTab();
-
-      const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
-      fireEvent.change(textarea, { target: { value: "go faster" } });
-
-      const submitButton = screen.getByText("Send steering instruction");
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Steering instruction sent.")).toBeTruthy();
-      });
-    });
-
-    it("shows error when steer fails", async () => {
-      const user = userEvent.setup();
-      mockSteer.mockImplementationOnce(() => Promise.reject(new Error("Steer failed")));
-
-      renderSessionTab();
-
-      const textarea = screen.getByPlaceholderText("Enter re-steering instruction...");
-      fireEvent.change(textarea, { target: { value: "go faster" } });
-
-      const submitButton = screen.getByText("Send steering instruction");
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("Steer failed")).toBeTruthy();
-      });
-    });
   });
 
   describe("tasks section", () => {

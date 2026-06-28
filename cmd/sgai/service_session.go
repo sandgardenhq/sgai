@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"strings"
 
 	"github.com/sandgardenhq/sgai/pkg/state"
 )
@@ -159,31 +158,4 @@ func (s *Server) respondViaCoordinatorService(coord *state.Coordinator, req apiR
 	s.notifyStateChange()
 
 	return respondResult{Success: true, Message: "response submitted"}, nil
-}
-
-type steerResult struct {
-	Success bool
-	Message string
-}
-
-func (s *Server) steerService(workspacePath, message string) (steerResult, error) {
-	if strings.TrimSpace(message) == "" {
-		return steerResult{}, fmt.Errorf("message cannot be empty")
-	}
-
-	coord := s.workspaceCoordinator(workspacePath)
-	steerBody := "Re-steering instruction: " + strings.TrimSpace(message)
-
-	if errUpdate := coord.UpdateState(func(wf *state.Workflow) {
-		wf.Status = state.StatusAgentDone
-	}); errUpdate != nil {
-		return steerResult{}, fmt.Errorf("failed to save state: %w", errUpdate)
-	}
-	if errAppend := appendProjectManagementSection(workspacePath, "Human Steering", steerBody); errAppend != nil {
-		return steerResult{}, fmt.Errorf("failed to update PROJECT_MANAGEMENT.md: %w", errAppend)
-	}
-
-	s.notifyStateChange()
-
-	return steerResult{Success: true, Message: "steering instruction added"}, nil
 }
