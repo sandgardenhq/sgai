@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Link, MemoryRouter, Route, Routes } from "react-router";
+import { Link } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiComposeDraftRequest } from "@/types";
 
@@ -76,6 +77,8 @@ mock.module("@/components/MarkdownEditor", () => ({
   ),
 }));
 
+const { createMemoryRouter } = await import("react-router");
+
 const { WizardStep1 } = await import("../WizardStep1");
 const { WizardStep2 } = await import("../WizardStep2");
 const { WizardStep3 } = await import("../WizardStep3");
@@ -84,48 +87,89 @@ const { WizardFinish } = await import("../WizardFinish");
 
 const hookOrderErrorPattern = /change in the order of Hooks|Rendered more hooks|Rendered fewer hooks/i;
 
+function OpenDemoWorkspaceLink({ to }: { to: string }) {
+  return (
+    <Link to={to}>
+      Open demo workspace
+    </Link>
+  );
+}
+
 function renderStep4() {
+  const router = createMemoryRouter([
+    {
+      path: "/compose/step/4",
+      element: <WizardStep4 />,
+    },
+  ], {
+    initialEntries: ["/compose/step/4?workspace=demo"],
+  });
+
   return render(
-    <MemoryRouter initialEntries={["/compose/step/4?workspace=demo"]}>
-      <Routes>
-        <Route path="/compose/step/4" element={<WizardStep4 />} />
-      </Routes>
-    </MemoryRouter>,
+    <RouterProvider router={router} />,
   );
 }
 
 function renderStep4WithRouteToggle() {
-  return render(
-    <MemoryRouter initialEntries={["/compose/step/4"]}>
-      <Link to="/compose/step/4?workspace=demo">Open workspace settings</Link>
-      <Routes>
-        <Route path="/compose/step/4" element={<WizardStep4 />} />
-      </Routes>
-    </MemoryRouter>,
+  const router = createMemoryRouter([
+    {
+      path: "/compose/step/4",
+      element: (
+        <>
+          <WizardStep4 />
+          <OpenDemoWorkspaceLink to="/compose/step/4?workspace=demo" />
+        </>
+      ),
+    },
+  ], {
+    initialEntries: ["/compose/step/4"],
+  });
+
+  const view = render(
+    <RouterProvider router={router} />,
   );
+
+  return view;
 }
 
-function renderWizardPageWithRouteToggle(path: string, element: React.ReactNode, linkLabel: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <TooltipProvider>
-        <Link to={`${path}?workspace=demo`}>{linkLabel}</Link>
-        <Routes>
-          <Route path={path} element={element} />
-        </Routes>
-      </TooltipProvider>
-    </MemoryRouter>,
+function renderWizardPageWithRouteToggle(path: string, element: React.ReactNode) {
+  const router = createMemoryRouter([
+    {
+      path,
+      element: (
+        <TooltipProvider>
+          {element}
+          <OpenDemoWorkspaceLink to={`${path}?workspace=demo`} />
+        </TooltipProvider>
+      ),
+    },
+  ], {
+    initialEntries: [path],
+  });
+
+  const view = render(
+    <RouterProvider router={router} />,
   );
+
+  return view;
 }
 
 function renderFinish() {
+  const router = createMemoryRouter([
+    {
+      path: "/compose/finish",
+      element: <WizardFinish />,
+    },
+    {
+      path: "/workspaces/:workspace",
+      element: <div>Workspace page</div>,
+    },
+  ], {
+    initialEntries: ["/compose/finish?workspace=demo"],
+  });
+
   return render(
-    <MemoryRouter initialEntries={["/compose/finish?workspace=demo"]}>
-      <Routes>
-        <Route path="/compose/finish" element={<WizardFinish />} />
-        <Route path="/workspaces/:workspace" element={<div>Workspace page</div>} />
-      </Routes>
-    </MemoryRouter>,
+    <RouterProvider router={router} />,
   );
 }
 
@@ -135,7 +179,7 @@ async function waitForSettings() {
 
 describe("WizardStep4 retrospective opt-in", () => {
   beforeEach(() => {
-    document.body.style.pointerEvents = "auto";
+    document.body.style.cssText = "pointer-events: auto;";
     sessionStorage.clear();
     savedDraft = null;
     saveDraftCalls.length = 0;
@@ -216,11 +260,12 @@ describe("WizardStep4 retrospective opt-in", () => {
   });
 
   it("keeps hook ordering stable when workspace query param appears after the missing workspace state", async () => {
+    const user = userEvent.setup();
     renderStep4WithRouteToggle();
 
     expect(screen.getByText("Workspace required")).not.toBeNull();
 
-    await userEvent.click(screen.getByRole("link", { name: "Open workspace settings" }));
+    await user.click(screen.getByRole("link", { name: "Open demo workspace" }));
 
     await waitForSettings();
     expect(screen.getByRole("switch", { name: "Run a retrospective after completion" })).not.toBeNull();
@@ -233,14 +278,15 @@ describe("WizardStep4 retrospective opt-in", () => {
     ["WizardStep4", "/compose/step/4", <WizardStep4 key="wizard-step-4" />, "Step 4: Settings"],
     ["WizardFinish", "/compose/finish", <WizardFinish key="wizard-finish" />, "Review & Save"],
   ])("keeps %s hook ordering stable after workspace query param appears", async (_name, path, element, heading) => {
+    const user = userEvent.setup();
     const consoleError = spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      renderWizardPageWithRouteToggle(path, element, `Open ${_name}`);
+      renderWizardPageWithRouteToggle(path, element);
 
       expect(screen.getByText("Workspace required")).not.toBeNull();
 
-      await userEvent.click(screen.getByRole("link", { name: `Open ${_name}` }));
+      await user.click(screen.getByRole("link", { name: "Open demo workspace" }));
 
       await screen.findByRole("heading", { name: heading });
 

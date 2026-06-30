@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceDetail } from "../WorkspaceDetail";
@@ -59,12 +59,6 @@ const mockAgentsList = mock(() => Promise.resolve({ agents: [] }));
 const mockModelsList = mock(() => Promise.resolve({ models: [] }));
 const mockTriggerFactoryRefresh = mock(() => {});
 const mockRespond = mock(() => Promise.resolve({ success: true }));
-const mockNavigate = mock(() => {});
-
-mock.module("react-router", () => ({
-  ...require("react-router"),
-  useNavigate: () => mockNavigate,
-}));
 
 mock.module("@/lib/factory-state", () => ({
   useFactoryState: () => ({
@@ -145,6 +139,11 @@ mock.module("@/hooks/use-mobile", () => ({
   useIsMobile: () => false,
 }));
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="current-location">{`${location.pathname}${location.search}`}</div>;
+}
+
 function renderWorkspaceDetail(workspaceName = "test-workspace", tab = "progress") {
   return render(
     <MemoryRouter initialEntries={[`/workspaces/${workspaceName}/${tab}`]}>
@@ -152,7 +151,9 @@ function renderWorkspaceDetail(workspaceName = "test-workspace", tab = "progress
         <SidebarProvider>
           <Routes>
             <Route path="/workspaces/:name/*" element={<WorkspaceDetail />} />
+            <Route path="/workspaces/:name/respond" element={<div>Respond page</div>} />
           </Routes>
+          <LocationDisplay />
         </SidebarProvider>
       </TooltipProvider>
     </MemoryRouter>
@@ -179,7 +180,6 @@ describe("WorkspaceDetail", () => {
     mockModelsList.mockClear();
     mockTriggerFactoryRefresh.mockClear();
     mockRespond.mockClear();
-    mockNavigate.mockClear();
   });
 
   describe("start/stop buttons work", () => {
@@ -878,7 +878,7 @@ describe("WorkspaceDetail", () => {
       await user.click(respondButtons[0]);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/workspaces/test-workspace/respond");
+        expect(screen.getByTestId("current-location").textContent).toBe("/workspaces/test-workspace/respond");
       });
     });
   });

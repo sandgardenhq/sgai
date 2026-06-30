@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Dashboard } from "../Dashboard";
@@ -122,13 +122,6 @@ mock.module("@/lib/factory-state", () => ({
 
 const mockDeleteFork = mock(() => Promise.resolve({ deleted: true }));
 const mockDeleteWorkspace = mock(() => Promise.resolve({ deleted: true }));
-const mockNavigate = mock(() => {});
-
-mock.module("react-router", () => ({
-  ...require("react-router"),
-  useNavigate: () => mockNavigate,
-}));
-
 mock.module("@/lib/api", () => ({
   api: {
     workspaces: {
@@ -155,6 +148,11 @@ mock.module("@/hooks/use-mobile", () => ({
   useIsMobile: () => false,
 }));
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="current-location">{`${location.pathname}${location.search}`}</div>;
+}
+
 function renderDashboard(initialRoute = "/") {
   return render(
     <MemoryRouter initialEntries={[initialRoute]}>
@@ -164,6 +162,7 @@ function renderDashboard(initialRoute = "/") {
             <Route path="/workspaces/:name/forks" element={<Dashboard><div data-testid="redirect-target">Redirected to forks</div></Dashboard>} />
             <Route path="*" element={<Dashboard><div data-testid="dashboard-content">Content</div></Dashboard>} />
           </Routes>
+          <LocationDisplay />
         </SidebarProvider>
       </TooltipProvider>
     </MemoryRouter>
@@ -174,7 +173,6 @@ describe("Dashboard", () => {
   beforeEach(() => {
     mockDeleteFork.mockClear();
     mockDeleteWorkspace.mockClear();
-    mockNavigate.mockClear();
   });
 
   afterEach(() => {
@@ -562,7 +560,7 @@ describe("Dashboard", () => {
       });
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/workspaces/workspace-2/forks");
+        expect(screen.getByTestId("current-location").textContent).toBe("/workspaces/workspace-2/forks");
       });
     });
   });
