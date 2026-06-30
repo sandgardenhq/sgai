@@ -2,6 +2,11 @@
 description: Coordinates HTMX/PicoCSS implementation and review by delegating to frontend specialist subagents
 mode: primary
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   task:
     "*": deny
     htmx-picocss-developer: allow

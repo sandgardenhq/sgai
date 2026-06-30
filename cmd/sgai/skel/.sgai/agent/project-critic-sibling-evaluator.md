@@ -3,6 +3,11 @@ description: Hidden internal Project Critic role agent for independent strict co
 mode: subagent
 hidden: true
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   read:
     "*": allow
     "*/.sgai/state.json": deny
