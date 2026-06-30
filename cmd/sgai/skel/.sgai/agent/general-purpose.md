@@ -2,6 +2,11 @@
 description: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks to which no other specialized agent would be able to do; be aware that maybe other agents are more adequate for language or domain specific work.
 mode: primary
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   doom_loop: deny
   external_directory: deny
   question: deny

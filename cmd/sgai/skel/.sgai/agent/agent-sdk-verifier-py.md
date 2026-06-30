@@ -2,6 +2,11 @@
 description: Use this agent to verify that a Python Agent SDK application is properly configured, follows SDK best practices and documentation recommendations, and is ready for deployment or testing. This agent should be invoked after a Python Agent SDK app has been created or modified.
 mode: all
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   doom_loop: deny
   external_directory: deny
   question: deny

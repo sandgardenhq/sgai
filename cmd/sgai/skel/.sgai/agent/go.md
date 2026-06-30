@@ -2,6 +2,11 @@
 description: Coordinates Go implementation and review by delegating to Go specialist subagents
 mode: primary
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   task:
     "*": deny
     go-developer: allow

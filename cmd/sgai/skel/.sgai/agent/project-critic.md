@@ -2,6 +2,11 @@
 description: Visible completion-review wrapper that acts as Project Critic FrontMan, orchestrates hidden critic role subagents, asks reviewer agents for specific opinions, and reports a single verdict to coordinator.
 mode: subagent
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   read:
     "*": allow
     "*/.sgai/state.json": deny

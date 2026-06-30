@@ -3,6 +3,11 @@ description: Reviews shell script quality for correctness, portability, security
 mode: subagent
 hidden: true
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   edit: deny
   bash:
     "*": deny

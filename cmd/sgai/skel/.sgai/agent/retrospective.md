@@ -2,6 +2,11 @@
 description: Post-completion retrospective agent that analyzes session artifacts, produces improvement suggestions for the sgai/ overlay and AGENTS.md, and presents proposed changes grouped by category for individual approve/reject before applying them.
 mode: primary
 permission:
+  sgai_ask_user_question: deny
+  sgai_ask_user_work_gate: deny
+  sgai_project_todowrite: deny
+  sgai_project_todoread: deny
+  sgai_update_workflow_state: deny
   edit:
     "*": deny
     "*/sgai/*": allow
