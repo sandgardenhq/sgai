@@ -12,12 +12,6 @@ beforeEach(() => {
 const mockFork = mock(() => Promise.resolve({ name: "new-fork", dir: "/path/to/new-fork" }));
 const mockForkTemplate = mock(() => Promise.resolve({ content: "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n# Goal\n\nDescribe your task" }));
 const mockTriggerFactoryRefresh = mock(() => {});
-const mockNavigate = mock(() => {});
-
-mock.module("react-router", () => ({
-  ...require("react-router"),
-  useNavigate: () => mockNavigate,
-}));
 
 mock.module("@/lib/factory-state", () => ({
   triggerFactoryRefresh: mockTriggerFactoryRefresh,
@@ -76,7 +70,6 @@ describe("InlineForkEditor", () => {
     mockFork.mockClear();
     mockForkTemplate.mockClear();
     mockTriggerFactoryRefresh.mockClear();
-    mockNavigate.mockClear();
     mockFork.mockImplementation(() => Promise.resolve({ name: "new-fork", dir: "/path/to/new-fork" }));
     mockForkTemplate.mockImplementation(() => Promise.resolve({ content: "---\nagents:\n  - \"go\"\nmodel: \"openai/gpt-5.5 (xhigh)\"\n---\n# Goal\n\nDescribe your task" }));
   });
