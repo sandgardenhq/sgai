@@ -88,7 +88,7 @@ func TestApprovedExecutionModesSuppressWorkflowChoiceQuestions(t *testing.T) {
 }
 
 func TestCoordinatorDelegationPromptStatesCoordinatorOwnedSubagentDelegation(t *testing.T) {
-	prompt := buildCoordinatorDelegationMessage([]string{"coordinator", "go-reviewer"}, t.TempDir(), state.ModeInteractive)
+	prompt := buildAgentMessage(agentRunConfig{dir: t.TempDir(), agent: "coordinator"}, state.Workflow{InteractionMode: state.ModeInteractive}, GoalMetadata{Agents: []string{"coordinator", "go-reviewer"}})
 
 	assert.Contains(t, prompt, "SGAI runs this top-level session as the coordinator")
 	assert.Contains(t, prompt, "Delegate by calling the Task tool")
