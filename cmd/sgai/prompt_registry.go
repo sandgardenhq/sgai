@@ -1,10 +1,6 @@
 package main
 
-import (
-	"strings"
-
-	"github.com/sandgardenhq/sgai/pkg/state"
-)
+import "github.com/sandgardenhq/sgai/pkg/state"
 
 const promptSectionPreamble = `<UserInstructions>
 YOU MUST LOAD THE SKILL "set-workflow-state" - CALL find_skills({"name":"set-workflow-state"}) TO DISCOVER IT, THEN CALL skill({"name":"set-workflow-state"}) TO GET THE SKILL CONTENT.
@@ -113,30 +109,6 @@ const promptSectionContinuousModeCoordinator = `- Your master plan starts at rea
 - Proceed directly: read GOAL.md → create PROJECT_MANAGEMENT.md → delegate to agents → verify → complete
 - Do NOT run retrospective work in Continuous Mode
 `
-
-type promptOptions struct {
-	agent           string
-	modeSection     string
-	coordinatorPlan string
-}
-
-func composePrompt(opts promptOptions) string {
-	base := composeCoordinatorPromptTemplate()
-
-	if opts.modeSection == "" {
-		return base
-	}
-
-	var sb strings.Builder
-	sb.WriteString(base)
-	sb.WriteString("\n\n")
-	sb.WriteString(opts.modeSection)
-	if opts.agent == "coordinator" && opts.coordinatorPlan != "" {
-		sb.WriteString(opts.coordinatorPlan)
-	}
-
-	return sb.String()
-}
 
 func modeSectionForMode(interactionMode string) (modeSection, coordinatorPlan string) {
 	switch interactionMode {

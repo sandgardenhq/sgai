@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,72 @@ func buildIterationPrefix(dir string, iteration int) string {
 }
 
 func buildAgentMessage(cfg agentRunConfig, wfState state.Workflow, metadata GoalMetadata) string {
-	msg := buildCoordinatorDelegationMessage(metadata.Agents, cfg.dir, wfState.InteractionMode)
+	var agentLines []string
+	for _, agent := range delegatableAgents(metadata.Agents) {
+		agentPath := cfg.dir + "/.sgai/agent/" + agent + ".md"
+		content, errRead := os.ReadFile(agentPath)
+		var line string
+		if errRead != nil {
+			line = agent
+		} else if desc := extractFrontmatterDescription(string(content)); desc != "" {
+			line = agent + ": " + desc
+		} else {
+			line = agent
+		}
+		agentLines = append(agentLines, line)
+	}
+	if len(agentLines) == 0 {
+		agentLines = append(agentLines, "(none configured)")
+	}
+	modeSection, coordPlan := modeSectionForMode(wfState.InteractionMode)
+
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(promptSectionPreamble)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionHumanCommDirect)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionMessaging)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionProjectManagementMonitor)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionWorkFocus)
+	sb.WriteString("\n\n")
+	sb.WriteString(promptSectionDelegation)
+	sb.WriteString("\n")
+	sb.WriteString(`## Parallel Task Subagent Usage
+CRITICALLY IMPORTANT: use as many Task subagents as possible at all times. Your default action is to split work into independent units and launch every safe Task subagent concurrently.
+- Before doing coordinator-direct work, identify which parts can be delegated to Task subagents.
+- If two or more Task subagents can run without editing the same files or depending on each other's output, launch them in the same parallel batch.
+- Prefer multiple focused Task subagents over one broad Task subagent.
+- Only serialize Task subagents when there is a concrete dependency, shared edit target, or required ordering.
+- If you do not delegate or you serialize work, record the specific reason in .sgai/PROJECT_MANAGEMENT.md.
+`)
+	sb.WriteString("\n")
+
+	sb.WriteString(promptSectionPostSkillsCoordinator)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionGuidelines)
+	sb.WriteString("\n\n")
+
+	sb.WriteString(promptSectionTailCoordinator)
+	sb.WriteString("\n")
+
+	sb.WriteString(promptSectionCommonTail)
+	sb.WriteString("\n")
+
+	sb.WriteString(promptSectionCoordinatorMessagingTail)
+	sb.WriteString("\n")
+	sb.WriteString("\n")
+	sb.WriteString(modeSection)
+	sb.WriteString(coordPlan)
+
+	msg := strings.ReplaceAll(sb.String(), "%AGENTS_LIST%", strings.Join(agentLines, "\n"))
 
 	pendingTodosCount := countPendingTodos(wfState, cfg.agent)
 	if pendingTodosCount > 0 {
