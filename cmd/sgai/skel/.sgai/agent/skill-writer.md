@@ -213,8 +213,8 @@ Before completing:
 After skill is tested and ready:
 1. Verify skill file is properly formatted
 2. Verify skill was tested (not optional!)
-3. Call `sgai_update_workflow_state` with status `agent-done`
-4. Include summary: "Created skill [name] and validated with testing-skills-with-subagents"
+3. Return the `STATUS` envelope
+4. Include summary evidence: "Created skill [name] and validated with testing-skills-with-subagents"
 
 ## Failure Modes
 
@@ -226,3 +226,13 @@ After skill is tested and ready:
 **If you cannot test the skill** (e.g., it's a pure reference skill):
 - Document why testing doesn't apply
 - Ensure this is a valid exception per testing-skills-with-subagents guidelines
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep skill work inside the provided scope. If the packet lacks the approved suggestion, target skill path, source skill examples, or validation requirement, return `NEEDS_CONTEXT` with the exact missing path, decision, or question.
+
+Split broad skill work by trigger definition, workflow steps, failure modes, examples, validation plan, and overlay output. Serialize any work that changes the same skill path or depends on validation feedback. Reconcile results by matching the created/changed skill path to test evidence and any unresolved validation concerns before reporting completion.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

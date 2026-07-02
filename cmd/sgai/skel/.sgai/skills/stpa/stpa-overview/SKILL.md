@@ -1,8 +1,8 @@
 ---
 name: stpa-overview
-description: Entry point for STPA (System Theoretic Process Analysis) hazard and safety analysis. Use for full 4-step STPA sessions, focused project-critic safety reviews, coordinator safety gates, reviewer hazard checks, risk assessment, unsafe state transitions, external input, filesystem, concurrency, physical systems, AI-driven systems, or when tempted to route work to retired stpa-analyst.
+description: Entry point for STPA (System Theoretic Process Analysis) hazard and safety analysis. Use for full 4-step STPA sessions, focused project-critic safety reviews, coordinator safety gates, reviewer hazard checks, risk assessment, unsafe state transitions, external input, filesystem, concurrency, physical systems, or AI-driven systems.
 metadata:
-  tags: "stpa, safety, hazard-analysis, risk-assessment, control-theory, project-critic, reviewer, retired-stpa-analyst"
+  tags: "stpa, safety, hazard-analysis, risk-assessment, control-theory, project-critic, reviewer"
 ---
 
 # STPA Overview
@@ -11,7 +11,7 @@ metadata:
 
 STPA is a **skill workflow**, not a routable workflow agent.
 
-When safety, hazards, risk, unsafe state transitions, external input, filesystem effects, concurrency, physical systems, or AI-driven control loops are relevant, load and use this skill. Do **not** route to `stpa-analyst`, add `stpa-analyst` to GOAL `agents`, expose it as an available delegate agent, or send `QUALITY_REPORT_REQUEST` to a retired agent.
+When safety, hazards, risk, unsafe state transitions, external input, filesystem effects, concurrency, physical systems, or AI-driven control loops are relevant, load and use this skill.
 
 ## What is STPA?
 
@@ -33,9 +33,9 @@ Do not use this skill for ordinary style-only review with no safety, risk, contr
 
 ## Mandatory Routing Rules
 
-1. **No retired-agent routing** — Never route safety work to `stpa-analyst`; STPA lives here.
+1. **Skill workflow** — STPA lives in this skill workflow.
 2. **Coordinator gate** — The coordinator must load/use this skill when safety/hazard analysis is relevant before delegating, validating, or declaring a safety-sensitive workflow complete.
-3. **Project-critic gate** — Project critics must request or perform focused safety-review evidence through this skill, not by targeting `stpa-analyst`.
+3. **Project-critic gate** — Project critics must request or perform focused safety-review evidence through this skill.
 4. **Reviewer permission** — Any `*-reviewer` may load/use this skill when circumstances warrant hazard or safety analysis. If safety risk is material, include focused STPA findings in the review report.
 5. **Coordinator-owned checkboxes** — If a GOAL checkbox is completed by STPA work, report evidence to the coordinator; do not edit GOAL checkboxes unless you are explicitly the coordinator.
 
@@ -45,7 +45,7 @@ Do not use this skill for ordinary style-only review with no safety, risk, contr
 |-----------|------|--------|
 | Human asks for STPA, hazard analysis, risk assessment, or safety analysis | Full 4-step STPA | Losses, hazards, constraints, control structure, UCAs, loss scenarios, mitigations |
 | Coordinator sees external input, filesystem changes, concurrent operations, unsafe state transitions, or safety-critical behavior | Focused safety-review first; escalate to full STPA if needed | Gate note or task plan with hazards/constraints |
-| Project critic needs a quality report | Focused safety-review | PASS/NEEDS WORK safety report |
+| Project critic needs a quality report | Focused safety-review | `REVIEW_STATUS` safety report |
 | `*-reviewer` sees safety or hazard implications | Focused safety-review inside normal review | Review comments with safety findings |
 
 ## Full 4-Step STPA Mode
@@ -122,22 +122,7 @@ Focus on:
 
 ### Focused Report Format
 
-```markdown
-QUALITY_REPORT from stpa-overview focused safety review
-
-**Scope Reviewed:** [brief scope]
-
-**Hazards / Issues Found:**
-- H-1: [hazard or issue, with file:line if applicable]
-
-**Recommended Safety Constraints:**
-- SC-1: [constraint or mitigation]
-
-**Verdict:** PASS | NEEDS WORK
-
-**Unresolved Concerns:**
-- [unknowns, assumptions, or follow-up needed]
-```
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly. Put hazards as `H-n`, constraints as `SC-n`, and concrete issues with file/line evidence in `FINDINGS`.
 
 ## Documentation Structure
 
@@ -170,16 +155,15 @@ Record full STPA sessions like this:
 
 | Excuse | Reality |
 |--------|---------|
-| "Routing to the dedicated STPA agent is faster." | `stpa-analyst` is retired. Loading this skill is the supported path. |
-| "The quality-report behavior lived in the old wrapper." | Focused safety-review mode now owns that behavior. Use this skill's report format. |
+| "Skipping STPA is faster." | Loading this skill is the supported path when safety risk is relevant. |
+| "The quality-report behavior belongs elsewhere." | Focused safety-review mode owns that behavior. Use this skill's `REVIEW_STATUS` format. |
 | "STPA is outside reviewer scope." | `*-reviewer` agents may load/use STPA when safety or hazard risk warrants it. |
 | "Full STPA is too heavy for a project-critic gate." | Use focused safety-review mode; escalate only if needed. |
-| "Safety Analysis should add `stpa-analyst` to GOAL agents." | Safety analysis is coordinator/reviewer guidance plus this skill, not an available delegate agent. |
+| "Safety Analysis should add another GOAL agent." | Safety analysis is coordinator/reviewer guidance plus this skill, not a separate delegate agent. |
 
 ## Red Flags - STOP
 
-- Adding `stpa-analyst` to GOAL `agents` or exposing it as an available delegate
-- Sending `QUALITY_REPORT_REQUEST` to `stpa-analyst`
+- Representing safety analysis as a separate GOAL delegate agent
 - Treating safety review as impossible because full STPA is too large
 - Saying reviewers cannot use STPA when they see hazard/safety implications
 - Completing a safety-relevant coordinator or project-critic gate without STPA evidence
@@ -189,22 +173,22 @@ Record full STPA sessions like this:
 
 ### Good: Coordinator Gate
 
-The coordinator sees a task involving external input, filesystem writes, and concurrent workers. It loads `stpa-overview`, runs focused safety-review mode, records hazards and constraints, then delegates implementation with those constraints.
+The coordinator sees a task involving external input, filesystem writes, and concurrent workers. It loads `stpa-overview`, runs focused safety-review mode, records hazards and constraints, then loads `subagent-delegation-protocol` skill before delegating implementation with those constraints.
 
 ### Good: Reviewer
 
-A `go-readability-reviewer` sees a workflow state transition that can mark work complete after a failed validation. The reviewer loads `stpa-overview`, uses focused mode, and reports `H-1` plus `SC-1` in the review.
+A `go-reviewer` sees a workflow state transition that can mark work complete after a failed validation. The reviewer loads `stpa-overview`, uses focused mode, and reports `H-1` plus `SC-1` in the review.
 
-### Bad: Retired Agent Routing
+### Bad: Separate Safety Delegate
 
-The project critic sends `QUALITY_REPORT_REQUEST` to `stpa-analyst` because an old wrapper described that mode. This is wrong: use focused safety-review mode in this skill and report back directly.
+The project critic treats safety analysis as a separate delegate instead of using focused safety-review mode in this skill. This is wrong: use this skill and report back directly.
 
 ## Completion Checklist
 
 Before finishing STPA work, verify:
 
 - [ ] You chose full mode or focused mode intentionally
-- [ ] You did not route to `stpa-analyst`
+- [ ] You used this skill instead of adding a separate safety delegate
 - [ ] You loaded actual step skills by name when running full mode
 - [ ] You recorded findings or returned a structured focused report
 - [ ] You notified the coordinator of completed GOAL work instead of editing checkboxes yourself

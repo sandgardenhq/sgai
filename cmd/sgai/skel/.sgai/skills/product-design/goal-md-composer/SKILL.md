@@ -1,6 +1,6 @@
 ---
 name: goal-md-composer
-description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. Use when creating GOAL.md, configuring agents and model, safety-analysis guidance, or starting an SGAI project. Safety Analysis must use coordinator/reviewer stpa-overview skill guidance, not stpa-analyst as a GOAL agent.
+description: Interactive wizard to compose valid GOAL.md files for SGAI with step-by-step guidance through 7 phases. Use when creating GOAL.md, configuring agents and model, safety-analysis guidance, or starting an SGAI project. Safety Analysis must use coordinator/reviewer stpa-overview skill guidance.
 ---
 
 # GOAL.md Composer
@@ -16,7 +16,7 @@ Default GPT-5.5 recommendation:
 - A single `model` is used for all agents. The coordinator runs with `openai/gpt-5.5 (xhigh)` for orchestration quality; the OpenCode runtime handles model propagation to subagents.
 - The `agents` list enumerates non-coordinator delegate agents available for OpenCode subagent delegation.
 
-Do not add `stpa-analyst` to the agents list.
+Do not add safety-analysis-only entries to the agents list; safety analysis is handled through `stpa-overview` guidance.
 
 Example:
 
@@ -43,7 +43,7 @@ Safety analysis is coordinator/reviewer skill guidance, not a routable flow node
 
 ## Validation Checklist
 
-- [ ] `stpa-analyst` is not in the agents list
+- [ ] Safety analysis is not represented as a separate delegate agent
 - [ ] Safety Analysis, if selected, appears as coordinator/reviewer `stpa-overview` guidance
 - [ ] Agent names are valid OpenCode subagent identifiers
 - [ ] Interactive mode is set

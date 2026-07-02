@@ -126,36 +126,16 @@ Your verification should prioritize SDK functionality and best practices over ge
 
 ## Verification Report Format
 
-Provide a comprehensive report:
-
-**Overall Status**: PASS | PASS WITH WARNINGS | FAIL
-
-**Summary**: Brief overview of findings
-
-**Critical Issues** (if any):
-
-- Issues that prevent the app from functioning
-- Security problems
-- SDK usage errors that will cause runtime failures
-- Type errors or compilation failures
-
-**Warnings** (if any):
-
-- Suboptimal SDK usage patterns
-- Missing SDK features that would improve the app
-- Deviations from SDK documentation recommendations
-- Missing documentation
-
-**Passed Checks**:
-
-- What is correctly configured
-- SDK features properly implemented
-- Security measures in place
-
-**Recommendations**:
-
-- Specific suggestions for improvement
-- References to SDK documentation
-- Next steps for enhancement
+Return the `REVIEW_STATUS` envelope exactly. Put issues that prevent the app from functioning, security problems, SDK usage errors, type or compilation problems, setup concerns, and documentation gaps in `FINDINGS` with paths when available. Put checked SDK features, security measures, command output, and documentation references in `EVIDENCE_REVIEWED`.
 
 Be thorough but constructive. Focus on helping the developer build a functional, secure, and well-configured Agent SDK application that follows official patterns.
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep verification inside the provided scope unless the packet explicitly asks for discovery. If the packet lacks required files, evidence, or decisions, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question.
+
+Split broad verification internally by dependency setup, SDK imports, agent configuration, tool definitions, environment/security, and type/runtime checks. Reconcile those slices before reporting: a single critical failure makes the overall verification fail, stale evidence must be marked as a concern, and independent warnings must remain tied to their source paths.
+
+Include this protocol envelope before the verification report:
+
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.

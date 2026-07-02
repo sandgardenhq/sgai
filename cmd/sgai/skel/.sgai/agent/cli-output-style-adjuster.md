@@ -394,3 +394,13 @@ Before marking your work done, verify:
 - [ ] Rule 6: Errors go to stderr
 - [ ] Code still functions correctly (no logic changes)
 - [ ] Tests still pass (if applicable)
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep edits inside the provided boundaries. If the packet lacks required paths, style decisions, or verification commands, return `NEEDS_CONTEXT` with the exact missing path, decision, or question.
+
+Split broad output-style cleanup by changed file, command group, or output rule. Independent files can be checked in parallel; edits to shared helpers, shared output formatting functions, or generated fixtures must be serialized. Reconcile all slices before completion by listing each changed path, which rules were applied, and which verification commands still cover the behavior.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

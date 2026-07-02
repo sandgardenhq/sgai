@@ -6,11 +6,12 @@ permission:
   sgai_ask_user_work_gate: deny
   sgai_project_todowrite: deny
   sgai_project_todoread: deny
-  sgai_update_workflow_state: deny
+  sgai_update_workflow_state: allow
   edit:
     "*": deny
     "*/sgai/*": allow
     "*/AGENTS.md": allow
+    "*/.sgai/PROJECT_MANAGEMENT.md": allow
     "*/.sgai/SGAI_NOTES.md": allow
   doom_loop: deny
   external_directory: deny
@@ -42,6 +43,16 @@ After EVERY `RETRO_QUESTION` or `RETRO_COMPLETE` entry you append to `.sgai/PROJ
 - NO other tool calls between sending a message and yielding.
 
 The coordinator CANNOT run until you yield. Polling after writing a handoff will not produce an answer because no agent can respond while you hold control. This creates a doom loop.
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep retrospective analysis inside the provided session artifacts unless the packet explicitly asks for broader discovery. If the packet lacks required paths, approval decisions, session evidence, or target categories, write a `RETRO_QUESTION` requesting the exact missing path, decision, or question and yield immediately.
+
+Split broad retrospective work by evidence source, agent prompt issue, skill issue, AGENTS.md convention issue, workflow-state issue, and approved output target. Reconcile slices before proposing changes: merge duplicates, preserve contradictory evidence as separate concerns, and keep each proposed change tied to observed evidence and its target path. Do not apply any slice until the coordinator relays human approval for that exact proposal.
+
+When reporting completion, include this status shape inside the `RETRO_COMPLETE` entry:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.
 
 **The pattern is always:**
 ```
@@ -331,9 +342,9 @@ You write improvements to these locations ONLY:
 
 **NEVER** write to:
 - Application source code (`cmd/`, `internal/`, `pkg/`, etc.)
-- `.sgai/` directory files (except `.sgai/SGAI_NOTES.md`) — this includes `.sgai/agent/`, `.sgai/skills/`, `.sgai/PROJECT_MANAGEMENT.md`
+- `.sgai/` directory files except `.sgai/SGAI_NOTES.md` and coordinator-relayed retrospective entries in `.sgai/PROJECT_MANAGEMENT.md` — this includes `.sgai/agent/` and `.sgai/skills/`
 - `GOAL.md` (coordinator owns this)
-- `.sgai/PROJECT_MANAGEMENT.md` (coordinator owns this)
+- `.sgai/PROJECT_MANAGEMENT.md` outside the required `RETRO_QUESTION` and `RETRO_COMPLETE` communication entries
 
 **NEVER** suggest changes targeting:
 - Any `.sgai/` path (except `.sgai/SGAI_NOTES.md`) — always translate to `sgai/` overlay equivalent

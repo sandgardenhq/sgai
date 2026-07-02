@@ -201,13 +201,7 @@ After every deployment, verify by:
 
 ## Inter-Agent Communication
 
-Report deployment status to the coordinator by appending to `.sgai/PROJECT_MANAGEMENT.md`, then yield with navigation:
-
-```
-sgai_update_workflow_state({status: "agent-done"})
-```
-
-If you encounter issues requiring human intervention, write `QUESTION: <describe the issue>` in `.sgai/PROJECT_MANAGEMENT.md` before yielding to coordinator.
+Report deployment status to the coordinator by returning the `STATUS` envelope. If you encounter issues requiring human intervention, return `NEEDS_CONTEXT` with the exact missing decision or question.
 
 ---
 
@@ -218,3 +212,13 @@ If you encounter issues requiring human intervention, write `QUESTION: <describe
 - Wrangler Commands: https://developers.cloudflare.com/workers/wrangler/commands/
 - Wrangler Configuration: https://developers.cloudflare.com/workers/wrangler/configuration/
 - Worker Bindings: https://developers.cloudflare.com/workers/runtime-apis/bindings/
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep deployment work inside the provided scope. If the packet lacks required configuration paths, credentials decisions, environment names, deployment target, or verification commands, return `NEEDS_CONTEXT` with the exact missing path, decision, or question.
+
+Split broad deployment work by Wrangler configuration, bindings/secrets, build artifact, preview upload, traffic routing, rollback plan, and post-deployment verification. Serialize any step that changes the same Worker, route, binding, secret, version, or traffic allocation. Reconcile results by matching deployment URLs/version IDs to verification evidence and rollback evidence before reporting completion.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

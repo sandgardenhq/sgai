@@ -1,13 +1,13 @@
 ---
 name: set-workflow-state
-description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU ARE DOING, WHERE YOU ARE GOING, AND WHETHER YOU ARE BLOCKED (IE NEED TO SEND THE HUMAN PARTNER A MESSAGE)
+description: Coordinator and retrospective workflow-state protocol. Use only when the current agent has permission to call sgai_update_workflow_state; Task subagents should return STATUS or REVIEW_STATUS envelopes instead.
 ---
 
 # Set Workflow State
 
 ## State File Protocol
 
-**CRITICAL:** You must maintain the workflow state file throughout your work using the `sgai_update_workflow_state` tool.
+**CRITICAL:** Use `sgai_update_workflow_state` only from agents that have permission to call it, primarily `coordinator` and `retrospective`. Developer, reviewer, verifier, deployer, writer, and hidden role subagents should return their `STATUS` or `REVIEW_STATUS` envelopes to the caller instead.
 
 ### State Schema
 
@@ -24,7 +24,7 @@ description: You MUST USE THIS SKILL TO COMMUNICATE TO THE ENVIRONMENT WHAT YOU 
 
 **`status`** - Overall workflow status
 - `"working"` - Actively working, may need another iteration
-- `"agent-done"` - Agent finished its work and the sgai should move to the next agent.
+- `"agent-done"` - Current primary workflow agent finished its turn and SGAI should return control to coordinator or the next workflow phase.
 - `"complete"` - Work is done successfully
 
 **`message`** - Status message
@@ -101,11 +101,11 @@ Use `ask_user_question` to present structured multi-choice questions to the huma
 
 ## Coordinator Handoffs
 
-Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus `sgai_update_workflow_state({status: "agent-done"})` to yield control.
+Workflow handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus `sgai_update_workflow_state({status: "agent-done"})` to yield control when the current agent is a workflow owner. Task subagent handoffs are driven by their final envelope response.
 
 ### How Handoffs Work
 
-1. **Record the handoff**: Append the work request, blocker, or decision to `.sgai/PROJECT_MANAGEMENT.md`.
+1. **Record the handoff**: Append the work request, blocker, or decision to `.sgai/PROJECT_MANAGEMENT.md` only if the current agent has permission and the prompt explicitly owns that ledger write.
 
 2. **Yield control when done**: Set `status: "agent-done"` after recording durable handoff notes in `.sgai/PROJECT_MANAGEMENT.md`.
 
@@ -120,5 +120,9 @@ Agent handoffs are driven by durable notes in `.sgai/PROJECT_MANAGEMENT.md` plus
 - The current handoff and available-agent list provide context for coordinator delegation
 - Agents never route to themselves
 - The coordinator should record its own status with `sgai_update_workflow_state` or `.sgai/PROJECT_MANAGEMENT.md`
+
+### Task Subagent Return Protocol
+
+If you are a Task subagent, do not call `sgai_update_workflow_state` unless your prompt explicitly permits it. Load and follow `subagent-return-protocol` skill; implementation, deployment, writing, and cleanup agents return its Execution Envelope, while reviewer, verifier, safety-review, and project-critic agents return its Review Envelope.
 
 ---

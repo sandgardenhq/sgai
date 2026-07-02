@@ -154,7 +154,7 @@ Read artifacts in THIS ORDER (priority matters — richest signal sources first)
 
 **GATE: You MUST complete this step before proceeding to Step 2. You may NOT skip this step.**
 
-After reading all artifacts in Step 1, write a structured analysis summary to your progress notes using `sgai_update_workflow_state`. This summary MUST contain:
+After reading all artifacts in Step 1, write a structured analysis summary to `.sgai/SGAI_NOTES.md` and include a brief progress note using `sgai_update_workflow_state`. This summary MUST contain:
 
 1. **Files read count**: "Read X session JSONs out of Y total" (X must equal Y, or you must explain why not)
 2. **Visit count summary**: From session `state.json` (or `.sgai/state.json` fallback) — which agents ran, how many visits each
@@ -176,12 +176,12 @@ After reading all artifacts in Step 1, write a structured analysis summary to yo
 ```
 Analysis Summary:
 - Files: Read 15/15 session JSONs, session state.json (from .sgai/retrospectives/<session-id>/state.json), GOAL.md, PROJECT_MANAGEMENT.md, stdout.log, stderr.log
-- Visits: coordinator(8), backend-go-developer(3), go-readability-reviewer(2), react-developer(1), retrospective(1)
+- Visits: coordinator(8), go-developer(3), go-reviewer(2), react-developer(1), retrospective(1)
 - Handoffs: 19 inter-agent handoffs, 3 reviewer feedback rounds
 - Efficiency: Backend developer visited 3 times due to reviewer feedback — could skills reduce this?
 - Quality: Reviewer caught SQL formatting issues 3 times — suggests missing skill
 - Knowledge gaps: Agent asked about migration workflow mid-session — no skill exists for this
-- Process gaps: stpa-analyst.md was a 17-line stub that needed emergency expansion in-session
+- Process gaps: safety analysis appeared as agent routing instead of stpa-overview skill workflow
 - AGENTS.md Health: AGENTS.md present (53 lines), 2 rules appear stale (no React code was modified but 4 React-specific rules exist), no contradictions detected
 ```
 

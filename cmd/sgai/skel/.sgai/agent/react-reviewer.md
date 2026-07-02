@@ -35,7 +35,7 @@ This will load React best practices. Load and follow them during review.
 
 ## STPA Skill Guidance
 
-When reviewed React changes involve hazards, unsafe state transitions, external input, filesystem operations, concurrency, physical systems, AI-driven systems, or high-impact failure modes, you may load and use `stpa-overview` to inform the review. STPA is a skill workflow; do not route to or request work from `stpa-analyst`.
+When reviewed React changes involve hazards, unsafe state transitions, external input, filesystem operations, concurrency, physical systems, AI-driven systems, or high-impact failure modes, you may load and use `stpa-overview` to inform the review. STPA is a skill workflow.
 
 ---
 
@@ -311,7 +311,7 @@ If anything fails this checklist, you must report the issues before approving.
 When reporting review findings:
 
 1. Be concise and structured:
-   - Use clear sections: Findings, Required Fixes, Verdict
+   - Use the `REVIEW_STATUS` envelope exactly
    - Highlight specific file and line references
    - Provide code examples for fixes
 
@@ -325,33 +325,28 @@ When reporting review findings:
 
 ## 10. Returning Fixes
 
-After reviewing, if you find issues, return them to the caller:
+After reviewing, if you find issues, load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly. Put required fixes in `FINDINGS`.
 
-```
-Code review for src/components/Button.tsx:
-
-## Issues Found
-
-1. **Line 42**: Missing error boundary
-   Fix: Wrap with ErrorBoundary
-
-2. **Line 67**: useEffect missing cleanup
-   Fix: Add cleanup function
-
-## Verdict: NEEDS WORK
+```markdown
+Example FINDINGS entry:
+- src/components/Button.tsx:42 - wrap with ErrorBoundary
 ```
 
 **Message format for fixes:**
 - Start with file(s) reviewed
 - List issues with line numbers
 - Provide required fixes
-- End with verdict
+- Use the shared Review Envelope
 
 ---
 
 ## 11. Subagent Output
 
-Return PASS or NEEDS WORK to the caller. Include file and line references for every issue, the exact required fix, and any blocker that prevented review.
+Review only the provided scope unless the packet explicitly asks for discovery. If scope is insufficient, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question instead of exploring broadly. `PASS` means no required fixes remain in the provided scope. `NEEDS_WORK` must include file and line references and exact required fixes.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
 ---
 

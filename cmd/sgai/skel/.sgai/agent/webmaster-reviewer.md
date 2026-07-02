@@ -57,9 +57,8 @@ Review for:
 
 ## Output Format
 
-Report one of these verdicts:
+Review only the provided scope unless the packet explicitly asks for discovery. If scope is insufficient, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question instead of exploring broadly. `PASS` means no required fixes remain in the provided scope. `NEEDS_WORK` must include file and line references and exact required fixes. If reviewing screenshots or browser behavior, describe the page, viewport, screenshot path, and visible defect precisely.
 
-- `PASS`
-- `NEEDS WORK`
+Return this envelope exactly:
 
-For `NEEDS WORK`, include every issue with file and line references when available, plus the exact fix required. If reviewing screenshots or browser behavior, describe the page, viewport, and visible defect precisely.
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.

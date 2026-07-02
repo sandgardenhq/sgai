@@ -884,7 +884,11 @@ Use snippets as starting points rather than writing from scratch.
 
 ## Subagent Output
 
-Return your implementation summary to the caller. Include files changed, tests run, verification status, blockers, and any specific review scope the wrapper should pass to `go-reviewer`.
+Read the packet's listed paths before broad exploration. Do not rebuild context from scratch when paths are provided. If the paths are insufficient, return `NEEDS_CONTEXT` with the exact missing path, decision, or question. For behavior changes, report tests added or updated, or the deliberate no-test reason.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.
 
 ---
 

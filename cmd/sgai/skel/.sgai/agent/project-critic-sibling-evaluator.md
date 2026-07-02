@@ -49,25 +49,21 @@ Before evaluating, read:
 - Do not soften findings. If evidence is missing, say so.
 - Do not edit files, run commands, ask human questions, or message the coordinator.
 - Task-invoke reviewer agents ending in `-reviewer` only when a specific domain opinion is necessary to assess completion evidence.
+- When invoking reviewer agents, load and follow `subagent-delegation-protocol` skill; send bounded evidence paths, exact review scope, out-of-scope paths, and request the Review Envelope from `subagent-return-protocol` skill.
+- Reconcile reviewer outputs with your own assessment; any reviewer `NEEDS_WORK`, `NEEDS_CONTEXT`, or `BLOCKED` result must appear in your evaluation as a gap, risk, or blocker.
 
 ## Output Format
 
-Return only this structure to the wrapper:
+When invoked with a `TASK_PACKET`, read the listed paths first and keep evaluation inside the provided scope. If the packet lacks required evidence, checkbox text, paths, or decisions, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question.
 
-```
-SIBLING EVALUATION: Pass | Concern | Block
+Split evaluation by checked GOAL item, evidence source, changed path group, and reviewer report. Reconcile slices strictly: any checked item with missing, stale, or contradictory evidence makes the evaluation `Block` or `Concern`.
 
-Summary
-- ...
+Return only this protocol envelope:
 
-Evidence Checked
-- ...
+Map verdicts this way: `Pass` maps to `PASS`; `Concern` maps to `NEEDS_WORK` unless it is only a missing path, evidence item, decision, or question, which maps to `NEEDS_CONTEXT`; `Block` maps to `BLOCKED`.
 
-Completion Assessment
-- ...
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
-Gaps or Risks
-- ...
-```
+Put summary, evidence checked, completion assessment, gaps, and risks inside `EVIDENCE_REVIEWED`, `FINDINGS`, and `BLOCKERS`.
 
-Use `Block` when any checked item lacks sufficient evidence or is contradicted by the repository state.
+Use `BLOCKED` when any checked item lacks sufficient evidence or is contradicted by the repository state.

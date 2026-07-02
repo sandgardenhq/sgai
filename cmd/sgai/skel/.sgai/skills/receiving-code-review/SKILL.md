@@ -117,7 +117,7 @@ Push back when:
 - Reviewer lacks full context
 - Violates YAGNI (unused feature)
 - Technically incorrect for this stack
-- Legacy/compatibility reasons exist
+- Backward-compatibility reasons exist
 - Conflicts with your human partner's architectural decisions
 
 **How to push back:**
@@ -177,13 +177,13 @@ State the correction factually and move on.
 
 **Performative Agreement (Bad):**
 ```
-Reviewer: "Remove legacy code"
+Reviewer: "Remove compatibility code"
 ❌ "You're absolutely right! Let me remove that..."
 ```
 
 **Technical Verification (Good):**
 ```
-Reviewer: "Remove legacy code"
+Reviewer: "Remove compatibility code"
 ✅ "Checking... build target is 10.15+, this API needs 13+. Need legacy for backward compat. Current impl has wrong bundle ID - fix it or drop pre-13 support?"
 ```
 
