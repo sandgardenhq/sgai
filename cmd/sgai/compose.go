@@ -12,7 +12,6 @@ import (
 type composerState struct {
 	Description    string              `json:"description"`
 	CompletionGate string              `json:"completionGate"`
-	SafetyAnalysis bool                `json:"safetyAnalysis"`
 	Retrospective  bool                `json:"retrospective"`
 	Agents         []composerAgentConf `json:"agents"`
 	Model          string              `json:"model"`
@@ -62,7 +61,6 @@ func loadComposerStateFromDisk(dir string) composerState {
 	st := composerState{
 		Description:    extractDescriptionFromBody(bodyContent),
 		CompletionGate: metadata.CompletionGateScript,
-		SafetyAnalysis: bodyHasSafetyAnalysis(bodyContent),
 		Retrospective:  retrospectiveEnabled(metadata),
 		Model:          metadata.Model,
 		Tasks:          extractTasksFromBody(bodyContent),
@@ -86,10 +84,6 @@ func loadComposerStateFromDisk(dir string) composerState {
 	return st
 }
 
-func bodyHasSafetyAnalysis(body string) bool {
-	return strings.Contains(body, "## Safety Analysis") || strings.Contains(body, "stpa-overview")
-}
-
 func defaultComposerState() composerState {
 	return composerState{
 		Model: defaultCoordinatorModel,
@@ -100,17 +94,9 @@ func extractDescriptionFromBody(body string) string {
 	lines := strings.Split(body, "\n")
 	var descLines []string
 	inTasks := false
-	inSafetyAnalysis := false
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "## Safety Analysis") {
-			inSafetyAnalysis = true
-			continue
-		}
-		if strings.HasPrefix(trimmed, "## ") && inSafetyAnalysis {
-			inSafetyAnalysis = false
-		}
 		if strings.HasPrefix(trimmed, "## Tasks") || strings.HasPrefix(trimmed, "## Task") {
 			inTasks = true
 			continue
@@ -118,7 +104,7 @@ func extractDescriptionFromBody(body string) string {
 		if strings.HasPrefix(trimmed, "## ") && inTasks {
 			inTasks = false
 		}
-		if !inTasks && !inSafetyAnalysis {
+		if !inTasks {
 			descLines = append(descLines, line)
 		}
 	}
@@ -208,13 +194,6 @@ func buildGOALContent(st composerState) string {
 	if st.Description != "" {
 		buf.WriteString(st.Description)
 		buf.WriteString("\n\n")
-	}
-
-	if st.SafetyAnalysis {
-		buf.WriteString("## Safety Analysis\n\n")
-		buf.WriteString("- STPA analysis is a skill workflow, not a routable workflow agent; do not add `stpa-analyst` to GOAL `agents`.\n")
-		buf.WriteString("- The coordinator must load/use `stpa-overview` when safety, hazard, risk, external input, filesystem, concurrency, or unsafe state-transition concerns are relevant.\n")
-		buf.WriteString("- `*-reviewer` agents may load/use `stpa-overview` when circumstances warrant hazard or safety analysis.\n\n")
 	}
 
 	if st.Tasks != "" {

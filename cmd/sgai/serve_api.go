@@ -1242,7 +1242,6 @@ type apiWizardState struct {
 	FromTemplate   string   `json:"fromTemplate,omitempty"`
 	Description    string   `json:"description,omitempty"`
 	TechStack      []string `json:"techStack"`
-	SafetyAnalysis bool     `json:"safetyAnalysis"`
 	Retrospective  bool     `json:"retrospective"`
 	CompletionGate string   `json:"completionGate,omitempty"`
 }

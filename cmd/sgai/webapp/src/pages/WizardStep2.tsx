@@ -51,10 +51,6 @@ export function WizardStep2() {
     return <MissingWorkspaceNotice />;
   }
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">

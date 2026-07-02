@@ -15,7 +15,6 @@ import {
   Save,
   FileText,
   Users,
-  ShieldCheck,
   Terminal,
   History,
   CheckCircle2,
@@ -41,7 +40,7 @@ export function WizardFinish() {
     fetchPreview,
     saveGoal,
     goToStep,
-  } = useComposeWizard({ workspace, currentStep: 4 });
+  } = useComposeWizard({ workspace, currentStep: 3 });
 
   // Fetch preview on mount
   useEffect(() => {
@@ -72,14 +71,6 @@ export function WizardFinish() {
     return <MissingWorkspaceNotice />;
   }
 
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -95,12 +86,12 @@ export function WizardFinish() {
       {/* Header */}
       <div className="flex items-center justify-between border-b pb-3 mb-4">
         <Link
-          to={`/compose/step/4?workspace=${encodeURIComponent(workspace)}`}
+          to={`/compose/step/3?workspace=${encodeURIComponent(workspace)}`}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           ← Back to Settings
         </Link>
-        <ProgressDots currentStep={5} />
+        <ProgressDots currentStep={3} />
       </div>
 
       {/* Success notification */}
@@ -163,24 +154,6 @@ export function WizardFinish() {
                 ) : (
                   <div className="text-sm italic text-muted-foreground">None selected</div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Safety Analysis */}
-          <Card className="py-3">
-            <CardContent className="flex items-start gap-3 px-4 py-0">
-              <ShieldCheck className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground mb-1">Safety Analysis</div>
-                <div className="font-semibold text-sm">
-                  {wizardData.safetyAnalysis ? "Enabled" : "Disabled"}
-                </div>
-                {wizardData.safetyAnalysis ? (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Coordinator uses the STPA skill guidance
-                  </div>
-                ) : null}
               </div>
             </CardContent>
           </Card>

@@ -1,12 +1,11 @@
 import { useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { WizardLayout } from "@/components/WizardLayout";
 import { useComposeWizard } from "@/hooks/useComposeWizard";
-import { ShieldCheck } from "lucide-react";
 import { MissingWorkspaceNotice } from "@/components/MissingWorkspaceNotice";
 
 export function WizardStep3() {
@@ -22,31 +21,30 @@ export function WizardStep3() {
     isSavingDraft,
     fetchPreview,
     goToStep,
+    goToFinish,
   } = useComposeWizard({ workspace, currentStep: 3 });
 
-  const handleToggleSafety = useCallback(
-    (checked: boolean) => {
-      setWizardData((prev) => ({ ...prev, safetyAnalysis: checked }));
+  const handleCompletionGateChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setWizardData((prev) => ({ ...prev, completionGate: e.target.value }));
     },
     [setWizardData],
   );
 
-  // Update preview when safety analysis changes
+  const handleRetrospectiveChange = useCallback(
+    (checked: boolean) => {
+      setWizardData((prev) => ({ ...prev, retrospective: checked }));
+    },
+    [setWizardData],
+  );
+
   useEffect(() => {
     if (!workspace || isLoading) return;
     const timer = setTimeout(() => {
       fetchPreview();
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
-  }, [workspace, wizardData.safetyAnalysis, isLoading, fetchPreview]);
-
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
-
-  if (!workspace) {
-    return <MissingWorkspaceNotice />;
-  }
+  }, [workspace, wizardData.completionGate, wizardData.retrospective, isLoading, fetchPreview]);
 
   if (!workspace) {
     return <MissingWorkspaceNotice />;
@@ -57,7 +55,8 @@ export function WizardStep3() {
       <div className="space-y-4 p-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
       </div>
     );
   }
@@ -69,48 +68,44 @@ export function WizardStep3() {
       draftSavedAt={draftSavedAt}
       isSavingDraft={isSavingDraft}
       onBack={() => goToStep(2)}
-      onNext={() => goToStep(4)}
+      onNext={goToFinish}
+      nextLabel="Review & Save"
     >
       <div>
-        <h2 className="text-xl font-semibold mb-1">Step 3: Safety Analysis</h2>
+        <h2 className="text-xl font-semibold mb-1">Step 3: Settings</h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Enable STPA (System Theoretic Process Analysis) guidance for hazard analysis and safety-critical systems.
+          Configure runtime settings for coordinator delegation.
         </p>
 
-        <div className="flex items-center justify-between p-4 border rounded-lg mb-4">
-          <div className="flex-1 mr-4">
-            <Label htmlFor="safety-toggle" className="font-semibold cursor-pointer">
-              Enable Safety Analysis
-            </Label>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Coordinator loads the STPA skill to identify unsafe control actions and loss scenarios
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="completiongate">Completion Gate Script</Label>
+            <Input
+              id="completiongate"
+              value={wizardData.completionGate}
+              onChange={handleCompletionGateChange}
+              placeholder="e.g., make test"
+            />
+            <p className="text-xs text-muted-foreground">
+              A command that must pass before coordinator delegation is considered complete (optional)
             </p>
           </div>
-          <Switch
-            id="safety-toggle"
-            checked={wizardData.safetyAnalysis}
-            onCheckedChange={handleToggleSafety}
-          />
-        </div>
 
-        {wizardData.safetyAnalysis ? (
-          <Card className="bg-primary/5 border-primary/20 py-4">
-            <CardContent className="px-4 py-0">
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="size-5 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-sm mb-2">What STPA skill guidance provides:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Loss identification</li>
-                    <li>Hazard analysis</li>
-                    <li>Unsafe control action detection</li>
-                    <li>Loss scenario modeling</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="retrospective">Run a retrospective after completion</Label>
+              <p id="retrospective-help" className="text-xs text-muted-foreground">
+                Capture lessons and factory improvements after the build finishes. Optional and off by default.
+              </p>
+            </div>
+            <Switch
+              id="retrospective"
+              checked={wizardData.retrospective}
+              onCheckedChange={handleRetrospectiveChange}
+              aria-describedby="retrospective-help"
+            />
+          </div>
+        </div>
       </div>
     </WizardLayout>
   );

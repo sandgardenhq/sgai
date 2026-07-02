@@ -21,7 +21,6 @@ import {
   WizardStep1Route,
   WizardStep2Route,
   WizardStep3Route,
-  WizardStep4Route,
 } from "./router-elements";
 
 export const router = createBrowserRouter([
@@ -108,10 +107,6 @@ export const router = createBrowserRouter([
       {
         path: "compose/step/3",
         element: <WizardStep3Route />,
-      },
-      {
-        path: "compose/step/4",
-        element: <WizardStep4Route />,
       },
       {
         path: "compose/finish",

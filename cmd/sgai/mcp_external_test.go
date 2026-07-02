@@ -1013,9 +1013,8 @@ func TestMCPToolSaveComposeDraft(t *testing.T) {
 				"tasks":          "",
 			},
 			"wizard": map[string]any{
-				"currentStep":    0,
-				"techStack":      []any{},
-				"safetyAnalysis": false,
+				"currentStep": 0,
+				"techStack":   []any{},
 			},
 		},
 	})
