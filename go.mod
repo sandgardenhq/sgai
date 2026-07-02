@@ -1,6 +1,6 @@
 module github.com/sandgardenhq/sgai
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/adhocore/gronx v1.20.0
