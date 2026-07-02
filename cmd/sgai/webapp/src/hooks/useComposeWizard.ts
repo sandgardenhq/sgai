@@ -11,12 +11,12 @@ import type {
 
 const STORAGE_KEY_PREFIX = "compose-wizard-step-";
 const AUTO_SAVE_INTERVAL_MS = 30_000;
-const WIZARD_STEPS = [1, 2, 3, 4] as const;
+const WIZARD_STEPS = [1, 2, 3] as const;
+const OBSOLETE_WIZARD_STEPS = [4] as const;
 
 export interface WizardStepData {
   description: string;
   techStack: string[];
-  safetyAnalysis: boolean;
   completionGate: string;
   retrospective: boolean;
 }
@@ -25,6 +25,8 @@ interface StorageLoadResult {
   data: Partial<WizardStepData> | null;
   error: string | null;
 }
+
+type StorageReaderRemover = Pick<Storage, "getItem"> & Partial<Pick<Storage, "removeItem">>;
 
 function getStepStorageKey(step: number): string {
   return `${STORAGE_KEY_PREFIX}${step}`;
@@ -51,10 +53,6 @@ function validateStoredStepData(
         ? { techStack: candidate.techStack }
         : null;
     case 3:
-      return typeof candidate.safetyAnalysis === "boolean"
-        ? { safetyAnalysis: candidate.safetyAnalysis }
-        : null;
-    case 4:
       return typeof candidate.completionGate === "string" &&
         (candidate.retrospective === undefined || typeof candidate.retrospective === "boolean")
         ? {
@@ -67,9 +65,23 @@ function validateStoredStepData(
   }
 }
 
+function isStaleSafetyAnalysisStep3Data(
+  step: number,
+  raw: unknown,
+): boolean {
+  if (step !== 3 || !raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return false;
+  }
+
+  const candidate = raw as Record<string, unknown>;
+  return typeof candidate.safetyAnalysis === "boolean" &&
+    candidate.completionGate === undefined &&
+    candidate.retrospective === undefined;
+}
+
 export function loadStepFromStorage(
   step: number,
-  storage: Pick<Storage, "getItem"> = sessionStorage,
+  storage: StorageReaderRemover = sessionStorage,
 ): StorageLoadResult {
   let stored: string | null;
   try {
@@ -99,6 +111,19 @@ export function loadStepFromStorage(
 
   const validated = validateStoredStepData(step, parsed);
   if (!validated) {
+    if (isStaleSafetyAnalysisStep3Data(step, parsed)) {
+      try {
+        storage.removeItem?.(getStepStorageKey(step));
+      } catch (errStorageRemove) {
+        const message = errStorageRemove instanceof Error ? errStorageRemove.message : "unknown sessionStorage remove error";
+        return {
+          data: null,
+          error: `Failed to clear stale step ${step} from sessionStorage: ${message}`,
+        };
+      }
+      return { data: null, error: null };
+    }
+
     return {
       data: null,
       error: `Invalid payload shape in step ${step} sessionStorage data`,
@@ -122,10 +147,10 @@ export function saveStepToStorage(
   }
 }
 
-function clearAllWizardStorage(
+export function clearAllWizardStorage(
   storage: Pick<Storage, "removeItem"> = sessionStorage,
 ): string | null {
-  for (const step of WIZARD_STEPS) {
+  for (const step of [...WIZARD_STEPS, ...OBSOLETE_WIZARD_STEPS]) {
     try {
       storage.removeItem(getStepStorageKey(step));
     } catch (errStorageRemove) {
@@ -141,7 +166,6 @@ function buildWizardStateFromData(data: WizardStepData, step: number): ApiWizard
     currentStep: step,
     description: data.description,
     techStack: data.techStack,
-    safetyAnalysis: data.safetyAnalysis,
     completionGate: data.completionGate,
     retrospective: data.retrospective,
   };
@@ -183,17 +207,20 @@ const TECH_STACK_AGENT_MAP: Record<string, TechStackMapping> = {
   },
 };
 
-const RETIRED_AGENT_NAMES = new Set(["stpa-analyst"]);
-
-function sanitizeComposerAgents(agents: ApiComposerAgentConf[]): ApiComposerAgentConf[] {
-  return agents.filter((agent) => !RETIRED_AGENT_NAMES.has(agent.name));
-}
-
 function mergeComposerAgents(
   serverAgents: ApiComposerAgentConf[],
   generatedAgents: ApiComposerAgentConf[],
 ): ApiComposerAgentConf[] {
-  const mergedAgents = sanitizeComposerAgents(serverAgents);
+  const allTechAgentNames = new Set(
+    Object.values(TECH_STACK_AGENT_MAP).flatMap((mapping) => mapping.agents),
+  );
+  const generatedAgentNames = new Set(generatedAgents.map((agent) => agent.name));
+  const mergedAgents = serverAgents.filter((agent) => {
+    if (!allTechAgentNames.has(agent.name)) {
+      return true;
+    }
+    return generatedAgentNames.has(agent.name);
+  });
   const existingAgentNames = new Set(mergedAgents.map((agent) => agent.name));
 
   for (const generatedAgent of generatedAgents) {
@@ -225,7 +252,7 @@ function computeAgentsFromTechStack(
     .map((name) => ({ name, selected: true }));
 }
 
-function buildComposerStateFromData(
+export function buildComposerStateFromData(
   data: WizardStepData,
   serverState: ApiComposerState | null,
 ): ApiComposerState {
@@ -239,6 +266,40 @@ function buildComposerStateFromData(
     model: serverState?.model || DEFAULT_COORDINATOR_MODEL,
     tasks: serverState?.tasks ?? "",
   };
+}
+
+function buildLocalPreviewContent(state: ApiComposerState): string {
+  const lines = ["---"];
+  const selectedAgents = state.agents.filter((agent) => agent.selected);
+
+  if (selectedAgents.length > 0) {
+    lines.push("agents:");
+    for (const agent of selectedAgents) {
+      lines.push(`  - "${agent.name}"`);
+    }
+  }
+
+  lines.push(`model: "${state.model || DEFAULT_COORDINATOR_MODEL}"`);
+
+  if (state.completionGate) {
+    lines.push(`completionGateScript: ${state.completionGate}`);
+  }
+
+  if (state.retrospective) {
+    lines.push("retrospective: true");
+  }
+
+  lines.push("---", "");
+
+  if (state.description) {
+    lines.push(`# ${state.description}`);
+  }
+
+  if (state.tasks) {
+    lines.push("", state.tasks);
+  }
+
+  return lines.join("\n");
 }
 
 function buildDraftRequest(
@@ -295,7 +356,6 @@ function serializeWizardData(data: WizardStepData): string {
   return JSON.stringify({
     description: data.description,
     techStack: data.techStack,
-    safetyAnalysis: data.safetyAnalysis,
     completionGate: data.completionGate,
     retrospective: data.retrospective,
   });
@@ -304,7 +364,6 @@ function serializeWizardData(data: WizardStepData): string {
 const DEFAULT_WIZARD_DATA: WizardStepData = {
   description: "",
   techStack: [],
-  safetyAnalysis: false,
   completionGate: "",
   retrospective: false,
 };
@@ -347,6 +406,7 @@ export function useComposeWizard({
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveDraftRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const isDirtyRef = useRef(false);
+  const previewRequestSequenceRef = useRef(0);
   const cleanBaselineRef = useRef<string | null>(null);
   if (cleanBaselineRef.current === null) {
     cleanBaselineRef.current = serializeWizardData(DEFAULT_WIZARD_DATA);
@@ -373,7 +433,6 @@ export function useComposeWizard({
         const merged: WizardStepData = {
           description: stateResp.wizard.description ?? stateResp.state.description ?? "",
           techStack: stateResp.wizard.techStack ?? [],
-          safetyAnalysis: stateResp.wizard.safetyAnalysis ?? false,
           completionGate: stateResp.wizard.completionGate ?? stateResp.state.completionGate ?? "",
           retrospective: stateResp.wizard.retrospective ?? stateResp.state.retrospective ?? false,
         };
@@ -395,10 +454,7 @@ export function useComposeWizard({
             if (step === 2 && storedStep.techStack !== undefined) {
               merged.techStack = storedStep.techStack;
             }
-            if (step === 3 && storedStep.safetyAnalysis !== undefined) {
-              merged.safetyAnalysis = storedStep.safetyAnalysis;
-            }
-            if (step === 4) {
+            if (step === 3) {
               if (storedStep.completionGate !== undefined) {
                 merged.completionGate = storedStep.completionGate;
               }
@@ -412,6 +468,7 @@ export function useComposeWizard({
         setWizardData(merged);
         cleanBaselineRef.current = serializeWizardData(merged);
         const draftRequest = buildDraftRequest(merged, currentStep, stateResp.state);
+        const optimisticPreview = buildLocalPreviewContent(draftRequest.state);
         await api.compose.saveDraft(workspace, draftRequest);
         const previewResp = await api.compose.preview(workspace);
         if (cancelled) return;
@@ -419,7 +476,7 @@ export function useComposeWizard({
         updateState({
           techStackItems: stateResp.techStackItems,
           etag: previewResp.etag,
-          preview: previewResp,
+          preview: previewResp.content ? previewResp : { content: optimisticPreview, etag: previewResp.etag },
           isDirty: false,
           saveError: storageErrors[0] ?? null,
           isLoading: false,
@@ -457,10 +514,7 @@ export function useComposeWizard({
         storageError = saveStepToStorage(2, { techStack: wizardData.techStack });
         break;
       case 3:
-        storageError = saveStepToStorage(3, { safetyAnalysis: wizardData.safetyAnalysis });
-        break;
-      case 4:
-        storageError = saveStepToStorage(4, {
+        storageError = saveStepToStorage(3, {
           completionGate: wizardData.completionGate,
           retrospective: wizardData.retrospective,
         });
@@ -527,6 +581,18 @@ export function useComposeWizard({
     wizardDataRef.current = wizardData;
   }, [wizardData]);
 
+  useEffect(() => {
+    if (!isInitialLoadDone) return;
+
+    const state = buildComposerStateFromData(wizardData, serverStateRef.current);
+    updateState({
+      preview: {
+        content: buildLocalPreviewContent(state),
+        etag: "",
+      },
+    });
+  }, [isInitialLoadDone, wizardData]);
+
   // Auto-save draft every 30s (R-15) — uses refs to avoid stale closures
   useEffect(() => {
     if (!workspace || !isInitialLoadDone) return;
@@ -545,8 +611,10 @@ export function useComposeWizard({
 
   const fetchPreview = useCallback(async () => {
     if (!workspace) return;
+    const requestSequence = previewRequestSequenceRef.current + 1;
+    previewRequestSequenceRef.current = requestSequence;
+    const requestedSnapshot = serializeWizardData(wizardData);
     try {
-      // Save draft first to update server state, then fetch preview
       const draftRequest = buildDraftRequest(
         wizardData,
         currentStep,
@@ -555,6 +623,12 @@ export function useComposeWizard({
       await api.compose.saveDraft(workspace, draftRequest);
 
       const previewResp = await api.compose.preview(workspace);
+      if (
+        requestSequence !== previewRequestSequenceRef.current ||
+        requestedSnapshot !== serializeWizardData(wizardDataRef.current)
+      ) {
+        return;
+      }
       updateState({ preview: previewResp, etag: previewResp.etag, saveError: null });
     } catch (err) {
       updateState({ saveError: getErrorMessage(err, "Failed to refresh preview") });

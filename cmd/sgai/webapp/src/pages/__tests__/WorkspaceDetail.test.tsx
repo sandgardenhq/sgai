@@ -109,12 +109,24 @@ mock.module("@/lib/api", () => ({
 
 mock.module("@/hooks/useAdhocRun", () => ({
   useAdhocRun: () => ({
+    models: { models: [{ id: "test-model", name: "Test Model" }] },
+    modelsLoading: false,
+    modelsError: null,
+    selectedModel: "test-model",
+    setSelectedModel: mock(() => {}),
+    prompt: "",
+    setPrompt: mock(() => {}),
     output: "",
     isRunning: false,
     runError: null,
     startRun: mock(() => {}),
+    handleSubmit: mock(() => {}),
+    handleKeyDown: mock(() => {}),
     stopRun: mock(() => {}),
     outputRef: { current: null },
+    promptHistory: [],
+    selectFromHistory: mock(() => {}),
+    clearHistory: mock(() => {}),
   }),
 }));
 
@@ -505,6 +517,7 @@ describe("WorkspaceDetail", () => {
       renderWorkspaceDetail();
 
       await user.click(screen.getByRole("button", { name: "Reset" }));
+      mockTriggerFactoryRefresh.mockClear();
       await user.click(await screen.findByRole("button", { name: "Reset workspace" }));
 
       await waitFor(() => {
@@ -612,28 +625,84 @@ describe("WorkspaceDetail", () => {
   });
 
   describe("fork editor visibility", () => {
-    it("shows fork editor for standalone workspaces", async () => {
+    it("shows the Forks tab between Internals and Run for standalone workspaces without forks", async () => {
       mockWorkspaces = [createMockWorkspace({ name: "standalone", isRoot: false, isFork: false })];
 
       renderWorkspaceDetail("standalone");
 
-      expect(await screen.findByText("Create Fork")).toBeTruthy();
+      const links = await screen.findAllByRole("link");
+      const tabLabels = links
+        .filter((link) => link.getAttribute("href")?.startsWith("/workspaces/standalone/"))
+        .map((link) => link.textContent);
+
+      expect(tabLabels).toEqual(["Progress", "Log", "Internals", "Forks", "Run"]);
     });
 
-    it("shows fork editor for root workspaces", async () => {
+    it("shows fork creation and empty state inside the standalone Forks tab", async () => {
+      mockWorkspaces = [createMockWorkspace({ name: "standalone", isRoot: false, isFork: false })];
+
+      renderWorkspaceDetail("standalone", "forks");
+
+      expect(await screen.findByText("Create Fork")).toBeTruthy();
+      expect(await screen.findByText("No forks yet. Create a fork to start work.")).toBeTruthy();
+      expect(screen.queryByText("Ad-hoc Prompt")).toBeNull();
+    });
+
+    it("keeps configured action buttons out of Forks while Run controls remain available", async () => {
+      mockWorkspaces = [createMockWorkspace({
+        name: "root",
+        isRoot: true,
+        isFork: false,
+        actions: [{
+          name: "Ship It",
+          description: "Run the configured ship action",
+          prompt: "ship it",
+          model: "test-model",
+        }],
+        forks: [{
+          name: "child",
+          dir: "/path/to/child",
+          running: false,
+          needsInput: false,
+          inProgress: false,
+          pinned: false,
+          description: "Child fork",
+          commitAhead: 0,
+          commits: [],
+        }],
+      })];
+
+      renderWorkspaceDetail("root", "forks");
+
+      expect(await screen.findByText("Child fork")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Ship It" })).toBeNull();
+
+      cleanup();
+      renderWorkspaceDetail("root", "run");
+
+      expect(await screen.findByRole("button", { name: "Run prompt" })).toBeTruthy();
+    });
+
+    it("shows the Forks tab between Internals and Run for root workspaces without forks", async () => {
       mockWorkspaces = [createMockWorkspace({ name: "root", isRoot: true, isFork: false })];
 
       renderWorkspaceDetail("root");
 
-      expect(await screen.findByText("Create Fork")).toBeTruthy();
+      const links = await screen.findAllByRole("link");
+      const tabLabels = links
+        .filter((link) => link.getAttribute("href")?.startsWith("/workspaces/root/"))
+        .map((link) => link.textContent);
+
+      expect(tabLabels).toEqual(["Progress", "Log", "Internals", "Forks", "Run"]);
     });
 
-    it("hides fork editor for fork workspaces", async () => {
+    it("hides Forks tab and fork creation for fork workspaces", async () => {
       mockWorkspaces = [createMockWorkspace({ name: "fork-ws", isRoot: false, isFork: true })];
 
       renderWorkspaceDetail("fork-ws");
 
       await waitFor(() => {
+        expect(screen.queryByRole("link", { name: "Forks" })).toBeNull();
         expect(screen.queryByText("Create Fork")).toBeNull();
       });
     });
@@ -864,7 +933,6 @@ describe("WorkspaceDetail", () => {
     });
 
     it("Respond button navigates to respond page", async () => {
-      const user = userEvent.setup();
       mockWorkspaces[0] = createMockWorkspace({ needsInput: true });
 
       renderWorkspaceDetail();
@@ -875,7 +943,7 @@ describe("WorkspaceDetail", () => {
       });
 
       const respondButtons = screen.getAllByRole("button", { name: /Respond/ });
-      await user.click(respondButtons[0]);
+      fireEvent.click(respondButtons[0]);
 
       await waitFor(() => {
         expect(screen.getByTestId("current-location").textContent).toBe("/workspaces/test-workspace/respond");

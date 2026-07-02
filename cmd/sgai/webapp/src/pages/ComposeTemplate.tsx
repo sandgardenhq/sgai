@@ -93,7 +93,6 @@ function buildDraftRequest(template: ApiComposeTemplateEntry) {
       fromTemplate: template.id,
       description: "",
       techStack: [],
-      safetyAnalysis: false,
       completionGate: "",
       retrospective: false,
     },

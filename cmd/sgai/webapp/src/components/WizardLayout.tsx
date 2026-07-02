@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 import type { ApiComposePreviewResponse } from "@/types";
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
 interface WizardLayoutProps {
   currentStep: number;

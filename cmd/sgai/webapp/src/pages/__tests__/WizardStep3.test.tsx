@@ -1,57 +1,61 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { Link } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { WizardStep3 } from "../WizardStep3";
+import type { ApiComposeDraftRequest } from "@/types";
 
-function defaultComposeGetResponse() {
-  return {
-  workspace: "test-workspace",
+let savedDraft: ApiComposeDraftRequest | null = null;
+const saveDraftCalls: ApiComposeDraftRequest[] = [];
+
+const defaultDraft: ApiComposeDraftRequest = {
   state: {
-    description: "Build safer controls",
-    completionGate: "make test",
+    description: "",
+    completionGate: "",
+    retrospective: false,
     agents: [],
     model: "openai/gpt-5.5 (xhigh)",
     tasks: "",
   },
   wizard: {
     currentStep: 3,
-    description: "Build safer controls",
-    techStack: ["react"],
-    safetyAnalysis: false,
-    completionGate: "make test",
+    description: "",
+    techStack: [],
+    completionGate: "",
+    retrospective: false,
   },
-  techStackItems: [
-    { id: "react", name: "React", selected: true },
-  ],
-  };
-}
-
-let composeGetResponse = defaultComposeGetResponse();
-
-let composePreviewResponse = {
-  content: "# Preview",
-  etag: "test-etag",
 };
 
-const mockComposeGet = mock(() => Promise.resolve(composeGetResponse));
+const mockGet = mock(() => Promise.resolve({
+  workspace: "demo",
+  state: savedDraft?.state ?? defaultDraft.state,
+  wizard: savedDraft?.wizard ?? defaultDraft.wizard,
+  techStackItems: [],
+}));
 
-const mockComposePreview = mock(() => Promise.resolve(
-  mockComposeSaveDraft.mock.calls.length > 0
-    ? { content: "# Preview", etag: "test-etag" }
-    : composePreviewResponse,
-));
+const mockPreview = mock(() => Promise.resolve({
+  content: savedDraft?.state.retrospective
+    ? "---\nretrospective: true\n---\n# GOAL"
+    : "---\n---\n# GOAL",
+  etag: "etag-1",
+}));
 
-const mockComposeSaveDraft = mock(() => Promise.resolve({ saved: true }));
+const mockSaveDraft = mock((_workspace: string, draft: ApiComposeDraftRequest) => {
+  savedDraft = draft;
+  saveDraftCalls.push(draft);
+  return Promise.resolve({ saved: true });
+});
+
+const mockSaveGoal = mock(() => Promise.resolve({ saved: true, workspace: "demo" }));
 
 mock.module("@/lib/api", () => ({
   api: {
     compose: {
-      get: mockComposeGet,
-      preview: mockComposePreview,
-      saveDraft: mockComposeSaveDraft,
+      get: mockGet,
+      preview: mockPreview,
+      saveDraft: mockSaveDraft,
+      save: mockSaveGoal,
     },
   },
   ApiError: class ApiError extends Error {
@@ -62,40 +66,125 @@ mock.module("@/lib/api", () => ({
   },
 }));
 
-function renderWizardStep3() {
-  return render(
-    <MemoryRouter initialEntries={["/compose/step/3?workspace=test-workspace"]}>
-      <TooltipProvider>
-        <SidebarProvider>
-          <Routes>
-            <Route path="/compose/step/3" element={<WizardStep3 />} />
-          </Routes>
-        </SidebarProvider>
-      </TooltipProvider>
-    </MemoryRouter>,
+mock.module("@/components/MarkdownEditor", () => ({
+  MarkdownEditor: ({ value, onChange }: { value: string; onChange: (value: string | undefined) => void }) => (
+    <textarea
+      aria-label="Project Description"
+      value={value}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
+  ),
+}));
+
+const { createMemoryRouter } = await import("react-router");
+
+const { WizardStep1 } = await import("../WizardStep1");
+const { WizardStep2 } = await import("../WizardStep2");
+const { WizardStep3 } = await import("../WizardStep3");
+const { WizardFinish } = await import("../WizardFinish");
+
+const hookOrderErrorPattern = /change in the order of Hooks|Rendered more hooks|Rendered fewer hooks/i;
+
+function OpenDemoWorkspaceLink({ to }: { to: string }) {
+  return (
+    <Link to={to}>
+      Open demo workspace
+    </Link>
   );
 }
 
-async function latestSavedDraftRequest() {
-  await waitFor(() => {
-    expect(mockComposeSaveDraft.mock.calls.length).toBeGreaterThan(0);
+function renderStep3() {
+  const router = createMemoryRouter([
+    {
+      path: "/compose/step/3",
+      element: <WizardStep3 />,
+    },
+  ], {
+    initialEntries: ["/compose/step/3?workspace=demo"],
   });
-  const latestCall = mockComposeSaveDraft.mock.calls.at(-1);
-  expect(latestCall).toBeDefined();
-  return latestCall?.[1];
+
+  return render(
+    <RouterProvider router={router} />,
+  );
 }
 
-describe("WizardStep3", () => {
+function renderStep3WithRouteToggle() {
+  const router = createMemoryRouter([
+    {
+      path: "/compose/step/3",
+      element: (
+        <>
+          <WizardStep3 />
+          <OpenDemoWorkspaceLink to="/compose/step/3?workspace=demo" />
+        </>
+      ),
+    },
+  ], {
+    initialEntries: ["/compose/step/3"],
+  });
+
+  const view = render(
+    <RouterProvider router={router} />,
+  );
+
+  return { router, view };
+}
+
+function renderWizardPageWithRouteToggle(path: string, element: React.ReactNode) {
+  const router = createMemoryRouter([
+    {
+      path,
+      element: (
+        <TooltipProvider>
+          {element}
+          <OpenDemoWorkspaceLink to={`${path}?workspace=demo`} />
+        </TooltipProvider>
+      ),
+    },
+  ], {
+    initialEntries: [path],
+  });
+
+  const view = render(
+    <RouterProvider router={router} />,
+  );
+
+  return { router, view };
+}
+
+function renderFinish() {
+  const router = createMemoryRouter([
+    {
+      path: "/compose/finish",
+      element: <WizardFinish />,
+    },
+    {
+      path: "/workspaces/:workspace",
+      element: <div>Workspace page</div>,
+    },
+  ], {
+    initialEntries: ["/compose/finish?workspace=demo"],
+  });
+
+  return render(
+    <RouterProvider router={router} />,
+  );
+}
+
+async function waitForSettings() {
+  await screen.findByRole("heading", { name: "Step 3: Settings" });
+}
+
+describe("WizardStep3 retrospective opt-in", () => {
   beforeEach(() => {
+    document.body.style.cssText = "pointer-events: auto;";
     sessionStorage.clear();
-    composeGetResponse = defaultComposeGetResponse();
-    composePreviewResponse = {
-      content: "# Preview",
-      etag: "test-etag",
-    };
-    mockComposeGet.mockClear();
-    mockComposePreview.mockClear();
-    mockComposeSaveDraft.mockClear();
+    savedDraft = null;
+    saveDraftCalls.length = 0;
+    mockGet.mockClear();
+    mockPreview.mockClear();
+    mockSaveDraft.mockClear();
+    mockSaveGoal.mockClear();
   });
 
   afterEach(() => {
@@ -103,206 +192,145 @@ describe("WizardStep3", () => {
     sessionStorage.clear();
   });
 
-  it("describes safety analysis as coordinator STPA skill behavior", async () => {
-    renderWizardStep3();
+  it("renders the retrospective switch off by default with accessible copy", async () => {
+    renderStep3();
 
-    expect(await screen.findByText("Enable Safety Analysis")).toBeTruthy();
-    expect(screen.getByText(/coordinator loads the STPA skill/i)).toBeTruthy();
-    expect(screen.queryByText(/STPA analyst/i)).toBeNull();
-  });
+    await waitForSettings();
 
-  it("creates React stack delegation with a single coordinator model", async () => {
-    renderWizardStep3();
-
-    const draftRequest = await latestSavedDraftRequest();
-
-    expect(draftRequest?.state.model).toBe("openai/gpt-5.5 (xhigh)");
-    expect(draftRequest?.state.agents).toEqual([{ name: "react", selected: true }]);
-  });
-
-  it("creates multi-agent stack delegation with a single coordinator model", async () => {
-    composeGetResponse = {
-      ...defaultComposeGetResponse(),
-      wizard: {
-        currentStep: 3,
-        description: "Build SDK verifier delegation",
-        techStack: ["claudesdk", "openaisdk", "shell"],
-        safetyAnalysis: false,
-        completionGate: "make test",
-      },
-      techStackItems: [
-        { id: "claudesdk", name: "Claude SDK", selected: true },
-        { id: "openaisdk", name: "OpenAI SDK", selected: true },
-        { id: "shell", name: "Shell", selected: true },
-      ],
-    };
-
-    renderWizardStep3();
-
-    const draftRequest = await latestSavedDraftRequest();
-
-    expect(draftRequest?.state.model).toBe("openai/gpt-5.5 (xhigh)");
-    expect((draftRequest?.state.agents ?? []).map((agent) => agent.name).sort()).toEqual([
-      "agent-sdk-verifier-py",
-      "agent-sdk-verifier-ts",
-      "general-purpose",
-      "openai-sdk-verifier-py",
-      "openai-sdk-verifier-ts",
-      "shell-script",
-    ]);
-  });
-
-  it("preserves custom TypeScript-only server state while sanitizing retired agents", async () => {
-    composeGetResponse = {
-      ...defaultComposeGetResponse(),
-      state: {
-        description: "Preserve custom TypeScript delegation",
-        completionGate: "make test",
-        agents: [
-          { name: "custom-reviewer", selected: true },
-          { name: "stpa-analyst", selected: true },
-        ],
-        model: "custom/coordinator-model",
-        tasks: "keep this task plan",
-      },
-      wizard: {
-        currentStep: 3,
-        description: "Preserve custom TypeScript delegation",
-        techStack: ["typescript"],
-        safetyAnalysis: false,
-        completionGate: "make test",
-      },
-      techStackItems: [
-        { id: "typescript", name: "TypeScript", selected: true },
-      ],
-    };
-
-    renderWizardStep3();
-
-    const draftRequest = await latestSavedDraftRequest();
-
-    expect(draftRequest?.state.agents).toEqual([
-      { name: "custom-reviewer", selected: true },
-    ]);
-    expect(draftRequest?.state.model).toBe("custom/coordinator-model");
-    expect(draftRequest?.state.tasks).toBe("keep this task plan");
-    expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
-  });
-
-  it("merges preserved server agents with generated React stack agents while keeping the single model", async () => {
-    composeGetResponse = {
-      ...defaultComposeGetResponse(),
-      state: {
-        description: "Preserve custom React delegation",
-        completionGate: "make test",
-        agents: [
-          { name: "custom-reviewer", selected: true },
-          { name: "stpa-analyst", selected: true },
-        ],
-        model: "custom/coordinator-model",
-        tasks: "keep generated stack task plan",
-      },
-      wizard: {
-        currentStep: 3,
-        description: "Preserve custom React delegation",
-        techStack: ["react"],
-        safetyAnalysis: false,
-        completionGate: "make test",
-      },
-      techStackItems: [
-        { id: "react", name: "React", selected: true },
-      ],
-    };
-
-    renderWizardStep3();
-
-    const draftRequest = await latestSavedDraftRequest();
-
-    expect(draftRequest?.state.agents).toEqual([
-      { name: "custom-reviewer", selected: true },
-      { name: "react", selected: true },
-    ]);
-    expect(draftRequest?.state.model).toBe("custom/coordinator-model");
-    expect(draftRequest?.state.tasks).toBe("keep generated stack task plan");
-    expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
-  });
-
-  it("does not add stpa-analyst to draft agents when safety analysis is enabled", async () => {
-    const user = userEvent.setup();
-    renderWizardStep3();
-
-    const toggle = await screen.findByRole("switch", { name: /enable safety analysis/i });
-    let disabledSafetyDraftRequest:
-      | { state: { agents: unknown; model: string }; wizard: { safetyAnalysis: boolean } }
-      | undefined;
-    await waitFor(() => {
-      expect(mockComposeSaveDraft.mock.calls.length).toBeGreaterThan(0);
-      const latestCall = mockComposeSaveDraft.mock.calls.at(-1);
-      expect(latestCall).toBeDefined();
-      disabledSafetyDraftRequest = latestCall?.[1];
-      expect(disabledSafetyDraftRequest?.wizard.safetyAnalysis).toBe(false);
+    const retrospectiveSwitch = screen.getByRole("switch", {
+      name: "Run a retrospective after completion",
     });
 
-    await user.click(toggle);
+    expect(retrospectiveSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByText("Capture lessons and factory improvements after the build finishes. Optional and off by default.")).not.toBeNull();
+  });
+
+  it("persists the retrospective switch in session storage across remounts", async () => {
+    const firstRender = renderStep3();
+    await waitForSettings();
+
+    await userEvent.click(screen.getByRole("switch", { name: "Run a retrospective after completion" }));
 
     await waitFor(() => {
-      expect(mockComposeSaveDraft.mock.calls.length).toBeGreaterThan(0);
-      const latestCall = mockComposeSaveDraft.mock.calls.at(-1);
-      expect(latestCall).toBeDefined();
-      const draftRequest = latestCall?.[1];
-      expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
-      expect(draftRequest?.state.agents).toEqual(disabledSafetyDraftRequest?.state.agents);
-      expect(draftRequest?.state.model).toBe(disabledSafetyDraftRequest?.state.model);
-      expect(draftRequest?.wizard.safetyAnalysis).toBe(true);
+      expect(JSON.parse(sessionStorage.getItem("compose-wizard-step-3") ?? "{}")).toMatchObject({
+        retrospective: true,
+      });
+    });
+
+    firstRender.unmount();
+    renderStep3();
+    await waitForSettings();
+
+    expect(screen.getByRole("switch", { name: "Run a retrospective after completion" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("refreshes preview and draft payload from the retrospective switch state", async () => {
+    renderStep3();
+    await waitForSettings();
+
+    const previewPanel = screen.getByText("GOAL.md Preview").closest("div")?.parentElement;
+    expect(previewPanel).not.toBeNull();
+    expect(within(previewPanel as HTMLElement).queryByText(/retrospective: true/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("switch", { name: "Run a retrospective after completion" }));
+
+    await waitFor(() => {
+      const latestDraft = saveDraftCalls.at(-1);
+      expect(latestDraft?.state.retrospective).toBe(true);
+      expect(latestDraft?.wizard.retrospective).toBe(true);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/retrospective: true/)).not.toBeNull();
+    });
+
+    await userEvent.click(screen.getByRole("switch", { name: "Run a retrospective after completion" }));
+
+    await waitFor(() => {
+      const latestDraft = saveDraftCalls.at(-1);
+      expect(latestDraft?.state.retrospective).toBe(false);
+      expect(latestDraft?.wizard.retrospective).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/retrospective: true/)).toBeNull();
     });
   });
 
-  it("removes retired stpa-analyst from preserved server draft state", async () => {
-    composePreviewResponse = {
-      content: "stale stpa-analyst preview",
-      etag: "stale-etag",
-    };
-    composeGetResponse = {
-      ...defaultComposeGetResponse(),
+  it("keeps hook ordering stable when workspace query param appears after the missing workspace state", async () => {
+    const { router } = renderStep3WithRouteToggle();
+
+    expect(screen.getByText("Workspace required")).not.toBeNull();
+
+    await router.navigate("/compose/step/3?workspace=demo");
+
+    await waitForSettings();
+    expect(screen.getByRole("switch", { name: "Run a retrospective after completion" })).not.toBeNull();
+  });
+
+  it.each([
+    ["WizardStep1", "/compose/step/1", <WizardStep1 key="wizard-step-1" />, "Step 1: Project Description"],
+    ["WizardStep2", "/compose/step/2", <WizardStep2 key="wizard-step-2" />, "Step 2: Tech Stack"],
+    ["WizardStep3", "/compose/step/3", <WizardStep3 key="wizard-step-3" />, "Step 3: Settings"],
+    ["WizardFinish", "/compose/finish", <WizardFinish key="wizard-finish" />, "Review & Save"],
+  ])("keeps %s hook ordering stable after workspace query param appears", async (_name, path, element, heading) => {
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const { router } = renderWizardPageWithRouteToggle(path, element);
+
+      expect(screen.getByText("Workspace required")).not.toBeNull();
+
+      await router.navigate(`${path}?workspace=demo`);
+
+      await screen.findByRole("heading", { name: heading });
+
+      const hookOrderMessages: string[] = [];
+      for (const call of consoleError.mock.calls) {
+        for (const value of call) {
+          const message = String(value);
+          if (hookOrderErrorPattern.test(message)) {
+            hookOrderMessages.push(message);
+          }
+        }
+      }
+      expect(hookOrderMessages).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("saves the final GOAL.md with the current retrospective opt-in state", async () => {
+    savedDraft = {
       state: {
-        description: "Build safer controls",
+        description: "Build the thing",
         completionGate: "make test",
-        agents: [
-          { name: "stpa-analyst", selected: true },
-        ],
-        model: "openai/gpt-5.5",
+        retrospective: true,
+        agents: [],
+        model: "openai/gpt-5.5 (xhigh)",
         tasks: "",
       },
       wizard: {
         currentStep: 3,
-        description: "Build safer controls",
-        techStack: ["typescript"],
-        safetyAnalysis: false,
+        description: "Build the thing",
+        techStack: [],
         completionGate: "make test",
+        retrospective: true,
       },
-      techStackItems: [
-        { id: "typescript", name: "TypeScript", selected: true },
-      ],
     };
 
-    const user = userEvent.setup();
-    renderWizardStep3();
+    renderFinish();
 
-    const toggle = await screen.findByRole("switch", { name: /enable safety analysis/i });
-    await waitFor(() => {
-      expect(screen.queryByText(/stale stpa-analyst preview/i)).toBeNull();
-    });
-    await user.click(toggle);
+    await screen.findByRole("heading", { name: "Review & Save" });
+    expect(screen.getByText("Enabled")).not.toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save GOAL.md" }));
 
     await waitFor(() => {
-      expect(mockComposeSaveDraft.mock.calls.length).toBeGreaterThan(0);
-      const latestCall = mockComposeSaveDraft.mock.calls.at(-1);
-      expect(latestCall).toBeDefined();
-      const draftRequest = latestCall?.[1];
-      expect(JSON.stringify(draftRequest)).not.toContain("stpa-analyst");
-      expect(draftRequest?.state.agents.map((agent) => agent.name)).toEqual([]);
-      expect(draftRequest?.state.model).toBe("openai/gpt-5.5");
-      expect(draftRequest?.wizard.safetyAnalysis).toBe(true);
+      expect(mockSaveGoal).toHaveBeenCalledWith("demo", "etag-1");
     });
+    const latestDraft = saveDraftCalls.at(-1);
+    expect(latestDraft?.state.retrospective).toBe(true);
+    expect(latestDraft?.wizard.retrospective).toBe(true);
   });
 });

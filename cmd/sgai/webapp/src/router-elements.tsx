@@ -43,9 +43,6 @@ const WizardStep2 = lazy(() =>
 const WizardStep3 = lazy(() =>
   import("./pages/WizardStep3").then((m) => ({ default: m.WizardStep3 })),
 );
-const WizardStep4 = lazy(() =>
-  import("./pages/WizardStep4").then((m) => ({ default: m.WizardStep4 })),
-);
 const WizardFinish = lazy(() =>
   import("./pages/WizardFinish").then((m) => ({ default: m.WizardFinish })),
 );
@@ -160,10 +157,6 @@ export function WizardStep2Route() {
 
 export function WizardStep3Route() {
   return <PageRoute><WizardStep3 /></PageRoute>;
-}
-
-export function WizardStep4Route() {
-  return <PageRoute><WizardStep4 /></PageRoute>;
 }
 
 export function WizardFinishRoute() {

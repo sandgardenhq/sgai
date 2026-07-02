@@ -1,14 +1,9 @@
 import { useState, useTransition, useMemo, useCallback, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
-import { ChevronRight, ChevronDown, Mail, SquarePen, ExternalLink, Trash2, Square } from "lucide-react";
+import { ChevronRight, ChevronDown, Mail, SquarePen, ExternalLink, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectOption } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
@@ -27,17 +22,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { PromptHistory } from "@/components/PromptHistory";
-import { ActionBar } from "@/pages/tabs/SessionTab";
+import { InlineForkEditor } from "@/pages/InlineForkEditor";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
-import { useAdhocRun } from "@/hooks/useAdhocRun";
-import type { ApiForkEntry, ApiForkCommit, ApiActionEntry } from "@/types";
+import type { ApiForkEntry, ApiForkCommit } from "@/types";
 
 interface ForksTabProps {
   workspaceName: string;
-  actions?: ApiActionEntry[];
-  onActionClick?: (action: ApiActionEntry, forkName: string) => void;
 }
 
 function ForksTabSkeleton() {
@@ -121,11 +112,9 @@ interface CompactForkRowProps {
   fork: ApiForkEntry;
   rootName: string;
   needsInput: boolean;
-  actions?: ApiActionEntry[];
-  onActionClick?: (action: ApiActionEntry, forkName: string) => void;
 }
 
-function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: CompactForkRowProps) {
+function CompactForkRow({ fork, rootName, needsInput }: CompactForkRowProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -291,32 +280,6 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
               </AlertDialogContent>
             </AlertDialog>
           </div>
-
-          {actions && actions.length > 0 && (
-            <div className="flex items-center gap-1 shrink-0 border-l pl-2 ml-1">
-              {actions.map((action) => (
-                <Tooltip key={`${action.name}-${action.model}`}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs px-2"
-                      disabled={isActionPending}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onActionClick?.(action, fork.name);
-                      }}
-                    >
-                      {action.name}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{action.description || action.model}</TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          )}
         </div>
 
         {actionError && (
@@ -339,138 +302,7 @@ function CompactForkRow({ fork, rootName, needsInput, actions, onActionClick }: 
   );
 }
 
-function InlineRunBox({ workspaceName }: { workspaceName: string }) {
-  const {
-    models,
-    modelsLoading,
-    modelsError,
-    selectedModel,
-    setSelectedModel,
-    prompt,
-    setPrompt,
-    output,
-    isRunning,
-    runError,
-    handleSubmit,
-    handleKeyDown,
-    stopRun,
-    outputRef,
-    promptHistory,
-    selectFromHistory,
-    clearHistory,
-  } = useAdhocRun({ workspaceName });
-
-  if (modelsLoading && !models) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-10 w-full rounded" />
-        <Skeleton className="h-32 w-full rounded" />
-        <Skeleton className="h-10 w-32 rounded" />
-      </div>
-    );
-  }
-
-  if (modelsError) {
-    return (
-      <p className="text-sm text-destructive">
-        Failed to load models: {modelsError.message}
-      </p>
-    );
-  }
-
-  if (!models) return null;
-
-  return (
-    <div className="space-y-4">
-      {runError ? (
-        <Alert className="border-destructive/50 text-destructive">
-          <AlertDescription>{runError}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="forks-adhoc-model">Model</Label>
-            <Select
-              id="forks-adhoc-model"
-              value={selectedModel}
-              onChange={(event) => setSelectedModel(event.target.value)}
-              disabled={isRunning}
-              className="w-full"
-            >
-              <SelectOption value="" disabled>
-                Select a model
-              </SelectOption>
-              {models?.models?.map((model) => (
-                <SelectOption key={model.id} value={model.id}>
-                  {model.name}
-                </SelectOption>
-              ))}
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="forks-adhoc-prompt">Prompt</Label>
-              <PromptHistory
-                history={promptHistory}
-                onSelect={selectFromHistory}
-                onClear={clearHistory}
-                disabled={isRunning}
-              />
-            </div>
-            <Textarea
-              id="forks-adhoc-prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Enter prompt..."
-              rows={6}
-              className="resize-y"
-              disabled={isRunning}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {isRunning ? (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={stopRun}
-            >
-              <Square className="mr-2 size-4" />
-              Stop
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              disabled={!selectedModel || !prompt.trim()}
-            >
-              Run prompt
-            </Button>
-          )}
-        </div>
-      </form>
-
-      {(isRunning || output) ? (
-        <div className="space-y-2">
-          <Label>Output</Label>
-          <pre
-            ref={outputRef}
-            className="bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
-          >
-            {output}
-          </pre>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function ForksTab({ workspaceName, actions, onActionClick }: ForksTabProps) {
+export function ForksTab({ workspaceName }: ForksTabProps) {
   const { workspaces: allWorkspaces, fetchStatus } = useFactoryState();
 
   const workspace = allWorkspaces.find((ws) => ws.name === workspaceName);
@@ -497,17 +329,10 @@ export function ForksTab({ workspaceName, actions, onActionClick }: ForksTabProp
   }
 
   const forks = workspace.forks ?? [];
-  const isAnyForkRunning = forks.some((fork) => fork.running);
 
   return (
     <div className="space-y-4">
-      {actions && actions.length > 0 && (
-        <ActionBar
-          actions={actions}
-          isRunning={isAnyForkRunning}
-          onActionClick={(action) => onActionClick?.(action, workspaceName)}
-        />
-      )}
+      <InlineForkEditor workspaceName={workspaceName} />
       {forks.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground italic">
           <p>No forks yet. Create a fork to start work.</p>
@@ -520,19 +345,10 @@ export function ForksTab({ workspaceName, actions, onActionClick }: ForksTabProp
               fork={fork}
               rootName={workspaceName}
               needsInput={needsInputMap[fork.name] ?? false}
-              actions={actions}
-              onActionClick={onActionClick}
             />
           ))}
         </div>
       )}
-
-      <Separator className="my-6" />
-
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Ad-hoc Prompt</h3>
-        <InlineRunBox workspaceName={workspaceName} />
-      </div>
     </div>
   );
 }

@@ -83,18 +83,6 @@ func workflowTemplates() []workflowTemplate {
 			},
 		},
 		{
-			ID:          "c4docs",
-			Name:        "C4 Architecture Docs",
-			Description: "C4 model documentation chain: code → component → container → context",
-			Icon:        "📐",
-			Agents: []composerAgentConf{
-				{Name: "c4-code", Selected: true},
-				{Name: "c4-component", Selected: true},
-				{Name: "c4-container", Selected: true},
-				{Name: "c4-context", Selected: true},
-			},
-		},
-		{
 			ID:          "claudesdk",
 			Name:        "Claude SDK App",
 			Description: "Build with Claude Agent SDK, verified for TS and Python",
@@ -124,15 +112,13 @@ type wizardState struct {
 	FromTemplate   string
 	Description    string
 	TechStack      []string
-	SafetyAnalysis bool
 	Retrospective  bool
 	CompletionGate string
 }
 
 func defaultWizardState() wizardState {
 	return wizardState{
-		CurrentStep:    1,
-		SafetyAnalysis: false,
+		CurrentStep: 1,
 	}
 }
 
@@ -160,9 +146,6 @@ func defaultTechStackItems() []techStackItem {
 func syncWizardState(wizard wizardState, st composerState) wizardState {
 	if len(wizard.TechStack) == 0 {
 		wizard.TechStack = techStackFromAgents(st.Agents)
-	}
-	if !wizard.SafetyAnalysis {
-		wizard.SafetyAnalysis = st.SafetyAnalysis
 	}
 	wizard.Retrospective = st.Retrospective
 	return wizard

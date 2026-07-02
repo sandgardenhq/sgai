@@ -105,9 +105,8 @@ func TestCountPendingTodosIgnoresCoordinatorRuntimeTodos(t *testing.T) {
 	assert.Equal(t, 1, countPendingTodos(wf, "go"))
 }
 
-func TestSafetyAnalysisComposerTextUsesSkillsNotWorkflowAgents(t *testing.T) {
-	content := buildGOALContent(composerState{Description: "Goal", SafetyAnalysis: true, Agents: []composerAgentConf{{Name: "go", Selected: true}}, Model: "openai/gpt-5.5 (xhigh)"})
+func TestBuildGOALContentWritesDescriptionAndTasks(t *testing.T) {
+	content := buildGOALContent(composerState{Description: "Goal", Tasks: "- Task 1", Agents: []composerAgentConf{{Name: "go", Selected: true}}, Model: "openai/gpt-5.5 (xhigh)"})
 
-	assert.Contains(t, content, "stpa-overview")
-	assert.NotContains(t, strings.Split(content, "---")[1], "stpa-analyst")
+	assert.Contains(t, content, "Goal\n\n## Tasks\n\n- Task 1\n")
 }

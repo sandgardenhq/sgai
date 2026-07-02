@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useTransition, useRef, useCallback, useReducer, type ReactNode } from "react";
+import { useState, useEffect, Suspense, lazy, useTransition, useRef, useReducer, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { InlineForkEditor } from "@/pages/InlineForkEditor";
 import { api } from "@/lib/api";
 import { useFactoryState, triggerFactoryRefresh } from "@/lib/factory-state";
-import { useAdhocRun } from "@/hooks/useAdhocRun";
-import { ChevronRight, Square } from "lucide-react";
 import type { ApiWorkspaceEntry, ApiActionEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -76,9 +73,12 @@ const TABS = [
   { key: "run", label: "Run" },
 ] as const;
 
-const ROOT_TABS = [
-  { key: "forks", label: "Forks" },
+const NON_FORK_TABS = [
+  { key: "progress", label: "Progress" },
+  { key: "log", label: "Log" },
   { key: "internals", label: "Internals" },
+  { key: "forks", label: "Forks" },
+  { key: "run", label: "Run" },
 ] as const;
 
 function hasTab(tabs: readonly { key: string; label: string }[], tab: string) {
@@ -88,12 +88,11 @@ function hasTab(tabs: readonly { key: string; label: string }[], tab: string) {
 interface TabNavProps {
   workspaceName: string;
   activeTab: string;
-  isRoot: boolean;
-  hasForks: boolean;
+  isFork: boolean;
 }
 
-function TabNav({ workspaceName, activeTab, isRoot, hasForks }: TabNavProps) {
-  const tabs = isRoot && hasForks ? ROOT_TABS : TABS;
+function TabNav({ workspaceName, activeTab, isFork }: TabNavProps) {
+  const tabs = isFork ? TABS : NON_FORK_TABS;
   const encodedName = encodeURIComponent(workspaceName);
 
   return (
@@ -180,26 +179,11 @@ export function WorkspaceDetail(): ReactNode {
     return () => clearInterval(timer);
   }, [detailRunning]);
 
-  const hasForks = (detail?.forks?.length ?? 0) > 0;
-  const isForkedRoot = Boolean(detail?.isRoot && hasForks);
-  const visibleTabs = isForkedRoot ? ROOT_TABS : TABS;
-  const fallbackTab = isForkedRoot ? "forks" : "progress";
+  const isForkedRoot = Boolean(detail?.isRoot && (detail.forks?.length ?? 0) > 0);
+  const canShowForks = !detail?.isFork;
+  const visibleTabs = canShowForks ? NON_FORK_TABS : TABS;
+  const fallbackTab = "progress";
   const displayTab = hasTab(visibleTabs, activeTab) ? activeTab : fallbackTab;
-
-  const [actionOutputOpen, setActionOutputOpen] = useState(false);
-  const {
-    output: actionOutput,
-    isRunning: isActionRunning,
-    runError: actionRunError,
-    startRun: startActionRun,
-    stopRun: stopActionRun,
-    outputRef: actionOutputRef,
-  } = useAdhocRun({ workspaceName, skipModelsFetch: true });
-
-  const handleActionClick = useCallback((action: ApiActionEntry, _forkName?: string) => {
-    setActionOutputOpen(true);
-    startActionRun(action.prompt, action.model);
-  }, [startActionRun]);
 
   useEffect(() => {
     if (!detail) return;
@@ -361,7 +345,6 @@ export function WorkspaceDetail(): ReactNode {
         effectiveRunning,
         actionError,
         activeTab: displayTab,
-        hasForks,
         encodedWorkspace,
         selfDriveLabel,
         showComposeGoalAction,
@@ -383,52 +366,22 @@ export function WorkspaceDetail(): ReactNode {
         handleReset,
         handleDelete,
       }}
-      actionOutputProps={{
-        actionRunError,
-        isActionRunning,
-        actionOutput,
-        actionOutputOpen,
-        actionOutputRef,
-        setActionOutputOpen,
-        stopActionRun,
-      }}
-      handleActionClick={handleActionClick}
     />
   );
 }
 
-interface ForkedRootActionOutputProps {
-  actionRunError: string | null;
-  isActionRunning: boolean;
-  actionOutput: string;
-  actionOutputOpen: boolean;
-  actionOutputRef: React.RefObject<HTMLPreElement | null>;
-  setActionOutputOpen: (open: boolean) => void;
-  stopActionRun: () => void;
-}
-
 interface WorkspaceDetailViewProps {
   headerProps: WorkspaceDetailHeaderProps;
-  actionOutputProps: ForkedRootActionOutputProps;
-  handleActionClick: (action: ApiActionEntry, forkName?: string) => void;
 }
 
-function WorkspaceDetailView({ headerProps, actionOutputProps, handleActionClick }: WorkspaceDetailViewProps) {
-  const { detail, isForkedRoot, activeTab } = headerProps;
+function WorkspaceDetailView({ headerProps }: WorkspaceDetailViewProps) {
+  const { detail, activeTab } = headerProps;
 
   return (
     <div className="sticky-header-wrapper">
       <WorkspaceDetailHeader {...headerProps} />
 
       <div className="pt-4">
-        {!detail.isFork && (
-          <div className="mb-6">
-            <InlineForkEditor workspaceName={detail.name} />
-          </div>
-        )}
-        {isForkedRoot ? (
-          <ForkedRootActionOutput {...actionOutputProps} />
-        ) : null}
         <Suspense fallback={<TabSkeleton />}>
           <TabContent
             activeTab={activeTab}
@@ -437,7 +390,6 @@ function WorkspaceDetailView({ headerProps, actionOutputProps, handleActionClick
             pmContent={detail.pmContent}
             hasProjectMgmt={detail.hasProjectMgmt}
             actions={detail.actions}
-            onActionClick={isForkedRoot ? handleActionClick : undefined}
           />
         </Suspense>
       </div>
@@ -475,29 +427,26 @@ interface WorkspaceDetailActionsProps {
   actions: WorkspaceDetailActionsConfig;
 }
 
-function WorkspaceDetailActions({
-  detail,
-  actions,
-}: WorkspaceDetailActionsProps) {
+function WorkspaceDetailActions({ detail, actions }: WorkspaceDetailActionsProps) {
   const {
-  isForkedRoot,
-  effectiveRunning,
-  encodedWorkspace,
-  selfDriveLabel,
-  showComposeGoalAction,
-  showEditGoalAction,
-  showOpenEditorAction,
-  showDeleteAction,
-  isActionDisabled,
-  isEditorPending,
-  isPinPending,
+    isForkedRoot,
+    effectiveRunning,
+    encodedWorkspace,
+    selfDriveLabel,
+    showComposeGoalAction,
+    showEditGoalAction,
+    showOpenEditorAction,
+    showDeleteAction,
+    isActionDisabled,
+    isEditorPending,
+    isPinPending,
     isStartStopPending,
     isDeletePending,
     isResetPending,
     navigate,
-  handleStart,
-  handleStop,
-  handleSelfDrive,
+    handleStart,
+    handleStop,
+    handleSelfDrive,
     handlePinToggle,
     handleOpenEditor,
     handleReset,
@@ -729,7 +678,6 @@ interface WorkspaceDetailHeaderProps extends WorkspaceDetailActionsConfig {
   displayExecTime: string;
   actionError: string | null;
   activeTab: string;
-  hasForks: boolean;
 }
 
 function WorkspaceDetailHeader({
@@ -739,7 +687,6 @@ function WorkspaceDetailHeader({
   effectiveRunning,
   actionError,
   activeTab,
-  hasForks,
   ...actionsProps
 }: WorkspaceDetailHeaderProps) {
   return (
@@ -793,66 +740,8 @@ function WorkspaceDetailHeader({
       <TabNav
         workspaceName={detail.name}
         activeTab={activeTab}
-        isRoot={detail.isRoot}
-        hasForks={hasForks}
+        isFork={detail.isFork}
       />
-    </div>
-  );
-}
-
-function ForkedRootActionOutput({
-  actionRunError,
-  isActionRunning,
-  actionOutput,
-  actionOutputOpen,
-  actionOutputRef,
-  setActionOutputOpen,
-  stopActionRun,
-}: {
-  actionRunError: string | null;
-  isActionRunning: boolean;
-  actionOutput: string;
-  actionOutputOpen: boolean;
-  actionOutputRef: React.RefObject<HTMLPreElement | null>;
-  setActionOutputOpen: (open: boolean) => void;
-  stopActionRun: () => void;
-}) {
-  if (!actionRunError && !isActionRunning && !actionOutput) return null;
-
-  return (
-    <div className="space-y-3 mb-4">
-      {actionRunError ? (
-        <p className="text-sm text-destructive" role="alert">{actionRunError}</p>
-      ) : null}
-      {(isActionRunning || actionOutput) ? (
-        <details open={actionOutputOpen} onToggle={(e) => setActionOutputOpen((e.target as HTMLDetailsElement).open)}>
-          <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
-            <ChevronRight
-              className="size-4 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-90"
-              aria-hidden="true"
-            />
-            Output
-            {isActionRunning && (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={(e) => { e.preventDefault(); stopActionRun(); }}
-                className="ml-auto"
-              >
-                <Square className="mr-1 size-3" />
-                Stop
-              </Button>
-            )}
-          </summary>
-          <pre
-            ref={actionOutputRef}
-            className="mt-2 bg-muted rounded-md p-4 text-sm font-mono overflow-auto max-h-[400px] whitespace-pre-wrap"
-          >
-            {actionOutput || (isActionRunning ? "Running..." : "")}
-          </pre>
-        </details>
-      ) : null}
     </div>
   );
 }
@@ -891,7 +780,6 @@ function TabContent({
   pmContent,
   hasProjectMgmt,
   actions,
-  onActionClick,
 }: {
   activeTab: string;
   workspaceName: string;
@@ -899,7 +787,6 @@ function TabContent({
   pmContent?: string;
   hasProjectMgmt?: boolean;
   actions?: ApiActionEntry[];
-  onActionClick?: (action: ApiActionEntry, forkName: string) => void;
 }) {
   switch (activeTab) {
     case "progress":
@@ -917,7 +804,7 @@ function TabContent({
     case "run":
       return <RunTab workspaceName={workspaceName} />;
     case "forks":
-      return <ForksTab workspaceName={workspaceName} actions={actions} onActionClick={onActionClick} />;
+      return <ForksTab workspaceName={workspaceName} />;
     default:
       return <EventsTab workspaceName={workspaceName} goalContent={goalContent} actions={actions} />;
   }

@@ -83,6 +83,8 @@ func TestWorkflowTemplatesDoNotExposeCoordinatorAsSelectableAgent(t *testing.T) 
 		t.Run(tmpl.ID, func(t *testing.T) {
 			for _, agent := range tmpl.Agents {
 				assert.NotEqual(t, "coordinator", agent.Name)
+				agentPath := filepath.Join("skel", ".sgai", "agent", agent.Name+".md")
+				assert.FileExists(t, agentPath, "template agent %q must exist in the scaffold", agent.Name)
 			}
 		})
 	}

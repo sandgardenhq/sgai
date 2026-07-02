@@ -228,7 +228,6 @@ export interface ApiWizardState {
   fromTemplate?: string;
   description?: string;
   techStack: string[];
-  safetyAnalysis: boolean;
   completionGate?: string;
   retrospective: boolean;
 }
