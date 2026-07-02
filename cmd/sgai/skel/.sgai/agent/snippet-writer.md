@@ -236,5 +236,15 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 After snippet is created:
 1. Verify file is in correct location
 2. Verify snippet follows conventions
-3. Call `sgai_update_workflow_state` with status `agent-done`
-4. Include summary: "Created snippet [name] for [language]"
+3. Return the `STATUS` envelope
+4. Include summary evidence: "Created snippet [name] for [language]"
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep snippet work inside the provided scope. If the packet lacks the approved suggestion, target snippet path, language, source examples, or verification requirement, return `NEEDS_CONTEXT` with the exact missing path, decision, or question.
+
+Split broad snippet work by language conventions, example selection, snippet content, metadata/comments, and output path. Serialize any work that changes the same snippet path or depends on review of an example pattern. Reconcile results by matching the created/changed snippet path to convention checks and any unresolved concerns before reporting completion.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

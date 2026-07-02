@@ -22,7 +22,7 @@ Notes:
 - `model` is a single model string used by the coordinator; the OpenCode runtime manages model propagation to subagents.
 - Variant syntax such as `(xhigh)` and `(low)` is passed through to the inference engine.
 - The coordinator runs with the configured model — use `openai/gpt-5.5 (xhigh)` for orchestration quality.
-- Do not add `stpa-analyst` to the agents list.
+- Do not add safety-analysis-only entries to the agents list; safety analysis is handled through `stpa-overview` guidance.
 
 ## Model Selection Guidelines
 

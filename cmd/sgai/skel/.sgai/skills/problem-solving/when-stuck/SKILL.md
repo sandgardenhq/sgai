@@ -60,7 +60,7 @@ digraph stuck_dispatch {
 | **Forced by assumptions** - "Must be done this way", can't question premise | skills/problem-solving/inversion-exercise |
 | **Scale uncertainty** - Will it work in production? Edge cases unclear? | skills/problem-solving/scale-game |
 | **Code broken** - Wrong behavior, test failing, unexpected output | skills/debugging/systematic-debugging |
-| **Multiple independent problems** - Can parallelize investigation | skills/collaboration/dispatching-parallel-agents |
+| **Multiple independent problems** - Can parallelize investigation | Use coordinator/wrapper-agent `WORK_SPLIT` and bounded `TASK_PACKET`s |
 | **Root cause unknown** - Symptom clear, cause hidden | skills/debugging/root-cause-tracing |
 
 ## Process

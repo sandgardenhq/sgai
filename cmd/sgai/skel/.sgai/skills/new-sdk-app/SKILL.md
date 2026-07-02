@@ -129,10 +129,11 @@ After gathering requirements and getting user confirmation on the plan:
 
 After all files are created and dependencies are installed, use the appropriate verifier agent to validate that the Agent SDK application is properly configured and ready for use:
 
-1. **For TypeScript projects**: Launch the **agent-sdk-verifier-ts** agent to validate the setup
-2. **For Python projects**: Launch the **agent-sdk-verifier-py** agent to validate the setup
-3. The agent will check SDK usage, configuration, functionality, and adherence to official documentation
-4. Review the verification report and address any issues
+1. Load and follow `subagent-delegation-protocol` skill before launching the verifier Task.
+2. **For TypeScript projects**: Launch the **agent-sdk-verifier-ts** agent to validate the setup with a Task Packet and Review Envelope return contract.
+3. **For Python projects**: Launch the **agent-sdk-verifier-py** agent to validate the setup with a Task Packet and Review Envelope return contract.
+4. The agent will check SDK usage, configuration, functionality, and adherence to official documentation.
+5. Review the verification report and address any issues.
 
 ## Getting Started Guide
 

@@ -71,7 +71,7 @@ When writing shell scripts:
 2. **Plan** the script structure
 3. **Write** the script with proper error handling
 4. **Test** the script works correctly using bash
-5. **Set status** to `agent-done` when complete
+5. **Return** the `STATUS` envelope when complete
 
 ## Important
 
@@ -79,3 +79,11 @@ When writing shell scripts:
 - Test your scripts by running them
 - Make scripts executable (`chmod +x`)
 - Return a summary and review scope to the wrapper so it can dispatch `shell-script-reviewer`
+
+## Subagent Output
+
+Read the packet's listed paths before broad exploration. Do not rebuild context from scratch when paths are provided. If the paths are insufficient, return `NEEDS_CONTEXT` with the exact missing path, decision, or question. For behavior changes, report tests added or updated, or the deliberate no-test reason.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

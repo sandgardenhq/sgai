@@ -519,23 +519,7 @@ For fast reviews, check these critical items:
 
 ## Review Output Format
 
-```markdown
-## Code Review: [scope]
-
-### Critical Issues
-[Must fix before merge]
-
-### Important Issues
-[Should fix]
-
-### Minor Issues
-[Nice to have]
-
-### Strengths
-[What's done well]
-
-### Verdict: [PASS/NEEDS WORK]
-```
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
 ## Go References for Idomatic Code
 

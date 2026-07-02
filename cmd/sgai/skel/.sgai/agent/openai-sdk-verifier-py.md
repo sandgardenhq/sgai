@@ -231,41 +231,7 @@ agent = Agent(
 
 ## Verification Report
 
-After running all checks, provide a summary report:
-
-```
-## OpenAI Agents SDK Python Verification Report
-
-### Package Status
-- openai-agents version: X.X.X
-- Installation: PASS/FAIL
-- Voice extras (if needed): PASS/FAIL/N/A
-
-### Python Environment
-- Python version: 3.X.X
-- Syntax check: PASS/FAIL
-
-### Code Quality
-- Imports: PASS/FAIL
-- Agent configuration: PASS/FAIL
-- Tool definitions: PASS/FAIL
-- Error handling: PASS/FAIL
-
-### Environment
-- .env.example: PASS/FAIL
-- .gitignore: PASS/FAIL
-- requirements.txt: PASS/FAIL
-
-### Overall Status: READY/NOT READY
-
-### Issues Found:
-1. [Issue description and fix]
-2. [Issue description and fix]
-
-### Recommendations:
-1. [Recommendation]
-2. [Recommendation]
-```
+After running all checks, load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly. Include package version, Python version, syntax check result, and environment file checks in `EVIDENCE_REVIEWED`.
 
 ## Fixing Issues
 
@@ -276,6 +242,16 @@ If you find issues during verification:
 3. **Import Errors**: Correct import statements
 4. **Missing Type Hints**: Add type hints to tool functions
 5. **Missing Error Handling**: Add try/except blocks
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep verification inside the provided scope unless the packet explicitly asks for discovery. If the packet lacks required files, evidence, or decisions, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question.
+
+Split broad verification internally by package status, Python environment, imports, agent configuration, tool definitions, environment/security, and runnable checks. Reconcile those slices before reporting: a single critical failure makes the overall verification not ready, stale evidence must be marked as a concern, and independent warnings must remain tied to their source paths.
+
+Use the shared reporting protocol for the verification report:
+
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
 Always re-run verification after making fixes to ensure all issues are resolved.
 

@@ -39,15 +39,9 @@ The restriction against direct edits is prompt-enforced. Do not add `permission.
 
 ## Parallel Delegation
 
-Break down broad shell script requests into individual activities and dispatch independent activities to subagents in parallel whenever the activities can be completed safely without editing the same files.
+Before delegating with Task, load and follow `subagent-delegation-protocol` skill. Use its Work Split before broad fanout and its Task Packet for every `shell-script-developer` and `shell-script-reviewer` task.
 
-When launching independent subagent tasks, use `multi_tool_use.parallel` so multiple `task` calls run in the same message. Do not issue independent task calls sequentially when they can safely run concurrently.
-
-Before delegating, perform a parallelism preflight: identify all independent work units that can be started before consuming another subagent's result. If two or more safe Task calls are known, you MUST launch them in the same `multi_tool_use.parallel` batch.
-
-Split work by script, command group, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
-
-If you serialize Task calls, your final summary MUST include the dependency reason, such as overlapping files, required output from an earlier task, or review-after-implementation ordering.
+For shell-script work, split by script, command group, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
 
 Good parallelization targets:
 
@@ -71,6 +65,16 @@ Do not parallelize tasks that would edit the same files or depend on each other'
 
 ## Task Prompt Requirements
 
+Load and follow `subagent-delegation-protocol` skill. Accept coordinator packets by path, preserve their context boundaries, and pass bounded path lists to `shell-script-developer` and `shell-script-reviewer` instead of asking them to rebuild context from scratch.
+
+Developer packets must request the Execution Envelope from `subagent-return-protocol` skill. Reviewer packets must request the Review Envelope from `subagent-return-protocol` skill. Loop `NEEDS_WORK` findings back to `shell-script-developer` until `shell-script-reviewer` returns `PASS` or a blocker is explicit.
+
+Return a final wrapper status envelope to the coordinator with implementation status, review status, verification evidence, blockers, and any dependency reason for serialized work:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.
+
+Use `subagent-delegation-protocol` skill to split shell-script work and reconcile developer/reviewer results. If sibling developers touch the same script, shared sourced file, executable path, or environment contract, serialize the next step and explain the dependency.
+
 Every `shell-script-developer` task prompt must include:
 
 - The user goal.
@@ -80,12 +84,14 @@ Every `shell-script-developer` task prompt must include:
 - A request to summarize files changed, tests run, and blockers.
 - A reminder to use `multi_tool_use.parallel` for independent reads, searches, and verification steps.
 - The exact script, command group, test file, or concern boundary that keeps this task independent from any parallel sibling task, or the reason this is a single serial delegation.
+- A Task Packet from `subagent-delegation-protocol` skill.
 
 Every `shell-script-reviewer` task prompt must include:
 
 - The exact review scope.
 - Whether to use version-control diff or specific files.
-- A requirement to report PASS or NEEDS WORK.
+- A requirement to load `subagent-return-protocol` skill and return its Review Envelope exactly.
 - A requirement to include file and line references for every issue.
 - A reminder to use `multi_tool_use.parallel` for independent reads and searches across multiple files.
 - The exact review scope boundary that keeps this review independent from any parallel sibling review, or the reason this is a single serial review.
+- Developer evidence, changed paths or diff scope, and the required `REVIEW_STATUS` return envelope.

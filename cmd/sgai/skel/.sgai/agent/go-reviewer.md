@@ -76,9 +76,8 @@ jj diff path/to/file.go        # See specific file changes
 
 If any scope discovery command fails:
 - Stop the review immediately.
-- Call `sgai_update_workflow_state` with `status: "working"`, a task that states the blocked command, and an `addProgress` note describing the failure.
-- Return `BLOCKED: scope discovery failed for <command>: <error>`.
-- Do not issue PASS/NEEDS WORK verdicts until scope discovery succeeds.
+- Return `REVIEW_STATUS: BLOCKED` with the failed command and error in `BLOCKERS`.
+- Do not issue a pass or needs-work review status until scope discovery succeeds.
 
 **Note:** Use `jj` instead of `git`. See `skill({"name":"using-jj-instead-of-git"})` for details.
 
@@ -447,71 +446,26 @@ func doWork(state *appState) {
 
 ---
 
-## Output Format
+## Output Detail
 
-Provide a structured review:
-
-```markdown
-## Go Code Review: [file/scope]
-
-### Summary
-[Brief overall assessment - 1-2 sentences]
-
-### Formatting: [PASS/NEEDS WORK]
-[Details with line numbers]
-
-### Naming: [PASS/NEEDS WORK]
-[Details with line numbers]
-
-### Error Handling: [PASS/NEEDS WORK]
-[Details with line numbers]
-
-### Type Safety: [PASS/NEEDS WORK]
-[Check for map[string]any usage - details with line numbers]
-
-### Concurrency: [PASS/NEEDS WORK/N/A]
-[Details with line numbers]
-
-### Interfaces: [PASS/NEEDS WORK/N/A]
-[Details with line numbers]
-
-### Documentation: [PASS/NEEDS WORK]
-[Details with line numbers]
-
-### Code Quality: [PASS/NEEDS WORK]
-[Details with line numbers]
-
-### Overall Verdict: [PASS/NEEDS WORK]
-
-### Required Fixes
-[Numbered list of specific issues with file:line references - ALL MUST BE ADDRESSED]
-```
+Inside the `REVIEW_STATUS` envelope, include evidence and findings that cover formatting, naming, error handling, type safety, concurrency, interfaces, documentation, and code quality. Put required fixes only in `FINDINGS` with file:line references.
 
 ---
 
 ## Returning Fixes
 
-After reviewing, if you find issues, return them to the caller:
+After reviewing, if you find issues, load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly. Put required fixes in `FINDINGS`.
 
-```
-Code review for cmd/server/main.go:
-
-## Issues Found
-
-1. **Line 42**: Error not handled
-   Fix: Add error check
-
-2. **Line 67**: Receiver named 'self'
-   Fix: Use 'c' for Client
-
-## Verdict: NEEDS WORK
+```markdown
+Example FINDINGS entry:
+- cmd/server/main.go:42 - add error check
 ```
 
 **Message format for fixes:**
 - Start with file(s) reviewed
 - List issues with line numbers
 - Provide required fixes
-- End with verdict
+- Use the shared Review Envelope
 
 ---
 
@@ -521,7 +475,7 @@ Code review for cmd/server/main.go:
 2. **Read code** - Use Read tool to examine Go files
 3. **Check against checklist** - Apply all review criteria
 4. **Provide feedback** - Detailed review with line references
-5. **Return fixes** - Return PASS or NEEDS WORK to the caller
+5. **Return fixes** - Return the `REVIEW_STATUS` envelope to the caller
 
 ---
 
@@ -537,7 +491,11 @@ Load companion skills for detailed guidance:
 
 ## Subagent Output
 
-Return PASS or NEEDS WORK to the caller. Include file and line references for every issue, the exact required fix, and any blocker that prevented review.
+Review only the provided scope unless the packet explicitly asks for discovery. If scope is insufficient, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question instead of exploring broadly. `PASS` means no required fixes remain in the provided scope. `NEEDS_WORK` must include file and line references and exact required fixes.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
 ---
 
@@ -553,40 +511,12 @@ Return PASS or NEEDS WORK to the caller. Include file and line references for ev
 
 ## Example Review
 
-```markdown
-## Go Code Review: internal/api/handlers.go
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly. Example `FINDINGS` entries:
 
-### Summary
-Solid implementation with good error handling. Naming issues and missing doc comments require fixes.
-
-### Formatting: PASS
-Code is properly formatted with gofmt.
-
-### Naming: NEEDS WORK
-- Line 23: Receiver `self` should be `h` for `Handler`
-- Line 45: Variable `userID` should be `userID` (currently `userId`)
-
-### Error Handling: PASS
-All errors properly handled with context wrapping.
-
-### Type Safety: PASS
-No map[string]any usage detected. All functions use strongly-typed structs.
-
-### Documentation: NEEDS WORK
-- Line 15: Handler struct missing doc comment
-- Line 30: CreateUser function missing doc comment
-
-### Code Quality: PASS
-Clean control flow, single responsibility functions.
-
-### Overall Verdict: NEEDS WORK
-
-### Required Fixes
-1. Line 23: Change receiver `self` to `h`
-2. Line 45: Change `userId` to `userID`
-3. Line 15: Add doc comment: "// Handler handles HTTP requests..."
-4. Line 30: Add doc comment: "// CreateUser creates a new user..."
-```
+- `internal/api/handlers.go:23 - change receiver self to h`
+- `internal/api/handlers.go:45 - change userId to userID`
+- `internal/api/handlers.go:15 - add required exported type doc comment`
+- `internal/api/handlers.go:30 - add required exported function doc comment`
 
 ---
 

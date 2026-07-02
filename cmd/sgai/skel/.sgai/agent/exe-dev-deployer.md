@@ -208,13 +208,7 @@ After every deployment, verify by:
 
 ## Inter-Agent Communication
 
-Report deployment status to the coordinator by appending to `.sgai/PROJECT_MANAGEMENT.md`, then yield with navigation:
-
-```
-sgai_update_workflow_state({status: "agent-done"})
-```
-
-If you encounter issues requiring human intervention, write `QUESTION: <describe the issue>` in `.sgai/PROJECT_MANAGEMENT.md` before yielding to coordinator.
+Report deployment status to the coordinator by returning the `STATUS` envelope. If you encounter issues requiring human intervention, return `NEEDS_CONTEXT` with the exact missing decision or question.
 
 ---
 
@@ -225,3 +219,13 @@ If you encounter issues requiring human intervention, write `QUESTION: <describe
 - CLI Reference: https://exe.dev/docs/section/8-cli-reference
 - Sharing: https://exe.dev/docs/sharing
 - Custom Domains: https://exe.dev/docs/cnames
+
+## Intra-Agent Message Protocol
+
+When invoked with a `TASK_PACKET`, read the listed paths first and keep deployment work inside the provided scope. If the packet lacks required artifact paths, VM target, proxy decision, credential decision, or verification commands, return `NEEDS_CONTEXT` with the exact missing path, decision, or question.
+
+Split broad deployment work by build artifact, VM preparation, file transfer, process management, proxy/domain configuration, rollback plan, and post-deployment verification. Serialize any step that changes the same VM, process, proxy route, copied artifact path, or production endpoint. Reconcile results by matching VM names, deployment paths, proxy URLs, process evidence, and rollback evidence before reporting completion.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.

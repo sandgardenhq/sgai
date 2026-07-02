@@ -185,7 +185,7 @@ When searching, dispatch subagent with template...
 [20 lines of repeated instructions]
 
 # ✅ GOOD: Reference other skill
-Always use subagents (50-100x context savings). See skills/getting-started for workflow.
+Always use subagents (50-100x context savings). See `subagent-delegation-protocol` skill for Task Packet workflow.
 ```
 
 **Compress examples:**
@@ -485,6 +485,8 @@ Follow the TDD cycle:
 ### RED: Write Failing Test (Baseline)
 
 Run pressure scenario with subagent WITHOUT the skill. Document exact behavior:
+
+Use `subagent-delegation-protocol` skill for the pressure-test Task Packet, and request the appropriate return envelope from `subagent-return-protocol` skill.
 - What choices did they make?
 - What rationalizations did they use (verbatim)?
 - Which pressures triggered violations?
@@ -495,7 +497,7 @@ This is "watch the test fail" - you must see what agents naturally do before wri
 
 Write skill that addresses those specific rationalizations. Don't add extra content for hypothetical cases.
 
-Run same scenarios WITH skill. Agent should now comply.
+Run same scenarios WITH skill using `subagent-delegation-protocol` skill. Agent should now comply.
 
 ### REFACTOR: Close Loopholes
 

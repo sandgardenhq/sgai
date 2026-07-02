@@ -317,3 +317,13 @@ When reviewing interfaces that use polling, SSE, or any auto-refresh mechanism, 
    - [ ] Is conditional polling used to pause auto-refresh during user interaction (e.g., `hx-trigger="every 2s [document.activeElement.id!='input-id']"`)?
 
 For detailed patterns and anti-patterns, reference the `htmx-auto-refresh-preservation` skill.
+
+---
+
+## 12. Subagent Output
+
+Review only the provided scope unless the packet explicitly asks for discovery. If scope is insufficient, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question instead of exploring broadly. `PASS` means no required fixes remain in the provided scope. `NEEDS_WORK` must include file and line references and exact required fixes. If reviewing screenshots or browser behavior, describe the page, viewport, screenshot path, and visible defect precisely.
+
+Return this envelope exactly:
+
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.

@@ -48,28 +48,21 @@ Before dissenting, read:
 - Distinguish actual blockers from useful cautions.
 - Do not edit files, run commands, ask human questions, or message the coordinator.
 - Task-invoke reviewer agents ending in `-reviewer` only when a specific domain opinion is necessary to challenge completion evidence.
+- When invoking reviewer agents, load and follow `subagent-delegation-protocol` skill; send bounded evidence paths, exact review scope, out-of-scope paths, and request the Review Envelope from `subagent-return-protocol` skill.
+- Reconcile reviewer outputs with your dissent; any reviewer `NEEDS_WORK`, `NEEDS_CONTEXT`, or `BLOCKED` result must appear in your minority report as a consensus challenge, evidence gap, or blocker.
 
 ## Output Format
 
-Return only this structure to the wrapper:
+When invoked with a `TASK_PACKET`, read the listed paths first and keep dissent inside the provided scope. If the packet lacks required evidence, majority position, checkbox text, paths, or decisions, return `NEEDS_CONTEXT` with the exact missing path, evidence, decision, or question.
 
-```
-MINORITY REPORT: Pass | Concern | Block
+Split dissent by consensus assumption, checked GOAL item, evidence source, changed path group, and unresolved risk. Reconcile slices adversarially: any plausible unclosed evidence gap must be reported as `Concern` or `Block`.
 
-Majority Position Under Challenge
-- ...
+Return only this protocol envelope:
 
-Challenges to Consensus
-- ...
+Map verdicts this way: `Pass` maps to `PASS`; `Concern` maps to `NEEDS_WORK` unless it is only a missing path, evidence item, decision, or question, which maps to `NEEDS_CONTEXT`; `Block` maps to `BLOCKED`.
 
-Evidence Gaps
-- ...
+Load and follow `subagent-return-protocol` skill, then return its Review Envelope exactly.
 
-Overlooked Risks
-- ...
+Put the challenged position, challenges to consensus, evidence gaps, overlooked risks, and dissent verdict inside `EVIDENCE_REVIEWED`, `FINDINGS`, and `BLOCKERS`.
 
-Dissent Verdict
-- Pass | Concern | Block
-```
-
-Use `Block` when the consensus depends on evidence that is absent, stale, or contradicted by repository state.
+Use `BLOCKED` when the consensus depends on evidence that is absent, stale, or contradicted by repository state.

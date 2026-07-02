@@ -16,8 +16,6 @@ permission:
   question: deny
   plan_enter: deny
   plan_exit: deny
-  task:
-    "*": deny
 ---
 
 # HTMX/PicoCSS
@@ -41,15 +39,9 @@ The restriction against direct edits is prompt-enforced. Do not add `permission.
 
 ## Parallel Delegation
 
-Break down broad HTMX/PicoCSS requests into individual activities and dispatch independent activities to subagents in parallel whenever the activities can be completed safely without editing the same files.
+Before delegating with Task, load and follow `subagent-delegation-protocol` skill. Use its Work Split before broad fanout and its Task Packet for every `htmx-picocss-developer` and `htmx-picocss-reviewer` task.
 
-When launching independent subagent tasks, use `multi_tool_use.parallel` so multiple `task` calls run in the same message. Do not issue independent task calls sequentially when they can safely run concurrently.
-
-Before delegating, perform a parallelism preflight: identify all independent work units that can be started before consuming another subagent's result. If two or more safe Task calls are known, you MUST launch them in the same `multi_tool_use.parallel` batch.
-
-Split work by page, template, partial, route, asset, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
-
-If you serialize Task calls, your final summary MUST include the dependency reason, such as overlapping files, required output from an earlier task, or review-after-implementation ordering.
+For HTMX/PicoCSS work, split by page, template, partial, route, asset, test file, concern, or review scope so subagents have non-overlapping edit targets whenever possible.
 
 Good parallelization targets:
 
@@ -73,6 +65,16 @@ Do not parallelize tasks that would edit the same files or depend on each other'
 
 ## Task Prompt Requirements
 
+Load and follow `subagent-delegation-protocol` skill. Accept coordinator packets by path, preserve their context boundaries, and pass bounded path lists to `htmx-picocss-developer` and `htmx-picocss-reviewer` instead of asking them to rebuild context from scratch.
+
+Developer packets must request the Execution Envelope from `subagent-return-protocol` skill. Reviewer packets must request the Review Envelope from `subagent-return-protocol` skill. Loop `NEEDS_WORK` findings back to `htmx-picocss-developer` until `htmx-picocss-reviewer` returns `PASS` or a blocker is explicit.
+
+Return a final wrapper status envelope to the coordinator with implementation status, review status, verification evidence, blockers, screenshots when applicable, and any dependency reason for serialized work:
+
+Load and follow `subagent-return-protocol` skill, then return its Execution Envelope exactly.
+
+Use `subagent-delegation-protocol` skill to split HTMX/PicoCSS work and reconcile developer/reviewer results. If sibling developers touch the same template, route, shared stylesheet, or browser flow, serialize the next step and explain the dependency.
+
 Every `htmx-picocss-developer` task prompt must include:
 
 - The user goal.
@@ -82,12 +84,14 @@ Every `htmx-picocss-developer` task prompt must include:
 - A request to summarize files changed, tests run, screenshots captured, and blockers.
 - A reminder to use `multi_tool_use.parallel` for independent reads, searches, and verification steps.
 - The exact page, template, partial, route, asset, test file, or concern boundary that keeps this task independent from any parallel sibling task, or the reason this is a single serial delegation.
+- A Task Packet from `subagent-delegation-protocol` skill.
 
 Every `htmx-picocss-reviewer` task prompt must include:
 
 - The exact review scope.
 - Whether to use version-control diff, specific files, browser verification, or screenshots.
-- A requirement to report PASS or NEEDS WORK.
+- A requirement to load `subagent-return-protocol` skill and return its Review Envelope exactly.
 - A requirement to include file and line references for every code issue.
 - A reminder to use `multi_tool_use.parallel` for independent reads and searches across multiple files.
 - The exact review scope boundary that keeps this review independent from any parallel sibling review, or the reason this is a single serial review.
+- Developer evidence, changed paths or diff scope, screenshot paths when applicable, and the required `REVIEW_STATUS` return envelope.

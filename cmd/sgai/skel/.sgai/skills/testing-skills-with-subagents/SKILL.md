@@ -52,7 +52,7 @@ This is identical to TDD's "write failing test first" - you MUST see what agents
 **Process:**
 
 - [ ] **Create pressure scenarios** (3+ combined pressures)
-- [ ] **Run WITHOUT skill** - give agents realistic task with pressures
+- [ ] **Run WITHOUT skill** - load and follow `subagent-delegation-protocol` skill, then give agents realistic task with pressures
 - [ ] **Document choices and rationalizations** word-for-word
 - [ ] **Identify patterns** - which excuses appear repeatedly?
 - [ ] **Note effective pressures** - which scenarios trigger violations?
@@ -86,7 +86,7 @@ Run this WITHOUT a TDD skill. Agent chooses B or C and rationalizes:
 
 Write skill addressing the specific baseline failures you documented. Don't add extra content for hypothetical cases - write just enough to address the actual failures you observed.
 
-Run same scenarios WITH skill. Agent should now comply.
+Run same scenarios WITH skill. Load and follow `subagent-delegation-protocol` skill for each pressure-test Task. Agent should now comply.
 
 If agent still fails: skill is unclear or incomplete. Revise and re-test.
 
@@ -229,7 +229,7 @@ Add symptoms of ABOUT to violate.
 
 ### Re-verify After Refactoring
 
-**Re-test same scenarios with updated skill.**
+**Re-test same scenarios with updated skill.** Load and follow `subagent-delegation-protocol` skill for each pressure-test Task.
 
 Agent should now:
 - Choose correct option
@@ -314,12 +314,12 @@ Before deploying skill, verify you followed RED-GREEN-REFACTOR:
 
 **RED Phase:**
 - [ ] Created pressure scenarios (3+ combined pressures)
-- [ ] Ran scenarios WITHOUT skill (baseline)
+- [ ] Ran scenarios WITHOUT skill (baseline) using `subagent-delegation-protocol` skill
 - [ ] Documented agent failures and rationalizations verbatim
 
 **GREEN Phase:**
 - [ ] Wrote skill addressing specific baseline failures
-- [ ] Ran scenarios WITH skill
+- [ ] Ran scenarios WITH skill using `subagent-delegation-protocol` skill
 - [ ] Agent now complies
 
 **REFACTOR Phase:**
