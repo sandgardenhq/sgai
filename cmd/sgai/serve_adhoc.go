@@ -3,11 +3,8 @@ package main
 import (
 	"bytes"
 	"os/exec"
-	"regexp"
 	"sync"
 )
-
-var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b[^[\]].?`)
 
 type adhocPromptState struct {
 	mu            sync.Mutex
@@ -31,16 +28,16 @@ func (s *Server) getAdhocState(workspacePath string) *adhocPromptState {
 }
 
 type lockedWriter struct {
-	mu  *sync.Mutex
-	buf *bytes.Buffer
+	mu       *sync.Mutex
+	buf      *bytes.Buffer
+	stripper ansiStrippingWriter
 }
 
 func (w *lockedWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	stripped := ansiEscapePattern.ReplaceAll(p, nil)
-	w.buf.Write(stripped)
-	return len(p), nil
+	w.stripper.w = w.buf
+	return w.stripper.Write(p)
 }
 
 func (st *adhocPromptState) stop() {

@@ -68,8 +68,8 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 	cmd.SysProcAttr = commandProcessGroupAttr()
 	cmd.Env = buildAgentEnv(cfg, wfState, modelSpec)
 	cmd.Stdin = strings.NewReader(agentMsg)
-	cmd.Stderr = io.MultiWriter(stderrWriter, outputCapture)
-	cmd.Stdout = sessionIDCapture
+	cmd.Stderr = &ansiStrippingWriter{w: io.MultiWriter(stderrWriter, outputCapture)}
+	cmd.Stdout = &ansiStrippingWriter{w: sessionIDCapture}
 
 	if errStart := cmd.Start(); errStart != nil {
 		agentCancel()
@@ -97,6 +97,13 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 	close(processExited)
 	cfg.coord.Stop()
 	agentCancel()
+	sessionIDCapture.Flush()
+	if errFlush := stdoutWriter.Flush(); errFlush != nil {
+		log.Println("write failed:", errFlush)
+	}
+	if errFlush := stderrWriter.Flush(); errFlush != nil {
+		log.Println("write failed:", errFlush)
+	}
 
 	if errWait != nil {
 		if ctx.Err() != nil {
@@ -116,7 +123,6 @@ func executeAgentProcess(ctx context.Context, cfg agentRunConfig, agentArgs []st
 		return state.Workflow{}, "", &result
 	}
 
-	sessionIDCapture.Flush()
 	return cfg.coord.State(), sessionIDCapture.sessionID, nil
 }
 

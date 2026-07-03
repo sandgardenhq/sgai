@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -73,6 +76,33 @@ func TestAdhocStartServiceWrapsStartError(t *testing.T) {
 	assert.True(t, errors.Unwrap(result.Error) != nil)
 }
 
+func TestAdhocStartServiceStripsANSIFromTerminalPassthrough(t *testing.T) {
+	binDir := t.TempDir()
+	opencodePath := filepath.Join(binDir, "opencode")
+	script := "#!/bin/sh\nprintf '\\033[31mstdout red\\033[0m'\nprintf '\\033[32mstderr green\\033[0m' >&2\n"
+	require.NoError(t, os.WriteFile(opencodePath, []byte(script), 0o755))
+	t.Setenv("PATH", binDir)
+
+	server, rootDir := setupTestServer(t)
+	wsDir := setupTestWorkspace(t, rootDir, "test-ws-adhoc-ansi-terminal")
+
+	stdout, stderr := captureStdoutStderr(t, func() {
+		result := server.adhocStartService(wsDir, "prompt", "model")
+		require.NoError(t, result.Error)
+		waitForAdhocDone(t, server.getAdhocState(wsDir))
+	})
+
+	assert.NotContains(t, stdout, "\x1b[")
+	assert.NotContains(t, stderr, "\x1b[")
+	assert.Contains(t, stdout, "stdout red")
+	assert.Contains(t, stderr, "stderr green")
+
+	status := server.adhocStatusService(wsDir)
+	assert.NotContains(t, status.Output, "\x1b[")
+	assert.Contains(t, status.Output, "stdout red")
+	assert.Contains(t, status.Output, "stderr green")
+}
+
 func TestGetAdhocStateCreation(t *testing.T) {
 	srv, rootDir := setupTestServer(t)
 	wsDir := setupTestWorkspace(t, rootDir, "adhoc-create")
@@ -103,6 +133,29 @@ func TestLockedWriterStripsANSI(t *testing.T) {
 	_, err := w.Write([]byte("\x1b[31mred text\x1b[0m"))
 	assert.NoError(t, err)
 	assert.Equal(t, "red text", buf.String())
+}
+
+func TestLockedWriterStripsANSISplitAcrossWrites(t *testing.T) {
+	var mu sync.Mutex
+	var buf bytes.Buffer
+	w := &lockedWriter{mu: &mu, buf: &buf}
+
+	chunks := []string{
+		"start \x1b[",
+		"31mred\x1b]8;;https://example.com",
+		"\x07link\x1b]8;;",
+		"\x07 \x1b[?25",
+		"lend\x1b[0",
+		"m",
+	}
+
+	for _, chunk := range chunks {
+		n, errWrite := w.Write([]byte(chunk))
+		require.NoError(t, errWrite)
+		assert.Equal(t, len(chunk), n)
+	}
+
+	assert.Equal(t, "start redlink end", buf.String())
 }
 
 func TestLockedWriterPlainTextPassthrough(t *testing.T) {
@@ -152,8 +205,55 @@ func TestAnsiEscapePatternMatches(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ansiEscapePattern.ReplaceAllString(tt.input, "")
+			got := string(stripANSIBytes([]byte(tt.input)))
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func captureStdoutStderr(t *testing.T, fn func()) (string, string) {
+	t.Helper()
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
+	stdoutReader, stdoutWriter, errStdoutPipe := os.Pipe()
+	require.NoError(t, errStdoutPipe)
+	stderrReader, stderrWriter, errStderrPipe := os.Pipe()
+	require.NoError(t, errStderrPipe)
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+	defer func() {
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+	}()
+
+	stdoutDone := make(chan string, 1)
+	stderrDone := make(chan string, 1)
+	go readPipeToString(stdoutReader, stdoutDone)
+	go readPipeToString(stderrReader, stderrDone)
+
+	fn()
+
+	require.NoError(t, stdoutWriter.Close())
+	require.NoError(t, stderrWriter.Close())
+	return <-stdoutDone, <-stderrDone
+}
+
+func readPipeToString(r *os.File, done chan<- string) {
+	data, errRead := io.ReadAll(r)
+	if errRead != nil {
+		done <- errRead.Error()
+		return
+	}
+	done <- string(data)
+}
+
+func waitForAdhocDone(t *testing.T, st *adhocPromptState) {
+	t.Helper()
+	st.mu.Lock()
+	done := st.done
+	st.mu.Unlock()
+	if done == nil {
+		return
+	}
+	<-done
 }
