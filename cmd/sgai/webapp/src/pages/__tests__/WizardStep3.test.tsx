@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Link } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { ApiComposeDraftRequest } from "@/types";
@@ -85,14 +84,6 @@ const { WizardFinish } = await import("../WizardFinish");
 
 const hookOrderErrorPattern = /change in the order of Hooks|Rendered more hooks|Rendered fewer hooks/i;
 
-function OpenDemoWorkspaceLink({ to }: { to: string }) {
-  return (
-    <Link to={to}>
-      Open demo workspace
-    </Link>
-  );
-}
-
 function renderStep3() {
   const router = createMemoryRouter([
     {
@@ -108,36 +99,17 @@ function renderStep3() {
   );
 }
 
-function renderStep3WithRouteToggle() {
+function renderWizardPageWithoutWorkspace(path: string, element: React.ReactNode) {
   const router = createMemoryRouter([
     {
-      path: "/compose/step/3",
-      element: (
-        <>
-          <WizardStep3 />
-          <OpenDemoWorkspaceLink to="/compose/step/3?workspace=demo" />
-        </>
-      ),
+      path: "/",
+      element: <h1>Dashboard</h1>,
     },
-  ], {
-    initialEntries: ["/compose/step/3"],
-  });
-
-  const view = render(
-    <RouterProvider router={router} />,
-  );
-
-  return { router, view };
-}
-
-function renderWizardPageWithRouteToggle(path: string, element: React.ReactNode) {
-  const router = createMemoryRouter([
     {
       path,
       element: (
         <TooltipProvider>
           {element}
-          <OpenDemoWorkspaceLink to={`${path}?workspace=demo`} />
         </TooltipProvider>
       ),
     },
@@ -150,6 +122,40 @@ function renderWizardPageWithRouteToggle(path: string, element: React.ReactNode)
   );
 
   return { router, view };
+}
+
+async function expectMissingWorkspaceNavigation(path: string, element: React.ReactNode) {
+  const consoleError = spyOn(console, "error").mockImplementation(() => {});
+
+  try {
+    const { view } = renderWizardPageWithoutWorkspace(path, element);
+    const user = userEvent.setup();
+
+    expect(screen.getByRole("alert")).not.toBeNull();
+    expect(screen.getByText("Workspace required")).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Back to Dashboard" }));
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    const hookOrderMessages: string[] = [];
+    for (const call of consoleError.mock.calls) {
+      for (const value of call) {
+        const message = String(value);
+        if (hookOrderErrorPattern.test(message)) {
+          hookOrderMessages.push(message);
+        }
+      }
+    }
+    expect(hookOrderMessages).toEqual([]);
+
+    view.unmount();
+  } finally {
+    consoleError.mockRestore();
+    cleanup();
+  }
 }
 
 function renderFinish() {
@@ -257,47 +263,23 @@ describe("WizardStep3 retrospective opt-in", () => {
     });
   });
 
-  it("keeps hook ordering stable when workspace query param appears after the missing workspace state", async () => {
-    const { router } = renderStep3WithRouteToggle();
-
-    expect(screen.getByText("Workspace required")).not.toBeNull();
-
-    await router.navigate("/compose/step/3?workspace=demo");
-
-    await waitForSettings();
-    expect(screen.getByRole("switch", { name: "Run a retrospective after completion" })).not.toBeNull();
-  });
-
-  it.each([
-    ["WizardStep1", "/compose/step/1", <WizardStep1 key="wizard-step-1" />, "Step 1: Project Description"],
-    ["WizardStep2", "/compose/step/2", <WizardStep2 key="wizard-step-2" />, "Step 2: Tech Stack"],
-    ["WizardStep3", "/compose/step/3", <WizardStep3 key="wizard-step-3" />, "Step 3: Settings"],
-    ["WizardFinish", "/compose/finish", <WizardFinish key="wizard-finish" />, "Review & Save"],
-  ])("keeps %s hook ordering stable after workspace query param appears", async (_name, path, element, heading) => {
-    const consoleError = spyOn(console, "error").mockImplementation(() => {});
-
-    try {
-      const { router } = renderWizardPageWithRouteToggle(path, element);
-
-      expect(screen.getByText("Workspace required")).not.toBeNull();
-
-      await router.navigate(`${path}?workspace=demo`);
-
-      await screen.findByRole("heading", { name: heading });
-
-      const hookOrderMessages: string[] = [];
-      for (const call of consoleError.mock.calls) {
-        for (const value of call) {
-          const message = String(value);
-          if (hookOrderErrorPattern.test(message)) {
-            hookOrderMessages.push(message);
-          }
-        }
-      }
-      expect(hookOrderMessages).toEqual([]);
-    } finally {
-      consoleError.mockRestore();
-    }
+  it("keeps wizard pages stable when users leave the missing-workspace state", async () => {
+    await expectMissingWorkspaceNavigation(
+      "/compose/step/1",
+      <WizardStep1 key="wizard-step-1" />,
+    );
+    await expectMissingWorkspaceNavigation(
+      "/compose/step/2",
+      <WizardStep2 key="wizard-step-2" />,
+    );
+    await expectMissingWorkspaceNavigation(
+      "/compose/step/3",
+      <WizardStep3 key="wizard-step-3" />,
+    );
+    await expectMissingWorkspaceNavigation(
+      "/compose/finish",
+      <WizardFinish key="wizard-finish" />,
+    );
   });
 
   it("saves the final GOAL.md with the current retrospective opt-in state", async () => {
