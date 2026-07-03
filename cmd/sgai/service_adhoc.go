@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,9 +62,9 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	prefix := fmt.Sprintf("[%s:%04d]", filepath.Base(workspacePath), 0)
 	stdoutPW := &prefixWriter{prefix: prefix + " ", w: os.Stdout}
 	stderrPW := &prefixWriter{prefix: prefix + " ", w: os.Stderr}
-	stdoutPassthrough := io.MultiWriter(stdoutPW, writer)
+	stdoutPassthrough := io.MultiWriter(&ansiStrippingWriter{w: stdoutPW}, writer)
 	cmd.Stdout = stdoutPassthrough
-	cmd.Stderr = io.MultiWriter(stderrPW, writer)
+	cmd.Stderr = io.MultiWriter(&ansiStrippingWriter{w: stderrPW}, writer)
 	commandLine := "$ opencode " + strings.Join(args, " ")
 	promptLine := "prompt: " + st.promptText
 	if _, errWriteCommand := fmt.Fprintln(stderrPW, commandLine); errWriteCommand != nil {
@@ -93,6 +94,12 @@ func (s *Server) adhocStartService(workspacePath, prompt, model string) adhocSta
 	go func() {
 		defer close(done)
 		errWait := cmd.Wait()
+		if errFlushStdout := stdoutPW.Flush(); errFlushStdout != nil {
+			log.Println("write failed:", errFlushStdout)
+		}
+		if errFlushStderr := stderrPW.Flush(); errFlushStderr != nil {
+			log.Println("write failed:", errFlushStderr)
+		}
 		st.mu.Lock()
 		if errWait != nil {
 			st.output.WriteString("\n[command exited with error: " + errWait.Error() + "]\n")
