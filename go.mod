@@ -8,7 +8,7 @@ require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/stretchr/testify v1.11.1
-	github.com/yuin/goldmark v1.8.2
+	github.com/yuin/goldmark v1.8.4
 	github.com/yuin/goldmark-emoji v1.0.6
 	modernc.org/sqlite v1.53.0
 	sigs.k8s.io/yaml v1.6.0
